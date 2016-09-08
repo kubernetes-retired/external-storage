@@ -40,3 +40,7 @@ flycheck_*.el
 
 # projectiles files
 .projectile
+
+# nfs binary
+nfs
+
