@@ -1,0 +1,7 @@
+kind: StorageClass
+apiVersion: extensions/v1beta1
+metadata:
+  name: matthew
+provisioner: matthew/nfs
+parameters:
+  type: matthew
