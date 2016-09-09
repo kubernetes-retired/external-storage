@@ -41,6 +41,6 @@ flycheck_*.el
 # projectiles files
 .projectile
 
-# nfs binary
-nfs
+# nfs-provisioner binary
+nfs-provisioner
 
