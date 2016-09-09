@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package record has all client logic for recording and reporting events.
-package record // import "k8s.io/client-go/1.4/tools/record"
+package record

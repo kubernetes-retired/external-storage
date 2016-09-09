@@ -16,7 +16,6 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
-	"math"
 	"net"
 	"net/http"
 	"sort"
@@ -149,28 +148,27 @@ type ClientConn struct {
 	readerDone chan struct{} // closed on error
 	readerErr  error         // set before readerDone is closed
 
-	mu              sync.Mutex // guards following
-	cond            *sync.Cond // hold mu; broadcast on flow/closed changes
-	flow            flow       // our conn-level flow control quota (cs.flow is per stream)
-	inflow          flow       // peer's conn-level flow control
-	closed          bool
-	wantSettingsAck bool                     // we sent a SETTINGS frame and haven't heard back
-	goAway          *GoAwayFrame             // if non-nil, the GoAwayFrame we received
-	goAwayDebug     string                   // goAway frame's debug data, retained as a string
-	streams         map[uint32]*clientStream // client-initiated
-	nextStreamID    uint32
-	bw              *bufio.Writer
-	br              *bufio.Reader
-	fr              *Framer
-	lastActive      time.Time
-	// Settings from peer: (also guarded by mu)
+	mu           sync.Mutex // guards following
+	cond         *sync.Cond // hold mu; broadcast on flow/closed changes
+	flow         flow       // our conn-level flow control quota (cs.flow is per stream)
+	inflow       flow       // peer's conn-level flow control
+	closed       bool
+	goAway       *GoAwayFrame             // if non-nil, the GoAwayFrame we received
+	goAwayDebug  string                   // goAway frame's debug data, retained as a string
+	streams      map[uint32]*clientStream // client-initiated
+	nextStreamID uint32
+	bw           *bufio.Writer
+	br           *bufio.Reader
+	fr           *Framer
+	lastActive   time.Time
+
+	// Settings from peer:
 	maxFrameSize         uint32
 	maxConcurrentStreams uint32
 	initialWindowSize    uint32
-
-	hbuf    bytes.Buffer // HPACK encoder writes into this
-	henc    *hpack.Encoder
-	freeBuf [][]byte
+	hbuf                 bytes.Buffer // HPACK encoder writes into this
+	henc                 *hpack.Encoder
+	freeBuf              [][]byte
 
 	wmu  sync.Mutex // held while writing; acquire AFTER mu if holding both
 	werr error      // first write error that has occurred
@@ -341,7 +339,7 @@ func shouldRetryRequest(req *http.Request, err error) bool {
 	return err == errClientConnUnusable
 }
 
-func (t *Transport) dialClientConn(addr string, singleUse bool) (*ClientConn, error) {
+func (t *Transport) dialClientConn(addr string) (*ClientConn, error) {
 	host, _, err := net.SplitHostPort(addr)
 	if err != nil {
 		return nil, err
@@ -350,7 +348,7 @@ func (t *Transport) dialClientConn(addr string, singleUse bool) (*ClientConn, er
 	if err != nil {
 		return nil, err
 	}
-	return t.newClientConn(tconn, singleUse)
+	return t.NewClientConn(tconn)
 }
 
 func (t *Transport) newTLSConfig(host string) *tls.Config {
@@ -411,10 +409,14 @@ func (t *Transport) expectContinueTimeout() time.Duration {
 }
 
 func (t *Transport) NewClientConn(c net.Conn) (*ClientConn, error) {
-	return t.newClientConn(c, false)
-}
+	if VerboseLogs {
+		t.vlogf("http2: Transport creating client conn to %v", c.RemoteAddr())
+	}
+	if _, err := c.Write(clientPreface); err != nil {
+		t.vlogf("client preface write error: %v", err)
+		return nil, err
+	}
 
-func (t *Transport) newClientConn(c net.Conn, singleUse bool) (*ClientConn, error) {
 	cc := &ClientConn{
 		t:                    t,
 		tconn:                c,
@@ -424,13 +426,7 @@ func (t *Transport) newClientConn(c net.Conn, singleUse bool) (*ClientConn, erro
 		initialWindowSize:    65535,    // spec default
 		maxConcurrentStreams: 1000,     // "infinite", per spec. 1000 seems good enough.
 		streams:              make(map[uint32]*clientStream),
-		singleUse:            singleUse,
-		wantSettingsAck:      true,
 	}
-	if VerboseLogs {
-		t.vlogf("http2: Transport creating client conn %p to %v", cc, c.RemoteAddr())
-	}
-
 	cc.cond = sync.NewCond(&cc.mu)
 	cc.flow.add(int32(initialWindowSize))
 
@@ -458,8 +454,6 @@ func (t *Transport) newClientConn(c net.Conn, singleUse bool) (*ClientConn, erro
 	if max := t.maxHeaderListSize(); max != 0 {
 		initialSettings = append(initialSettings, Setting{ID: SettingMaxHeaderListSize, Val: max})
 	}
-
-	cc.bw.Write(clientPreface)
 	cc.fr.WriteSettings(initialSettings...)
 	cc.fr.WriteWindowUpdate(0, transportDefaultConnFlow)
 	cc.inflow.add(transportDefaultConnFlow + initialWindowSize)
@@ -467,6 +461,33 @@ func (t *Transport) newClientConn(c net.Conn, singleUse bool) (*ClientConn, erro
 	if cc.werr != nil {
 		return nil, cc.werr
 	}
+
+	// Read the obligatory SETTINGS frame
+	f, err := cc.fr.ReadFrame()
+	if err != nil {
+		return nil, err
+	}
+	sf, ok := f.(*SettingsFrame)
+	if !ok {
+		return nil, fmt.Errorf("expected settings frame, got: %T", f)
+	}
+	cc.fr.WriteSettingsAck()
+	cc.bw.Flush()
+
+	sf.ForeachSetting(func(s Setting) error {
+		switch s.ID {
+		case SettingMaxFrameSize:
+			cc.maxFrameSize = s.Val
+		case SettingMaxConcurrentStreams:
+			cc.maxConcurrentStreams = s.Val
+		case SettingInitialWindowSize:
+			cc.initialWindowSize = s.Val
+		default:
+			// TODO(bradfitz): handle more; at least SETTINGS_HEADER_TABLE_SIZE?
+			t.vlogf("Unhandled Setting: %v", s)
+		}
+		return nil
+	})
 
 	go cc.readLoop()
 	return cc, nil
@@ -500,7 +521,7 @@ func (cc *ClientConn) canTakeNewRequestLocked() bool {
 	}
 	return cc.goAway == nil && !cc.closed &&
 		int64(len(cc.streams)+1) < int64(cc.maxConcurrentStreams) &&
-		cc.nextStreamID < math.MaxInt32
+		cc.nextStreamID < 2147483647
 }
 
 func (cc *ClientConn) closeIfIdle() {
@@ -510,13 +531,9 @@ func (cc *ClientConn) closeIfIdle() {
 		return
 	}
 	cc.closed = true
-	nextID := cc.nextStreamID
 	// TODO: do clients send GOAWAY too? maybe? Just Close:
 	cc.mu.Unlock()
 
-	if VerboseLogs {
-		cc.vlogf("http2: Transport closing idle conn %p (forSingleUse=%v, maxStream=%v)", cc, cc.singleUse, nextID-2)
-	}
 	cc.tconn.Close()
 }
 
@@ -622,18 +639,15 @@ func bodyAndLength(req *http.Request) (body io.Reader, contentLen int64) {
 	// We have a body but a zero content length. Test to see if
 	// it's actually zero or just unset.
 	var buf [1]byte
-	n, rerr := body.Read(buf[:])
+	n, rerr := io.ReadFull(body, buf[:])
 	if rerr != nil && rerr != io.EOF {
 		return errorReader{rerr}, -1
 	}
 	if n == 1 {
 		// Oh, guess there is data in this Body Reader after all.
 		// The ContentLength field just wasn't set.
-		// Stitch the Body back together again, re-attaching our
+		// Stich the Body back together again, re-attaching our
 		// consumed byte.
-		if rerr == io.EOF {
-			return bytes.NewReader(buf[:]), 1
-		}
 		return io.MultiReader(bytes.NewReader(buf[:]), body), -1
 	}
 	// Body is actually zero bytes.
@@ -733,34 +747,30 @@ func (cc *ClientConn) RoundTrip(req *http.Request) (*http.Response, error) {
 	bodyWritten := false
 	ctx := reqContext(req)
 
-	handleReadLoopResponse := func(re resAndError) (*http.Response, error) {
-		res := re.res
-		if re.err != nil || res.StatusCode > 299 {
-			// On error or status code 3xx, 4xx, 5xx, etc abort any
-			// ongoing write, assuming that the server doesn't care
-			// about our request body. If the server replied with 1xx or
-			// 2xx, however, then assume the server DOES potentially
-			// want our body (e.g. full-duplex streaming:
-			// golang.org/issue/13444). If it turns out the server
-			// doesn't, they'll RST_STREAM us soon enough.  This is a
-			// heuristic to avoid adding knobs to Transport.  Hopefully
-			// we can keep it.
-			bodyWriter.cancel()
-			cs.abortRequestBodyWrite(errStopReqBodyWrite)
-		}
-		if re.err != nil {
-			cc.forgetStreamID(cs.ID)
-			return nil, re.err
-		}
-		res.Request = req
-		res.TLS = cc.tlsState
-		return res, nil
-	}
-
 	for {
 		select {
 		case re := <-readLoopResCh:
-			return handleReadLoopResponse(re)
+			res := re.res
+			if re.err != nil || res.StatusCode > 299 {
+				// On error or status code 3xx, 4xx, 5xx, etc abort any
+				// ongoing write, assuming that the server doesn't care
+				// about our request body. If the server replied with 1xx or
+				// 2xx, however, then assume the server DOES potentially
+				// want our body (e.g. full-duplex streaming:
+				// golang.org/issue/13444). If it turns out the server
+				// doesn't, they'll RST_STREAM us soon enough.  This is a
+				// heuristic to avoid adding knobs to Transport.  Hopefully
+				// we can keep it.
+				bodyWriter.cancel()
+				cs.abortRequestBodyWrite(errStopReqBodyWrite)
+			}
+			if re.err != nil {
+				cc.forgetStreamID(cs.ID)
+				return nil, re.err
+			}
+			res.Request = req
+			res.TLS = cc.tlsState
+			return res, nil
 		case <-respHeaderTimer:
 			cc.forgetStreamID(cs.ID)
 			if !hasBody || bodyWritten {
@@ -794,12 +804,6 @@ func (cc *ClientConn) RoundTrip(req *http.Request) (*http.Response, error) {
 			// forgetStreamID.
 			return nil, cs.resetErr
 		case err := <-bodyWriter.resc:
-			// Prefer the read loop's response, if available. Issue 16102.
-			select {
-			case re := <-readLoopResCh:
-				return handleReadLoopResponse(re)
-			default:
-			}
 			if err != nil {
 				return nil, err
 			}
@@ -904,11 +908,10 @@ func (cs *clientStream) writeRequestBody(body io.Reader, bodyCloser io.Closer) (
 			err = cc.fr.WriteData(cs.ID, sentEnd, data)
 			if err == nil {
 				// TODO(bradfitz): this flush is for latency, not bandwidth.
-				// Most requests won't need this. Make this opt-in or
-				// opt-out?  Use some heuristic on the body type? Nagel-like
-				// timers?  Based on 'n'? Only last chunk of this for loop,
-				// unless flow control tokens are low? For now, always.
-				// If we change this, see comment below.
+				// Most requests won't need this. Make this opt-in or opt-out?
+				// Use some heuristic on the body type? Nagel-like timers?
+				// Based on 'n'? Only last chunk of this for loop, unless flow control
+				// tokens are low? For now, always:
 				err = cc.bw.Flush()
 			}
 			cc.wmu.Unlock()
@@ -918,33 +921,28 @@ func (cs *clientStream) writeRequestBody(body io.Reader, bodyCloser io.Closer) (
 		}
 	}
 
-	if sentEnd {
-		// Already sent END_STREAM (which implies we have no
-		// trailers) and flushed, because currently all
-		// WriteData frames above get a flush. So we're done.
-		return nil
-	}
-
-	var trls []byte
-	if hasTrailers {
-		cc.mu.Lock()
-		defer cc.mu.Unlock()
-		trls = cc.encodeTrailers(req)
-	}
-
 	cc.wmu.Lock()
-	defer cc.wmu.Unlock()
+	if !sentEnd {
+		var trls []byte
+		if hasTrailers {
+			cc.mu.Lock()
+			trls = cc.encodeTrailers(req)
+			cc.mu.Unlock()
+		}
 
-	// Two ways to send END_STREAM: either with trailers, or
-	// with an empty DATA frame.
-	if len(trls) > 0 {
-		err = cc.writeHeaders(cs.ID, true, trls)
-	} else {
-		err = cc.fr.WriteData(cs.ID, true, nil)
+		// Avoid forgetting to send an END_STREAM if the encoded
+		// trailers are 0 bytes. Both results produce and END_STREAM.
+		if len(trls) > 0 {
+			err = cc.writeHeaders(cs.ID, true, trls)
+		} else {
+			err = cc.fr.WriteData(cs.ID, true, nil)
+		}
 	}
 	if ferr := cc.bw.Flush(); ferr != nil && err == nil {
 		err = ferr
 	}
+	cc.wmu.Unlock()
+
 	return err
 }
 
@@ -998,22 +996,6 @@ func (cc *ClientConn) encodeHeaders(req *http.Request, addGzipHeader bool, trail
 		host = req.URL.Host
 	}
 
-	var path string
-	if req.Method != "CONNECT" {
-		path = req.URL.RequestURI()
-		if !validPseudoPath(path) {
-			orig := path
-			path = strings.TrimPrefix(path, req.URL.Scheme+"://"+host)
-			if !validPseudoPath(path) {
-				if req.URL.Opaque != "" {
-					return nil, fmt.Errorf("invalid request :path %q from URL.Opaque = %q", orig, req.URL.Opaque)
-				} else {
-					return nil, fmt.Errorf("invalid request :path %q", orig)
-				}
-			}
-		}
-	}
-
 	// Check for any invalid headers and return an error before we
 	// potentially pollute our hpack state. (We want to be able to
 	// continue to reuse the hpack encoder for future requests)
@@ -1036,7 +1018,7 @@ func (cc *ClientConn) encodeHeaders(req *http.Request, addGzipHeader bool, trail
 	cc.writeHeader(":authority", host)
 	cc.writeHeader(":method", req.Method)
 	if req.Method != "CONNECT" {
-		cc.writeHeader(":path", path)
+		cc.writeHeader(":path", req.URL.RequestURI())
 		cc.writeHeader(":scheme", "https")
 	}
 	if trailers != "" {
@@ -1206,14 +1188,6 @@ func (e GoAwayError) Error() string {
 		e.LastStreamID, e.ErrCode, e.DebugData)
 }
 
-func isEOFOrNetReadError(err error) bool {
-	if err == io.EOF {
-		return true
-	}
-	ne, ok := err.(*net.OpError)
-	return ok && ne.Op == "read"
-}
-
 func (rl *clientConnReadLoop) cleanup() {
 	cc := rl.cc
 	defer cc.tconn.Close()
@@ -1225,14 +1199,16 @@ func (rl *clientConnReadLoop) cleanup() {
 	// gotten a response yet.
 	err := cc.readerErr
 	cc.mu.Lock()
-	if cc.goAway != nil && isEOFOrNetReadError(err) {
-		err = GoAwayError{
-			LastStreamID: cc.goAway.LastStreamID,
-			ErrCode:      cc.goAway.ErrCode,
-			DebugData:    cc.goAwayDebug,
+	if err == io.EOF {
+		if cc.goAway != nil {
+			err = GoAwayError{
+				LastStreamID: cc.goAway.LastStreamID,
+				ErrCode:      cc.goAway.ErrCode,
+				DebugData:    cc.goAwayDebug,
+			}
+		} else {
+			err = io.ErrUnexpectedEOF
 		}
-	} else if err == io.EOF {
-		err = io.ErrUnexpectedEOF
 	}
 	for _, cs := range rl.activeRes {
 		cs.bufPipe.CloseWithError(err)
@@ -1252,20 +1228,15 @@ func (rl *clientConnReadLoop) cleanup() {
 func (rl *clientConnReadLoop) run() error {
 	cc := rl.cc
 	rl.closeWhenIdle = cc.t.disableKeepAlives() || cc.singleUse
-	gotReply := false // ever saw a HEADERS reply
-	gotSettings := false
+	gotReply := false // ever saw a reply
 	for {
 		f, err := cc.fr.ReadFrame()
 		if err != nil {
-			cc.vlogf("http2: Transport readFrame error on conn %p: (%T) %v", cc, err, err)
+			cc.vlogf("Transport readFrame error: (%T) %v", err, err)
 		}
 		if se, ok := err.(StreamError); ok {
 			if cs := cc.streamByID(se.StreamID, true /*ended; remove it*/); cs != nil {
-				cs.cc.writeStreamReset(cs.ID, se.Code, err)
-				if se.Cause == nil {
-					se.Cause = cc.fr.errDetail
-				}
-				rl.endStreamError(cs, se)
+				rl.endStreamError(cs, cc.fr.errDetail)
 			}
 			continue
 		} else if err != nil {
@@ -1273,13 +1244,6 @@ func (rl *clientConnReadLoop) run() error {
 		}
 		if VerboseLogs {
 			cc.vlogf("http2: Transport received %s", summarizeFrame(f))
-		}
-		if !gotSettings {
-			if _, ok := f.(*SettingsFrame); !ok {
-				cc.logf("protocol error: received %T before a SETTINGS frame", f)
-				return ConnectionError(ErrCodeProtocol)
-			}
-			gotSettings = true
 		}
 		maybeIdle := false // whether frame might transition us to idle
 
@@ -1309,9 +1273,6 @@ func (rl *clientConnReadLoop) run() error {
 			cc.logf("Transport: unhandled response frame type %T", f)
 		}
 		if err != nil {
-			if VerboseLogs {
-				cc.vlogf("http2: Transport conn %p received error from processing frame %v: %v", cc, summarizeFrame(f), err)
-			}
 			return err
 		}
 		if rl.closeWhenIdle && gotReply && maybeIdle && len(rl.activeRes) == 0 {
@@ -1561,27 +1522,10 @@ var errClosedResponseBody = errors.New("http2: response body closed")
 
 func (b transportResponseBody) Close() error {
 	cs := b.cs
-	cc := cs.cc
-
-	serverSentStreamEnd := cs.bufPipe.Err() == io.EOF
-	unread := cs.bufPipe.Len()
-
-	if unread > 0 || !serverSentStreamEnd {
-		cc.mu.Lock()
-		cc.wmu.Lock()
-		if !serverSentStreamEnd {
-			cc.fr.WriteRSTStream(cs.ID, ErrCodeCancel)
-		}
-		// Return connection-level flow control.
-		if unread > 0 {
-			cc.inflow.add(int32(unread))
-			cc.fr.WriteWindowUpdate(0, uint32(unread))
-		}
-		cc.bw.Flush()
-		cc.wmu.Unlock()
-		cc.mu.Unlock()
+	if cs.bufPipe.Err() != io.EOF {
+		// TODO: write test for this
+		cs.cc.writeStreamReset(cs.ID, ErrCodeCancel, nil)
 	}
-
 	cs.bufPipe.BreakWithError(errClosedResponseBody)
 	return nil
 }
@@ -1589,7 +1533,6 @@ func (b transportResponseBody) Close() error {
 func (rl *clientConnReadLoop) processData(f *DataFrame) error {
 	cc := rl.cc
 	cs := cc.streamByID(f.StreamID, f.StreamEnded())
-	data := f.Data()
 	if cs == nil {
 		cc.mu.Lock()
 		neverSent := cc.nextStreamID
@@ -1603,22 +1546,10 @@ func (rl *clientConnReadLoop) processData(f *DataFrame) error {
 		// TODO: be stricter here? only silently ignore things which
 		// we canceled, but not things which were closed normally
 		// by the peer? Tough without accumulating too much state.
-
-		// But at least return their flow control:
-		if f.Length > 0 {
-			cc.mu.Lock()
-			cc.inflow.add(int32(f.Length))
-			cc.mu.Unlock()
-
-			cc.wmu.Lock()
-			cc.fr.WriteWindowUpdate(0, uint32(f.Length))
-			cc.bw.Flush()
-			cc.wmu.Unlock()
-		}
 		return nil
 	}
-	if f.Length > 0 {
-		if len(data) > 0 && cs.bufPipe.b == nil {
+	if data := f.Data(); len(data) > 0 {
+		if cs.bufPipe.b == nil {
 			// Data frame after it's already closed?
 			cc.logf("http2: Transport received DATA frame for closed stream; closing connection")
 			return ConnectionError(ErrCodeProtocol)
@@ -1626,30 +1557,17 @@ func (rl *clientConnReadLoop) processData(f *DataFrame) error {
 
 		// Check connection-level flow control.
 		cc.mu.Lock()
-		if cs.inflow.available() >= int32(f.Length) {
-			cs.inflow.take(int32(f.Length))
+		if cs.inflow.available() >= int32(len(data)) {
+			cs.inflow.take(int32(len(data)))
 		} else {
 			cc.mu.Unlock()
 			return ConnectionError(ErrCodeFlowControl)
 		}
-		// Return any padded flow control now, since we won't
-		// refund it later on body reads.
-		if pad := int32(f.Length) - int32(len(data)); pad > 0 {
-			cs.inflow.add(pad)
-			cc.inflow.add(pad)
-			cc.wmu.Lock()
-			cc.fr.WriteWindowUpdate(0, uint32(pad))
-			cc.fr.WriteWindowUpdate(cs.ID, uint32(pad))
-			cc.bw.Flush()
-			cc.wmu.Unlock()
-		}
 		cc.mu.Unlock()
 
-		if len(data) > 0 {
-			if _, err := cs.bufPipe.Write(data); err != nil {
-				rl.endStreamError(cs, err)
-				return err
-			}
+		if _, err := cs.bufPipe.Write(data); err != nil {
+			rl.endStreamError(cs, err)
+			return err
 		}
 	}
 
@@ -1675,13 +1593,8 @@ func (rl *clientConnReadLoop) endStreamError(cs *clientStream, err error) {
 	}
 	cs.bufPipe.closeWithErrorAndCode(err, code)
 	delete(rl.activeRes, cs.ID)
-	if isConnectionCloseRequest(cs.req) {
+	if cs.req.Close || cs.req.Header.Get("Connection") == "close" {
 		rl.closeWhenIdle = true
-	}
-
-	select {
-	case cs.resc <- resAndError{err: err}:
-	default:
 	}
 }
 
@@ -1710,39 +1623,18 @@ func (rl *clientConnReadLoop) processSettings(f *SettingsFrame) error {
 	cc := rl.cc
 	cc.mu.Lock()
 	defer cc.mu.Unlock()
-
-	if f.IsAck() {
-		if cc.wantSettingsAck {
-			cc.wantSettingsAck = false
-			return nil
-		}
-		return ConnectionError(ErrCodeProtocol)
-	}
-
-	err := f.ForeachSetting(func(s Setting) error {
+	return f.ForeachSetting(func(s Setting) error {
 		switch s.ID {
 		case SettingMaxFrameSize:
 			cc.maxFrameSize = s.Val
 		case SettingMaxConcurrentStreams:
 			cc.maxConcurrentStreams = s.Val
 		case SettingInitialWindowSize:
-			// Values above the maximum flow-control
-			// window size of 2^31-1 MUST be treated as a
-			// connection error (Section 5.4.1) of type
-			// FLOW_CONTROL_ERROR.
-			if s.Val > math.MaxInt32 {
-				return ConnectionError(ErrCodeFlowControl)
-			}
+			// TODO: error if this is too large.
 
-			// Adjust flow control of currently-open
+			// TODO: adjust flow control of still-open
 			// frames by the difference of the old initial
 			// window size and this one.
-			delta := int32(s.Val) - int32(cc.initialWindowSize)
-			for _, cs := range cc.streams {
-				cs.flow.add(delta)
-			}
-			cc.cond.Broadcast()
-
 			cc.initialWindowSize = s.Val
 		default:
 			// TODO(bradfitz): handle more settings? SETTINGS_HEADER_TABLE_SIZE probably.
@@ -1750,16 +1642,6 @@ func (rl *clientConnReadLoop) processSettings(f *SettingsFrame) error {
 		}
 		return nil
 	})
-	if err != nil {
-		return err
-	}
-
-	cc.wmu.Lock()
-	defer cc.wmu.Unlock()
-
-	cc.fr.WriteSettingsAck()
-	cc.bw.Flush()
-	return cc.werr
 }
 
 func (rl *clientConnReadLoop) processWindowUpdate(f *WindowUpdateFrame) error {
@@ -1796,7 +1678,7 @@ func (rl *clientConnReadLoop) processResetStream(f *RSTStreamFrame) error {
 		// which closes this, so there
 		// isn't a race.
 	default:
-		err := streamError(cs.ID, f.ErrCode)
+		err := StreamError{cs.ID, f.ErrCode}
 		cs.resetErr = err
 		close(cs.peerReset)
 		cs.bufPipe.CloseWithError(err)
@@ -1833,10 +1715,8 @@ func (rl *clientConnReadLoop) processPushPromise(f *PushPromiseFrame) error {
 }
 
 func (cc *ClientConn) writeStreamReset(streamID uint32, code ErrCode, err error) {
-	// TODO: map err to more interesting error codes, once the
-	// HTTP community comes up with some. But currently for
-	// RST_STREAM there's no equivalent to GOAWAY frame's debug
-	// data, and the error codes are all pretty vague ("cancel").
+	// TODO: do something with err? send it as a debug frame to the peer?
+	// But that's only in GOAWAY. Invent a new frame type? Is there one already?
 	cc.wmu.Lock()
 	cc.fr.WriteRSTStream(streamID, code)
 	cc.bw.Flush()
@@ -1985,10 +1865,4 @@ func (s bodyWriterState) scheduleBodyWrite() {
 	if s.timer.Stop() {
 		s.timer.Reset(s.delay)
 	}
-}
-
-// isConnectionCloseRequest reports whether req should use its own
-// connection for a single request and then close the connection.
-func isConnectionCloseRequest(req *http.Request) bool {
-	return req.Close || httplex.HeaderValuesContainsToken(req.Header["Connection"], "close")
 }

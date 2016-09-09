@@ -9,8 +9,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/wongma7/nfs-provisioner/framework"
 
-	"k8s.io/kubernetes/pkg/util/goroutinemap"
-
 	"k8s.io/client-go/1.4/kubernetes"
 	"k8s.io/client-go/1.4/pkg/api"
 	"k8s.io/client-go/1.4/pkg/api/resource"
@@ -21,6 +19,8 @@ import (
 	"k8s.io/client-go/1.4/pkg/watch"
 	"k8s.io/client-go/1.4/tools/cache"
 	"k8s.io/client-go/1.4/tools/record"
+
+	"k8s.io/kubernetes/pkg/util/goroutinemap"
 )
 
 // annClass annotation represents the storage class associated with a resource:
