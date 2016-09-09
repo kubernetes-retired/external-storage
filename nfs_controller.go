@@ -73,7 +73,14 @@ func newNfsController(
 ) *nfsController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(&EventSinkImpl{Interface: client.Core().Events(v1.NamespaceAll)})
-	eventRecorder := broadcaster.NewRecorder(v1.EventSource{Component: "nfs-provisioner-controller"})
+	var eventRecorder record.EventRecorder
+	out, err := exec.Command("hostname").Output()
+	if err != nil {
+		glog.Errorf("Error getting hostname for specifying it as source of events: %v", err)
+		eventRecorder = broadcaster.NewRecorder(v1.EventSource{Component: fmt.Sprintf("nfs-provisioner-%s", string(out))})
+	} else {
+		eventRecorder = broadcaster.NewRecorder(v1.EventSource{Component: "nfs-provisioner"})
+	}
 
 	controller := &nfsController{
 		client:        client,
@@ -152,7 +159,6 @@ func (ctrl *nfsController) updateVolume(oldObj, newObj interface{}) {
 }
 
 func (ctrl *nfsController) addClaim(obj interface{}) {
-	// check already provisoined somewhere.
 	glog.Error("addClaim!")
 	claim, ok := obj.(*v1.PersistentVolumeClaim)
 	if !ok {
@@ -325,7 +331,7 @@ type VolumeOptions struct {
 }
 
 func (ctrl *nfsController) provision(options VolumeOptions) (*v1.PersistentVolume, error) {
-	server, path, sizeGB, err := ctrl.createVolume(options.Capacity, options.PVName)
+	server, path, err := ctrl.createVolume(options.PVName)
 	if err != nil {
 		return nil, err
 	}
@@ -341,7 +347,7 @@ func (ctrl *nfsController) provision(options VolumeOptions) (*v1.PersistentVolum
 			PersistentVolumeReclaimPolicy: options.PersistentVolumeReclaimPolicy,
 			AccessModes:                   options.AccessModes,
 			Capacity: v1.ResourceList{
-				v1.ResourceName(v1.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
+				v1.ResourceName(v1.ResourceStorage): options.Capacity,
 			},
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				NFS: &v1.NFSVolumeSource{
@@ -356,31 +362,31 @@ func (ctrl *nfsController) provision(options VolumeOptions) (*v1.PersistentVolum
 	return pv, nil
 }
 
-func (ctrl *nfsController) createVolume(capacity resource.Quantity, PVName string) (string, string, int, error) {
+func (ctrl *nfsController) createVolume(PVName string) (string, string, error) {
 	path := fmt.Sprintf("/exports/%s", PVName)
 
 	if err := os.MkdirAll(path, 0750); err != nil {
-		return "", "", 0, err
+		return "", "", err
 	}
 	f, err := os.OpenFile("/etc/exports", os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
-		return "", "", 0, err
+		os.RemoveAll(path)
+		return "", "", err
 	}
 	defer f.Close()
-
-	// fsid=0: needed for NFSv4
 	if _, err = f.WriteString(path + "*(rw,fsid=0,insecure,no_root_squash)"); err != nil {
-		return "", "", 0, err
+		os.RemoveAll(path)
+		return "", "", err
 	}
 
 	out, err := exec.Command("hostname", "-i").Output()
 	if err != nil {
-		return "", "", 0, err
+		os.RemoveAll(path)
+		return "", "", err
 	}
 	server := string(out)
 
-	// capacity is 1 Pi??
-	return server, path, int(capacity.Value()), nil
+	return server, path, nil
 }
 
 func (ctrl *nfsController) deleteVolume(volume *v1.PersistentVolume) error {
@@ -391,6 +397,13 @@ func (ctrl *nfsController) deleteVolume(volume *v1.PersistentVolume) error {
 	}
 	if volume.Spec.NFS == nil {
 		return fmt.Errorf("volume.spec.NFS is nil")
+	}
+	path := fmt.Sprintf("/exports/%s", volume.ObjectMeta.Name)
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return fmt.Errorf("deleteVolume received a volume whose path doesn't exist to delete")
+	}
+	if err := os.RemoveAll(path); err != nil {
+		return fmt.Errorf("Error deleting volume by removing its path")
 	}
 
 	return nil
