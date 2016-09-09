@@ -6,3 +6,6 @@ spec:
   containers:
   - name: provisioner
     image: wongma7/nfs-provisioner:0.1
+    securityContext:
+      privileged: true
+
