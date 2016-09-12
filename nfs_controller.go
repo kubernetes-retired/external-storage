@@ -412,25 +412,14 @@ func (ctrl *nfsController) provision(options VolumeOptions) (*v1.PersistentVolum
 
 func (ctrl *nfsController) createVolume(PVName string) (string, string, error) {
 	path := fmt.Sprintf("/exports/%s", PVName)
-
 	if err := os.MkdirAll(path, 0750); err != nil {
 		return "", "", err
 	}
-	f, err := os.OpenFile("/etc/exports", os.O_APPEND|os.O_WRONLY, 0600)
-	if err != nil {
-		os.RemoveAll(path)
-		return "", "", err
-	}
-	defer f.Close()
-	if _, err = f.WriteString(path + " *(rw,fsid=0,insecure,no_root_squash)\n"); err != nil {
-		os.RemoveAll(path)
-		return "", "", err
-	}
-	cmd := exec.Command("exportfs", "-r")
+	cmd := exec.Command("exportfs", "-o", "rw,fsid=0,insecure,no_root_squash", "*:"+path)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		os.RemoveAll(path)
-		return "", "", err
+		return "", "", fmt.Errorf("Export failed with error: %v, output: %v", err, out)
 	}
 
 	out, err = exec.Command("hostname", "-i").Output()
@@ -482,6 +471,12 @@ func (ctrl *nfsController) delete(volume *v1.PersistentVolume) error {
 	path := fmt.Sprintf("/exports/%s", volume.ObjectMeta.Name)
 	if err := os.RemoveAll(path); err != nil {
 		return fmt.Errorf("Error deleting volume by removing its path")
+	}
+
+	cmd := exec.Command("exportfs", "-u", "*:"+path)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("Unexport failed with error: %v, output: %v", err, out)
 	}
 
 	return nil
