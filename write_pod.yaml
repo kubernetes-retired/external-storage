@@ -14,8 +14,6 @@ spec:
     volumeMounts:
       - name: nfs-pvc
         mountPath: "/mnt"
-    securityContext:
-      privileged: true
   volumes:
     - name: nfs-pvc
       persistentVolumeClaim:

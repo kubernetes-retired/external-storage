@@ -159,7 +159,6 @@ func newNfsController(
 }
 
 func (ctrl *nfsController) updateVolume(oldObj, newObj interface{}) {
-	glog.Error("updateVolume!")
 	volume, ok := newObj.(*v1.PersistentVolume)
 	if !ok {
 		glog.Errorf("Expected PersistentVolume but handler received %#v", newObj)
@@ -177,7 +176,6 @@ func (ctrl *nfsController) updateVolume(oldObj, newObj interface{}) {
 }
 
 func (ctrl *nfsController) addClaim(obj interface{}) {
-	glog.Error("addClaim!")
 	claim, ok := obj.(*v1.PersistentVolumeClaim)
 	if !ok {
 		glog.Errorf("Expected PersistentVolumeClaim but addClaim received %+v", obj)
@@ -195,7 +193,6 @@ func (ctrl *nfsController) addClaim(obj interface{}) {
 }
 
 func (ctrl *nfsController) updateClaim(oldObj, newObj interface{}) {
-	glog.Error("updateClaim!")
 	ctrl.addClaim(newObj)
 }
 
@@ -415,7 +412,7 @@ func (ctrl *nfsController) createVolume(PVName string) (string, string, error) {
 	if err := os.MkdirAll(path, 0750); err != nil {
 		return "", "", err
 	}
-	cmd := exec.Command("exportfs", "-o", "rw,fsid=0,insecure,no_root_squash", "*:"+path)
+	cmd := exec.Command("exportfs", "-o", "rw,insecure,no_root_squash", "*:"+path)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		os.RemoveAll(path)
