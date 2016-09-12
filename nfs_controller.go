@@ -13,8 +13,8 @@ import (
 	"k8s.io/client-go/1.4/pkg/api"
 	"k8s.io/client-go/1.4/pkg/api/resource"
 	"k8s.io/client-go/1.4/pkg/api/v1"
-	"k8s.io/client-go/1.4/pkg/apis/extensions"
-	"k8s.io/client-go/1.4/pkg/apis/extensions/v1beta1"
+	"k8s.io/client-go/1.4/pkg/apis/storage"
+	"k8s.io/client-go/1.4/pkg/apis/storage/v1beta1"
 	"k8s.io/client-go/1.4/pkg/runtime"
 	"k8s.io/client-go/1.4/pkg/watch"
 	"k8s.io/client-go/1.4/tools/cache"
@@ -96,6 +96,7 @@ func newNfsController(
 	controller := &nfsController{
 		client:                        client,
 		eventRecorder:                 eventRecorder,
+		runningOperations:             goroutinemap.NewGoRoutineMap(false /* exponentialBackOffOnError */),
 		createProvisionedPVRetryCount: createProvisionedPVRetryCount,
 		createProvisionedPVInterval:   createProvisionedPVInterval,
 	}
@@ -140,16 +141,16 @@ func newNfsController(
 
 	controller.classSource = &cache.ListWatch{
 		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-			return client.Extensions().StorageClasses().List(options)
+			return client.Storage().StorageClasses().List(options)
 		},
 		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-			return client.Extensions().StorageClasses().Watch(options)
+			return client.Storage().StorageClasses().Watch(options)
 		},
 	}
 	controller.classes = cache.NewStore(framework.DeletionHandlingMetaNamespaceKeyFunc)
 	controller.classReflector = cache.NewReflector(
 		controller.classSource,
-		&extensions.StorageClass{},
+		&storage.StorageClass{},
 		controller.classes,
 		resyncPeriod,
 	)
@@ -166,31 +167,13 @@ func (ctrl *nfsController) updateVolume(oldObj, newObj interface{}) {
 	}
 
 	if ctrl.shouldDelete(volume) {
+		glog.Error("DELETE!")
 		opName := fmt.Sprintf("delete-%s[%s]", volume.Name, string(volume.UID))
 		ctrl.scheduleOperation(opName, func() error {
 			ctrl.deleteVolumeOperation(volume)
 			return nil
 		})
 	}
-}
-
-func (ctrl *nfsController) shouldDelete(volume *v1.PersistentVolume) bool {
-	if volume.Status.Phase != v1.VolumeReleased || volume.Status.Phase != v1.VolumeFailed {
-		return false
-	}
-
-	if hasAnnotation(volume.ObjectMeta, annDynamicallyProvisioned) {
-		if ann := volume.Annotations[annDynamicallyProvisioned]; ann != provisionerName {
-			return false
-		}
-	}
-
-	path := fmt.Sprintf("/exports/%s", volume.ObjectMeta.Name)
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return false
-	}
-
-	return true
 }
 
 func (ctrl *nfsController) addClaim(obj interface{}) {
@@ -216,6 +199,25 @@ func (ctrl *nfsController) updateClaim(oldObj, newObj interface{}) {
 	ctrl.addClaim(newObj)
 }
 
+func (ctrl *nfsController) shouldDelete(volume *v1.PersistentVolume) bool {
+	if volume.Status.Phase != v1.VolumeReleased && volume.Status.Phase != v1.VolumeFailed {
+		return false
+	}
+
+	if hasAnnotation(volume.ObjectMeta, annDynamicallyProvisioned) {
+		if ann := volume.Annotations[annDynamicallyProvisioned]; ann != provisionerName {
+			return false
+		}
+	}
+
+	path := fmt.Sprintf("/exports/%s", volume.ObjectMeta.Name)
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return false
+	}
+
+	return true
+}
+
 func (ctrl *nfsController) shouldProvision(claim *v1.PersistentVolumeClaim) bool {
 	// We can do this instead of class.Provisioner != provisionerName below later
 	// then we can remove all code below volumename check
@@ -235,6 +237,7 @@ func (ctrl *nfsController) shouldProvision(claim *v1.PersistentVolumeClaim) bool
 	}
 	if !found {
 		glog.Errorf("StorageClass %q not found", claimClass)
+		glog.Errorf("%v", ctrl.classes.List())
 		return false
 	}
 	class, ok := classObj.(*v1beta1.StorageClass)
@@ -419,12 +422,18 @@ func (ctrl *nfsController) createVolume(PVName string) (string, string, error) {
 		return "", "", err
 	}
 	defer f.Close()
-	if _, err = f.WriteString(path + "*(rw,fsid=0,insecure,no_root_squash)"); err != nil {
+	if _, err = f.WriteString(path + " *(rw,fsid=0,insecure,no_root_squash)\n"); err != nil {
+		os.RemoveAll(path)
+		return "", "", err
+	}
+	cmd := exec.Command("exportfs", "-r")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
 		os.RemoveAll(path)
 		return "", "", err
 	}
 
-	out, err := exec.Command("hostname", "-i").Output()
+	out, err = exec.Command("hostname", "-i").Output()
 	if err != nil {
 		os.RemoveAll(path)
 		return "", "", err
