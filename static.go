@@ -44,16 +44,14 @@ func provisionStatic(client kubernetes.Interface, exportsFile string) error {
 		for i := 0; i < createProvisionedPVRetryCount; i++ {
 			if _, err = client.Core().PersistentVolumes().Create(volume); err == nil {
 				// Save succeeded.
-				glog.V(3).Infof("volume %q saved", volume.Name)
+				glog.Infof("volume %q saved", volume.Name)
 				break
 			}
 			// Save failed, try again after a while.
-			glog.Errorf("failed to save volume %q: %v", volume.Name, err)
+			glog.Infof("failed to save volume %q: %v", volume.Name, err)
 			time.Sleep(createProvisionedPVInterval)
 		}
-		// if err != nil {}
-		// Save failed. Now we have a storage asset outside of Kubernetes,
-		// ....
+		glog.Errorf("failed to save volume %q after %v retries, it is still being exported: %v", volume.Name, createProvisionedPVRetryCount, err)
 	}
 
 	return nil
