@@ -10,6 +10,7 @@ import (
 	"github.com/wongma7/nfs-provisioner/framework"
 
 	"k8s.io/client-go/1.4/kubernetes"
+	core_v1 "k8s.io/client-go/1.4/kubernetes/typed/core/v1"
 	"k8s.io/client-go/1.4/pkg/api"
 	"k8s.io/client-go/1.4/pkg/api/resource"
 	"k8s.io/client-go/1.4/pkg/api/v1"
@@ -79,7 +80,7 @@ func newNfsController(
 	resyncPeriod time.Duration,
 ) *nfsController {
 	broadcaster := record.NewBroadcaster()
-	broadcaster.StartRecordingToSink(&EventSinkImpl{Interface: client.Core().Events(v1.NamespaceAll)})
+	broadcaster.StartRecordingToSink(&core_v1.EventSinkImpl{Interface: client.Core().Events(v1.NamespaceAll)})
 	var eventRecorder record.EventRecorder
 	out, err := exec.Command("hostname").Output()
 	if err != nil {
