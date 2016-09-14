@@ -15,4 +15,11 @@ spec:
         containerPort: 111
     securityContext:
       privileged: true
+    volumeMounts:
+      - name: config-volume
+        mountPath: /etc/config
+  volumes:
+    - name: config-volume
+      configMap:
+        name: nfs-provisioner-config
 

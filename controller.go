@@ -70,10 +70,6 @@ type nfsController struct {
 	// Map of scheduled/running operations.
 	runningOperations goroutinemap.GoRoutineMap
 
-	// For testing only: hook to call before an asynchronous operation starts.
-	// Not used when set to nil.
-	preOperationHook func(operationName string)
-
 	createProvisionedPVRetryCount int
 	createProvisionedPVInterval   time.Duration
 }
@@ -461,6 +457,7 @@ func (ctrl *nfsController) deleteVolumeOperation(volume *v1.PersistentVolume) {
 		glog.V(3).Infof("failed to delete volume %q from database: %v", volume.Name, err)
 		return
 	}
+
 	return
 }
 
@@ -483,11 +480,6 @@ func (ctrl *nfsController) delete(volume *v1.PersistentVolume) error {
 // makes sure the operation is already not running.
 func (ctrl *nfsController) scheduleOperation(operationName string, operation func() error) {
 	glog.V(4).Infof("scheduleOperation[%s]", operationName)
-
-	// Poke test code that an operation is just about to get started.
-	if ctrl.preOperationHook != nil {
-		ctrl.preOperationHook(operationName)
-	}
 
 	err := ctrl.runningOperations.Run(operationName, operation)
 	if err != nil {

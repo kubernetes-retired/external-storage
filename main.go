@@ -16,9 +16,12 @@ import (
 	"k8s.io/client-go/1.4/rest"
 )
 
+var ()
+
 func main() {
 	flag.Parse()
 
+	// Start the NFS server which will `exportfs -r`
 	startAndLog("/start_nfs.sh")
 	c := make(chan os.Signal, 2)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
@@ -32,13 +35,17 @@ func main() {
 	if err != nil {
 		glog.Fatalf("Failed to create config: %v", err)
 	}
-
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		glog.Fatalf("Failed to create client: %v", err)
 	}
-	nc := newNfsController(clientset, 5*time.Second)
 
+	err = provisionStatic(clientset, "/etc/config/exports.json")
+	if err != nil {
+		glog.Errorf("Error while provisioning static exports: %v", err)
+	}
+
+	nc := newNfsController(clientset, 15*time.Second)
 	nc.Run(wait.NeverStop)
 }
 
