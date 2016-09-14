@@ -55,10 +55,10 @@ const createProvisionedPVInterval = 10 * time.Second
 type nfsController struct {
 	client kubernetes.Interface
 
-	volumeSource     cache.ListerWatcher
-	volumeController *framework.Controller
 	claimSource      cache.ListerWatcher
 	claimController  *framework.Controller
+	volumeSource     cache.ListerWatcher
+	volumeController *framework.Controller
 	classSource      cache.ListerWatcher
 	classReflector   *cache.Reflector
 
@@ -98,25 +98,6 @@ func newNfsController(
 		createProvisionedPVInterval:   createProvisionedPVInterval,
 	}
 
-	controller.volumeSource = &cache.ListWatch{
-		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-			return client.Core().PersistentVolumes().List(options)
-		},
-		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-			return client.Core().PersistentVolumes().Watch(options)
-		},
-	}
-	controller.volumes, controller.volumeController = framework.NewInformer(
-		controller.volumeSource,
-		&v1.PersistentVolume{},
-		resyncPeriod,
-		framework.ResourceEventHandlerFuncs{
-			AddFunc:    nil,
-			UpdateFunc: controller.updateVolume,
-			DeleteFunc: nil,
-		},
-	)
-
 	controller.claimSource = &cache.ListWatch{
 		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 			return client.Core().PersistentVolumeClaims(v1.NamespaceAll).List(options)
@@ -132,6 +113,25 @@ func newNfsController(
 		framework.ResourceEventHandlerFuncs{
 			AddFunc:    controller.addClaim,
 			UpdateFunc: controller.updateClaim,
+			DeleteFunc: nil,
+		},
+	)
+
+	controller.volumeSource = &cache.ListWatch{
+		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+			return client.Core().PersistentVolumes().List(options)
+		},
+		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+			return client.Core().PersistentVolumes().Watch(options)
+		},
+	}
+	controller.volumes, controller.volumeController = framework.NewInformer(
+		controller.volumeSource,
+		&v1.PersistentVolume{},
+		resyncPeriod,
+		framework.ResourceEventHandlerFuncs{
+			AddFunc:    nil,
+			UpdateFunc: controller.updateVolume,
 			DeleteFunc: nil,
 		},
 	)
@@ -155,23 +155,8 @@ func newNfsController(
 	return controller
 }
 
-func (ctrl *nfsController) updateVolume(oldObj, newObj interface{}) {
-	volume, ok := newObj.(*v1.PersistentVolume)
-	if !ok {
-		glog.Errorf("Expected PersistentVolume but handler received %#v", newObj)
-		return
-	}
-
-	if ctrl.shouldDelete(volume) {
-		glog.Error("DELETE!")
-		opName := fmt.Sprintf("delete-%s[%s]", volume.Name, string(volume.UID))
-		ctrl.scheduleOperation(opName, func() error {
-			ctrl.deleteVolumeOperation(volume)
-			return nil
-		})
-	}
-}
-
+// On add claim, check if the added claim should have a volume provisioned for
+// it and provision one if so.
 func (ctrl *nfsController) addClaim(obj interface{}) {
 	claim, ok := obj.(*v1.PersistentVolumeClaim)
 	if !ok {
@@ -189,27 +174,29 @@ func (ctrl *nfsController) addClaim(obj interface{}) {
 	}
 }
 
+// On update claim, pass the new claim to addClaim. Updates occur at least every
+// resyncPeriod.
 func (ctrl *nfsController) updateClaim(oldObj, newObj interface{}) {
 	ctrl.addClaim(newObj)
 }
 
-func (ctrl *nfsController) shouldDelete(volume *v1.PersistentVolume) bool {
-	if volume.Status.Phase != v1.VolumeReleased && volume.Status.Phase != v1.VolumeFailed {
-		return false
+// On update volume, check if the updated volume should be deleted and delete if
+// so. Updates occur at least every resyncPeriod.
+func (ctrl *nfsController) updateVolume(oldObj, newObj interface{}) {
+	volume, ok := newObj.(*v1.PersistentVolume)
+	if !ok {
+		glog.Errorf("Expected PersistentVolume but handler received %#v", newObj)
+		return
 	}
 
-	if hasAnnotation(volume.ObjectMeta, annDynamicallyProvisioned) {
-		if ann := volume.Annotations[annDynamicallyProvisioned]; ann != provisionerName {
-			return false
-		}
+	if ctrl.shouldDelete(volume) {
+		glog.Error("DELETE!")
+		opName := fmt.Sprintf("delete-%s[%s]", volume.Name, string(volume.UID))
+		ctrl.scheduleOperation(opName, func() error {
+			ctrl.deleteVolumeOperation(volume)
+			return nil
+		})
 	}
-
-	path := fmt.Sprintf("/exports/%s", volume.ObjectMeta.Name)
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return false
-	}
-
-	return true
 }
 
 func (ctrl *nfsController) shouldProvision(claim *v1.PersistentVolumeClaim) bool {
@@ -241,6 +228,26 @@ func (ctrl *nfsController) shouldProvision(claim *v1.PersistentVolumeClaim) bool
 	}
 
 	if class.Provisioner != provisionerName {
+		return false
+	}
+
+	return true
+}
+
+func (ctrl *nfsController) shouldDelete(volume *v1.PersistentVolume) bool {
+	// https://github.com/kubernetes/kubernetes/pull/32565 will not Fail PVs
+	if volume.Status.Phase != v1.VolumeReleased && volume.Status.Phase != v1.VolumeFailed {
+		return false
+	}
+
+	if hasAnnotation(volume.ObjectMeta, annDynamicallyProvisioned) {
+		if ann := volume.Annotations[annDynamicallyProvisioned]; ann != provisionerName {
+			return false
+		}
+	}
+
+	path := fmt.Sprintf("/exports/%s", volume.ObjectMeta.Name)
+	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return false
 	}
 
