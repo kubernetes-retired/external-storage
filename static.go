@@ -23,10 +23,10 @@ type Export struct {
 }
 
 // what if there are errors partway through?
-func provisionStatic(client kubernetes.Interface, configFile string) error {
-	exports, err := loadValidConfig(configFile)
+func provisionStatic(client kubernetes.Interface, exportsFile string) error {
+	exports, err := loadValidExports(exportsFile)
 	if err != nil {
-		return fmt.Errorf("failed to load valid config from file %s: %v", configFile, err)
+		return fmt.Errorf("failed to load valid exports from file %s: %v", exportsFile, err)
 	}
 
 	options := VolumeOptions{
@@ -48,7 +48,7 @@ func provisionStatic(client kubernetes.Interface, configFile string) error {
 				break
 			}
 			// Save failed, try again after a while.
-			glog.V(3).Infof("failed to save volume %q: %v", volume.Name, err)
+			glog.Errorf("failed to save volume %q: %v", volume.Name, err)
 			time.Sleep(createProvisionedPVInterval)
 		}
 		// if err != nil {}
@@ -59,29 +59,29 @@ func provisionStatic(client kubernetes.Interface, configFile string) error {
 	return nil
 }
 
-// loadValidConfig loads the json config file and validates its contents.
-func loadValidConfig(configFile string) ([]Export, error) {
-	file, err := ioutil.ReadFile(configFile)
+// loadValidExports loads the json exports file and validates its contents.
+func loadValidExports(exportsFile string) ([]Export, error) {
+	file, err := ioutil.ReadFile(exportsFile)
 	if err != nil {
-		return []Export{}, fmt.Errorf("read config file %s failed: %v", configFile, err)
+		return []Export{}, fmt.Errorf("read exports file %s failed: %v", exportsFile, err)
 	}
 
-	var config []Export
-	err = json.Unmarshal(file, &config)
+	var exports []Export
+	err = json.Unmarshal(file, &exports)
 	if err != nil {
-		return []Export{}, fmt.Errorf("unmarshal json config file %s failed: %v", configFile, err)
+		return []Export{}, fmt.Errorf("unmarshal json exports file %s failed: %v", exportsFile, err)
 	}
 
-	for _, export := range config {
-		if _, err := os.Stat(export.Path); err != nil {
-			return []Export{}, fmt.Errorf("stat path %s failed: %v", export.Path, err)
+	for _, e := range exports {
+		if _, err := os.Stat(e.Path); err != nil {
+			return []Export{}, fmt.Errorf("stat path %s failed: %v", e.Path, err)
 		}
-		if _, err := resource.ParseQuantity(export.Capacity); err != nil {
-			return []Export{}, fmt.Errorf("parse quantity %v failed: %v", export.Capacity, err)
+		if _, err := resource.ParseQuantity(e.Capacity); err != nil {
+			return []Export{}, fmt.Errorf("parse quantity %v failed: %v", e.Capacity, err)
 		}
 	}
 
-	return config, nil
+	return exports, nil
 }
 
 func provision(options VolumeOptions, exports []Export) ([]*v1.PersistentVolume, error) {
@@ -90,11 +90,11 @@ func provision(options VolumeOptions, exports []Export) ([]*v1.PersistentVolume,
 		return nil, fmt.Errorf("create volumes failed: %v", err)
 	}
 
-	volumes := make([]*v1.PersistentVolume, len(exports))
-	for _, export := range exports {
+	volumes := make([]*v1.PersistentVolume, 0, len(exports))
+	for _, e := range exports {
 		pv := &v1.PersistentVolume{
 			ObjectMeta: v1.ObjectMeta{
-				Name:   strings.Replace(export.Path, "/", ".", -1),
+				Name:   strings.Replace(e.Path[1:], "/", ".", -1),
 				Labels: map[string]string{},
 				Annotations: map[string]string{
 					"kubernetes.io/createdby": "nfs-static-provisioner",
@@ -104,12 +104,12 @@ func provision(options VolumeOptions, exports []Export) ([]*v1.PersistentVolume,
 				PersistentVolumeReclaimPolicy: options.PersistentVolumeReclaimPolicy,
 				AccessModes:                   options.AccessModes,
 				Capacity: v1.ResourceList{
-					v1.ResourceName(v1.ResourceStorage): resource.MustParse(export.Capacity),
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse(e.Capacity),
 				},
 				PersistentVolumeSource: v1.PersistentVolumeSource{
 					NFS: &v1.NFSVolumeSource{
 						Server:   server,
-						Path:     export.Path,
+						Path:     e.Path,
 						ReadOnly: false,
 					},
 				},
@@ -147,8 +147,8 @@ func populateExports(exports []Export) error {
 		return fmt.Errorf("open /etc/exports file failed: %v", err)
 	}
 	defer f.Close()
-	for _, export := range exports {
-		if _, err = f.WriteString(export.Path + " *(rw,insecure,no_root_squash)\n"); err != nil {
+	for _, e := range exports {
+		if _, err = f.WriteString(e.Path + " *(rw,insecure,no_root_squash)\n"); err != nil {
 			return fmt.Errorf("write to /etc/exports failed: %v", err)
 		}
 	}
