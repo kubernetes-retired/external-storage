@@ -1,4 +1,14 @@
 # nfs-provisioner
+```
+go build
+docker build -t wongma7/nfs-provisioner:latest .
+```
+
+## Dynamic Provisioning Example
+
+```
+$ cd examples
+```
 
 Create the `StorageClass` "matthew" with `provisioner: matthew/nfs`
 ```
@@ -6,23 +16,10 @@ $ kubectl create -f class.yaml
 storageclass "matthew" created
 ```
 
-Create the `ConfigMap` "nfs-provisioner-exports" from exports.json containing static exports to provision
-```
-$ kubectl create cm --from-file=exports.json nfs-provisioner-exports
-configmap "nfs-provisioner-exports" created
-```
-
 Create the NFS provisioner pod "nfs-provisioner"
 ```
 $ kubectl create -f pod.yaml
 pod "nfs-provisioner" created
-```
-
-The NFS provisioner provisions the static exports
-```
-$ kubectl get pv
-NAME      CAPACITY   ACCESSMODES   RECLAIMPOLICY   STATUS      CLAIM     REASON    AGE
-home      1Mi        RWX           Retain          Available                       2m
 ```
 
 Create a PVC "nfs" requesting `StorageClass` "matthew"
@@ -35,7 +32,6 @@ The NFS provisioner provisions a PV for PVC "nfs"
 ```
 $ kubectl get pv
 NAME                                       CAPACITY   ACCESSMODES   RECLAIMPOLICY   STATUS      CLAIM         REASON    AGE
-home                                       1Mi        RWX           Retain          Available                           3m
 pvc-dce84888-7a9d-11e6-b1ee-5254001e0c1b   1Mi        RWX           Delete          Bound       default/nfs             23s
 ```
 
@@ -69,6 +65,29 @@ persistentvolumeclaim "nfs" deleted
 The NFS provisioner deletes the PV it originally provisioned for PVC "nfs"
 ```
 $ kubectl get pv
+```
+
+## Static Provisioning Example
+
+```
+$ cd examples/static
+```
+
+Create the `ConfigMap` "nfs-provisioner-exports" from exports.json containing static exports to provision
+```
+$ kubectl create cm --from-file=exports.json nfs-provisioner-exports
+configmap "nfs-provisioner-exports" created
+```
+
+Create the NFS provisioner pod "nfs-provisioner"
+```
+$ kubectl create -f pod.yaml
+pod "nfs-provisioner" created
+```
+
+The NFS provisioner provisions the static exports
+```
+$ kubectl get pv
 NAME      CAPACITY   ACCESSMODES   RECLAIMPOLICY   STATUS      CLAIM     REASON    AGE
-home      1Mi        RWX           Retain          Available                       9m
+home      1Mi        RWX           Retain          Available                       2m
 ```
