@@ -14,7 +14,6 @@ import (
 	"k8s.io/client-go/1.4/pkg/api"
 	"k8s.io/client-go/1.4/pkg/api/resource"
 	"k8s.io/client-go/1.4/pkg/api/v1"
-	"k8s.io/client-go/1.4/pkg/apis/storage"
 	"k8s.io/client-go/1.4/pkg/apis/storage/v1beta1"
 	"k8s.io/client-go/1.4/pkg/runtime"
 	"k8s.io/client-go/1.4/pkg/watch"
@@ -147,12 +146,20 @@ func newNfsController(
 	controller.classes = cache.NewStore(framework.DeletionHandlingMetaNamespaceKeyFunc)
 	controller.classReflector = cache.NewReflector(
 		controller.classSource,
-		&storage.StorageClass{},
+		&v1beta1.StorageClass{},
 		controller.classes,
 		resyncPeriod,
 	)
 
 	return controller
+}
+
+func (ctrl *nfsController) Run(stopCh <-chan struct{}) {
+	glog.Info("starting nfs controller!")
+	go ctrl.claimController.Run(stopCh)
+	go ctrl.volumeController.Run(stopCh)
+	go ctrl.classReflector.RunUntil(stopCh)
+	<-stopCh
 }
 
 // On add claim, check if the added claim should have a volume provisioned for
@@ -200,8 +207,8 @@ func (ctrl *nfsController) updateVolume(oldObj, newObj interface{}) {
 }
 
 func (ctrl *nfsController) shouldProvision(claim *v1.PersistentVolumeClaim) bool {
-	// We can do this instead of class.Provisioner != provisionerName below later
-	// then we can remove all code below volumename check
+	// TODO do this instead of class.Provisioner != provisionerName below then we
+	// can remove all code below volumename check
 	// if claim.Annotations[annStorageProvisioner] != provisionerName {
 	// 	return false, nil
 	// }
@@ -235,7 +242,7 @@ func (ctrl *nfsController) shouldProvision(claim *v1.PersistentVolumeClaim) bool
 }
 
 func (ctrl *nfsController) shouldDelete(volume *v1.PersistentVolume) bool {
-	// https://github.com/kubernetes/kubernetes/pull/32565 will not Fail PVs
+	// TODO https://github.com/kubernetes/kubernetes/pull/32565 will not Fail PVs
 	if volume.Status.Phase != v1.VolumeReleased && volume.Status.Phase != v1.VolumeFailed {
 		return false
 	}
@@ -416,7 +423,7 @@ func (ctrl *nfsController) createVolume(PVName string) (string, string, error) {
 	if err := os.MkdirAll(path, 0750); err != nil {
 		return "", "", err
 	}
-	cmd := exec.Command("exportfs", "-o", "rw,insecure,no_root_squash", "*:"+path)
+	cmd := exec.Command("exportfs", "-o", "rw,no_root_squash,sync", "*:"+path)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		os.RemoveAll(path)
@@ -537,12 +544,4 @@ func claimToClaimKey(claim *v1.PersistentVolumeClaim) string {
 
 func claimrefToClaimKey(claimref *v1.ObjectReference) string {
 	return fmt.Sprintf("%s/%s", claimref.Namespace, claimref.Name)
-}
-
-func (ctrl *nfsController) Run(stopCh <-chan struct{}) {
-	glog.Info("starting nfs controller!")
-	go ctrl.claimController.Run(stopCh)
-	go ctrl.volumeController.Run(stopCh)
-	go ctrl.classReflector.RunUntil(stopCh)
-	<-stopCh
 }
