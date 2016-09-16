@@ -16,10 +16,13 @@ import (
 	"k8s.io/client-go/1.4/pkg/util/validation/field"
 	"k8s.io/client-go/1.4/pkg/util/wait"
 	"k8s.io/client-go/1.4/rest"
+	"k8s.io/client-go/1.4/tools/clientcmd"
 )
 
 var (
-	provisioner = flag.String("provisioner", "matthew/nfs", "Name of this provisioner. This provisioner will only provision volumes for claims that request a StorageClass with a provisioner field set equal to this name")
+	provisioner  = flag.String("provisioner", "matthew/nfs", "Name of the provisioner. The provisioner will only provision volumes for claims that request a StorageClass with a provisioner field set equal to this name.")
+	outOfCluster = flag.Bool("out-of-cluster", false, "If the provisioner is being run out of cluster. Set the kubeconfig flag accordingly if true. Default false.")
+	kubeconfig   = flag.String("kubeconfig", "./config", "Absolute path to the kubeconfig file. Probably needs to be set if the provisioner is being run out of cluster.")
 )
 
 func main() {
@@ -27,7 +30,7 @@ func main() {
 	flag.Parse()
 
 	if errs := validateProvisioner(*provisioner, field.NewPath("provisioner")); len(errs) != 0 {
-		glog.Fatalf("Invalid provisioner specified: %v", errs)
+		glog.Errorf("Invalid provisioner specified: %v", errs)
 	}
 	glog.Infof("Provisioner %s specified", *provisioner)
 
@@ -39,18 +42,24 @@ func main() {
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-c
-		stopServer()
-		os.Exit(1)
+		stopServerAndExit()
 	}()
 
-	// TODO out of cluster config
-	config, err := rest.InClusterConfig()
+	var config *rest.Config
+	var err error
+	if *outOfCluster {
+		config, err = clientcmd.BuildConfigFromFlags("", *kubeconfig)
+	} else {
+		config, err = rest.InClusterConfig()
+	}
 	if err != nil {
-		glog.Fatalf("Failed to create config: %v", err)
+		glog.Errorf("Failed to create config: %v", err)
+		stopServerAndExit()
 	}
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		glog.Fatalf("Failed to create client: %v", err)
+		glog.Errorf("Failed to create client: %v", err)
+		stopServerAndExit()
 	}
 
 	// TODO is this useful?
@@ -81,7 +90,6 @@ func validateProvisioner(provisioner string, fldPath *field.Path) field.ErrorLis
 }
 
 // startServer is based on start in https://github.com/kubernetes/kubernetes/blob/release-1.4/examples/volumes/nfs/nfs-data/run_nfs.sh
-// It Fatals on any error.
 func startServer() {
 	glog.Info("Starting NFS")
 
@@ -91,32 +99,37 @@ func startServer() {
 		glog.Info("Starting rpcbind")
 		cmd := exec.Command("/usr/sbin/rpcbind", "-w")
 		if err := cmd.Run(); err != nil {
-			glog.Fatalf("Starting rpcbind failed: %v", err)
+			glog.Errorf("Starting rpcbind failed: %v", err)
+			stopServerAndExit()
 		}
 	}
 
 	// Mount the nfsd filesystem to /proc/fs/nfsd
 	cmd = exec.Command("mount", "-t", "nfsd", "nfsd", "/proc/fs/nfsd")
 	if out, err := cmd.CombinedOutput(); err != nil {
-		glog.Fatalf("mount nfsd failed with error: %v, output: %s", err, out)
+		glog.Errorf("mount nfsd failed with error: %v, output: %s", err, out)
+		stopServerAndExit()
 	}
 
 	// -N 4.x: disable NFSv4
 	// -V 3: enable NFSv3
 	cmd = exec.Command("/usr/sbin/rpc.mountd", "-N2", "-V3", "-N4", "-N4.1")
 	if err := cmd.Run(); err != nil {
-		glog.Fatalf("rpc.mountd failed: %v", err)
+		glog.Errorf("rpc.mountd failed: %v", err)
+		stopServerAndExit()
 	}
 
 	// -G 10 to reduce grace period to 10 seconds (the lowest allowed)
 	cmd = exec.Command("/usr/sbin/rpc.nfsd", "-G10", "-N2", "-V3", "-N4", "-N4.1", "2")
 	if err := cmd.Run(); err != nil {
-		glog.Fatalf("rpc.nfsd failed: %v", err)
+		glog.Errorf("rpc.nfsd failed: %v", err)
+		stopServerAndExit()
 	}
 
 	cmd = exec.Command("/usr/sbin/rpc.statd", "--no-notify")
 	if err := cmd.Run(); err != nil {
-		glog.Fatalf("rpc.statd failed: %v", err)
+		glog.Errorf("rpc.statd failed: %v", err)
+		stopServerAndExit()
 	}
 
 	glog.Info("NFS started")
@@ -157,4 +170,9 @@ func stopServer() {
 	}
 
 	glog.Info("Stopped NFS")
+}
+
+func stopServerAndExit() {
+	stopServer()
+	os.Exit(1)
 }
