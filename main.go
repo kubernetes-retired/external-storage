@@ -5,23 +5,31 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/golang/glog"
 
 	"k8s.io/client-go/1.4/kubernetes"
+	"k8s.io/client-go/1.4/pkg/util/validation"
+	"k8s.io/client-go/1.4/pkg/util/validation/field"
 	"k8s.io/client-go/1.4/pkg/util/wait"
 	"k8s.io/client-go/1.4/rest"
 )
 
 var (
-	provisionerName = flag.String("provisioner-name", "matthew/nfs", "The name of this provisioner, i.e. the value `StorageClasses` will set for their `provisioner`.")
+	provisioner = flag.String("provisioner", "matthew/nfs", "Name of this provisioner. This provisioner will only provision volumes for claims that request a StorageClass with a provisioner field set equal to this name")
 )
 
 func main() {
 	flag.Set("logtostderr", "true")
 	flag.Parse()
+
+	if errs := validateProvisioner(*provisioner, field.NewPath("provisioner")); len(errs) != 0 {
+		glog.Fatalf("Invalid provisioner specified: %v", errs)
+	}
+	glog.Infof("Provisioner %s specified", *provisioner)
 
 	// Start the NFS server
 	startServer()
@@ -53,8 +61,23 @@ func main() {
 	}
 
 	// Start the NFS controller which will dynamically provision NFS PVs
-	nc := newNfsController(clientset, 15*time.Second, *provisionerName)
+	nc := newNfsController(clientset, 15*time.Second, *provisioner)
 	nc.Run(wait.NeverStop)
+}
+
+// validateProvisioner is taken from https://github.com/kubernetes/kubernetes/blob/release-1.4/pkg/apis/storage/validation/validation.go
+// validateProvisioner tests if provisioner is a valid qualified name.
+func validateProvisioner(provisioner string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(provisioner) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath, provisioner))
+	}
+	if len(provisioner) > 0 {
+		for _, msg := range validation.IsQualifiedName(strings.ToLower(provisioner)) {
+			allErrs = append(allErrs, field.Invalid(fldPath, provisioner, msg))
+		}
+	}
+	return allErrs
 }
 
 // startServer is based on start in https://github.com/kubernetes/kubernetes/blob/release-1.4/examples/volumes/nfs/nfs-data/run_nfs.sh

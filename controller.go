@@ -56,7 +56,7 @@ type nfsController struct {
 	// The name of the provisioner for which this controller dynamically
 	// provisions volumes. The value of annDynamicallyProvisioned and
 	// annStorageProvisioner to set & watch for, respectively
-	provisionerName string
+	provisioner string
 
 	claimSource      cache.ListerWatcher
 	claimController  *framework.Controller
@@ -81,7 +81,7 @@ type nfsController struct {
 func newNfsController(
 	client kubernetes.Interface,
 	resyncPeriod time.Duration,
-	provisionerName string,
+	provisioner string,
 ) *nfsController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(&core_v1.EventSinkImpl{Interface: client.Core().Events(v1.NamespaceAll)})
@@ -96,7 +96,7 @@ func newNfsController(
 
 	controller := &nfsController{
 		client:                        client,
-		provisionerName:               provisionerName,
+		provisioner:                   provisioner,
 		eventRecorder:                 eventRecorder,
 		runningOperations:             goroutinemap.NewGoRoutineMap(false /* exponentialBackOffOnError */),
 		createProvisionedPVRetryCount: createProvisionedPVRetryCount,
@@ -213,7 +213,7 @@ func (ctrl *nfsController) updateVolume(oldObj, newObj interface{}) {
 func (ctrl *nfsController) shouldProvision(claim *v1.PersistentVolumeClaim) bool {
 	// TODO do this and remove all code below VolumeName check
 	// https://github.com/kubernetes/kubernetes/pull/30285
-	// if claim.Annotations[annStorageProvisioner] != provisionerName {
+	// if claim.Annotations[annStorageProvisioner] != provisioner {
 	// 	return false, nil
 	// }
 
@@ -237,7 +237,7 @@ func (ctrl *nfsController) shouldProvision(claim *v1.PersistentVolumeClaim) bool
 		return false
 	}
 
-	if class.Provisioner != ctrl.provisionerName {
+	if class.Provisioner != ctrl.provisioner {
 		return false
 	}
 
@@ -251,7 +251,7 @@ func (ctrl *nfsController) shouldDelete(volume *v1.PersistentVolume) bool {
 	}
 
 	if hasAnnotation(volume.ObjectMeta, annDynamicallyProvisioned) {
-		if ann := volume.Annotations[annDynamicallyProvisioned]; ann != ctrl.provisionerName {
+		if ann := volume.Annotations[annDynamicallyProvisioned]; ann != ctrl.provisioner {
 			return false
 		}
 	}
@@ -324,7 +324,7 @@ func (ctrl *nfsController) provisionClaimOperation(claim *v1.PersistentVolumeCla
 	// Set ClaimRef and the PV controller will bind and set annBoundByController for us
 	volume.Spec.ClaimRef = claimRef
 
-	setAnnotation(&volume.ObjectMeta, annDynamicallyProvisioned, ctrl.provisionerName)
+	setAnnotation(&volume.ObjectMeta, annDynamicallyProvisioned, ctrl.provisioner)
 	setAnnotation(&volume.ObjectMeta, annClass, claimClass)
 
 	// Try to create the PV object several times

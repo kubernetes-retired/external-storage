@@ -3,5 +3,3 @@ apiVersion: storage.k8s.io/v1beta1
 metadata:
   name: matthew
 provisioner: matthew/nfs
-parameters:
-  type: matthew

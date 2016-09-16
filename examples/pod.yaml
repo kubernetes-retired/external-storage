@@ -16,3 +16,5 @@ spec:
           protocol: "UDP"
       securityContext:
         privileged: true
+      args:
+        - "-provisioner=matthew/nfs"
