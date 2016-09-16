@@ -267,7 +267,7 @@ func (ctrl *nfsController) shouldDelete(volume *v1.PersistentVolume) bool {
 func (ctrl *nfsController) provisionClaimOperation(claim *v1.PersistentVolumeClaim) {
 	// Most code here is identical to that found in controller.go of kube's PV controller...
 	claimClass := getClaimClass(claim)
-	glog.V(4).Infof("provisionClaimOperation [%s] started, class: %q", claimToClaimKey(claim), claimClass)
+	glog.Infof("provisionClaimOperation [%s] started, class: %q", claimToClaimKey(claim), claimClass)
 
 	//  A previous doProvisionClaim may just have finished while we were waiting for
 	//  the locks. Check that PV (with deterministic name) hasn't been provisioned
@@ -276,7 +276,7 @@ func (ctrl *nfsController) provisionClaimOperation(claim *v1.PersistentVolumeCla
 	volume, err := ctrl.client.Core().PersistentVolumes().Get(pvName)
 	if err == nil && volume != nil {
 		// Volume has been already provisioned, nothing to do.
-		glog.V(4).Infof("provisionClaimOperation [%s]: volume already exists, skipping", claimToClaimKey(claim))
+		glog.Infof("provisionClaimOperation [%s]: volume already exists, skipping", claimToClaimKey(claim))
 		return
 	}
 
@@ -319,7 +319,7 @@ func (ctrl *nfsController) provisionClaimOperation(claim *v1.PersistentVolumeCla
 		return
 	}
 
-	glog.V(3).Infof("volume %q for claim %q created", volume.Name, claimToClaimKey(claim))
+	glog.Infof("volume %q for claim %q created", volume.Name, claimToClaimKey(claim))
 
 	// Set ClaimRef and the PV controller will bind and set annBoundByController for us
 	volume.Spec.ClaimRef = claimRef
@@ -329,14 +329,14 @@ func (ctrl *nfsController) provisionClaimOperation(claim *v1.PersistentVolumeCla
 
 	// Try to create the PV object several times
 	for i := 0; i < ctrl.createProvisionedPVRetryCount; i++ {
-		glog.V(4).Infof("provisionClaimOperation [%s]: trying to save volume %s", claimToClaimKey(claim), volume.Name)
+		glog.Infof("provisionClaimOperation [%s]: trying to save volume %s", claimToClaimKey(claim), volume.Name)
 		if _, err = ctrl.client.Core().PersistentVolumes().Create(volume); err == nil {
 			// Save succeeded.
-			glog.V(3).Infof("volume %q for claim %q saved", volume.Name, claimToClaimKey(claim))
+			glog.Infof("volume %q for claim %q saved", volume.Name, claimToClaimKey(claim))
 			break
 		}
 		// Save failed, try again after a while.
-		glog.V(3).Infof("failed to save volume %q for claim %q: %v", volume.Name, claimToClaimKey(claim), err)
+		glog.Infof("failed to save volume %q for claim %q: %v", volume.Name, claimToClaimKey(claim), err)
 		time.Sleep(ctrl.createProvisionedPVInterval)
 	}
 
@@ -346,17 +346,17 @@ func (ctrl *nfsController) provisionClaimOperation(claim *v1.PersistentVolumeCla
 		// Emit some event here and try to delete the storage asset several
 		// times.
 		strerr := fmt.Sprintf("Error creating provisioned PV object for claim %s: %v. Deleting the volume.", claimToClaimKey(claim), err)
-		glog.V(3).Info(strerr)
+		glog.Info(strerr)
 		ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, "ProvisioningFailed", strerr)
 
 		for i := 0; i < ctrl.createProvisionedPVRetryCount; i++ {
 			if err = ctrl.delete(volume); err == nil {
 				// Delete succeeded
-				glog.V(4).Infof("provisionClaimOperation [%s]: cleaning volume %s succeeded", claimToClaimKey(claim), volume.Name)
+				glog.Infof("provisionClaimOperation [%s]: cleaning volume %s succeeded", claimToClaimKey(claim), volume.Name)
 				break
 			}
 			// Delete failed, try again after a while.
-			glog.V(3).Infof("failed to delete volume %q: %v", volume.Name, err)
+			glog.Infof("failed to delete volume %q: %v", volume.Name, err)
 			time.Sleep(ctrl.createProvisionedPVInterval)
 		}
 
@@ -364,11 +364,11 @@ func (ctrl *nfsController) provisionClaimOperation(claim *v1.PersistentVolumeCla
 			// Delete failed several times. There is an orphaned volume and there
 			// is nothing we can do about it.
 			strerr := fmt.Sprintf("Error cleaning provisioned volume for claim %s: %v. Please delete manually.", claimToClaimKey(claim), err)
-			glog.V(2).Info(strerr)
+			glog.Info(strerr)
 			ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, "ProvisioningCleanupFailed", strerr)
 		}
 	} else {
-		glog.V(2).Infof("volume %q provisioned for claim %q", volume.Name, claimToClaimKey(claim))
+		glog.Infof("volume %q provisioned for claim %q", volume.Name, claimToClaimKey(claim))
 	}
 }
 
@@ -451,7 +451,7 @@ func (ctrl *nfsController) createVolume(PVName string) (string, string, error) {
 }
 
 func (ctrl *nfsController) deleteVolumeOperation(volume *v1.PersistentVolume) {
-	glog.V(4).Infof("deleteVolumeOperation [%s] started", volume.Name)
+	glog.Infof("deleteVolumeOperation [%s] started", volume.Name)
 
 	// This method may have been waiting for a volume lock for some time.
 	// Our check does not have to be as sophisticated as PV controller's, we can
@@ -459,27 +459,27 @@ func (ctrl *nfsController) deleteVolumeOperation(volume *v1.PersistentVolume) {
 	// ours to delete
 	newVolume, err := ctrl.client.Core().PersistentVolumes().Get(volume.Name)
 	if err != nil {
-		glog.V(3).Infof("error reading peristent volume %q: %v", volume.Name, err)
+		glog.Infof("error reading peristent volume %q: %v", volume.Name, err)
 		return
 	}
 	if !ctrl.shouldDelete(newVolume) {
-		glog.V(3).Infof("volume %q no longer needs deletion, skipping", volume.Name)
+		glog.Infof("volume %q no longer needs deletion, skipping", volume.Name)
 		return
 	}
 
 	if err := ctrl.delete(volume); err != nil {
 		// Delete failed, emit an event.
-		glog.V(3).Infof("deletion of volume %q failed: %v", volume.Name, err)
+		glog.Infof("deletion of volume %q failed: %v", volume.Name, err)
 		ctrl.eventRecorder.Event(volume, v1.EventTypeWarning, "VolumeFailedDelete", err.Error())
 		return
 	}
 
-	glog.V(4).Infof("deleteVolumeOperation [%s]: success", volume.Name)
+	glog.Infof("deleteVolumeOperation [%s]: success", volume.Name)
 	// Delete the volume
 	if err = ctrl.client.Core().PersistentVolumes().Delete(volume.Name, nil); err != nil {
 		// Oops, could not delete the volume and therefore the controller will
 		// try to delete the volume again on next update.
-		glog.V(3).Infof("failed to delete volume %q from database: %v", volume.Name, err)
+		glog.Infof("failed to delete volume %q from database: %v", volume.Name, err)
 		return
 	}
 
@@ -507,12 +507,12 @@ func (ctrl *nfsController) delete(volume *v1.PersistentVolume) error {
 // scheduleOperation starts given asynchronous operation on given volume. It
 // makes sure the operation is already not running.
 func (ctrl *nfsController) scheduleOperation(operationName string, operation func() error) {
-	glog.V(4).Infof("scheduleOperation[%s]", operationName)
+	glog.Infof("scheduleOperation[%s]", operationName)
 
 	err := ctrl.runningOperations.Run(operationName, operation)
 	if err != nil {
 		if goroutinemap.IsAlreadyExists(err) {
-			glog.V(4).Infof("operation %q is already running, skipping", operationName)
+			glog.Infof("operation %q is already running, skipping", operationName)
 		} else {
 			glog.Errorf("error scheduling operaion %q: %v", operationName, err)
 		}
