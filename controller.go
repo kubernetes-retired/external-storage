@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	// TODO get rid of this and use https://github.com/kubernetes/kubernetes/pull/32718
 	"github.com/wongma7/nfs-provisioner/framework"
 
 	"k8s.io/client-go/1.4/kubernetes"
@@ -39,11 +40,9 @@ const annClass = "volume.beta.kubernetes.io/storage-class"
 // recognize dynamically provisioned PVs in its decisions).
 const annDynamicallyProvisioned = "pv.kubernetes.io/provisioned-by"
 
-// Upstream proposes PV controller will set this on all claims automatically
+// TODO upstream proposes PV controller will set this on all claims automatically
+// https://github.com/kubernetes/kubernetes/pull/30285
 const annStorageProvisioner = "volume.beta.kubernetes.io/storage-provisioner"
-
-// Our value for annDynamicallyProvisioned
-const provisionerName = "matthew/nfs"
 
 // Number of retries when we create a PV object for a provisioned volume.
 const createProvisionedPVRetryCount = 5
@@ -53,6 +52,11 @@ const createProvisionedPVInterval = 10 * time.Second
 
 type nfsController struct {
 	client kubernetes.Interface
+
+	// The name of the provisioner for which this controller dynamically
+	// provisions volumes. The value of annDynamicallyProvisioned and
+	// annStorageProvisioner to set & watch for, respectively
+	provisionerName string
 
 	claimSource      cache.ListerWatcher
 	claimController  *framework.Controller
@@ -77,6 +81,7 @@ type nfsController struct {
 func newNfsController(
 	client kubernetes.Interface,
 	resyncPeriod time.Duration,
+	provisionerName string,
 ) *nfsController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(&core_v1.EventSinkImpl{Interface: client.Core().Events(v1.NamespaceAll)})
@@ -91,6 +96,7 @@ func newNfsController(
 
 	controller := &nfsController{
 		client:                        client,
+		provisionerName:               provisionerName,
 		eventRecorder:                 eventRecorder,
 		runningOperations:             goroutinemap.NewGoRoutineMap(false /* exponentialBackOffOnError */),
 		createProvisionedPVRetryCount: createProvisionedPVRetryCount,
@@ -155,7 +161,7 @@ func newNfsController(
 }
 
 func (ctrl *nfsController) Run(stopCh <-chan struct{}) {
-	glog.Info("starting nfs controller!")
+	glog.Info("Starting nfs provisioner controller!")
 	go ctrl.claimController.Run(stopCh)
 	go ctrl.volumeController.Run(stopCh)
 	go ctrl.classReflector.RunUntil(stopCh)
@@ -172,7 +178,6 @@ func (ctrl *nfsController) addClaim(obj interface{}) {
 	}
 
 	if ctrl.shouldProvision(claim) {
-		glog.Error("PROVISION!")
 		opName := fmt.Sprintf("provision-%s[%s]", claimToClaimKey(claim), string(claim.UID))
 		ctrl.scheduleOperation(opName, func() error {
 			ctrl.provisionClaimOperation(claim)
@@ -197,7 +202,6 @@ func (ctrl *nfsController) updateVolume(oldObj, newObj interface{}) {
 	}
 
 	if ctrl.shouldDelete(volume) {
-		glog.Error("DELETE!")
 		opName := fmt.Sprintf("delete-%s[%s]", volume.Name, string(volume.UID))
 		ctrl.scheduleOperation(opName, func() error {
 			ctrl.deleteVolumeOperation(volume)
@@ -207,8 +211,8 @@ func (ctrl *nfsController) updateVolume(oldObj, newObj interface{}) {
 }
 
 func (ctrl *nfsController) shouldProvision(claim *v1.PersistentVolumeClaim) bool {
-	// TODO do this instead of class.Provisioner != provisionerName below then we
-	// can remove all code below volumename check
+	// TODO do this and remove all code below VolumeName check
+	// https://github.com/kubernetes/kubernetes/pull/30285
 	// if claim.Annotations[annStorageProvisioner] != provisionerName {
 	// 	return false, nil
 	// }
@@ -225,7 +229,6 @@ func (ctrl *nfsController) shouldProvision(claim *v1.PersistentVolumeClaim) bool
 	}
 	if !found {
 		glog.Errorf("StorageClass %q not found", claimClass)
-		glog.Errorf("%v", ctrl.classes.List())
 		return false
 	}
 	class, ok := classObj.(*v1beta1.StorageClass)
@@ -234,7 +237,7 @@ func (ctrl *nfsController) shouldProvision(claim *v1.PersistentVolumeClaim) bool
 		return false
 	}
 
-	if class.Provisioner != provisionerName {
+	if class.Provisioner != ctrl.provisionerName {
 		return false
 	}
 
@@ -248,7 +251,7 @@ func (ctrl *nfsController) shouldDelete(volume *v1.PersistentVolume) bool {
 	}
 
 	if hasAnnotation(volume.ObjectMeta, annDynamicallyProvisioned) {
-		if ann := volume.Annotations[annDynamicallyProvisioned]; ann != provisionerName {
+		if ann := volume.Annotations[annDynamicallyProvisioned]; ann != ctrl.provisionerName {
 			return false
 		}
 	}
@@ -262,8 +265,7 @@ func (ctrl *nfsController) shouldDelete(volume *v1.PersistentVolume) bool {
 }
 
 func (ctrl *nfsController) provisionClaimOperation(claim *v1.PersistentVolumeClaim) {
-	// most code here identical to controller.go. Only, events should say they are coming from THIS controller if multiple controllers are running
-	// also theres probably no need to care about verbosity
+	// Most code here is identical to that found in controller.go of kube's PV controller...
 	claimClass := getClaimClass(claim)
 	glog.V(4).Infof("provisionClaimOperation [%s] started, class: %q", claimToClaimKey(claim), claimClass)
 
@@ -322,7 +324,7 @@ func (ctrl *nfsController) provisionClaimOperation(claim *v1.PersistentVolumeCla
 	// Set ClaimRef and the PV controller will bind and set annBoundByController for us
 	volume.Spec.ClaimRef = claimRef
 
-	setAnnotation(&volume.ObjectMeta, annDynamicallyProvisioned, provisionerName)
+	setAnnotation(&volume.ObjectMeta, annDynamicallyProvisioned, ctrl.provisionerName)
 	setAnnotation(&volume.ObjectMeta, annClass, claimClass)
 
 	// Try to create the PV object several times
@@ -385,6 +387,8 @@ type VolumeOptions struct {
 	Parameters map[string]string
 }
 
+// provision creates a volume i.e. the storage asset and returns a PV object for
+// the volume
 func (ctrl *nfsController) provision(options VolumeOptions) (*v1.PersistentVolume, error) {
 	// instead of createVolume could call out a script of some kind
 	server, path, err := ctrl.createVolume(options.PVName)
@@ -418,7 +422,12 @@ func (ctrl *nfsController) provision(options VolumeOptions) (*v1.PersistentVolum
 	return pv, nil
 }
 
+// createVolume creates a volume i.e. the storage asset. It creates a unique
+// directory under /exports (which could be the mountpoint of some persistent
+// storage or just the ephemeral container directory) and exports it.
 func (ctrl *nfsController) createVolume(PVName string) (string, string, error) {
+	// TODO quota, something better than just directories
+	// TODO figure out permissions: gid, chgrp, root_squash
 	path := fmt.Sprintf("/exports/%s", PVName)
 	if err := os.MkdirAll(path, 0750); err != nil {
 		return "", "", err
@@ -430,6 +439,7 @@ func (ctrl *nfsController) createVolume(PVName string) (string, string, error) {
 		return "", "", fmt.Errorf("Export failed with error: %v, output: %v", err, out)
 	}
 
+	// TODO use a service somehow, not the pod IP
 	out, err = exec.Command("hostname", "-i").Output()
 	if err != nil {
 		os.RemoveAll(path)
@@ -476,7 +486,10 @@ func (ctrl *nfsController) deleteVolumeOperation(volume *v1.PersistentVolume) {
 	return
 }
 
+// delete removes the directory backing the given PV that was created by
+// createVolume.
 func (ctrl *nfsController) delete(volume *v1.PersistentVolume) error {
+	// TODO quota, something better than just directories
 	path := fmt.Sprintf("/exports/%s", volume.ObjectMeta.Name)
 	if err := os.RemoveAll(path); err != nil {
 		return fmt.Errorf("Error deleting volume by removing its path")

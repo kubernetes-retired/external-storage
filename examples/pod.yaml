@@ -4,14 +4,15 @@ metadata:
   name: nfs-provisioner
 spec:
   containers:
-  - name: nfs-provisioner
-    image: wongma7/nfs-provisioner:latest
-    ports:
-      - name: nfs
-        containerPort: 2049
-      - name: mountd
-        containerPort: 20048
-      - name: rpcbind
-        containerPort: 111
-    securityContext:
-      privileged: true
+    - name: nfs-provisioner
+      image: wongma7/nfs-provisioner:latest
+      ports:
+        - name: nfs
+          containerPort: 2049
+        - name: mountd
+          containerPort: 20048
+        - name: rpcbind
+          containerPort: 111
+          protocol: "UDP"
+      securityContext:
+        privileged: true

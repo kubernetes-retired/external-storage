@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"flag"
 	"os"
 	"os/exec"
@@ -16,13 +15,18 @@ import (
 	"k8s.io/client-go/1.4/rest"
 )
 
-var ()
+var (
+	provisionerName = flag.String("provisioner-name", "matthew/nfs", "The name of this provisioner, i.e. the value `StorageClasses` will set for their `provisioner`.")
+)
 
 func main() {
+	flag.Set("logtostderr", "true")
 	flag.Parse()
 
 	// Start the NFS server
 	startServer()
+
+	// On interrupt or SIGTERM, stop the NFS server
 	c := make(chan os.Signal, 2)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
@@ -31,6 +35,7 @@ func main() {
 		os.Exit(1)
 	}()
 
+	// TODO out of cluster config
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		glog.Fatalf("Failed to create config: %v", err)
@@ -40,42 +45,27 @@ func main() {
 		glog.Fatalf("Failed to create client: %v", err)
 	}
 
+	// TODO is this useful?
+	// Statically provision NFS PVs specified in exports.json, if exists
 	err = provisionStatic(clientset, "/etc/config/exports.json")
 	if err != nil {
 		glog.Errorf("Error while provisioning static exports: %v", err)
 	}
 
-	nc := newNfsController(clientset, 15*time.Second)
+	// Start the NFS controller which will dynamically provision NFS PVs
+	nc := newNfsController(clientset, 15*time.Second, *provisionerName)
 	nc.Run(wait.NeverStop)
 }
 
-func startAndLog(command string) {
-	cmd := exec.Command(command)
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		glog.Errorf("Stdout pipe error: %v", err)
-	}
-	err = cmd.Start()
-	if err != nil {
-		glog.Fatalf("Error starting %s: %v", command, err)
-	}
-	in := bufio.NewScanner(stdout)
-	for in.Scan() {
-		glog.Errorf("%s: %v", command, in.Text())
-	}
-	if err := in.Err(); err != nil {
-		glog.Errorf("Scanner error: %v", err)
-	}
-}
-
-// https://github.com/kubernetes/kubernetes/blob/release-1.4/examples/volumes/nfs/nfs-data/run_nfs.sh
+// startServer is based on start in https://github.com/kubernetes/kubernetes/blob/release-1.4/examples/volumes/nfs/nfs-data/run_nfs.sh
+// It Fatals on any error.
 func startServer() {
-	glog.Error("Starting NFS")
+	glog.Info("Starting NFS")
 
 	// Start rpcbind if it is not started yet
 	cmd := exec.Command("/usr/sbin/rpcinfo", "127.0.0.1")
 	if err := cmd.Run(); err != nil {
-		glog.Errorf("Starting rpcbind")
+		glog.Info("Starting rpcbind")
 		cmd := exec.Command("/usr/sbin/rpcbind", "-w")
 		if err := cmd.Run(); err != nil {
 			glog.Fatalf("Starting rpcbind failed: %v", err)
@@ -106,11 +96,12 @@ func startServer() {
 		glog.Fatalf("rpc.statd failed: %v", err)
 	}
 
-	glog.Error("NFS started")
+	glog.Info("NFS started")
 }
 
+// stopServer is based on stop in https://github.com/kubernetes/kubernetes/blob/release-1.4/examples/volumes/nfs/nfs-data/run_nfs.sh
 func stopServer() {
-	glog.Error("Stopping NFS")
+	glog.Info("Stopping NFS")
 
 	cmd := exec.Command("/usr/sbin/rpc.nfsd", "0")
 	if err := cmd.Run(); err != nil {
@@ -142,5 +133,5 @@ func stopServer() {
 		glog.Errorf("Cleaning /etc/exports failed: %v", err)
 	}
 
-	glog.Error("Stopped NFS")
+	glog.Info("Stopped NFS")
 }
