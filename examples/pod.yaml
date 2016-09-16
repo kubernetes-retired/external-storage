@@ -5,7 +5,7 @@ metadata:
 spec:
   containers:
     - name: nfs-provisioner
-      image: wongma7/nfs-provisioner:latest
+      image: wongma7/nfs-provisioner
       ports:
         - name: nfs
           containerPort: 2049
@@ -18,3 +18,4 @@ spec:
         privileged: true
       args:
         - "-provisioner=matthew/nfs"
+      imagePullPolicy: "IfNotPresent"

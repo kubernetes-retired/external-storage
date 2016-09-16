@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -89,9 +90,9 @@ func newNfsController(
 	out, err := exec.Command("hostname").Output()
 	if err != nil {
 		glog.Errorf("Error getting hostname for specifying it as source of events: %v", err)
-		eventRecorder = broadcaster.NewRecorder(v1.EventSource{Component: fmt.Sprintf("nfs-provisioner-%s", string(out))})
-	} else {
 		eventRecorder = broadcaster.NewRecorder(v1.EventSource{Component: "nfs-provisioner"})
+	} else {
+		eventRecorder = broadcaster.NewRecorder(v1.EventSource{Component: fmt.Sprintf("nfs-provisioner-%s", strings.TrimSpace(string(out)))})
 	}
 
 	controller := &nfsController{
@@ -436,7 +437,7 @@ func (ctrl *nfsController) createVolume(PVName string) (string, string, error) {
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		os.RemoveAll(path)
-		return "", "", fmt.Errorf("Export failed with error: %v, output: %v", err, out)
+		return "", "", fmt.Errorf("Export failed with error: %v, output: %s", err, out)
 	}
 
 	// TODO use a service somehow, not the pod IP
@@ -498,7 +499,7 @@ func (ctrl *nfsController) delete(volume *v1.PersistentVolume) error {
 	cmd := exec.Command("exportfs", "-u", "*:"+path)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("Unexport failed with error: %v, output: %v", err, out)
+		return fmt.Errorf("Unexport failed with error: %v, output: %s", err, out)
 	}
 
 	return nil

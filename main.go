@@ -98,7 +98,7 @@ func startServer() {
 	// Mount the nfsd filesystem to /proc/fs/nfsd
 	cmd = exec.Command("mount", "-t", "nfsd", "nfsd", "/proc/fs/nfsd")
 	if out, err := cmd.CombinedOutput(); err != nil {
-		glog.Fatalf("mount nfsd failed with error: %v, output: %v", err, out)
+		glog.Fatalf("mount nfsd failed with error: %v, output: %s", err, out)
 	}
 
 	// -N 4.x: disable NFSv4
@@ -148,7 +148,7 @@ func stopServer() {
 
 	cmd = exec.Command("umount", "/proc/fs/nfsd")
 	if out, err := cmd.CombinedOutput(); err != nil {
-		glog.Errorf("umount nfsd failed with error: %v, output: %v", err, out)
+		glog.Errorf("umount nfsd failed with error: %v, output: %s", err, out)
 	}
 
 	cmd = exec.Command("echo", ">", "/etc/exports")

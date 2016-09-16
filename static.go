@@ -127,7 +127,7 @@ func createVolumes(exports []Export) (string, error) {
 	cmd := exec.Command("exportfs", "-r")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("'exportfs -r' failed with error: %v, output: %v", err, out)
+		return "", fmt.Errorf("'exportfs -r' failed with error: %v, output: %s", err, out)
 	}
 
 	out, err = exec.Command("hostname", "-i").Output()
