@@ -22,7 +22,9 @@ import (
 var (
 	provisioner  = flag.String("provisioner", "matthew/nfs", "Name of the provisioner. The provisioner will only provision volumes for claims that request a StorageClass with a provisioner field set equal to this name.")
 	outOfCluster = flag.Bool("out-of-cluster", false, "If the provisioner is being run out of cluster. Set the kubeconfig flag accordingly if true. Default false.")
-	kubeconfig   = flag.String("kubeconfig", "./config", "Absolute path to the kubeconfig file. Probably needs to be set if the provisioner is being run out of cluster.")
+	master       = flag.String("master", "", "Master URL to build a client config from. Either this or kubeconfig needs to be set if the provisioner is being run out of cluster.")
+	kubeconfig   = flag.String("kubeconfig", "", "Absolute path to the kubeconfig file. Either this or master needs to be set if the provisioner is being run out of cluster.")
+	runServer    = flag.Bool("run-server", true, "If the provisioner is responsible for running the NFS server, i.e. starting and stopping of the NFS server daemons. Default true.")
 )
 
 func main() {
@@ -34,21 +36,23 @@ func main() {
 	}
 	glog.Infof("Provisioner %s specified", *provisioner)
 
-	// Start the NFS server
-	startServer()
+	if *runServer {
+		// Start the NFS server
+		startServer()
 
-	// On interrupt or SIGTERM, stop the NFS server
-	c := make(chan os.Signal, 2)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		<-c
-		stopServerAndExit()
-	}()
+		// On interrupt or SIGTERM, stop the NFS server
+		c := make(chan os.Signal, 2)
+		signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+		go func() {
+			<-c
+			stopServerAndExit()
+		}()
+	}
 
 	var config *rest.Config
 	var err error
 	if *outOfCluster {
-		config, err = clientcmd.BuildConfigFromFlags("", *kubeconfig)
+		config, err = clientcmd.BuildConfigFromFlags(*master, *kubeconfig)
 	} else {
 		config, err = rest.InClusterConfig()
 	}
@@ -98,8 +102,8 @@ func startServer() {
 	if err := cmd.Run(); err != nil {
 		glog.Info("Starting rpcbind")
 		cmd := exec.Command("/usr/sbin/rpcbind", "-w")
-		if err := cmd.Run(); err != nil {
-			glog.Errorf("Starting rpcbind failed: %v", err)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			glog.Errorf("Starting rpcbind failed with error: %v, output :%s", err, out)
 			stopServerAndExit()
 		}
 	}
@@ -114,21 +118,21 @@ func startServer() {
 	// -N 4.x: disable NFSv4
 	// -V 3: enable NFSv3
 	cmd = exec.Command("/usr/sbin/rpc.mountd", "-N2", "-V3", "-N4", "-N4.1")
-	if err := cmd.Run(); err != nil {
-		glog.Errorf("rpc.mountd failed: %v", err)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		glog.Errorf("rpc.mountd failed with error: %v, output :%s", err, out)
 		stopServerAndExit()
 	}
 
 	// -G 10 to reduce grace period to 10 seconds (the lowest allowed)
 	cmd = exec.Command("/usr/sbin/rpc.nfsd", "-G10", "-N2", "-V3", "-N4", "-N4.1", "2")
-	if err := cmd.Run(); err != nil {
-		glog.Errorf("rpc.nfsd failed: %v", err)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		glog.Errorf("rpc.nfsd failed with error: %v, output :%s", err, out)
 		stopServerAndExit()
 	}
 
 	cmd = exec.Command("/usr/sbin/rpc.statd", "--no-notify")
-	if err := cmd.Run(); err != nil {
-		glog.Errorf("rpc.statd failed: %v", err)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		glog.Errorf("rpc.statd failed with error: %v, output :%s", err, out)
 		stopServerAndExit()
 	}
 
@@ -140,23 +144,23 @@ func stopServer() {
 	glog.Info("Stopping NFS")
 
 	cmd := exec.Command("/usr/sbin/rpc.nfsd", "0")
-	if err := cmd.Run(); err != nil {
-		glog.Errorf("rpc.nfsd failed: %v", err)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		glog.Errorf("rpc.nfsd failed with error: %v, output: %s", err, out)
 	}
 
 	cmd = exec.Command("/usr/sbin/exportfs", "-au")
-	if err := cmd.Run(); err != nil {
-		glog.Errorf("exportfs -au failed: %v", err)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		glog.Errorf("exportfs -au failed with error: %v, output: %s", err, out)
 	}
 
 	cmd = exec.Command("/usr/sbin/exportfs", "-f")
-	if err := cmd.Run(); err != nil {
-		glog.Errorf("exportfs -f failed: %v", err)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		glog.Errorf("exportfs -f failed with error: %v, output: %s", err, out)
 	}
 
 	cmd = exec.Command("kill", "$( pidof rpc.mountd )")
-	if err := cmd.Run(); err != nil {
-		glog.Errorf("kill rpc.mountd failed: %v", err)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		glog.Errorf("kill rpc.mountd failed with error: %v, output: %s", err, out)
 	}
 
 	cmd = exec.Command("umount", "/proc/fs/nfsd")
@@ -165,14 +169,17 @@ func stopServer() {
 	}
 
 	cmd = exec.Command("echo", ">", "/etc/exports")
-	if err := cmd.Run(); err != nil {
-		glog.Errorf("Cleaning /etc/exports failed: %v", err)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		glog.Errorf("Cleaning /etc/exports failed with error: %v, output: %s", err, out)
 	}
 
 	glog.Info("Stopped NFS")
 }
 
 func stopServerAndExit() {
-	stopServer()
+	if *runServer {
+		stopServer()
+	}
+
 	os.Exit(1)
 }
