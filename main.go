@@ -3,13 +3,15 @@ package main
 import (
 	"flag"
 	"os"
-	"os/exec"
 	"os/signal"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/golang/glog"
+
+	"github.com/wongma7/nfs-provisioner/controller"
+	"github.com/wongma7/nfs-provisioner/server"
 
 	"k8s.io/client-go/1.4/kubernetes"
 	"k8s.io/client-go/1.4/pkg/util/validation"
@@ -38,7 +40,10 @@ func main() {
 
 	if *runServer {
 		// Start the NFS server
-		startServer()
+		err := server.Start()
+		if err != nil {
+			stopServerAndExit()
+		}
 
 		// On interrupt or SIGTERM, stop the NFS server
 		c := make(chan os.Signal, 2)
@@ -74,7 +79,7 @@ func main() {
 	// }
 
 	// Start the NFS controller which will dynamically provision NFS PVs
-	nc := newNfsController(clientset, 15*time.Second, *provisioner)
+	nc := controller.NewNfsController(clientset, 15*time.Second, *provisioner)
 	nc.Run(wait.NeverStop)
 }
 
@@ -93,93 +98,9 @@ func validateProvisioner(provisioner string, fldPath *field.Path) field.ErrorLis
 	return allErrs
 }
 
-// startServer is based on start in https://github.com/kubernetes/kubernetes/blob/release-1.4/examples/volumes/nfs/nfs-data/run_nfs.sh
-func startServer() {
-	glog.Info("Starting NFS")
-
-	// Start rpcbind if it is not started yet
-	cmd := exec.Command("/usr/sbin/rpcinfo", "127.0.0.1")
-	if err := cmd.Run(); err != nil {
-		glog.Info("Starting rpcbind")
-		cmd := exec.Command("/usr/sbin/rpcbind", "-w")
-		if out, err := cmd.CombinedOutput(); err != nil {
-			glog.Errorf("Starting rpcbind failed with error: %v, output :%s", err, out)
-			stopServerAndExit()
-		}
-	}
-
-	// Mount the nfsd filesystem to /proc/fs/nfsd
-	cmd = exec.Command("mount", "-t", "nfsd", "nfsd", "/proc/fs/nfsd")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		glog.Errorf("mount nfsd failed with error: %v, output: %s", err, out)
-		stopServerAndExit()
-	}
-
-	// -N 4.x: disable NFSv4
-	// -V 3: enable NFSv3
-	cmd = exec.Command("/usr/sbin/rpc.mountd", "-N2", "-V3", "-N4", "-N4.1")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		glog.Errorf("rpc.mountd failed with error: %v, output :%s", err, out)
-		stopServerAndExit()
-	}
-
-	// -G 10 to reduce grace period to 10 seconds (the lowest allowed)
-	cmd = exec.Command("/usr/sbin/rpc.nfsd", "-G10", "-N2", "-V3", "-N4", "-N4.1", "2")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		glog.Errorf("rpc.nfsd failed with error: %v, output :%s", err, out)
-		stopServerAndExit()
-	}
-
-	cmd = exec.Command("/usr/sbin/rpc.statd", "--no-notify")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		glog.Errorf("rpc.statd failed with error: %v, output :%s", err, out)
-		stopServerAndExit()
-	}
-
-	glog.Info("NFS started")
-}
-
-// stopServer is based on stop in https://github.com/kubernetes/kubernetes/blob/release-1.4/examples/volumes/nfs/nfs-data/run_nfs.sh
-func stopServer() {
-	glog.Info("Stopping NFS")
-
-	cmd := exec.Command("/usr/sbin/rpc.nfsd", "0")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		glog.Errorf("rpc.nfsd failed with error: %v, output: %s", err, out)
-	}
-
-	cmd = exec.Command("/usr/sbin/exportfs", "-au")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		glog.Errorf("exportfs -au failed with error: %v, output: %s", err, out)
-	}
-
-	cmd = exec.Command("/usr/sbin/exportfs", "-f")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		glog.Errorf("exportfs -f failed with error: %v, output: %s", err, out)
-	}
-
-	cmd = exec.Command("kill", "$( pidof rpc.mountd )")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		glog.Errorf("kill rpc.mountd failed with error: %v, output: %s", err, out)
-	}
-
-	cmd = exec.Command("umount", "/proc/fs/nfsd")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		glog.Errorf("umount nfsd failed with error: %v, output: %s", err, out)
-	}
-
-	// TODO this is tied to static
-	// cmd = exec.Command("echo", ">", "/etc/exports")
-	// if out, err := cmd.CombinedOutput(); err != nil {
-	// 	glog.Errorf("Cleaning /etc/exports failed with error: %v, output: %s", err, out)
-	// }
-
-	glog.Info("Stopped NFS")
-}
-
 func stopServerAndExit() {
 	if *runServer {
-		stopServer()
+		server.Stop()
 	}
 
 	os.Exit(1)

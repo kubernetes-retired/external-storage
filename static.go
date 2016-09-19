@@ -10,11 +10,18 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	vol "github.com/wongma7/nfs-provisioner/volume"
 
 	"k8s.io/client-go/1.4/kubernetes"
 	"k8s.io/client-go/1.4/pkg/api/resource"
 	"k8s.io/client-go/1.4/pkg/api/v1"
 )
+
+// Number of retries when we create a PV object for a provisioned volume.
+const createProvisionedPVRetryCount = 5
+
+// Interval between retries when we create a PV object for a provisioned volume.
+const createProvisionedPVInterval = 10 * time.Second
 
 // Export is a share for the server to export and create a PV for
 type Export struct {
@@ -29,7 +36,7 @@ func provisionStatic(client kubernetes.Interface, exportsFile string) error {
 		return fmt.Errorf("failed to load valid exports from file %s: %v", exportsFile, err)
 	}
 
-	options := VolumeOptions{
+	options := vol.VolumeOptions{
 		AccessModes:                   []v1.PersistentVolumeAccessMode{v1.ReadWriteMany},
 		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimRetain,
 	}
@@ -82,7 +89,7 @@ func loadValidExports(exportsFile string) ([]Export, error) {
 	return exports, nil
 }
 
-func provision(options VolumeOptions, exports []Export) ([]*v1.PersistentVolume, error) {
+func provision(options vol.VolumeOptions, exports []Export) ([]*v1.PersistentVolume, error) {
 	server, err := createVolumes(exports)
 	if err != nil {
 		return nil, fmt.Errorf("create volumes failed: %v", err)

@@ -1,21 +1,20 @@
-package main
+package controller
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 	"strings"
 	"time"
 
 	"github.com/golang/glog"
+
 	// TODO get rid of this and use https://github.com/kubernetes/kubernetes/pull/32718
 	"github.com/wongma7/nfs-provisioner/framework"
+	vol "github.com/wongma7/nfs-provisioner/volume"
 
 	"k8s.io/client-go/1.4/kubernetes"
 	core_v1 "k8s.io/client-go/1.4/kubernetes/typed/core/v1"
 	"k8s.io/client-go/1.4/pkg/api"
-	"k8s.io/client-go/1.4/pkg/api/resource"
-	"k8s.io/client-go/1.4/pkg/api/unversioned"
 	"k8s.io/client-go/1.4/pkg/api/v1"
 	"k8s.io/client-go/1.4/pkg/apis/storage/v1beta1"
 	"k8s.io/client-go/1.4/pkg/runtime"
@@ -80,7 +79,7 @@ type nfsController struct {
 	createProvisionedPVInterval   time.Duration
 }
 
-func newNfsController(
+func NewNfsController(
 	client kubernetes.Interface,
 	resyncPeriod time.Duration,
 	provisioner string,
@@ -260,8 +259,9 @@ func (ctrl *nfsController) shouldDelete(volume *v1.PersistentVolume) bool {
 		return false
 	}
 
-	path := fmt.Sprintf("/exports/%s", volume.ObjectMeta.Name)
-	if _, err := os.Stat(path); os.IsNotExist(err) {
+	// Check if the volume even exists for deletion rather than trying, failing,
+	// and sending a bad event to the PV.
+	if !vol.Exists(volume) {
 		return false
 	}
 
@@ -307,8 +307,7 @@ func (ctrl *nfsController) provisionClaimOperation(claim *v1.PersistentVolumeCla
 		return
 	}
 
-	// TODO parse parameters & selector (iv)
-	options := VolumeOptions{
+	options := vol.VolumeOptions{
 		Capacity:                      claim.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)],
 		AccessModes:                   claim.Spec.AccessModes,
 		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
@@ -316,7 +315,7 @@ func (ctrl *nfsController) provisionClaimOperation(claim *v1.PersistentVolumeCla
 		Parameters: storageClass.Parameters,
 	}
 
-	volume, err = ctrl.provision(options)
+	volume, err = vol.Provision(options)
 	if err != nil {
 		strerr := fmt.Sprintf("Failed to provision volume with StorageClass %q: %v", storageClass.Name, err)
 		glog.Errorf("Failed to provision volume for claim %q with StorageClass %q: %v", claimToClaimKey(claim), claim.Name, err)
@@ -331,7 +330,6 @@ func (ctrl *nfsController) provisionClaimOperation(claim *v1.PersistentVolumeCla
 
 	setAnnotation(&volume.ObjectMeta, annDynamicallyProvisioned, ctrl.provisioner)
 	setAnnotation(&volume.ObjectMeta, annClass, claimClass)
-	// TODO pv.Labels MUST be set to match claim.spec.selector
 
 	// Try to create the PV object several times
 	for i := 0; i < ctrl.createProvisionedPVRetryCount; i++ {
@@ -356,7 +354,7 @@ func (ctrl *nfsController) provisionClaimOperation(claim *v1.PersistentVolumeCla
 		ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, "ProvisioningFailed", strerr)
 
 		for i := 0; i < ctrl.createProvisionedPVRetryCount; i++ {
-			if err = ctrl.delete(volume); err == nil {
+			if err = vol.Delete(volume); err == nil {
 				// Delete succeeded
 				glog.Infof("provisionClaimOperation [%s]: cleaning volume %s succeeded", claimToClaimKey(claim), volume.Name)
 				break
@@ -378,96 +376,6 @@ func (ctrl *nfsController) provisionClaimOperation(claim *v1.PersistentVolumeCla
 	}
 }
 
-// VolumeOptions contains option information about a volume
-type VolumeOptions struct {
-	// Capacity is the size of a volume.
-	Capacity resource.Quantity
-	// AccessModes of a volume
-	AccessModes []v1.PersistentVolumeAccessMode
-	// Reclamation policy for a persistent volume
-	PersistentVolumeReclaimPolicy v1.PersistentVolumeReclaimPolicy
-	// PV.Name of the appropriate PersistentVolume. Used to generate cloud
-	// volume name.
-	PVName string
-	// Volume provisioning parameters from StorageClass
-	Parameters map[string]string
-	// Volume selector from PersistentVolumeClaim
-	Selector *unversioned.LabelSelector
-}
-
-// provision creates a volume i.e. the storage asset and returns a PV object for
-// the volume
-func (ctrl *nfsController) provision(options VolumeOptions) (*v1.PersistentVolume, error) {
-	// instead of createVolume could call out a script of some kind
-	server, path, err := ctrl.createVolume(options)
-	if err != nil {
-		return nil, err
-	}
-	pv := &v1.PersistentVolume{
-		ObjectMeta: v1.ObjectMeta{
-			Name:   options.PVName,
-			Labels: map[string]string{},
-			Annotations: map[string]string{
-				"kubernetes.io/createdby": "nfs-dynamic-provisioner",
-			},
-		},
-		Spec: v1.PersistentVolumeSpec{
-			PersistentVolumeReclaimPolicy: options.PersistentVolumeReclaimPolicy,
-			AccessModes:                   options.AccessModes,
-			Capacity: v1.ResourceList{
-				v1.ResourceName(v1.ResourceStorage): options.Capacity,
-			},
-			PersistentVolumeSource: v1.PersistentVolumeSource{
-				NFS: &v1.NFSVolumeSource{
-					Server:   server,
-					Path:     path,
-					ReadOnly: false,
-				},
-			},
-		},
-	}
-
-	return pv, nil
-}
-
-// createVolume creates a volume i.e. the storage asset. It creates a unique
-// directory under /exports (which could be the mountpoint of some persistent
-// storage or just the ephemeral container directory) and exports it.
-func (ctrl *nfsController) createVolume(options VolumeOptions) (string, string, error) {
-	// TODO take and validate Parameters
-	if options.Parameters != nil {
-		return "", "", fmt.Errorf("Invalid parameter: no StorageClass parameters are supported")
-	}
-
-	// TODO implement options.ProvisionerSelector parsing
-	if options.Selector != nil {
-		return "", "", fmt.Errorf("claim.Spec.Selector is not supported")
-	}
-
-	// TODO quota, something better than just directories
-	// TODO figure out permissions: gid, chgrp, root_squash
-	path := fmt.Sprintf("/exports/%s", options.PVName)
-	if err := os.MkdirAll(path, 0750); err != nil {
-		return "", "", err
-	}
-	cmd := exec.Command("exportfs", "-o", "rw,no_root_squash,sync", "*:"+path)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		os.RemoveAll(path)
-		return "", "", fmt.Errorf("Export failed with error: %v, output: %s", err, out)
-	}
-
-	// TODO use a service somehow, not the pod IP
-	out, err = exec.Command("hostname", "-i").Output()
-	if err != nil {
-		os.RemoveAll(path)
-		return "", "", err
-	}
-	server := string(out)
-
-	return server, path, nil
-}
-
 func (ctrl *nfsController) deleteVolumeOperation(volume *v1.PersistentVolume) {
 	glog.Infof("deleteVolumeOperation [%s] started", volume.Name)
 
@@ -485,7 +393,7 @@ func (ctrl *nfsController) deleteVolumeOperation(volume *v1.PersistentVolume) {
 		return
 	}
 
-	if err := ctrl.delete(volume); err != nil {
+	if err := vol.Delete(volume); err != nil {
 		// Delete failed, emit an event.
 		glog.Infof("deletion of volume %q failed: %v", volume.Name, err)
 		ctrl.eventRecorder.Event(volume, v1.EventTypeWarning, "VolumeFailedDelete", err.Error())
@@ -502,24 +410,6 @@ func (ctrl *nfsController) deleteVolumeOperation(volume *v1.PersistentVolume) {
 	}
 
 	return
-}
-
-// delete removes the directory backing the given PV that was created by
-// createVolume.
-func (ctrl *nfsController) delete(volume *v1.PersistentVolume) error {
-	// TODO quota, something better than just directories
-	path := fmt.Sprintf("/exports/%s", volume.ObjectMeta.Name)
-	if err := os.RemoveAll(path); err != nil {
-		return fmt.Errorf("Error deleting volume by removing its path")
-	}
-
-	cmd := exec.Command("exportfs", "-u", "*:"+path)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("Unexport failed with error: %v, output: %s", err, out)
-	}
-
-	return nil
 }
 
 // scheduleOperation starts given asynchronous operation on given volume. It
