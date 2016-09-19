@@ -68,10 +68,10 @@ func main() {
 
 	// TODO is this useful?
 	// Statically provision NFS PVs specified in exports.json, if exists
-	err = provisionStatic(clientset, "/etc/config/exports.json")
-	if err != nil {
-		glog.Errorf("Error while provisioning static exports: %v", err)
-	}
+	// err = provisionStatic(clientset, "/etc/config/exports.json")
+	// if err != nil {
+	// 	glog.Errorf("Error while provisioning static exports: %v", err)
+	// }
 
 	// Start the NFS controller which will dynamically provision NFS PVs
 	nc := newNfsController(clientset, 15*time.Second, *provisioner)
@@ -168,10 +168,11 @@ func stopServer() {
 		glog.Errorf("umount nfsd failed with error: %v, output: %s", err, out)
 	}
 
-	cmd = exec.Command("echo", ">", "/etc/exports")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		glog.Errorf("Cleaning /etc/exports failed with error: %v, output: %s", err, out)
-	}
+	// TODO this is tied to static
+	// cmd = exec.Command("echo", ">", "/etc/exports")
+	// if out, err := cmd.CombinedOutput(); err != nil {
+	// 	glog.Errorf("Cleaning /etc/exports failed with error: %v, output: %s", err, out)
+	// }
 
 	glog.Info("Stopped NFS")
 }
