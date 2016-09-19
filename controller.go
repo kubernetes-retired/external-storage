@@ -15,6 +15,7 @@ import (
 	core_v1 "k8s.io/client-go/1.4/kubernetes/typed/core/v1"
 	"k8s.io/client-go/1.4/pkg/api"
 	"k8s.io/client-go/1.4/pkg/api/resource"
+	"k8s.io/client-go/1.4/pkg/api/unversioned"
 	"k8s.io/client-go/1.4/pkg/api/v1"
 	"k8s.io/client-go/1.4/pkg/apis/storage/v1beta1"
 	"k8s.io/client-go/1.4/pkg/runtime"
@@ -390,13 +391,15 @@ type VolumeOptions struct {
 	PVName string
 	// Volume provisioning parameters from StorageClass
 	Parameters map[string]string
+	// Volume selector from PersistentVolumeClaim
+	Selector *unversioned.LabelSelector
 }
 
 // provision creates a volume i.e. the storage asset and returns a PV object for
 // the volume
 func (ctrl *nfsController) provision(options VolumeOptions) (*v1.PersistentVolume, error) {
 	// instead of createVolume could call out a script of some kind
-	server, path, err := ctrl.createVolume(options.PVName)
+	server, path, err := ctrl.createVolume(options)
 	if err != nil {
 		return nil, err
 	}
@@ -430,10 +433,20 @@ func (ctrl *nfsController) provision(options VolumeOptions) (*v1.PersistentVolum
 // createVolume creates a volume i.e. the storage asset. It creates a unique
 // directory under /exports (which could be the mountpoint of some persistent
 // storage or just the ephemeral container directory) and exports it.
-func (ctrl *nfsController) createVolume(PVName string) (string, string, error) {
+func (ctrl *nfsController) createVolume(options VolumeOptions) (string, string, error) {
+	// TODO take and validate Parameters
+	if options.Parameters != nil {
+		return "", "", fmt.Errorf("Invalid parameter: no StorageClass parameters are supported")
+	}
+
+	// TODO implement options.ProvisionerSelector parsing
+	if options.Selector != nil {
+		return "", "", fmt.Errorf("claim.Spec.Selector is not supported")
+	}
+
 	// TODO quota, something better than just directories
 	// TODO figure out permissions: gid, chgrp, root_squash
-	path := fmt.Sprintf("/exports/%s", PVName)
+	path := fmt.Sprintf("/exports/%s", options.PVName)
 	if err := os.MkdirAll(path, 0750); err != nil {
 		return "", "", err
 	}
