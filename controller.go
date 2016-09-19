@@ -251,10 +251,12 @@ func (ctrl *nfsController) shouldDelete(volume *v1.PersistentVolume) bool {
 		return false
 	}
 
-	if hasAnnotation(volume.ObjectMeta, annDynamicallyProvisioned) {
-		if ann := volume.Annotations[annDynamicallyProvisioned]; ann != ctrl.provisioner {
-			return false
-		}
+	if !hasAnnotation(volume.ObjectMeta, annDynamicallyProvisioned) {
+		return false
+	}
+
+	if ann := volume.Annotations[annDynamicallyProvisioned]; ann != ctrl.provisioner {
+		return false
 	}
 
 	path := fmt.Sprintf("/exports/%s", volume.ObjectMeta.Name)
@@ -304,6 +306,7 @@ func (ctrl *nfsController) provisionClaimOperation(claim *v1.PersistentVolumeCla
 		return
 	}
 
+	// TODO parse parameters & selector (iv)
 	options := VolumeOptions{
 		Capacity:                      claim.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)],
 		AccessModes:                   claim.Spec.AccessModes,
@@ -327,6 +330,7 @@ func (ctrl *nfsController) provisionClaimOperation(claim *v1.PersistentVolumeCla
 
 	setAnnotation(&volume.ObjectMeta, annDynamicallyProvisioned, ctrl.provisioner)
 	setAnnotation(&volume.ObjectMeta, annClass, claimClass)
+	// TODO pv.Labels MUST be set to match claim.spec.selector
 
 	// Try to create the PV object several times
 	for i := 0; i < ctrl.createProvisionedPVRetryCount; i++ {
