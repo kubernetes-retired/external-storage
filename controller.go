@@ -91,9 +91,9 @@ func newNfsController(
 	out, err := exec.Command("hostname").Output()
 	if err != nil {
 		glog.Errorf("Error getting hostname for specifying it as source of events: %v", err)
-		eventRecorder = broadcaster.NewRecorder(v1.EventSource{Component: "nfs-provisioner"})
+		eventRecorder = broadcaster.NewRecorder(v1.EventSource{Component: provisioner})
 	} else {
-		eventRecorder = broadcaster.NewRecorder(v1.EventSource{Component: fmt.Sprintf("nfs-provisioner-%s", strings.TrimSpace(string(out)))})
+		eventRecorder = broadcaster.NewRecorder(v1.EventSource{Component: fmt.Sprintf("%s-%s", provisioner, strings.TrimSpace(string(out)))})
 	}
 
 	controller := &nfsController{

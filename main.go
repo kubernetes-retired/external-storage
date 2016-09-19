@@ -21,7 +21,7 @@ import (
 
 var (
 	provisioner  = flag.String("provisioner", "matthew/nfs", "Name of the provisioner. The provisioner will only provision volumes for claims that request a StorageClass with a provisioner field set equal to this name.")
-	outOfCluster = flag.Bool("out-of-cluster", false, "If the provisioner is being run out of cluster. Set the kubeconfig flag accordingly if true. Default false.")
+	outOfCluster = flag.Bool("out-of-cluster", false, "If the provisioner is being run out of cluster. Set the master or kubeconfig flag accordingly if true. Default false.")
 	master       = flag.String("master", "", "Master URL to build a client config from. Either this or kubeconfig needs to be set if the provisioner is being run out of cluster.")
 	kubeconfig   = flag.String("kubeconfig", "", "Absolute path to the kubeconfig file. Either this or master needs to be set if the provisioner is being run out of cluster.")
 	runServer    = flag.Bool("run-server", true, "If the provisioner is responsible for running the NFS server, i.e. starting and stopping of the NFS server daemons. Default true.")
