@@ -7,7 +7,7 @@ import (
 )
 
 // VolumeOptions contains option information about a volume
-// https://github.com/kubernetes/kubernetes/blob/master/pkg/volume/plugins.go
+// https://github.com/kubernetes/kubernetes/blob/release-1.4/pkg/volume/plugins.go
 type VolumeOptions struct {
 	// Capacity is the size of a volume.
 	Capacity resource.Quantity

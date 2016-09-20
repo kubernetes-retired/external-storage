@@ -78,13 +78,13 @@ func main() {
 	// 	glog.Errorf("Error while provisioning static exports: %v", err)
 	// }
 
-	// Start the NFS controller which will dynamically provision NFS PVs
-	nc := controller.NewNfsController(clientset, 15*time.Second, *provisioner)
-	nc.Run(wait.NeverStop)
+	// Start the provision controller which will dynamically provision NFS PVs
+	pc := controller.NewProvisionController(clientset, 15*time.Second, *provisioner)
+	pc.Run(wait.NeverStop)
 }
 
-// validateProvisioner is taken from https://github.com/kubernetes/kubernetes/blob/release-1.4/pkg/apis/storage/validation/validation.go
 // validateProvisioner tests if provisioner is a valid qualified name.
+// https://github.com/kubernetes/kubernetes/blob/release-1.4/pkg/apis/storage/validation/validation.go
 func validateProvisioner(provisioner string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(provisioner) == 0 {

@@ -51,7 +51,7 @@ const createProvisionedPVRetryCount = 5
 // Interval between retries when we create a PV object for a provisioned volume.
 const createProvisionedPVInterval = 10 * time.Second
 
-type nfsController struct {
+type provisionController struct {
 	client kubernetes.Interface
 
 	// The name of the provisioner for which this controller dynamically
@@ -79,11 +79,11 @@ type nfsController struct {
 	createProvisionedPVInterval   time.Duration
 }
 
-func NewNfsController(
+func NewProvisionController(
 	client kubernetes.Interface,
 	resyncPeriod time.Duration,
 	provisioner string,
-) *nfsController {
+) *provisionController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(&core_v1.EventSinkImpl{Interface: client.Core().Events(v1.NamespaceAll)})
 	var eventRecorder record.EventRecorder
@@ -95,7 +95,7 @@ func NewNfsController(
 		eventRecorder = broadcaster.NewRecorder(v1.EventSource{Component: fmt.Sprintf("%s-%s", provisioner, strings.TrimSpace(string(out)))})
 	}
 
-	controller := &nfsController{
+	controller := &provisionController{
 		client:                        client,
 		provisioner:                   provisioner,
 		eventRecorder:                 eventRecorder,
@@ -161,7 +161,7 @@ func NewNfsController(
 	return controller
 }
 
-func (ctrl *nfsController) Run(stopCh <-chan struct{}) {
+func (ctrl *provisionController) Run(stopCh <-chan struct{}) {
 	glog.Info("Starting nfs provisioner controller!")
 	go ctrl.claimController.Run(stopCh)
 	go ctrl.volumeController.Run(stopCh)
@@ -171,7 +171,7 @@ func (ctrl *nfsController) Run(stopCh <-chan struct{}) {
 
 // On add claim, check if the added claim should have a volume provisioned for
 // it and provision one if so.
-func (ctrl *nfsController) addClaim(obj interface{}) {
+func (ctrl *provisionController) addClaim(obj interface{}) {
 	claim, ok := obj.(*v1.PersistentVolumeClaim)
 	if !ok {
 		glog.Errorf("Expected PersistentVolumeClaim but addClaim received %+v", obj)
@@ -189,13 +189,13 @@ func (ctrl *nfsController) addClaim(obj interface{}) {
 
 // On update claim, pass the new claim to addClaim. Updates occur at least every
 // resyncPeriod.
-func (ctrl *nfsController) updateClaim(oldObj, newObj interface{}) {
+func (ctrl *provisionController) updateClaim(oldObj, newObj interface{}) {
 	ctrl.addClaim(newObj)
 }
 
 // On update volume, check if the updated volume should be deleted and delete if
 // so. Updates occur at least every resyncPeriod.
-func (ctrl *nfsController) updateVolume(oldObj, newObj interface{}) {
+func (ctrl *provisionController) updateVolume(oldObj, newObj interface{}) {
 	volume, ok := newObj.(*v1.PersistentVolume)
 	if !ok {
 		glog.Errorf("Expected PersistentVolume but handler received %#v", newObj)
@@ -211,7 +211,7 @@ func (ctrl *nfsController) updateVolume(oldObj, newObj interface{}) {
 	}
 }
 
-func (ctrl *nfsController) shouldProvision(claim *v1.PersistentVolumeClaim) bool {
+func (ctrl *provisionController) shouldProvision(claim *v1.PersistentVolumeClaim) bool {
 	// TODO do this and remove all code below VolumeName check
 	// https://github.com/kubernetes/kubernetes/pull/30285
 	// if claim.Annotations[annStorageProvisioner] != provisioner {
@@ -245,7 +245,7 @@ func (ctrl *nfsController) shouldProvision(claim *v1.PersistentVolumeClaim) bool
 	return true
 }
 
-func (ctrl *nfsController) shouldDelete(volume *v1.PersistentVolume) bool {
+func (ctrl *provisionController) shouldDelete(volume *v1.PersistentVolume) bool {
 	// TODO https://github.com/kubernetes/kubernetes/pull/32565 will not Fail PVs
 	if volume.Status.Phase != v1.VolumeReleased && volume.Status.Phase != v1.VolumeFailed {
 		return false
@@ -268,7 +268,7 @@ func (ctrl *nfsController) shouldDelete(volume *v1.PersistentVolume) bool {
 	return true
 }
 
-func (ctrl *nfsController) provisionClaimOperation(claim *v1.PersistentVolumeClaim) {
+func (ctrl *provisionController) provisionClaimOperation(claim *v1.PersistentVolumeClaim) {
 	// Most code here is identical to that found in controller.go of kube's PV controller...
 	claimClass := getClaimClass(claim)
 	glog.Infof("provisionClaimOperation [%s] started, class: %q", claimToClaimKey(claim), claimClass)
@@ -376,7 +376,7 @@ func (ctrl *nfsController) provisionClaimOperation(claim *v1.PersistentVolumeCla
 	}
 }
 
-func (ctrl *nfsController) deleteVolumeOperation(volume *v1.PersistentVolume) {
+func (ctrl *provisionController) deleteVolumeOperation(volume *v1.PersistentVolume) {
 	glog.Infof("deleteVolumeOperation [%s] started", volume.Name)
 
 	// This method may have been waiting for a volume lock for some time.
@@ -412,9 +412,15 @@ func (ctrl *nfsController) deleteVolumeOperation(volume *v1.PersistentVolume) {
 	return
 }
 
+// getProvisionedVolumeNameForClaim returns PV.Name for the provisioned volume.
+// The name must be unique.
+func (ctrl *provisionController) getProvisionedVolumeNameForClaim(claim *v1.PersistentVolumeClaim) string {
+	return "pvc-" + string(claim.UID)
+}
+
 // scheduleOperation starts given asynchronous operation on given volume. It
 // makes sure the operation is already not running.
-func (ctrl *nfsController) scheduleOperation(operationName string, operation func() error) {
+func (ctrl *provisionController) scheduleOperation(operationName string, operation func() error) {
 	glog.Infof("scheduleOperation[%s]", operationName)
 
 	err := ctrl.runningOperations.Run(operationName, operation)
@@ -442,7 +448,6 @@ func setAnnotation(obj *v1.ObjectMeta, ann string, value string) {
 // getClaimClass returns name of class that is requested by given claim.
 // Request for `nil` class is interpreted as request for class "",
 // i.e. for a classless PV.
-// controller_base.go
 func getClaimClass(claim *v1.PersistentVolumeClaim) string {
 	// TODO: change to PersistentVolumeClaim.Spec.Class value when this
 	// attribute is introduced.
@@ -451,12 +456,6 @@ func getClaimClass(claim *v1.PersistentVolumeClaim) string {
 	}
 
 	return ""
-}
-
-// getProvisionedVolumeNameForClaim returns PV.Name for the provisioned volume.
-// The name must be unique.
-func (ctrl *nfsController) getProvisionedVolumeNameForClaim(claim *v1.PersistentVolumeClaim) string {
-	return "pvc-" + string(claim.UID)
 }
 
 func claimToClaimKey(claim *v1.PersistentVolumeClaim) string {

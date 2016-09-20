@@ -1,4 +1,4 @@
-package main
+package static
 
 import (
 	"encoding/json"
@@ -30,7 +30,7 @@ type Export struct {
 }
 
 // what if there are errors partway through?
-func provisionStatic(client kubernetes.Interface, exportsFile string) error {
+func provisionFile(client kubernetes.Interface, exportsFile string) error {
 	exports, err := loadValidExports(exportsFile)
 	if err != nil {
 		return fmt.Errorf("failed to load valid exports from file %s: %v", exportsFile, err)
