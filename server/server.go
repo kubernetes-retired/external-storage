@@ -17,7 +17,7 @@ func Start() error {
 		glog.Info("Starting rpcbind")
 		cmd := exec.Command("/usr/sbin/rpcbind", "-w")
 		if out, err := cmd.CombinedOutput(); err != nil {
-			glog.Errorf("Starting rpcbind failed with error: %v, output :%s", err, out)
+			glog.Errorf("Starting rpcbind failed with error: %v, output: %s", err, out)
 			return err
 		}
 	}
@@ -33,20 +33,20 @@ func Start() error {
 	// -V 3: enable NFSv3
 	cmd = exec.Command("/usr/sbin/rpc.mountd", "-N2", "-V3", "-N4", "-N4.1")
 	if out, err := cmd.CombinedOutput(); err != nil {
-		glog.Errorf("rpc.mountd failed with error: %v, output :%s", err, out)
+		glog.Errorf("rpc.mountd failed with error: %v, output: %s", err, out)
 		return err
 	}
 
 	// -G 10 to reduce grace period to 10 seconds (the lowest allowed)
 	cmd = exec.Command("/usr/sbin/rpc.nfsd", "-G10", "-N2", "-V3", "-N4", "-N4.1", "2")
 	if out, err := cmd.CombinedOutput(); err != nil {
-		glog.Errorf("rpc.nfsd failed with error: %v, output :%s", err, out)
+		glog.Errorf("rpc.nfsd failed with error: %v, output: %s", err, out)
 		return err
 	}
 
 	cmd = exec.Command("/usr/sbin/rpc.statd", "--no-notify")
 	if out, err := cmd.CombinedOutput(); err != nil {
-		glog.Errorf("rpc.statd failed with error: %v, output :%s", err, out)
+		glog.Errorf("rpc.statd failed with error: %v, output: %s", err, out)
 		return err
 	}
 
