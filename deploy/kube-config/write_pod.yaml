@@ -14,6 +14,7 @@ spec:
     volumeMounts:
       - name: nfs-pvc
         mountPath: "/mnt"
+  restartPolicy: "Never"
   volumes:
     - name: nfs-pvc
       persistentVolumeClaim:

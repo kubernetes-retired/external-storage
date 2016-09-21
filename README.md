@@ -4,7 +4,9 @@ nfs-provisioner is an out-of-tree dynamic provisioner for Kubernetes. It automat
 ## Deployment
 You can run nfs-provisioner in Kubernetes as a pod or outside of Kubernetes as either a standalone binary or container.
 
-Regardless of how it is run, you must decide on a unique name to give the provisioner that follows the naming scheme `<vendor name>/<provisioner name>` and pass it in with the `provisioner` argument. The provisioner will only provision volumes for claims that request a StorageClass with a provisioner field set equal to this name.
+Regardless of how it is run, you must decide on a unique name to give the provisioner that follows the naming scheme `<vendor name>/<provisioner name>` and pass it in with the `provisioner` argument. The provisioner will only provision volumes for claims that request a `StorageClass` with a provisioner field set equal to this name.
+
+>Currently, by default the provisioner creates the NFS shares that back provisioned `PersistentVolumes` by making unique, deterministically named directories in `/exports` for each volume and exporting each made directory by doing `exportfs -o`. Unless `/exports` is persistent or some persistent storage is mounted there, the data will be gone when the provisioner stops. Even if the data is persistent, the provisioner won't attempt to recovery by searching for the directories and re-exporting them (yet?). How all this will work with persistent storage is still very much WIP :) So for now, PVs and PVCs may be left hanging.
 
 ### In Kubernetes
 
@@ -23,7 +25,7 @@ pod "nfs-provisioner" created
 
 ### Outside of Kubernetes - container
 
-The container is going to need to run with `out-of-cluster=true`, and one of `master` or `kubeconfig` set. For the `kubeconfig` argument to work, the config file needs to be inside the container somehow. This can be done by copying the kubeconfig file into the folder where the Dockerfile is and adding a line like `COPY config /config` to the Dockerfile.
+The container is going to need to run with `out-of-cluster` set true and one of `master` or `kubeconfig` set. For the `kubeconfig` argument to work, the config file needs to be inside the container somehow. This can be done by copying the kubeconfig file into the folder where the Dockerfile is and adding a line like `COPY config /config` to the Dockerfile.
 
 Build nfs-provisioner and a Docker image for it.
 
@@ -78,10 +80,23 @@ $ kubectl create -f deploy/kube-config/claim.yaml
 persistentvolumeclaim "nfs" created
 ```
 
-The NFS provisioner provisions a PV for the PVC you just created. 
+The nfs-provisioner provisions a PV for the PVC you just created.
 
 ```
 $ kubectl get pv
 NAME                                       CAPACITY   ACCESSMODES   RECLAIMPOLICY   STATUS      CLAIM         REASON    AGE
 pvc-dce84888-7a9d-11e6-b1ee-5254001e0c1b   1Mi        RWX           Delete          Bound       default/nfs             23s
 ```
+
+### Using as default
+
+The provisioner can be used as the default storage provider, meaning claims that don't request a `StorageClass` get volumes provisioned for them by the provisioner by default. To set as the default a `StorageClass` that specifies the provisioner, turn on the `DefaultStorageClass` admission-plugin and add the `storageclass.beta.kubernetes.io/is-default-class` annotation to the class. See http://kubernetes.io/docs/user-guide/persistent-volumes/#class-1 for more information.
+
+## Running Multiple Provisioners
+TODO ... not much reason to talk about this until persistent stuff is figured out.
+
+It's possible to run more than one instance of nfs-provisioner. There are a couple of things to note.
+### Single StorageClass
+(This is the same as having multiple `StorageClasses` all using the same nfs-provisioner as their provisioner, but there isn't much reason to do that since the provisioner doesn't take any parameters to differentiate between different `StorageClasses`.)
+
+### Multiple StorageClasses
