@@ -33,5 +33,5 @@ func Exists(volume *v1.PersistentVolume) bool {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return false
 	}
-	return false
+	return true
 }

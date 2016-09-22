@@ -19,6 +19,9 @@ spec:
               containerPort: 20048
             - name: rpcbind
               containerPort: 111
+            - name: rpcbind-udp
+              containerPort: 111
+              protocol: UDP
           securityContext:
             privileged: true
           args:

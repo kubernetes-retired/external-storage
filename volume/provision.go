@@ -124,11 +124,15 @@ func getServer(client kubernetes.Interface) (string, error) {
 
 	// Do some validation of the service before provisioning useless volumes
 	valid := false
-	expectedPorts := map[int32]v1.Protocol{
-		2049:  v1.ProtocolTCP,
-		20048: v1.ProtocolTCP,
-		// TODO 111 UDP (showmount tries UDP only...)
-		111: v1.ProtocolTCP,
+	type endpointPort struct {
+		port     int32
+		protocol v1.Protocol
+	}
+	expectedPorts := map[endpointPort]bool{
+		endpointPort{2049, v1.ProtocolTCP}:  true,
+		endpointPort{20048, v1.ProtocolTCP}: true,
+		endpointPort{111, v1.ProtocolUDP}:   true,
+		endpointPort{111, v1.ProtocolTCP}:   true,
 	}
 	endpoints, err := client.Core().Endpoints(namespace).Get(serviceName)
 	for _, subset := range endpoints.Subsets {
@@ -138,9 +142,9 @@ func getServer(client kubernetes.Interface) (string, error) {
 		if subset.Addresses[0].IP != fallbackServer {
 			continue
 		}
-		actualPorts := make(map[int32]v1.Protocol)
+		actualPorts := make(map[endpointPort]bool)
 		for _, port := range subset.Ports {
-			actualPorts[port.Port] = port.Protocol
+			actualPorts[endpointPort{port.Port, port.Protocol}] = true
 		}
 		if !reflect.DeepEqual(expectedPorts, actualPorts) {
 			continue
