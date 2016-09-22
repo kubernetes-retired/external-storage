@@ -12,7 +12,7 @@ import (
 // createVolume.
 func Delete(volume *v1.PersistentVolume) error {
 	// TODO quota, something better than just directories
-	path := fmt.Sprintf("/exports/%s", volume.ObjectMeta.Name)
+	path := fmt.Sprintf("/export/%s", volume.ObjectMeta.Name)
 	if err := os.RemoveAll(path); err != nil {
 		return fmt.Errorf("Error deleting volume by removing its path")
 	}
@@ -29,7 +29,7 @@ func Delete(volume *v1.PersistentVolume) error {
 // Exists returns true if the directory backing the given PV exists and so can
 // be deleted
 func Exists(volume *v1.PersistentVolume) bool {
-	path := fmt.Sprintf("/exports/%s", volume.ObjectMeta.Name)
+	path := fmt.Sprintf("/export/%s", volume.ObjectMeta.Name)
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return false
 	}

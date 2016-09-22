@@ -6,7 +6,7 @@ You can run nfs-provisioner in Kubernetes as a pod or outside of Kubernetes as e
 
 Regardless of how it is run, you must decide on a unique name to give the provisioner that follows the naming scheme `<vendor name>/<provisioner name>` and pass it in with the `provisioner` argument. The provisioner will only provision volumes for claims that request a `StorageClass` with a provisioner field set equal to this name.
 
->Currently, by default the provisioner creates the NFS shares that back provisioned `PersistentVolumes` by making unique, deterministically named directories in `/exports` for each volume and exporting each made directory by doing `exportfs -o`. Unless `/exports` is persistent or some persistent storage is mounted there, the data will be gone when the provisioner stops. Even if the data is persistent, the provisioner won't attempt to recovery by searching for the directories and re-exporting them (yet?). How all this will work with persistent storage is still very much WIP :) So for now, PVs and PVCs may be left hanging.
+>Currently, by default the provisioner creates the NFS shares that back provisioned `PersistentVolumes` by making unique, deterministically named directories in `/export` for each volume and exporting each made directory by doing `exportfs -o`. Unless `/export` is persistent or some persistent storage is mounted there, the data will be gone when the provisioner stops. Even if the data is persistent, the provisioner won't attempt to recovery by searching for the directories and re-exporting them (yet?). How all this will work with persistent storage is still very much WIP :) So for now, PVs and PVCs may be left hanging.
 
 ### In Kubernetes
 

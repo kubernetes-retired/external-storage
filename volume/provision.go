@@ -10,6 +10,7 @@ import (
 
 // Provision creates a volume i.e. the storage asset and returns a PV object for
 // the volume
+// TODO upstream does plugin.NewProvisioner and can take advantage of the plugin framework e.g. awsElasticBlockStore has, and uses, manager (.CreateVolume) and plugin (...GetCloudProvider).
 func Provision(options VolumeOptions) (*v1.PersistentVolume, error) {
 	// instead of createVolume could call out a script of some kind
 	server, path, err := createVolume(options)
@@ -44,7 +45,7 @@ func Provision(options VolumeOptions) (*v1.PersistentVolume, error) {
 }
 
 // createVolume creates a volume i.e. the storage asset. It creates a unique
-// directory under /exports (which could be the mountpoint of some persistent
+// directory under /export (which could be the mountpoint of some persistent
 // storage or just the ephemeral container directory) and exports it.
 func createVolume(options VolumeOptions) (string, string, error) {
 	// TODO take and validate Parameters
@@ -60,7 +61,7 @@ func createVolume(options VolumeOptions) (string, string, error) {
 
 	// TODO quota, something better than just directories
 	// TODO figure out permissions: gid, chgrp, root_squash
-	path := fmt.Sprintf("/exports/%s", options.PVName)
+	path := fmt.Sprintf("/export/%s", options.PVName)
 	if err := os.MkdirAll(path, 0750); err != nil {
 		return "", "", err
 	}
