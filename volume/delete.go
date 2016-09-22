@@ -14,13 +14,13 @@ func Delete(volume *v1.PersistentVolume) error {
 	// TODO quota, something better than just directories
 	path := fmt.Sprintf("/export/%s", volume.ObjectMeta.Name)
 	if err := os.RemoveAll(path); err != nil {
-		return fmt.Errorf("Error deleting volume by removing its path")
+		return fmt.Errorf("error deleting volume by removing its path: %v", err)
 	}
 
 	cmd := exec.Command("exportfs", "-u", "*:"+path)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("Unexport failed with error: %v, output: %s", err, out)
+		return fmt.Errorf("exportfs -u failed with error: %v, output: %s", err, out)
 	}
 
 	return nil

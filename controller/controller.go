@@ -315,7 +315,7 @@ func (ctrl *provisionController) provisionClaimOperation(claim *v1.PersistentVol
 		Parameters: storageClass.Parameters,
 	}
 
-	volume, err = vol.Provision(options)
+	volume, err = vol.Provision(options, ctrl.client)
 	if err != nil {
 		strerr := fmt.Sprintf("Failed to provision volume with StorageClass %q: %v", storageClass.Name, err)
 		glog.Errorf("Failed to provision volume for claim %q with StorageClass %q: %v", claimToClaimKey(claim), claim.Name, err)
