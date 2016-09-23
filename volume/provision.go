@@ -153,7 +153,7 @@ func getServer(client kubernetes.Interface) (string, error) {
 		break
 	}
 	if !valid {
-		return "", fmt.Errorf("service MY_SERVICE_NAME=%s is not valid; check that it has for ports %v one endpoint, this pod's IP %v", serviceName, expectedPorts, fallbackServer)
+		return "", fmt.Errorf("service MY_SERVICE_NAME=%s is not valid; check that it has for ports %v one endpoint, this pod's IP %v", serviceName, reflect.ValueOf(expectedPorts).MapKeys(), fallbackServer)
 	}
 	if service.Spec.ClusterIP == v1.ClusterIPNone {
 		return "", fmt.Errorf("service MY_SERVICE_NAME=%s is valid but it doesn't have a cluster IP", serviceName)

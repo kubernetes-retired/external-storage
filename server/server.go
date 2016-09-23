@@ -2,6 +2,7 @@ package server
 
 import (
 	"os/exec"
+	"strings"
 
 	"github.com/golang/glog"
 )
@@ -73,7 +74,13 @@ func Stop() {
 		glog.Errorf("exportfs -f failed with error: %v, output: %s", err, out)
 	}
 
-	cmd = exec.Command("kill", "$( pidof rpc.mountd )")
+	cmd = exec.Command("/usr/sbin/pidof", "rpc.mountd")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		glog.Errorf("pidof rpc.mountd failed with error: %v, output: %s", err, out)
+	}
+	pid := strings.TrimSpace(string(out))
+	cmd = exec.Command("kill", pid)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		glog.Errorf("kill rpc.mountd failed with error: %v, output: %s", err, out)
 	}
