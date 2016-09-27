@@ -2,14 +2,22 @@ package volume
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"reflect"
+	"regexp"
 
 	"github.com/golang/glog"
 	"k8s.io/client-go/1.4/kubernetes"
 	"k8s.io/client-go/1.4/pkg/api/v1"
 )
+
+const exportDir = "/export/"
+
+// are we allowed to set this? else make up our own
+const annCreatedBy = "kubernetes.io/createdby"
+const createdBy = "nfs-dynamic-provisioner"
 
 // Provision creates a volume i.e. the storage asset and returns a PV object for
 // the volume
@@ -25,7 +33,7 @@ func Provision(options VolumeOptions, client kubernetes.Interface) (*v1.Persiste
 			Name:   options.PVName,
 			Labels: map[string]string{},
 			Annotations: map[string]string{
-				"kubernetes.io/createdby": "nfs-dynamic-provisioner",
+				annCreatedBy: createdBy,
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{
@@ -64,7 +72,7 @@ func createVolume(options VolumeOptions, client kubernetes.Interface) (string, s
 
 	// TODO quota, something better than just directories
 	// TODO figure out permissions: gid, chgrp, root_squash
-	path := fmt.Sprintf("/export/%s", options.PVName)
+	path := fmt.Sprintf(exportDir+"%s", options.PVName)
 	if _, err := os.Stat(path); err == nil {
 		return "", "", fmt.Errorf("error creating volume, the path already exists: %v", err)
 	}
@@ -162,6 +170,47 @@ func getServer(client kubernetes.Interface) (string, error) {
 	return service.Spec.ClusterIP, nil
 }
 
-func Reprovision() ([]*v1.PersistentVolume, error) {
+func Reprovision(regexp *regexp.Regexp, client kubernetes.Interface) ([]*v1.PersistentVolume, error) {
+	files, err := ioutil.ReadDir(exportDir)
+	if err != nil {
+		return nil, err
+	}
+
+	volumes := make([]*v1.PersistentVolume, 0)
+	for _, file := range files {
+		if !file.IsDir() {
+			continue
+		}
+		if !regexp.MatchString(file.Name()) {
+			continue
+		}
+		volume, err := client.Core().PersistentVolumes().Get(file.Name())
+		if err != nil {
+			glog.Errorf("error getting PersistentVolume with same name as directory %s", file.Name())
+			continue
+		}
+		if !isProvisionedVolume(exportDir+file.Name(), volume, client) {
+			continue
+		}
+
+		volumes = append(volumes, volume)
+	}
+	// TODO
 	return nil, nil
+
+}
+
+// r, _ := regexp.Compile("pvc-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[8|9|aA|bB][a-f0-9]{3}-[a-f0-9]{12}$")
+
+// isProvisionedVolume returns true if the given PersistentVolume was
+// provisioned by this provisioner
+func isProvisionedVolume(path string, volume *v1.PersistentVolume, client kubernetes.Interface) bool {
+	if val, ok := volume.Annotations[annCreatedBy]; ok {
+		if val != createdBy {
+			return false
+		}
+	}
+	// if volume.Spec.PersistentVolumeSource
+	// deepequal
+	return false
 }

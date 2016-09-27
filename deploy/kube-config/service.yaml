@@ -4,7 +4,7 @@ metadata:
   name: nfs-provisioner
 spec:
   selector:
-    app: nfs-provisioner
+    app: matthew-nfs
   ports:
     - name: nfs
       port: 2049
