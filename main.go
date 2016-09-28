@@ -26,7 +26,7 @@ var (
 	outOfCluster = flag.Bool("out-of-cluster", false, "If the provisioner is being run out of cluster. Set the master or kubeconfig flag accordingly if true. Default false.")
 	master       = flag.String("master", "", "Master URL to build a client config from. Either this or kubeconfig needs to be set if the provisioner is being run out of cluster.")
 	kubeconfig   = flag.String("kubeconfig", "", "Absolute path to the kubeconfig file. Either this or master needs to be set if the provisioner is being run out of cluster.")
-	runServer    = flag.Bool("run-server", true, "If the provisioner is responsible for running the NFS server, i.e. starting and stopping of the NFS server daemons. Default true.")
+	runServer    = flag.Bool("run-server", true, "If the provisioner is responsible for running the NFS server, i.e. starting and stopping NFS Ganesha. Default true.")
 )
 
 func main() {
@@ -40,8 +40,10 @@ func main() {
 
 	if *runServer {
 		// Start the NFS server
+		glog.Infof("Starting NFS server!")
 		err := server.Start()
 		if err != nil {
+			glog.Errorf("Error starting NFS server: %v", err)
 			stopServerAndExit()
 		}
 
@@ -100,6 +102,7 @@ func validateProvisioner(provisioner string, fldPath *field.Path) field.ErrorLis
 
 func stopServerAndExit() {
 	if *runServer {
+		glog.Infof("Stopping NFS server!")
 		server.Stop()
 	}
 
