@@ -11,12 +11,17 @@ Build nfs-provisioner and a Docker image for it.
 $ make container
 ```
 
+Bring up a cluster.
+
+```
+$ API_HOST=172.17.0.1 KUBE_ENABLE_CLUSTER_DNS=true hack/local-up-cluster.sh
+```
+
 Decide on a unique name to give the provisioner that follows the naming scheme `<vendor name>/<provisioner name>`. The provisioner will only provision volumes for claims that request a `StorageClass` with a provisioner field set equal to this name.
 
 Decide how to run nfs-provisioner. It can be run in Kubernetes as a pod or outside of Kubernetes as a standalone container.
 
-* If you want to back your nfs-provisioner's exports with persistent storage, by mounting something at the `/export` directory it provisions out of, you should run it as a deployment with a service so that the provisioned `PersistentVolumes` are more likely to stay usable/mountable for longer than the lifetime of a single nfs-provisioner pod. A nfs-provisioner pod can use a service's cluster IP as the NFS server IP to put on its `PersistentVolumes`, instead of its own unstable pod IP, if the name of a service targeting it is passed in via the `MY_SERVICE_NAME` environment variable. Additionally, because nfs-provisioner uses an NFS Ganesha configuration file at `/export/_vfs.conf`, if one pod dies and the deployment starts another, the new pod will reuse the config file and directories will be re-exported.
-> Note that this setup isn't foolproof & can't overcome the "limitations" of NFS, e.g. if the server dies while a client had something open, expect `stale file handle` errors.
+* If you want to back your nfs-provisioner's exports with persistent storage, by mounting something at the `/export` directory it provisions out of, you should run it as a deployment with a service so that the provisioned `PersistentVolumes` are more likely to stay usable/mountable for longer than the lifetime of a single nfs-provisioner pod. A nfs-provisioner pod can use a service's cluster IP as the NFS server IP to put on its `PersistentVolumes`, instead of its own unstable pod IP, if the name of a service targeting it is passed in via the `MY_SERVICE_NAME` environment variable. Because nfs-provisioner uses an NFS Ganesha configuration file at `/export/_vfs.conf`, if one pod dies and the deployment starts another, the new pod will reuse the config file and directories will be re-exported.
 
 * Otherwise, if you don't care to back your nfs-provisioner's exports with persistent storage, there is no reason to use a service and you can just run it as a pod. Since in this case the pod is provisioning out of ephemeral storage inside the container, the `PersistentVolumes` it provisions will only be useful for as long as the pod is running anyway.
 
@@ -41,12 +46,14 @@ node "127.0.0.1" labeled
 ```
 
 Create the service.
+
 ```
 $ kubectl create -f deploy/kube-config/service.yaml
 service "nfs-provisioner" created
 ```
 
 Create the deployment.
+
 ```
 $ kubectl create -f deploy/kube-config/deployment.yaml 
 deployment "nfs-provisioner" created
@@ -102,6 +109,26 @@ $ kubectl get pv
 NAME                                       CAPACITY   ACCESSMODES   RECLAIMPOLICY   STATUS      CLAIM         REASON    AGE
 pvc-dce84888-7a9d-11e6-b1ee-5254001e0c1b   1Mi        RWX           Delete          Bound       default/nfs             23s
 ```
+
+A pod can consume the PVC and write to the backing NFS share. Create a pod to test this.
+
+```
+$ kubectl create -f deploy/kube-config/write_pod.yaml 
+pod "write-pod" created
+$ kubectl get pod --show-all
+nfs-provisioner   1/1       Running     0          31s
+write-pod         0/1       Completed   0          41s
+```
+
+Once you are done with the PVC, delete it and the provisioner will delete the PV and its backing storage.
+
+```
+$ kubectl delete pvc nfs
+persistentvolumeclaim "nfs" deleted
+$ kubectl get pv
+```
+
+If at any point things don't work correctly, check the provisioner's logs using `kubectl logs` and look for events in the PVs and PVCs using `kubectl describe`.
 
 ### Using as default
 
