@@ -73,13 +73,6 @@ func main() {
 		stopServerAndExit()
 	}
 
-	// TODO is this useful?
-	// Statically provision NFS PVs specified in exports.json, if exists
-	// err = provisionStatic(clientset, "/etc/config/exports.json")
-	// if err != nil {
-	// 	glog.Errorf("Error while provisioning static exports: %v", err)
-	// }
-
 	// Start the provision controller which will dynamically provision NFS PVs
 	pc := controller.NewProvisionController(clientset, 15*time.Second, *provisioner)
 	pc.Run(wait.NeverStop)
