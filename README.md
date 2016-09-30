@@ -1,6 +1,10 @@
 # nfs-provisioner
 nfs-provisioner is an out-of-tree dynamic provisioner for Kubernetes. It automatically creates NFS `PersistentVolumes` for `PersistentVolumeClaims` that request a `StorageClass` configured to use some instance of nfs-provisioner as their provisioner. For more information see http://kubernetes.io/docs/user-guide/persistent-volumes/ and https://github.com/kubernetes/kubernetes/pull/30285.
 
+Two goals:
+* Demonstrate how to implement an out-of-tree/external provisioner
+* Deploy shared storage anywhere, easily
+
 >Currently, the provisioner creates the NFS shares that back provisioned `PersistentVolumes` by making unique, deterministically named directories in `/export` for each volume. No quotaing or security/permissions yet.
 
 ## Deployment
@@ -75,7 +79,7 @@ or
 $ docker run --privileged wongma7/nfs-provisioner:latest -provisioner=matthew/nfs -out-of-cluster=true -master=http://172.17.0.1:8080
 ```
 
-### Arguments 
+#### Arguments 
 * `provisioner` - Name of the provisioner. The provisioner will only provision volumes for claims that request a StorageClass with a provisioner field set equal to this name.
 * `out-of-cluster` - If the provisioner is being run out of cluster. Set the master or kubeconfig flag accordingly if true. Default false.
 * `master` - Master URL to build a client config from. Either this or kubeconfig needs to be set if the provisioner is being run out of cluster.
@@ -128,8 +132,24 @@ persistentvolumeclaim "nfs" deleted
 $ kubectl get pv
 ```
 
+Note that deleting or stopping a provisioner won't delete the `PersistentVolume` objects it created.
+
 If at any point things don't work correctly, check the provisioner's logs using `kubectl logs` and look for events in the PVs and PVCs using `kubectl describe`.
 
 ### Using as default
 
 The provisioner can be used as the default storage provider, meaning claims that don't request a `StorageClass` get volumes provisioned for them by the provisioner by default. To set as the default a `StorageClass` that specifies the provisioner, turn on the `DefaultStorageClass` admission-plugin and add the `storageclass.beta.kubernetes.io/is-default-class` annotation to the class. See http://kubernetes.io/docs/user-guide/persistent-volumes/#class-1 for more information.
+
+## Running Multiple Provisioners
+
+### Single StorageClass
+
+Multiple nfs-provisioner instances can have the same name, i.e. the same value for the `provisioner` argument. They will all attempt to provision storage for the same class of claims. Only one will successfully create a `PersistentVolume.` The others will fail and eventually move on.
+
+### Multiple StorageClasses
+
+Multiple nfs-provisioner with different names can be running at the same time. They won't conflict because they'll try to provision storage for their own classes of claims.
+
+### Scaling
+
+Given that multiple instances can have the same name, to scale up or down a set of provisioner pods (or pairs of deployments & services), you simply create or delete pods (or deployments & services) with the same provisioner name. 
