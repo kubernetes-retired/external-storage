@@ -33,31 +33,53 @@ import (
 	"k8s.io/client-go/1.4/pkg/api/v1"
 )
 
-const exportDir = "/export/"
-const ganeshaConfig = "/export/_vfs.conf"
-
 // are we allowed to set this? else make up our own
 const annCreatedBy = "kubernetes.io/createdby"
 const createdBy = "nfs-dynamic-provisioner"
 
-// The entire EXPORT block, useful but not needed for deletion.
+// An annotation for the entire EXPORT block, useful but not needed for
+// deletion.
 const annBlock = "EXPORT_block"
 
-// The Export_Id of this PV's backing ganesha EXPORT, needed for deletion.
+// An annotation for the Export_Id of this PV's backing ganesha EXPORT, needed
+// for deletion.
 const annExportId = "Export_Id"
 
-// Incremented for assigning each export a unique ID
-var nextExportId = 0
+func NewNFSProvisioner(exportDir string, ganeshaConfig string, client kubernetes.Interface) Provisioner {
+	return &nfsProvisioner{
+		exportDir:     exportDir,
+		ganeshaConfig: ganeshaConfig,
+		client:        client,
+		nextExportId:  0,
+		mutex:         &sync.Mutex{},
+	}
+}
 
-// Lock for writing to the ganesha config file
-var mutex = &sync.Mutex{}
+type nfsProvisioner struct {
+	// The directory to create PV-backing directories in
+	exportDir string
+
+	// The path of the NFS Ganesha configuration file
+	ganeshaConfig string
+
+	// Client, needed for getting a service cluster IP to put as the NFS server of
+	// provisioned PVs
+	client kubernetes.Interface
+
+	// Incremented for assigning each export a unique ID, required by ganesha
+	nextExportId int
+
+	// Lock for writing to the ganesha config file
+	mutex *sync.Mutex
+}
+
+var _ Provisioner = &nfsProvisioner{}
 
 // Provision creates a volume i.e. the storage asset and returns a PV object for
-// the volume
-// TODO upstream does plugin.NewProvisioner and can take advantage of the plugin framework e.g. awsElasticBlockStore has, and uses, manager (.CreateVolume) and plugin (...GetCloudProvider). Find a nicer way to pass the client through the Provisioner?
-func Provision(options VolumeOptions, client kubernetes.Interface) (*v1.PersistentVolume, error) {
+// the volume.
+func (p *nfsProvisioner) Provision(options VolumeOptions) (*v1.PersistentVolume, error) {
 	// instead of createVolume could call out a script of some kind
-	server, path, block, exportId, err := createVolume(options, client)
+	server, path, block, exportId, err := p.createVolume(options)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +115,7 @@ func Provision(options VolumeOptions, client kubernetes.Interface) (*v1.Persiste
 // createVolume creates a volume i.e. the storage asset. It creates a unique
 // directory under /export (which could be the mountpoint of some persistent
 // storage or just the ephemeral container directory) and exports it.
-func createVolume(options VolumeOptions, client kubernetes.Interface) (string, string, string, int, error) {
+func (p *nfsProvisioner) createVolume(options VolumeOptions) (string, string, string, int, error) {
 	// TODO take and validate Parameters
 	if options.Parameters != nil {
 		return "", "", "", 0, fmt.Errorf("invalid parameter: no StorageClass parameters are supported")
@@ -105,7 +127,7 @@ func createVolume(options VolumeOptions, client kubernetes.Interface) (string, s
 		return "", "", "", 0, fmt.Errorf("claim.Spec.Selector is not supported")
 	}
 
-	server, err := getServer(client)
+	server, err := p.getServer()
 	if err != nil {
 		return "", "", "", 0, fmt.Errorf("error getting NFS server IP for created volume: %v", err)
 	}
@@ -114,7 +136,7 @@ func createVolume(options VolumeOptions, client kubernetes.Interface) (string, s
 	// TODO figure out permissions: gid, chgrp, root_squash
 	// Create the path for the volume unless it already exists. It has to exist
 	// when AddExport is called.
-	path := fmt.Sprintf(exportDir+"%s", options.PVName)
+	path := fmt.Sprintf(p.exportDir+"%s", options.PVName)
 	if _, err := os.Stat(path); err == nil {
 		return "", "", "", 0, fmt.Errorf("error creating volume, the path already exists")
 	}
@@ -123,7 +145,7 @@ func createVolume(options VolumeOptions, client kubernetes.Interface) (string, s
 	}
 
 	// Add the export block to the ganesha config file
-	block, exportId, err := addExportBlock(path)
+	block, exportId, err := p.addExportBlock(path)
 	if err != nil {
 		os.RemoveAll(path)
 		return "", "", "", 0, fmt.Errorf("error adding export block to the ganesha config file: %v", err)
@@ -133,14 +155,14 @@ func createVolume(options VolumeOptions, client kubernetes.Interface) (string, s
 	conn, err := dbus.SystemBus()
 	if err != nil {
 		os.RemoveAll(path)
-		removeExportBlock(block)
+		p.removeExportBlock(block)
 		return "", "", "", 0, fmt.Errorf("error getting dbus session bus: %v", err)
 	}
 	obj := conn.Object("org.ganesha.nfsd", "/org/ganesha/nfsd/ExportMgr")
-	call := obj.Call("org.ganesha.nfsd.exportmgr.AddExport", 0, ganeshaConfig, fmt.Sprintf("export(path = %s)", path))
+	call := obj.Call("org.ganesha.nfsd.exportmgr.AddExport", 0, p.ganeshaConfig, fmt.Sprintf("export(path = %s)", path))
 	if call.Err != nil {
 		os.RemoveAll(path)
-		removeExportBlock(block)
+		p.removeExportBlock(block)
 		return "", "", "", 0, fmt.Errorf("error calling org.ganesha.nfsd.exportmgr.AddExport: %v", call.Err)
 	}
 
@@ -149,11 +171,11 @@ func createVolume(options VolumeOptions, client kubernetes.Interface) (string, s
 
 // addExportBlock adds an EXPORT block to the ganesha config file. It returns
 // the added block, the Export_Id of the block, and an error if any.
-func addExportBlock(path string) (string, int, error) {
-	mutex.Lock()
-	read, err := ioutil.ReadFile(ganeshaConfig)
+func (p *nfsProvisioner) addExportBlock(path string) (string, int, error) {
+	p.mutex.Lock()
+	read, err := ioutil.ReadFile(p.ganeshaConfig)
 	if err != nil {
-		mutex.Unlock()
+		p.mutex.Unlock()
 		return "", 0, err
 	}
 
@@ -161,65 +183,65 @@ func addExportBlock(path string) (string, int, error) {
 	// across restarts, etc.
 	// If zero, this is the first add: find the maximum existing ID and the next
 	// ID to assign will be that maximum plus 1. Otherwise just keep incrementing.
-	if nextExportId == 0 {
+	if p.nextExportId == 0 {
 		re := regexp.MustCompile("Export_Id = [0-9]+;")
 		lines := re.FindAll(read, -1)
 		for _, line := range lines {
 			digits := regexp.MustCompile("[0-9]+").Find(line)
-			if id, _ := strconv.Atoi(string(digits)); id > nextExportId {
-				nextExportId = id
+			if id, _ := strconv.Atoi(string(digits)); id > p.nextExportId {
+				p.nextExportId = id
 			}
 		}
 	}
-	nextExportId++
+	p.nextExportId++
 
-	exportId := nextExportId
+	exportId := p.nextExportId
 	block := "\nEXPORT\n{\n"
 	block = block + "\tExport_Id = " + strconv.Itoa(exportId) + ";\n"
 	block = block + "\tPath = " + path + ";\n" +
 		"\tPseudo = " + path + ";\n" +
 		"\tFSAL {\n\t\tName = VFS;\n\t}\n}\n"
 
-	file, err := os.OpenFile(ganeshaConfig, os.O_APPEND|os.O_WRONLY, 0600)
+	file, err := os.OpenFile(p.ganeshaConfig, os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
-		mutex.Unlock()
+		p.mutex.Unlock()
 		return "", 0, err
 	}
 	defer file.Close()
 
 	if _, err = file.WriteString(block); err != nil {
-		mutex.Unlock()
+		p.mutex.Unlock()
 		return "", 0, err
 	}
 	file.Sync()
 
-	mutex.Unlock()
+	p.mutex.Unlock()
 
 	return block, exportId, nil
 }
 
 // removeExportBlock removes the given EXPORT block from the ganesha config file
-func removeExportBlock(block string) error {
-	mutex.Lock()
-	read, err := ioutil.ReadFile(ganeshaConfig)
+func (p *nfsProvisioner) removeExportBlock(block string) error {
+	p.mutex.Lock()
+	read, err := ioutil.ReadFile(p.ganeshaConfig)
 	if err != nil {
-		mutex.Unlock()
+		p.mutex.Unlock()
 		return err
 	}
 
 	removed := strings.Replace(string(read), block, "", -1)
 
-	err = ioutil.WriteFile(ganeshaConfig, []byte(removed), 0)
+	err = ioutil.WriteFile(p.ganeshaConfig, []byte(removed), 0)
 	if err != nil {
-		mutex.Unlock()
+		p.mutex.Unlock()
 		return err
 	}
 
-	mutex.Unlock()
+	p.mutex.Unlock()
 	return nil
 }
 
-func getServer(client kubernetes.Interface) (string, error) {
+func (p *nfsProvisioner) getServer() (string, error) {
 	// Use either `hostname -i` or MY_POD_IP as the fallback server
 	var fallbackServer string
 	podIP := os.Getenv("MY_POD_IP")
@@ -248,7 +270,7 @@ func getServer(client kubernetes.Interface) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("env MY_SERVICE_NAME is set but MY_POD_NAMESPACE isn't; no way to get the service cluster IP")
 	}
-	service, err := client.Core().Services(namespace).Get(serviceName)
+	service, err := p.client.Core().Services(namespace).Get(serviceName)
 	if err != nil {
 		return "", fmt.Errorf("error getting service MY_SERVICE_NAME=%s in MY_POD_NAMESPACE=%s", serviceName, namespace)
 	}
@@ -265,7 +287,7 @@ func getServer(client kubernetes.Interface) (string, error) {
 		endpointPort{111, v1.ProtocolUDP}:   true,
 		endpointPort{111, v1.ProtocolTCP}:   true,
 	}
-	endpoints, err := client.Core().Endpoints(namespace).Get(serviceName)
+	endpoints, err := p.client.Core().Endpoints(namespace).Get(serviceName)
 	for _, subset := range endpoints.Subsets {
 		if len(subset.Addresses) != 1 {
 			continue

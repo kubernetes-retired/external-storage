@@ -24,10 +24,9 @@ import (
 )
 
 const defaultGaneshaConfig = "/vfs.conf"
-const ganeshaConfig = "/export/_vfs.conf"
 
 // Start starts the NFS server. If an error is encountered at any point it returns it instantly
-func Start() error {
+func Start(ganeshaConfig string) error {
 	// Start rpcbind if it is not started yet
 	cmd := exec.Command("/usr/sbin/rpcinfo", "127.0.0.1")
 	if err := cmd.Run(); err != nil {

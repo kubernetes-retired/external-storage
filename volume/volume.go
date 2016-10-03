@@ -22,6 +22,22 @@ import (
 	"k8s.io/client-go/1.4/pkg/api/v1"
 )
 
+// Provisioner is an interface that creates templates for PersistentVolumes
+// and can create the volume as a new resource in the infrastructure provider.
+// It can also remove the volume it created from the underlying storage
+// provider.
+type Provisioner interface {
+	// Provision creates a volume i.e. the storage asset and returns a PV object
+	// for the volume
+	Provision(VolumeOptions) (*v1.PersistentVolume, error)
+	// Delete removes the storage asset that was created by Provision backing the
+	// given PV. Does not delete the PV object itself.
+	Delete(*v1.PersistentVolume) error
+	// Exists returns true if the storage asset backing the given PV was created by
+	// this provisioner and so can be deleted.
+	Exists(*v1.PersistentVolume) bool
+}
+
 // VolumeOptions contains option information about a volume
 // https://github.com/kubernetes/kubernetes/blob/release-1.4/pkg/volume/plugins.go
 type VolumeOptions struct {

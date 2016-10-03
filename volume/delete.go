@@ -25,19 +25,23 @@ import (
 	"k8s.io/client-go/1.4/pkg/api/v1"
 )
 
-// Delete removes the directory backing the given PV that was created by
-// createVolume.
-func Delete(volume *v1.PersistentVolume) error {
+// Delete removes the directory that was created by Provision backing the given
+// PV.
+func (p *nfsProvisioner) Delete(volume *v1.PersistentVolume) error {
 	// TODO quota, something better than just directories
 
-	path := fmt.Sprintf(exportDir+"%s", volume.ObjectMeta.Name)
+	if !p.Exists(volume) {
+		return fmt.Errorf("Delete called on a volume that doesn't exist, presumably because this provisioner never created it")
+	}
+
+	path := fmt.Sprintf(p.exportDir+"%s", volume.ObjectMeta.Name)
 	if err := os.RemoveAll(path); err != nil {
 		return fmt.Errorf("error deleting volume by removing its path: %v", err)
 	}
 
 	ann, ok := volume.Annotations[annExportId]
 	if !ok {
-		return fmt.Errorf("PV doesn't have an annotation %s, can't remove the export from the server even though the exported directory is gone", annExportId)
+		return fmt.Errorf("PV doesn't have an annotation %s, removed the exported directory but can't remove the export from the server", annExportId)
 	}
 	exportId, _ := strconv.Atoi(ann)
 
@@ -56,15 +60,18 @@ func Delete(volume *v1.PersistentVolume) error {
 	if !ok {
 		return fmt.Errorf("PV doesn't have an annotation %s, removed the exported directory and the export from the server but can't remove the export from the config file", annBlock)
 	}
-	removeExportBlock(block)
+	p.removeExportBlock(block)
 
 	return nil
 }
 
 // Exists returns true if the directory backing the given PV exists and so can
-// be deleted
-func Exists(volume *v1.PersistentVolume) bool {
-	path := fmt.Sprintf(exportDir+"%s", volume.ObjectMeta.Name)
+// be deleted. Since multiple NFS provisioners can be running, we can't assume
+// that the underlying volume was created by *this* one. This is a convenience
+// function to call before calling Delete; Delete will still fail if this isn't
+// true but presumably one wants to fail earlier than that.
+func (p *nfsProvisioner) Exists(volume *v1.PersistentVolume) bool {
+	path := fmt.Sprintf(p.exportDir+"%s", volume.ObjectMeta.Name)
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return false
 	}

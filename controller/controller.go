@@ -77,7 +77,13 @@ type provisionController struct {
 	// The name of the provisioner for which this controller dynamically
 	// provisions volumes. The value of annDynamicallyProvisioned and
 	// annStorageProvisioner to set & watch for, respectively
-	provisioner string
+	provisionerName string
+
+	// The provisioner the controller will use to provision and delete volumes.
+	// Presumably this implementer of vol.Provisioner carries its own
+	// volume-specific options and such that it needs in order to provision
+	// volumes.
+	provisioner vol.Provisioner
 
 	claimSource      cache.ListerWatcher
 	claimController  *framework.Controller
@@ -102,7 +108,8 @@ type provisionController struct {
 func NewProvisionController(
 	client kubernetes.Interface,
 	resyncPeriod time.Duration,
-	provisioner string,
+	provisionerName string,
+	provisioner vol.Provisioner,
 ) *provisionController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(&core_v1.EventSinkImpl{Interface: client.Core().Events(v1.NamespaceAll)})
@@ -110,13 +117,14 @@ func NewProvisionController(
 	out, err := exec.Command("hostname").Output()
 	if err != nil {
 		glog.Errorf("Error getting hostname for specifying it as source of events: %v", err)
-		eventRecorder = broadcaster.NewRecorder(v1.EventSource{Component: provisioner})
+		eventRecorder = broadcaster.NewRecorder(v1.EventSource{Component: provisionerName})
 	} else {
-		eventRecorder = broadcaster.NewRecorder(v1.EventSource{Component: fmt.Sprintf("%s-%s", provisioner, strings.TrimSpace(string(out)))})
+		eventRecorder = broadcaster.NewRecorder(v1.EventSource{Component: fmt.Sprintf("%s-%s", provisionerName, strings.TrimSpace(string(out)))})
 	}
 
 	controller := &provisionController{
 		client:                        client,
+		provisionerName:               provisionerName,
 		provisioner:                   provisioner,
 		eventRecorder:                 eventRecorder,
 		runningOperations:             goroutinemap.NewGoRoutineMap(false /* exponentialBackOffOnError */),
@@ -234,7 +242,7 @@ func (ctrl *provisionController) updateVolume(oldObj, newObj interface{}) {
 func (ctrl *provisionController) shouldProvision(claim *v1.PersistentVolumeClaim) bool {
 	// TODO do this and remove all code below VolumeName check
 	// https://github.com/kubernetes/kubernetes/pull/30285
-	// if claim.Annotations[annStorageProvisioner] != provisioner {
+	// if claim.Annotations[annStorageProvisioner] != provisionerName {
 	// 	return false, nil
 	// }
 
@@ -258,7 +266,7 @@ func (ctrl *provisionController) shouldProvision(claim *v1.PersistentVolumeClaim
 		return false
 	}
 
-	if class.Provisioner != ctrl.provisioner {
+	if class.Provisioner != ctrl.provisionerName {
 		return false
 	}
 
@@ -275,13 +283,14 @@ func (ctrl *provisionController) shouldDelete(volume *v1.PersistentVolume) bool 
 		return false
 	}
 
-	if ann := volume.Annotations[annDynamicallyProvisioned]; ann != ctrl.provisioner {
+	if ann := volume.Annotations[annDynamicallyProvisioned]; ann != ctrl.provisionerName {
 		return false
 	}
 
 	// Check if the volume even exists for deletion rather than trying, failing,
-	// and sending a bad event to the PV.
-	if !vol.Exists(volume) {
+	// and sending a bad event to the PV. This is kind of specific to NFS but it's
+	// better than every running provisioner spamming events.
+	if !ctrl.provisioner.Exists(volume) {
 		return false
 	}
 
@@ -335,7 +344,7 @@ func (ctrl *provisionController) provisionClaimOperation(claim *v1.PersistentVol
 		Parameters: storageClass.Parameters,
 	}
 
-	volume, err = vol.Provision(options, ctrl.client)
+	volume, err = ctrl.provisioner.Provision(options)
 	if err != nil {
 		strerr := fmt.Sprintf("Failed to provision volume with StorageClass %q: %v", storageClass.Name, err)
 		glog.Errorf("Failed to provision volume for claim %q with StorageClass %q: %v", claimToClaimKey(claim), claim.Name, err)
@@ -348,7 +357,7 @@ func (ctrl *provisionController) provisionClaimOperation(claim *v1.PersistentVol
 	// Set ClaimRef and the PV controller will bind and set annBoundByController for us
 	volume.Spec.ClaimRef = claimRef
 
-	setAnnotation(&volume.ObjectMeta, annDynamicallyProvisioned, ctrl.provisioner)
+	setAnnotation(&volume.ObjectMeta, annDynamicallyProvisioned, ctrl.provisionerName)
 	setAnnotation(&volume.ObjectMeta, annClass, claimClass)
 
 	// Try to create the PV object several times
@@ -374,7 +383,7 @@ func (ctrl *provisionController) provisionClaimOperation(claim *v1.PersistentVol
 		ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, "ProvisioningFailed", strerr)
 
 		for i := 0; i < ctrl.createProvisionedPVRetryCount; i++ {
-			if err = vol.Delete(volume); err == nil {
+			if err = ctrl.provisioner.Delete(volume); err == nil {
 				// Delete succeeded
 				glog.Infof("provisionClaimOperation [%s]: cleaning volume %s succeeded", claimToClaimKey(claim), volume.Name)
 				break
@@ -413,7 +422,7 @@ func (ctrl *provisionController) deleteVolumeOperation(volume *v1.PersistentVolu
 		return
 	}
 
-	if err := vol.Delete(volume); err != nil {
+	if err := ctrl.provisioner.Delete(volume); err != nil {
 		// Delete failed, emit an event.
 		glog.Infof("deletion of volume %q failed: %v", volume.Name, err)
 		ctrl.eventRecorder.Event(volume, v1.EventTypeWarning, "VolumeFailedDelete", err.Error())

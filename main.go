@@ -28,6 +28,7 @@ import (
 
 	"github.com/wongma7/nfs-provisioner/controller"
 	"github.com/wongma7/nfs-provisioner/server"
+	vol "github.com/wongma7/nfs-provisioner/volume"
 
 	"k8s.io/client-go/1.4/kubernetes"
 	"k8s.io/client-go/1.4/pkg/util/validation"
@@ -43,7 +44,10 @@ var (
 	master       = flag.String("master", "", "Master URL to build a client config from. Either this or kubeconfig needs to be set if the provisioner is being run out of cluster.")
 	kubeconfig   = flag.String("kubeconfig", "", "Absolute path to the kubeconfig file. Either this or master needs to be set if the provisioner is being run out of cluster.")
 	runServer    = flag.Bool("run-server", true, "If the provisioner is responsible for running the NFS server, i.e. starting and stopping NFS Ganesha. Default true.")
+	useGanesha   = flag.Bool("use-ganesha", true, "If the provisioner will create volumes using NFS Ganesha (D-Bus method calls) as opposed to using the kernel NFS server ('exportfs -o'). If run-server is true, this must be true. Default true.")
 )
+
+const ganeshaConfig = "/export/_vfs.conf"
 
 func main() {
 	flag.Set("logtostderr", "true")
@@ -51,13 +55,19 @@ func main() {
 
 	if errs := validateProvisioner(*provisioner, field.NewPath("provisioner")); len(errs) != 0 {
 		glog.Errorf("Invalid provisioner specified: %v", errs)
+		os.Exit(1)
 	}
 	glog.Infof("Provisioner %s specified", *provisioner)
+
+	if *runServer && !*useGanesha {
+		glog.Errorf("Invalid flags specified: if run-server is true, use-ganesha must also be true.")
+		os.Exit(1)
+	}
 
 	if *runServer {
 		// Start the NFS server
 		glog.Infof("Starting NFS server!")
-		err := server.Start()
+		err := server.Start(ganeshaConfig)
 		if err != nil {
 			glog.Errorf("Error starting NFS server: %v", err)
 			stopServerAndExit()
@@ -89,8 +99,10 @@ func main() {
 		stopServerAndExit()
 	}
 
+	nfsProvisioner := vol.NewNFSProvisioner("/export", ganeshaConfig, clientset)
+
 	// Start the provision controller which will dynamically provision NFS PVs
-	pc := controller.NewProvisionController(clientset, 15*time.Second, *provisioner)
+	pc := controller.NewProvisionController(clientset, 15*time.Second, *provisioner, nfsProvisioner)
 	pc.Run(wait.NeverStop)
 }
 
