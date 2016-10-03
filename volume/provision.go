@@ -37,7 +37,7 @@ import (
 const annCreatedBy = "kubernetes.io/createdby"
 const createdBy = "nfs-dynamic-provisioner"
 
-// An annotation for the entire EXPORT block, useful but not needed for
+// An annotation for the entire ganesha EXPORT block, useful but not needed for
 // deletion.
 const annBlock = "EXPORT_block"
 
@@ -45,10 +45,14 @@ const annBlock = "EXPORT_block"
 // for deletion.
 const annExportId = "Export_Id"
 
-func NewNFSProvisioner(exportDir string, ganeshaConfig string, client kubernetes.Interface) Provisioner {
+// An annotation for the line in /etc/exports, needed for deletion.
+const annLine = "etcexports_line"
+
+func NewNFSProvisioner(exportDir string, ganeshaConfig string, useGanesha bool, client kubernetes.Interface) Provisioner {
 	return &nfsProvisioner{
 		exportDir:     exportDir,
 		ganeshaConfig: ganeshaConfig,
+		useGanesha:    useGanesha,
 		client:        client,
 		nextExportId:  0,
 		mutex:         &sync.Mutex{},
@@ -62,6 +66,10 @@ type nfsProvisioner struct {
 	// The path of the NFS Ganesha configuration file
 	ganeshaConfig string
 
+	// Whether to use NFS Ganesha (D-Bus method calls) or kernel NFS server
+	// (exportfs)
+	useGanesha bool
+
 	// Client, needed for getting a service cluster IP to put as the NFS server of
 	// provisioned PVs
 	client kubernetes.Interface
@@ -69,7 +77,7 @@ type nfsProvisioner struct {
 	// Incremented for assigning each export a unique ID, required by ganesha
 	nextExportId int
 
-	// Lock for writing to the ganesha config file
+	// Lock for writing to the ganesha config or /etc/exports file
 	mutex *sync.Mutex
 }
 
@@ -78,20 +86,25 @@ var _ Provisioner = &nfsProvisioner{}
 // Provision creates a volume i.e. the storage asset and returns a PV object for
 // the volume.
 func (p *nfsProvisioner) Provision(options VolumeOptions) (*v1.PersistentVolume, error) {
-	// instead of createVolume could call out a script of some kind
-	server, path, block, exportId, err := p.createVolume(options)
+	server, path, added, exportId, err := p.createVolume(options)
 	if err != nil {
 		return nil, err
 	}
+
+	annotations := make(map[string]string)
+	annotations[annCreatedBy] = createdBy
+	if p.useGanesha {
+		annotations[annBlock] = added
+		annotations[annExportId] = strconv.Itoa(exportId)
+	} else {
+		annotations[annLine] = added
+	}
+
 	pv := &v1.PersistentVolume{
 		ObjectMeta: v1.ObjectMeta{
-			Name:   options.PVName,
-			Labels: map[string]string{},
-			Annotations: map[string]string{
-				annCreatedBy: createdBy,
-				annBlock:     block,
-				annExportId:  strconv.Itoa(exportId),
-			},
+			Name:        options.PVName,
+			Labels:      map[string]string{},
+			Annotations: annotations,
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: options.PersistentVolumeReclaimPolicy,
@@ -113,8 +126,10 @@ func (p *nfsProvisioner) Provision(options VolumeOptions) (*v1.PersistentVolume,
 }
 
 // createVolume creates a volume i.e. the storage asset. It creates a unique
-// directory under /export (which could be the mountpoint of some persistent
-// storage or just the ephemeral container directory) and exports it.
+// directory under /export and exports it. Returns the server IP and the path of
+// the directory. Also returns the block or line it added to either the ganesha
+// config or /etc/exports, respectively. If using ganesha, returns a non-zero
+// Export_Id.
 func (p *nfsProvisioner) createVolume(options VolumeOptions) (string, string, string, int, error) {
 	// TODO take and validate Parameters
 	if options.Parameters != nil {
@@ -135,7 +150,7 @@ func (p *nfsProvisioner) createVolume(options VolumeOptions) (string, string, st
 	// TODO quota, something better than just directories
 	// TODO figure out permissions: gid, chgrp, root_squash
 	// Create the path for the volume unless it already exists. It has to exist
-	// when AddExport is called.
+	// when AddExport or exportfs is called.
 	path := fmt.Sprintf(p.exportDir+"%s", options.PVName)
 	if _, err := os.Stat(path); err == nil {
 		return "", "", "", 0, fmt.Errorf("error creating volume, the path already exists")
@@ -144,103 +159,24 @@ func (p *nfsProvisioner) createVolume(options VolumeOptions) (string, string, st
 		return "", "", "", 0, fmt.Errorf("error creating dir for volume: %v", err)
 	}
 
-	// Add the export block to the ganesha config file
-	block, exportId, err := p.addExportBlock(path)
-	if err != nil {
-		os.RemoveAll(path)
-		return "", "", "", 0, fmt.Errorf("error adding export block to the ganesha config file: %v", err)
-	}
-
-	// Call AddExport using dbus
-	conn, err := dbus.SystemBus()
-	if err != nil {
-		os.RemoveAll(path)
-		p.removeExportBlock(block)
-		return "", "", "", 0, fmt.Errorf("error getting dbus session bus: %v", err)
-	}
-	obj := conn.Object("org.ganesha.nfsd", "/org/ganesha/nfsd/ExportMgr")
-	call := obj.Call("org.ganesha.nfsd.exportmgr.AddExport", 0, p.ganeshaConfig, fmt.Sprintf("export(path = %s)", path))
-	if call.Err != nil {
-		os.RemoveAll(path)
-		p.removeExportBlock(block)
-		return "", "", "", 0, fmt.Errorf("error calling org.ganesha.nfsd.exportmgr.AddExport: %v", call.Err)
-	}
-
-	return server, path, block, exportId, nil
-}
-
-// addExportBlock adds an EXPORT block to the ganesha config file. It returns
-// the added block, the Export_Id of the block, and an error if any.
-func (p *nfsProvisioner) addExportBlock(path string) (string, int, error) {
-	p.mutex.Lock()
-	read, err := ioutil.ReadFile(p.ganeshaConfig)
-	if err != nil {
-		p.mutex.Unlock()
-		return "", 0, err
-	}
-
-	// TODO there's probably a better way to do this. HAVE to assign unique IDs
-	// across restarts, etc.
-	// If zero, this is the first add: find the maximum existing ID and the next
-	// ID to assign will be that maximum plus 1. Otherwise just keep incrementing.
-	if p.nextExportId == 0 {
-		re := regexp.MustCompile("Export_Id = [0-9]+;")
-		lines := re.FindAll(read, -1)
-		for _, line := range lines {
-			digits := regexp.MustCompile("[0-9]+").Find(line)
-			if id, _ := strconv.Atoi(string(digits)); id > p.nextExportId {
-				p.nextExportId = id
-			}
+	if p.useGanesha {
+		block, exportId, err := p.ganeshaExport(path)
+		if err != nil {
+			os.RemoveAll(path)
+			return "", "", "", 0, err
 		}
+		return server, path, block, exportId, nil
+	} else {
+		line, err := p.kernelExport(path)
+		if err != nil {
+			os.RemoveAll(path)
+			return "", "", "", 0, err
+		}
+		return server, path, line, 0, nil
 	}
-	p.nextExportId++
-
-	exportId := p.nextExportId
-	block := "\nEXPORT\n{\n"
-	block = block + "\tExport_Id = " + strconv.Itoa(exportId) + ";\n"
-	block = block + "\tPath = " + path + ";\n" +
-		"\tPseudo = " + path + ";\n" +
-		"\tFSAL {\n\t\tName = VFS;\n\t}\n}\n"
-
-	file, err := os.OpenFile(p.ganeshaConfig, os.O_APPEND|os.O_WRONLY, 0600)
-	if err != nil {
-		p.mutex.Unlock()
-		return "", 0, err
-	}
-	defer file.Close()
-
-	if _, err = file.WriteString(block); err != nil {
-		p.mutex.Unlock()
-		return "", 0, err
-	}
-	file.Sync()
-
-	p.mutex.Unlock()
-
-	return block, exportId, nil
 }
 
-// removeExportBlock removes the given EXPORT block from the ganesha config file
-func (p *nfsProvisioner) removeExportBlock(block string) error {
-	p.mutex.Lock()
-	read, err := ioutil.ReadFile(p.ganeshaConfig)
-	if err != nil {
-		p.mutex.Unlock()
-		return err
-	}
-
-	removed := strings.Replace(string(read), block, "", -1)
-
-	err = ioutil.WriteFile(p.ganeshaConfig, []byte(removed), 0)
-	if err != nil {
-		p.mutex.Unlock()
-		return err
-	}
-
-	p.mutex.Unlock()
-	return nil
-}
-
+// getServer gets the server IP to put in a provisioned PV's spec.
 func (p *nfsProvisioner) getServer() (string, error) {
 	// Use either `hostname -i` or MY_POD_IP as the fallback server
 	var fallbackServer string
@@ -313,4 +249,123 @@ func (p *nfsProvisioner) getServer() (string, error) {
 	}
 
 	return service.Spec.ClusterIP, nil
+}
+
+// ganeshaExport exports the given directory using NFS Ganesha, assuming it is
+// running and can be connected to using D-Bus. Returns the block it added to
+// the ganesha config file and the block's Export_Id.
+// https://github.com/nfs-ganesha/nfs-ganesha/wiki/Dbusinterface
+func (p *nfsProvisioner) ganeshaExport(path string) (string, int, error) {
+	// Create the export block to add to the ganesha config file
+	p.mutex.Lock()
+	read, err := ioutil.ReadFile(p.ganeshaConfig)
+	if err != nil {
+		p.mutex.Unlock()
+		return "", 0, err
+	}
+	// TODO there's probably a better way to do this. HAVE to assign unique IDs
+	// across restarts, etc.
+	// If zero, this is the first add: find the maximum existing ID and the next
+	// ID to assign will be that maximum plus 1. Otherwise just keep incrementing.
+	if p.nextExportId == 0 {
+		re := regexp.MustCompile("Export_Id = [0-9]+;")
+		lines := re.FindAll(read, -1)
+		for _, line := range lines {
+			digits := regexp.MustCompile("[0-9]+").Find(line)
+			if id, _ := strconv.Atoi(string(digits)); id > p.nextExportId {
+				p.nextExportId = id
+			}
+		}
+	}
+	p.nextExportId++
+	exportId := p.nextExportId
+	p.mutex.Unlock()
+
+	block := "\nEXPORT\n{\n"
+	block = block + "\tExport_Id = " + strconv.Itoa(exportId) + ";\n"
+	block = block + "\tPath = " + path + ";\n" +
+		"\tPseudo = " + path + ";\n" +
+		"\tFSAL {\n\t\tName = VFS;\n\t}\n}\n"
+
+	// Add the export block to the ganesha config file
+	if err := p.addToFile(p.ganeshaConfig, block); err != nil {
+		return "", 0, fmt.Errorf("error adding export block to the ganesha config file: %v", err)
+	}
+
+	// Call AddExport using dbus
+	conn, err := dbus.SystemBus()
+	if err != nil {
+		p.removeFromFile(p.ganeshaConfig, block)
+		return "", 0, fmt.Errorf("error getting dbus session bus: %v", err)
+	}
+	obj := conn.Object("org.ganesha.nfsd", "/org/ganesha/nfsd/ExportMgr")
+	call := obj.Call("org.ganesha.nfsd.exportmgr.AddExport", 0, p.ganeshaConfig, fmt.Sprintf("export(path = %s)", path))
+	if call.Err != nil {
+		p.removeFromFile(p.ganeshaConfig, block)
+		return "", 0, fmt.Errorf("error calling org.ganesha.nfsd.exportmgr.AddExport: %v", call.Err)
+	}
+
+	return block, exportId, nil
+}
+
+// kernelExport exports the given directory using the NFS server, assuming it is
+// running. Returns the line it added to /etc/exports.
+func (p *nfsProvisioner) kernelExport(path string) (string, error) {
+	line := "\n" + path + " *(rw,insecure,no_root_squash)\n"
+
+	// Add the export directory line to /etc/exports
+	if err := p.addToFile("/etc/exports", line); err != nil {
+		return "", fmt.Errorf("error adding export directory to /etc/exports: %v", err)
+	}
+
+	// Execute exportfs
+	cmd := exec.Command("exportfs", "-r")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		p.removeFromFile("/etc/exports", line)
+		return "", fmt.Errorf("exportfs -r failed with error: %v, output: %s", err, out)
+	}
+
+	return line, nil
+}
+
+func (p *nfsProvisioner) addToFile(path string, toAdd string) error {
+	p.mutex.Lock()
+
+	file, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0600)
+	if err != nil {
+		p.mutex.Unlock()
+		return err
+	}
+	defer file.Close()
+
+	if _, err = file.WriteString(toAdd); err != nil {
+		p.mutex.Unlock()
+		return err
+	}
+	file.Sync()
+
+	p.mutex.Unlock()
+	return nil
+}
+
+func (p *nfsProvisioner) removeFromFile(path string, toRemove string) error {
+	p.mutex.Lock()
+
+	read, err := ioutil.ReadFile(path)
+	if err != nil {
+		p.mutex.Unlock()
+		return err
+	}
+
+	removed := strings.Replace(string(read), toRemove, "", -1)
+
+	err = ioutil.WriteFile(path, []byte(removed), 0)
+	if err != nil {
+		p.mutex.Unlock()
+		return err
+	}
+
+	p.mutex.Unlock()
+	return nil
 }

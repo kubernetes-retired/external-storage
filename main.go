@@ -44,7 +44,7 @@ var (
 	master       = flag.String("master", "", "Master URL to build a client config from. Either this or kubeconfig needs to be set if the provisioner is being run out of cluster.")
 	kubeconfig   = flag.String("kubeconfig", "", "Absolute path to the kubeconfig file. Either this or master needs to be set if the provisioner is being run out of cluster.")
 	runServer    = flag.Bool("run-server", true, "If the provisioner is responsible for running the NFS server, i.e. starting and stopping NFS Ganesha. Default true.")
-	useGanesha   = flag.Bool("use-ganesha", true, "If the provisioner will create volumes using NFS Ganesha (D-Bus method calls) as opposed to using the kernel NFS server ('exportfs -o'). If run-server is true, this must be true. Default true.")
+	useGanesha   = flag.Bool("use-ganesha", true, "If the provisioner will create volumes using NFS Ganesha (D-Bus method calls) as opposed to using the kernel NFS server ('exportfs'). If run-server is true, this must be true. Default true.")
 )
 
 const ganeshaConfig = "/export/vfs.conf"
@@ -99,7 +99,7 @@ func main() {
 		stopServerAndExit()
 	}
 
-	nfsProvisioner := vol.NewNFSProvisioner("/export", ganeshaConfig, clientset)
+	nfsProvisioner := vol.NewNFSProvisioner("/export", ganeshaConfig, *useGanesha, clientset)
 
 	// Start the provision controller which will dynamically provision NFS PVs
 	pc := controller.NewProvisionController(clientset, 15*time.Second, *provisioner, nfsProvisioner)

@@ -19,6 +19,7 @@ package volume
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"strconv"
 
 	"github.com/guelfey/go.dbus"
@@ -39,9 +40,23 @@ func (p *nfsProvisioner) Delete(volume *v1.PersistentVolume) error {
 		return fmt.Errorf("error deleting volume by removing its path: %v", err)
 	}
 
+	var err error
+	if p.useGanesha {
+		err = p.ganeshaUnexport(volume)
+	} else {
+		err = p.kernelUnexport(volume)
+	}
+	if err != nil {
+		return fmt.Errorf("removed the path backing the volume but error unexporting it: %v", err)
+	}
+
+	return nil
+}
+
+func (p *nfsProvisioner) ganeshaUnexport(volume *v1.PersistentVolume) error {
 	ann, ok := volume.Annotations[annExportId]
 	if !ok {
-		return fmt.Errorf("PV doesn't have an annotation %s, removed the exported directory but can't remove the export from the server", annExportId)
+		return fmt.Errorf("PV doesn't have an annotation %s, can't remove the export from the server", annExportId)
 	}
 	exportId, _ := strconv.Atoi(ann)
 
@@ -56,11 +71,35 @@ func (p *nfsProvisioner) Delete(volume *v1.PersistentVolume) error {
 		return fmt.Errorf("error calling org.ganesha.nfsd.exportmgr.RemoveExport: %v", call.Err)
 	}
 
+	// Error removing the EXPORT block from file is not really an error, ganesha
+	// will just not export it next time around
 	block, ok := volume.Annotations[annBlock]
 	if !ok {
-		return fmt.Errorf("PV doesn't have an annotation %s, removed the exported directory and the export from the server but can't remove the export from the config file", annBlock)
+		return fmt.Errorf("PV doesn't have an annotation %s, removed the export from the server but can't remove the export from the config file", annBlock)
 	}
-	p.removeExportBlock(block)
+	if err := p.removeFromFile(p.ganeshaConfig, block); err != nil {
+		return fmt.Errorf("removed the export from the server but error removing the export from the config file: %v", err)
+	}
+
+	return nil
+
+}
+
+func (p *nfsProvisioner) kernelUnexport(volume *v1.PersistentVolume) error {
+	line, ok := volume.Annotations[annLine]
+	if !ok {
+		return fmt.Errorf("PV doesn't have an annotation %s, can't remove the export from /etc/exports", annLine)
+	}
+	if err := p.removeFromFile("/etc/exports", line); err != nil {
+		return fmt.Errorf("error removing the export from /etc/exports: %v", err)
+	}
+
+	// Execute exportfs
+	cmd := exec.Command("exportfs", "-r")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("exportfs -r failed with error: %v, output: %s", err, out)
+	}
 
 	return nil
 }
