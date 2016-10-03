@@ -47,7 +47,7 @@ var (
 	useGanesha   = flag.Bool("use-ganesha", true, "If the provisioner will create volumes using NFS Ganesha (D-Bus method calls) as opposed to using the kernel NFS server ('exportfs -o'). If run-server is true, this must be true. Default true.")
 )
 
-const ganeshaConfig = "/export/_vfs.conf"
+const ganeshaConfig = "/export/vfs.conf"
 
 func main() {
 	flag.Set("logtostderr", "true")

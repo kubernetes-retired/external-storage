@@ -14,11 +14,7 @@ $ API_HOST=172.17.0.1 KUBE_ENABLE_CLUSTER_DNS=true hack/local-up-cluster.sh
 
 Decide on a unique name to give the provisioner that follows the naming scheme `<vendor name>/<provisioner name>`. The provisioner will only provision volumes for claims that request a `StorageClass` with a provisioner field set equal to this name.
 
-Decide how to run nfs-provisioner. It can be run in Kubernetes as a pod or outside of Kubernetes as a standalone container.
-
-* If you want to back your nfs-provisioner's exports with persistent storage, by mounting something at the `/export` directory it provisions out of, you should run it as a deployment with a service so that the provisioned `PersistentVolumes` are more likely to stay usable/mountable for longer than the lifetime of a single nfs-provisioner pod. A nfs-provisioner pod can use a service's cluster IP as the NFS server IP to put on its `PersistentVolumes`, instead of its own unstable pod IP, if the name of a service targeting it is passed in via the `MY_SERVICE_NAME` environment variable. Because nfs-provisioner uses an NFS Ganesha configuration file at `/export/_vfs.conf`, if one pod dies and the deployment starts another, the new pod will reuse the config file and directories will be re-exported.
-
-* Otherwise, if you don't care to back your nfs-provisioner's exports with persistent storage, there is no reason to use a service and you can just run it as a pod. Since in this case the pod is provisioning out of ephemeral storage inside the container, the `PersistentVolumes` it provisions will only be useful for as long as the pod is running anyway.
+Decide how to run nfs-provisioner. It can be run in Kubernetes as a pod or outside of Kubernetes as a standalone container. See [here](#a-note-on-deciding-how-to-run) for help on deciding between a pod and deployment; in short, if you want to back your shares with persistent storage, running a deployment & service has some benefits.
 
 ### In Kubernetes - Pod
 
@@ -33,7 +29,7 @@ pod "nfs-provisioner" created
 
 Edit the `provisioner` argument in the `args` field in `deploy/kube-config/deployment.yaml` to be the provisioner's name you decided on. 
 
-`deploy/kube-config/deployment.yaml` specifies a `hostPath` volume and a `nodeSelector`. Pick a node to deploy nfs-provisioner on and label it to match the `nodeSelector`.
+`deploy/kube-config/deployment.yaml` specifies a `hostPath` volume and a `nodeSelector`. You can substitute the `hostPath` volume with your own persistent storage if you like, just mount it at `/export`. Pick a node to deploy nfs-provisioner on and label it to match the `nodeSelector`.
 
 ```
 $ kubectl label node 127.0.0.1 app=matthew-nfs
@@ -70,7 +66,15 @@ or
 $ docker run --privileged wongma7/nfs-provisioner:latest -provisioner=matthew/nfs -out-of-cluster=true -master=http://172.17.0.1:8080
 ```
 
+#### A note on deciding how to run
+
+* If you want to back your nfs-provisioner's exports with persistent storage, you can mount something at the `/export` directory, where the provisioner creates unique directories for each provisioned volume. In this case you should run it as a deployment with a service so that the provisioned `PersistentVolumes` are more likely to stay usable/mountable for longer than the lifetime of a single nfs-provisioner pod. A nfs-provisioner pod can use a service's cluster IP as the NFS server IP to put on its `PersistentVolumes`, instead of its own unstable pod IP, if the name of a service targeting it is passed in via the `MY_SERVICE_NAME` environment variable. Because nfs-provisioner uses an NFS Ganesha configuration file at `/export/vfs.conf`, if one pod dies and the deployment starts another, the new pod will reuse the config file and directories will be re-exported to the same cluster IP.
+
+* Otherwise, if you don't care to back your nfs-provisioner's exports with persistent storage, there is no reason to use a service and you can just run it as a pod. Since in this case the pod is provisioning out of ephemeral storage inside the container, the `PersistentVolumes` it provisions will only be useful for as long as the pod is running anyway.
+
+
 #### Arguments 
+
 * `provisioner` - Name of the provisioner. The provisioner will only provision volumes for claims that request a StorageClass with a provisioner field set equal to this name.
 * `out-of-cluster` - If the provisioner is being run out of cluster. Set the master or kubeconfig flag accordingly if true. Default false.
 * `master` - Master URL to build a client config from. Either this or kubeconfig needs to be set if the provisioner is being run out of cluster.
