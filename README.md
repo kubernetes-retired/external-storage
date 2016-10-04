@@ -13,5 +13,8 @@ To use nfs-provisioner once it is deployed see [Usage](docs/usage.md).
 For information on running multiple instances of nfs-provisioner see [Running Multiple Provisioners](docs/multiple.md).
 
 ## TODO
->Currently, the provisioner creates the NFS shares that back provisioned `PersistentVolumes` by making unique, deterministically named directories in `/export` for each volume. No quotaing or security/permissions yet.
+* Quotaing
+* Security
+* Fix dependency vendoring (pending client-go things)
+
 

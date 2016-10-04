@@ -14,7 +14,7 @@ $ API_HOST=172.17.0.1 KUBE_ENABLE_CLUSTER_DNS=true hack/local-up-cluster.sh
 
 Decide on a unique name to give the provisioner that follows the naming scheme `<vendor name>/<provisioner name>`. The provisioner will only provision volumes for claims that request a `StorageClass` with a provisioner field set equal to this name.
 
-Decide how to run nfs-provisioner. It can be run in Kubernetes as a pod or outside of Kubernetes as a standalone container. See [here](#a-note-on-deciding-how-to-run) for help on deciding between a pod and deployment; in short, if you want to back your shares with persistent storage, running a deployment & service has some benefits.
+Decide how to run nfs-provisioner. It can be run in Kubernetes as a pod or outside of Kubernetes as a standalone container or binary. See [here](#a-note-on-deciding-how-to-run) for help on deciding between a pod and deployment; in short, if you want to back your shares with persistent storage, running a deployment & service has some benefits.
 
 ### In Kubernetes - Pod
 
@@ -96,4 +96,4 @@ $ sudo ./nfs-provisioner -provisioner=matthew/nfs -out-of-cluster=true -master=h
 * `master` - Master URL to build a client config from. Either this or kubeconfig needs to be set if the provisioner is being run out of cluster.
 * `kubeconfig` - Absolute path to the kubeconfig file. Either this or master needs to be set if the provisioner is being run out of cluster.
 * `run-server` - If the provisioner is responsible for running the NFS server, i.e. starting and stopping NFS Ganesha. Default true.
-* `useGanesha` - If the provisioner will create volumes using NFS Ganesha (D-Bus method calls) as opposed to using the kernel NFS server ('exportfs'). If run-server is true, this must be true. Default true.
+* `use-ganesha` - If the provisioner will create volumes using NFS Ganesha (D-Bus method calls) as opposed to using the kernel NFS server ('exportfs'). If run-server is true, this must be true. Default true.
