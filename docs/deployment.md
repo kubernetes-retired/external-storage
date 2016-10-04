@@ -66,6 +66,22 @@ or
 $ docker run --privileged wongma7/nfs-provisioner:latest -provisioner=matthew/nfs -out-of-cluster=true -master=http://172.17.0.1:8080
 ```
 
+### Outside of Kubernetes - binary
+
+Running nfs-provisioner in this way allows it to manipulate exports directly on the host machine. It runs assuming the host is already running either NFS Ganesha or a kernel NFS server, depending on how the `use-ganesha` flag is set. Use with caution.
+
+Run nfs-provisioner with `provisioner` equal to the name you decided on, `out-of-cluster` set true, one of `master` or `kubeconfig` set, `run-server` set false, and `use-ganesha` set according to how the NFS server is running on the host. It probably needs to be run as root. 
+
+```
+$ sudo ./nfs-provisioner -provisioner=matthew/nfs -out-of-cluster=true -kubeconfig=/config -run-server=false -use-ganesha=false
+```
+
+or
+
+```
+$ sudo ./nfs-provisioner -provisioner=matthew/nfs -out-of-cluster=true -master=http://172.17.0.1:8080 -run-server=false -use-ganesha=false
+```
+
 #### A note on deciding how to run
 
 * If you want to back your nfs-provisioner's exports with persistent storage, you can mount something at the `/export` directory, where the provisioner creates unique directories for each provisioned volume. In this case you should run it as a deployment with a service so that the provisioned `PersistentVolumes` are more likely to stay usable/mountable for longer than the lifetime of a single nfs-provisioner pod. A nfs-provisioner pod can use a service's cluster IP as the NFS server IP to put on its `PersistentVolumes`, instead of its own unstable pod IP, if the name of a service targeting it is passed in via the `MY_SERVICE_NAME` environment variable. Because nfs-provisioner uses an NFS Ganesha configuration file at `/export/vfs.conf`, if one pod dies and the deployment starts another, the new pod will reuse the config file and directories will be re-exported to the same cluster IP.
@@ -80,3 +96,4 @@ $ docker run --privileged wongma7/nfs-provisioner:latest -provisioner=matthew/nf
 * `master` - Master URL to build a client config from. Either this or kubeconfig needs to be set if the provisioner is being run out of cluster.
 * `kubeconfig` - Absolute path to the kubeconfig file. Either this or master needs to be set if the provisioner is being run out of cluster.
 * `run-server` - If the provisioner is responsible for running the NFS server, i.e. starting and stopping NFS Ganesha. Default true.
+* `useGanesha` - If the provisioner will create volumes using NFS Ganesha (D-Bus method calls) as opposed to using the kernel NFS server ('exportfs'). If run-server is true, this must be true. Default true.
