@@ -13,8 +13,9 @@ To use nfs-provisioner once it is deployed see [Usage](docs/usage.md).
 For information on running multiple instances of nfs-provisioner see [Running Multiple Provisioners](docs/multiple.md).
 
 ## TODO
-* Quotaing
-* Security
+* Testing
 * Fix dependency vendoring (pending client-go things)
-
-
+* Use-cases
+* Security
+* Privileged flag
+* Quotaing
