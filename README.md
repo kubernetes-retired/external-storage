@@ -13,9 +13,10 @@ To use nfs-provisioner once it is deployed see [Usage](docs/usage.md).
 For information on running multiple instances of nfs-provisioner see [Running Multiple Provisioners](docs/multiple.md).
 
 ## TODO
-* Testing
+* CI & testing
 * Fix dependency vendoring (pending client-go things)
-* Use-cases
-* Security
-* Privileged flag
-* Quotaing
+* Use-case documentation
+* Security: respecting SCC & PSP, restrict each share to a GID & use supplemental groups feature for access (pending nfs-ganesha things)
+* Privileged flag: is it needed now that NFS ganesha is being used, if not are any specific capabilities needed, etc.?
+* Quotaing (currently size request is ignored)
+* "Static" exports: expose existing exports to kubernetes
