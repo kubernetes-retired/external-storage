@@ -28,6 +28,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 
 	"github.com/golang/glog"
 	"github.com/guelfey/go.dbus"
@@ -175,6 +176,15 @@ func (p *nfsProvisioner) createVolume(options VolumeOptions) (string, string, in
 	server, err := p.getServer()
 	if err != nil {
 		return "", "", 0, "", 0, fmt.Errorf("error getting NFS server IP for created volume: %v", err)
+	}
+
+	var stat syscall.Statfs_t
+	syscall.Statfs(p.exportDir, &stat)
+	capacity := options.Capacity.Value()
+	// Available blocks * size per block = available space in bytes
+	available := int64(stat.Bavail) * int64(stat.Bsize)
+	if capacity > available {
+		return "", "", 0, "", 0, fmt.Errorf("not enough available space %v bytes to satisfy claim for %v bytes", available, capacity)
 	}
 
 	// TODO quota, something better than just directories
