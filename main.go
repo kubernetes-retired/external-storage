@@ -30,6 +30,7 @@ import (
 	"github.com/wongma7/nfs-provisioner/server"
 	vol "github.com/wongma7/nfs-provisioner/volume"
 
+	"k8s.io/client-go/1.4/discovery"
 	"k8s.io/client-go/1.4/kubernetes"
 	"k8s.io/client-go/1.4/pkg/util/validation"
 	"k8s.io/client-go/1.4/pkg/util/validation/field"
@@ -98,8 +99,13 @@ func main() {
 		glog.Errorf("Failed to create client: %v", err)
 		stopServerAndExit()
 	}
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
+	if err != nil {
+		glog.Errorf("Failed to create discovery client: %v", err)
+		stopServerAndExit()
+	}
 
-	nfsProvisioner := vol.NewNFSProvisioner("/export/", clientset, *useGanesha, ganeshaConfig)
+	nfsProvisioner := vol.NewNFSProvisioner("/export/", clientset, discoveryClient, *useGanesha, ganeshaConfig)
 
 	// Start the provision controller which will dynamically provision NFS PVs
 	pc := controller.NewProvisionController(clientset, 15*time.Second, *provisioner, nfsProvisioner)

@@ -32,53 +32,59 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/guelfey/go.dbus"
+	"k8s.io/client-go/1.4/discovery"
 	"k8s.io/client-go/1.4/kubernetes"
 	"k8s.io/client-go/1.4/pkg/api/v1"
 	"k8s.io/client-go/1.4/pkg/apis/extensions/v1beta1"
 )
 
 const (
-	downwardAnnotations    = "/podinfo/annotations"
+	// ValidatedPSPAnnotation is the annotation on the pod object that specifies
+	// the name of the PSP the pod validated against, if any.
 	ValidatedPSPAnnotation = "kubernetes.io/psp"
-
-	// are we allowed to set this? else make up our own
-	annCreatedBy = "kubernetes.io/createdby"
-	createdBy    = "nfs-dynamic-provisioner"
-
-	// An annotation for the entire ganesha EXPORT block, needed for
-	// deletion.
-	annBlock = "EXPORT_block"
-
-	// An annotation for the Export_Id of this PV's backing ganesha EXPORT, needed
-	// for deletion.
-	annExportId = "Export_Id"
-
-	// An annotation for the line in /etc/exports, needed for deletion.
-	annLine = "etcexports_line"
 
 	// VolumeGidAnnotationKey is the key of the annotation on the PersistentVolume
 	// object that specifies a supplemental GID.
 	VolumeGidAnnotationKey = "pv.beta.kubernetes.io/gid"
+
+	// A PV annotation for the entire ganesha EXPORT block, needed for ganesha
+	// deletion.
+	annBlock = "EXPORT_block"
+
+	// A PV annotation for the Export_Id of this PV's backing ganesha EXPORT,
+	// needed for ganesha deletion.
+	annExportId = "Export_Id"
+
+	// A PV annotation for the line in /etc/exports, needed for kernel deletion.
+	annLine = "etcexports_line"
+
+	// are we allowed to set this? else make up our own
+	annCreatedBy = "kubernetes.io/createdby"
+	createdBy    = "nfs-dynamic-provisioner"
 )
 
-func NewNFSProvisioner(exportDir string, client kubernetes.Interface, useGanesha bool, ganeshaConfig string) Provisioner {
+func NewNFSProvisioner(exportDir string, client kubernetes.Interface, discoveryClient discovery.DiscoveryInterface, useGanesha bool, ganeshaConfig string) Provisioner {
 	provisioner := &nfsProvisioner{
-		exportDir:     exportDir,
-		client:        client,
-		useGanesha:    useGanesha,
-		ganeshaConfig: ganeshaConfig,
-		nextExportId:  0,
-		mutex:         &sync.Mutex{},
-		ranges:        []v1beta1.IDRange{{Min: int64(0), Max: int64(65533)}},
+		exportDir:               exportDir,
+		client:                  client,
+		discoveryClient:         discoveryClient,
+		useGanesha:              useGanesha,
+		ganeshaConfig:           ganeshaConfig,
+		nextExportId:            0,
+		mutex:                   &sync.Mutex{},
+		ranges:                  []v1beta1.IDRange{{Min: int64(0), Max: int64(65533)}},
+		downwardAnnotationsFile: "/podinfo/annotations",
+		podIPEnv:                "MY_POD_IP",
+		serviceEnv:              "MY_SERVICE_NAME",
+		namespaceEnv:            "MY_POD_NAMESPACE",
 	}
 
-	// TODO SCC. use discovery?
 	psp, err := provisioner.getPSP()
 	if err != nil {
 		// TODO is this an error to fail on?
 		glog.Infof("error getting provisioner pod's psp, falling back to random gid")
 	} else {
-		ranges := provisioner.getPSPSupplementalGroups(psp)
+		ranges := getPSPSupplementalGroups(psp)
 		if ranges != nil {
 			provisioner.ranges = ranges
 		}
@@ -95,6 +101,9 @@ type nfsProvisioner struct {
 	// provisioned PVs
 	client kubernetes.Interface
 
+	// Discovery client, needed for discovering if SCC's are supported
+	discoveryClient discovery.DiscoveryInterface
+
 	// Whether to use NFS Ganesha (D-Bus method calls) or kernel NFS server
 	// (exportfs)
 	useGanesha bool
@@ -110,6 +119,17 @@ type nfsProvisioner struct {
 
 	// Ranges of gids to assign to PV's
 	ranges []v1beta1.IDRange
+
+	// Path of the file where the provisioner pod's annotations are exposed via a
+	// downward API volume. Needed to discover what PSP the pod validated against.
+	downwardAnnotationsFile string
+
+	// Environment variables the provisioner pod needs valid values for in order to
+	// put a service cluster IP as the server of provisioned NFS PVs, passed in
+	// via downward API. If serviceEnv is set, namespaceEnv must be too.
+	podIPEnv     string
+	serviceEnv   string
+	namespaceEnv string
 }
 
 var _ Provisioner = &nfsProvisioner{}
@@ -179,7 +199,9 @@ func (p *nfsProvisioner) createVolume(options VolumeOptions) (string, string, in
 	}
 
 	var stat syscall.Statfs_t
-	syscall.Statfs(p.exportDir, &stat)
+	if err := syscall.Statfs(p.exportDir, &stat); err != nil {
+		return "", "", 0, "", 0, fmt.Errorf("error calling statfs on %v: %v", p.exportDir, err)
+	}
 	capacity := options.Capacity.Value()
 	// Available blocks * size per block = available space in bytes
 	available := int64(stat.Bavail) * int64(stat.Bsize)
@@ -237,11 +259,11 @@ func (p *nfsProvisioner) createVolume(options VolumeOptions) (string, string, in
 
 // getServer gets the server IP to put in a provisioned PV's spec.
 func (p *nfsProvisioner) getServer() (string, error) {
-	// Use either `hostname -i` or MY_POD_IP as the fallback server
+	// Use either `hostname -i` or podIPEnv as the fallback server
 	var fallbackServer string
-	podIP := os.Getenv("MY_POD_IP")
+	podIP := os.Getenv(p.podIPEnv)
 	if podIP == "" {
-		glog.Info("env MY_POD_IP isn't set or provisioner isn't running as a pod")
+		glog.Infof("pod IP env %s isn't set or provisioner isn't running as a pod", p.podIPEnv)
 		out, err := exec.Command("hostname", "-i").Output()
 		if err != nil {
 			return "", fmt.Errorf("hostname -i failed with error: %v, output: %s", err, out)
@@ -251,23 +273,23 @@ func (p *nfsProvisioner) getServer() (string, error) {
 		fallbackServer = podIP
 	}
 
-	// Try to use the service's cluster IP as the server if MY_SERVICE_NAME is
+	// Try to use the service's cluster IP as the server if serviceEnv is
 	// specified. Otherwise, use fallback here.
-	serviceName := os.Getenv("MY_SERVICE_NAME")
+	serviceName := os.Getenv(p.serviceEnv)
 	if serviceName == "" {
-		glog.Info("env MY_SERVICE_NAME isn't set, falling back to using `hostname -i` or pod IP as server IP")
+		glog.Infof("service env %s isn't set, falling back to using `hostname -i` or pod IP as server IP", p.serviceEnv)
 		return fallbackServer, nil
 	}
 
 	// From this point forward, rather than fallback & provision non-persistent
 	// where persistent is expected, just return an error.
-	namespace := os.Getenv("MY_POD_NAMESPACE")
+	namespace := os.Getenv(p.namespaceEnv)
 	if namespace == "" {
-		return "", fmt.Errorf("env MY_SERVICE_NAME is set but MY_POD_NAMESPACE isn't; no way to get the service cluster IP")
+		return "", fmt.Errorf("service env %s is set but namespace env %s isn't; no way to get the service cluster IP", p.serviceEnv, p.namespaceEnv)
 	}
 	service, err := p.client.Core().Services(namespace).Get(serviceName)
 	if err != nil {
-		return "", fmt.Errorf("error getting service MY_SERVICE_NAME=%s in MY_POD_NAMESPACE=%s", serviceName, namespace)
+		return "", fmt.Errorf("error getting service %s=%s in namespace %s=%s", p.serviceEnv, serviceName, p.namespaceEnv, namespace)
 	}
 
 	// Do some validation of the service before provisioning useless volumes
@@ -301,10 +323,10 @@ func (p *nfsProvisioner) getServer() (string, error) {
 		break
 	}
 	if !valid {
-		return "", fmt.Errorf("service MY_SERVICE_NAME=%s is not valid; check that it has for ports %v one endpoint, this pod's IP %v", serviceName, expectedPorts, fallbackServer)
+		return "", fmt.Errorf("service %s=%s is not valid; check that it has for ports %v one endpoint, this pod's IP %v", p.serviceEnv, serviceName, expectedPorts, fallbackServer)
 	}
 	if service.Spec.ClusterIP == v1.ClusterIPNone {
-		return "", fmt.Errorf("service MY_SERVICE_NAME=%s is valid but it doesn't have a cluster IP", serviceName)
+		return "", fmt.Errorf("service %s=%s is valid but it doesn't have a cluster IP", p.serviceEnv, serviceName)
 	}
 
 	return service.Spec.ClusterIP, nil
@@ -454,22 +476,9 @@ func (p *nfsProvisioner) removeFromFile(path string, toRemove string) error {
 	return nil
 }
 
-// getPSPSupplementalGroups returns the SupplementalGroup Ranges of the PSP the
-// provisioner pod validated against or nil if the PSP doesn't impose gid range
-// rules.
-func (p *nfsProvisioner) getPSPSupplementalGroups(psp *v1beta1.PodSecurityPolicy) []v1beta1.IDRange {
-	if psp == nil {
-		return nil
-	}
-	if psp.Spec.SupplementalGroups.Rule != v1beta1.SupplementalGroupsStrategyMustRunAs {
-		return nil
-	}
-	return psp.Spec.SupplementalGroups.Ranges
-}
-
 // getPSP returns the PSP the provisioner pod validated against
 func (p *nfsProvisioner) getPSP() (*v1beta1.PodSecurityPolicy, error) {
-	pspName, err := getPodAnnotation(ValidatedPSPAnnotation)
+	pspName, err := p.getPodAnnotation(ValidatedPSPAnnotation)
 	if err != nil {
 		return nil, fmt.Errorf("error getting pod annotation %s: %v", ValidatedPSPAnnotation, err)
 	}
@@ -480,10 +489,10 @@ func (p *nfsProvisioner) getPSP() (*v1beta1.PodSecurityPolicy, error) {
 	return psp, nil
 }
 
-// getPodAnnotation returns the value of the given annotation on the pod or an
-// empty string if the annotation doesn't exist.
-func getPodAnnotation(annotation string) (string, error) {
-	read, err := ioutil.ReadFile(downwardAnnotations)
+// getPodAnnotation returns the value of the given annotation on the provisioner
+// pod or an empty string if the annotation doesn't exist.
+func (p *nfsProvisioner) getPodAnnotation(annotation string) (string, error) {
+	read, err := ioutil.ReadFile(p.downwardAnnotationsFile)
 	if err != nil {
 		return "", fmt.Errorf("error reading downward API annotations volume: %v", err)
 	}
@@ -493,4 +502,16 @@ func getPodAnnotation(annotation string) (string, error) {
 		return "", nil
 	}
 	return string(line), nil
+}
+
+// getPSPSupplementalGroups returns the SupplementalGroup Ranges of the PSP or
+// nil if the PSP doesn't impose gid range rules.
+func getPSPSupplementalGroups(psp *v1beta1.PodSecurityPolicy) []v1beta1.IDRange {
+	if psp == nil {
+		return nil
+	}
+	if psp.Spec.SupplementalGroups.Rule != v1beta1.SupplementalGroupsStrategyMustRunAs {
+		return nil
+	}
+	return psp.Spec.SupplementalGroups.Ranges
 }
