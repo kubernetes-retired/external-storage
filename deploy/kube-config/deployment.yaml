@@ -41,9 +41,18 @@ spec:
           volumeMounts:
             - name: export-volume
               mountPath: /export
+            - name: podinfo
+              mountPath: /podinfo
+              readOnly: false
       volumes:
         - name: export-volume
           hostPath:
             path: /srv
+        - name: podinfo
+          downwardAPI:
+            items:
+              - path: "annotations"
+                fieldRef:
+                  fieldPath: metadata.annotations
       nodeSelector:
         app: matthew-nfs

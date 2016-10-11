@@ -99,7 +99,7 @@ func main() {
 		stopServerAndExit()
 	}
 
-	nfsProvisioner := vol.NewNFSProvisioner("/export/", ganeshaConfig, *useGanesha, clientset)
+	nfsProvisioner := vol.NewNFSProvisioner("/export/", clientset, *useGanesha, ganeshaConfig)
 
 	// Start the provision controller which will dynamically provision NFS PVs
 	pc := controller.NewProvisionController(clientset, 15*time.Second, *provisioner, nfsProvisioner)

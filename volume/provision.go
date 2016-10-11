@@ -17,8 +17,10 @@ limitations under the License.
 package volume
 
 import (
+	"crypto/rand"
 	"fmt"
 	"io/ioutil"
+	"math/big"
 	"os"
 	"os/exec"
 	"reflect"
@@ -31,54 +33,82 @@ import (
 	"github.com/guelfey/go.dbus"
 	"k8s.io/client-go/1.4/kubernetes"
 	"k8s.io/client-go/1.4/pkg/api/v1"
+	"k8s.io/client-go/1.4/pkg/apis/extensions/v1beta1"
 )
 
-// are we allowed to set this? else make up our own
-const annCreatedBy = "kubernetes.io/createdby"
-const createdBy = "nfs-dynamic-provisioner"
+const (
+	downwardAnnotations    = "/podinfo/annotations"
+	ValidatedPSPAnnotation = "kubernetes.io/psp"
 
-// An annotation for the entire ganesha EXPORT block, useful but not needed for
-// deletion.
-const annBlock = "EXPORT_block"
+	// are we allowed to set this? else make up our own
+	annCreatedBy = "kubernetes.io/createdby"
+	createdBy    = "nfs-dynamic-provisioner"
 
-// An annotation for the Export_Id of this PV's backing ganesha EXPORT, needed
-// for deletion.
-const annExportId = "Export_Id"
+	// An annotation for the entire ganesha EXPORT block, needed for
+	// deletion.
+	annBlock = "EXPORT_block"
 
-// An annotation for the line in /etc/exports, needed for deletion.
-const annLine = "etcexports_line"
+	// An annotation for the Export_Id of this PV's backing ganesha EXPORT, needed
+	// for deletion.
+	annExportId = "Export_Id"
 
-func NewNFSProvisioner(exportDir string, ganeshaConfig string, useGanesha bool, client kubernetes.Interface) Provisioner {
-	return &nfsProvisioner{
+	// An annotation for the line in /etc/exports, needed for deletion.
+	annLine = "etcexports_line"
+
+	// VolumeGidAnnotationKey is the key of the annotation on the PersistentVolume
+	// object that specifies a supplemental GID.
+	VolumeGidAnnotationKey = "pv.beta.kubernetes.io/gid"
+)
+
+func NewNFSProvisioner(exportDir string, client kubernetes.Interface, useGanesha bool, ganeshaConfig string) Provisioner {
+	provisioner := &nfsProvisioner{
 		exportDir:     exportDir,
-		ganeshaConfig: ganeshaConfig,
-		useGanesha:    useGanesha,
 		client:        client,
+		useGanesha:    useGanesha,
+		ganeshaConfig: ganeshaConfig,
 		nextExportId:  0,
 		mutex:         &sync.Mutex{},
+		ranges:        []v1beta1.IDRange{{Min: int64(0), Max: int64(65533)}},
 	}
+
+	// TODO SCC. use discovery?
+	psp, err := provisioner.getPSP()
+	if err != nil {
+		// TODO is this an error to fail on?
+		glog.Infof("error getting provisioner pod's psp, falling back to random gid")
+	} else {
+		ranges := provisioner.getPSPSupplementalGroups(psp)
+		if ranges != nil {
+			provisioner.ranges = ranges
+		}
+	}
+
+	return provisioner
 }
 
 type nfsProvisioner struct {
 	// The directory to create PV-backing directories in
 	exportDir string
 
-	// The path of the NFS Ganesha configuration file
-	ganeshaConfig string
+	// Client, needed for getting a service cluster IP to put as the NFS server of
+	// provisioned PVs
+	client kubernetes.Interface
 
 	// Whether to use NFS Ganesha (D-Bus method calls) or kernel NFS server
 	// (exportfs)
 	useGanesha bool
 
-	// Client, needed for getting a service cluster IP to put as the NFS server of
-	// provisioned PVs
-	client kubernetes.Interface
+	// The path of the NFS Ganesha configuration file
+	ganeshaConfig string
 
 	// Incremented for assigning each export a unique ID, required by ganesha
 	nextExportId int
 
 	// Lock for writing to the ganesha config or /etc/exports file
 	mutex *sync.Mutex
+
+	// Ranges of gids to assign to PV's
+	ranges []v1beta1.IDRange
 }
 
 var _ Provisioner = &nfsProvisioner{}
@@ -86,13 +116,14 @@ var _ Provisioner = &nfsProvisioner{}
 // Provision creates a volume i.e. the storage asset and returns a PV object for
 // the volume.
 func (p *nfsProvisioner) Provision(options VolumeOptions) (*v1.PersistentVolume, error) {
-	server, path, added, exportId, err := p.createVolume(options)
+	server, path, gid, added, exportId, err := p.createVolume(options)
 	if err != nil {
 		return nil, err
 	}
 
 	annotations := make(map[string]string)
 	annotations[annCreatedBy] = createdBy
+	annotations[VolumeGidAnnotationKey] = strconv.FormatInt(gid, 10)
 	if p.useGanesha {
 		annotations[annBlock] = added
 		annotations[annExportId] = strconv.Itoa(exportId)
@@ -126,25 +157,24 @@ func (p *nfsProvisioner) Provision(options VolumeOptions) (*v1.PersistentVolume,
 }
 
 // createVolume creates a volume i.e. the storage asset. It creates a unique
-// directory under /export and exports it. Returns the server IP and the path of
-// the directory. Also returns the block or line it added to either the ganesha
-// config or /etc/exports, respectively. If using ganesha, returns a non-zero
-// Export_Id.
-func (p *nfsProvisioner) createVolume(options VolumeOptions) (string, string, string, int, error) {
+// directory under /export and exports it. Returns the server IP, the path, and
+// gid. Also returns the block or line it added to either the ganesha config or
+// /etc/exports, respectively. If using ganesha, returns a non-zero Export_Id.
+func (p *nfsProvisioner) createVolume(options VolumeOptions) (string, string, int64, string, int, error) {
 	// TODO take and validate Parameters
 	if options.Parameters != nil {
-		return "", "", "", 0, fmt.Errorf("invalid parameter: no StorageClass parameters are supported")
+		return "", "", 0, "", 0, fmt.Errorf("invalid parameter: no StorageClass parameters are supported")
 	}
 
 	// TODO implement options.ProvisionerSelector parsing
 	// TODO pv.Labels MUST be set to match claim.spec.selector
 	if options.Selector != nil {
-		return "", "", "", 0, fmt.Errorf("claim.Spec.Selector is not supported")
+		return "", "", 0, "", 0, fmt.Errorf("claim.Spec.Selector is not supported")
 	}
 
 	server, err := p.getServer()
 	if err != nil {
-		return "", "", "", 0, fmt.Errorf("error getting NFS server IP for created volume: %v", err)
+		return "", "", 0, "", 0, fmt.Errorf("error getting NFS server IP for created volume: %v", err)
 	}
 
 	// TODO quota, something better than just directories
@@ -153,26 +183,45 @@ func (p *nfsProvisioner) createVolume(options VolumeOptions) (string, string, st
 	// when AddExport or exportfs is called.
 	path := fmt.Sprintf(p.exportDir+"%s", options.PVName)
 	if _, err := os.Stat(path); err == nil {
-		return "", "", "", 0, fmt.Errorf("error creating volume, the path already exists")
+		return "", "", 0, "", 0, fmt.Errorf("error creating volume, the path already exists")
 	}
-	if err := os.MkdirAll(path, 0750); err != nil {
-		return "", "", "", 0, fmt.Errorf("error creating dir for volume: %v", err)
+	// Execute permission is required for stat, which kubelet uses during unmount.
+	if err := os.MkdirAll(path, 0071); err != nil {
+		return "", "", 0, "", 0, fmt.Errorf("error creating dir for volume: %v", err)
+	}
+	// Due to umask, need to chmod
+	cmd := exec.Command("chmod", "071", path)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		os.RemoveAll(path)
+		return "", "", 0, "", 0, fmt.Errorf("chmod failed with error: %v, output: %s", err, out)
+	}
+
+	gid, err := p.generateSupplementalGroup()
+	if err != nil {
+		return "", "", 0, "", 0, fmt.Errorf("error generating SupplementalGroup: %v", err)
+	}
+	cmd = exec.Command("chgrp", strconv.FormatInt(gid, 10), path)
+	out, err = cmd.CombinedOutput()
+	if err != nil {
+		os.RemoveAll(path)
+		return "", "", 0, "", 0, fmt.Errorf("chgrp failed with error: %v, output: %s", err, out)
 	}
 
 	if p.useGanesha {
 		block, exportId, err := p.ganeshaExport(path)
 		if err != nil {
 			os.RemoveAll(path)
-			return "", "", "", 0, err
+			return "", "", 0, "", 0, err
 		}
-		return server, path, block, exportId, nil
+		return server, path, gid, block, exportId, nil
 	} else {
 		line, err := p.kernelExport(path)
 		if err != nil {
 			os.RemoveAll(path)
-			return "", "", "", 0, err
+			return "", "", 0, "", 0, err
 		}
-		return server, path, line, 0, nil
+		return server, path, gid, line, 0, nil
 	}
 }
 
@@ -251,6 +300,29 @@ func (p *nfsProvisioner) getServer() (string, error) {
 	return service.Spec.ClusterIP, nil
 }
 
+// generateSupplementalGroup generates a random SupplementalGroup from the
+// provisioners ranges of SupplementalGroups. Picks a random range then a random
+// value within it
+// TODO make this better
+func (p *nfsProvisioner) generateSupplementalGroup() (int64, error) {
+	if len(p.ranges) == 0 {
+		return 0, fmt.Errorf("provisioner has empty ranges, can't generate SupplementalGroup")
+	}
+	rng := p.ranges[0]
+	if len(p.ranges) > 0 {
+		i, err := rand.Int(rand.Reader, big.NewInt(int64(len(p.ranges))))
+		if err != nil {
+			return 0, fmt.Errorf("error getting rand value: %v", err)
+		}
+		rng = p.ranges[i.Int64()]
+	}
+	i, err := rand.Int(rand.Reader, big.NewInt(rng.Max-rng.Min+1))
+	if err != nil {
+		return 0, fmt.Errorf("error getting rand value: %v", err)
+	}
+	return rng.Min + i.Int64(), nil
+}
+
 // ganeshaExport exports the given directory using NFS Ganesha, assuming it is
 // running and can be connected to using D-Bus. Returns the block it added to
 // the ganesha config file and the block's Export_Id.
@@ -285,6 +357,9 @@ func (p *nfsProvisioner) ganeshaExport(path string) (string, int, error) {
 	block = block + "\tExport_Id = " + strconv.Itoa(exportId) + ";\n"
 	block = block + "\tPath = " + path + ";\n" +
 		"\tPseudo = " + path + ";\n" +
+		"\tAccess_Type = RW;\n" +
+		"\tSquash = root_id_squash;\n" +
+		"\tSecType = sys;\n" +
 		"\tFSAL {\n\t\tName = VFS;\n\t}\n}\n"
 
 	// Add the export block to the ganesha config file
@@ -311,7 +386,7 @@ func (p *nfsProvisioner) ganeshaExport(path string) (string, int, error) {
 // kernelExport exports the given directory using the NFS server, assuming it is
 // running. Returns the line it added to /etc/exports.
 func (p *nfsProvisioner) kernelExport(path string) (string, error) {
-	line := "\n" + path + " *(rw,insecure,no_root_squash)\n"
+	line := "\n" + path + " *(rw,insecure,root_squash)\n"
 
 	// Add the export directory line to /etc/exports
 	if err := p.addToFile("/etc/exports", line); err != nil {
@@ -359,7 +434,6 @@ func (p *nfsProvisioner) removeFromFile(path string, toRemove string) error {
 	}
 
 	removed := strings.Replace(string(read), toRemove, "", -1)
-
 	err = ioutil.WriteFile(path, []byte(removed), 0)
 	if err != nil {
 		p.mutex.Unlock()
@@ -368,4 +442,45 @@ func (p *nfsProvisioner) removeFromFile(path string, toRemove string) error {
 
 	p.mutex.Unlock()
 	return nil
+}
+
+// getPSPSupplementalGroups returns the SupplementalGroup Ranges of the PSP the
+// provisioner pod validated against or nil if the PSP doesn't impose gid range
+// rules.
+func (p *nfsProvisioner) getPSPSupplementalGroups(psp *v1beta1.PodSecurityPolicy) []v1beta1.IDRange {
+	if psp == nil {
+		return nil
+	}
+	if psp.Spec.SupplementalGroups.Rule != v1beta1.SupplementalGroupsStrategyMustRunAs {
+		return nil
+	}
+	return psp.Spec.SupplementalGroups.Ranges
+}
+
+// getPSP returns the PSP the provisioner pod validated against
+func (p *nfsProvisioner) getPSP() (*v1beta1.PodSecurityPolicy, error) {
+	pspName, err := getPodAnnotation(ValidatedPSPAnnotation)
+	if err != nil {
+		return nil, fmt.Errorf("error getting pod annotation %s: %v", ValidatedPSPAnnotation, err)
+	}
+	psp, err := p.client.Extensions().PodSecurityPolicies().Get(pspName)
+	if err != nil {
+		return nil, err
+	}
+	return psp, nil
+}
+
+// getPodAnnotation returns the value of the given annotation on the pod or an
+// empty string if the annotation doesn't exist.
+func getPodAnnotation(annotation string) (string, error) {
+	read, err := ioutil.ReadFile(downwardAnnotations)
+	if err != nil {
+		return "", fmt.Errorf("error reading downward API annotations volume: %v", err)
+	}
+	re := regexp.MustCompile("^" + annotation + "=\".*\"$")
+	line := re.Find(read)
+	if line == nil {
+		return "", nil
+	}
+	return string(line), nil
 }

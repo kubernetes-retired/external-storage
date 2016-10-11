@@ -21,3 +21,14 @@ spec:
       args:
         - "-provisioner=matthew/nfs"
       imagePullPolicy: "IfNotPresent"
+      volumeMounts:
+        - name: podinfo
+          mountPath: /podinfo
+          readOnly: false
+  volumes:
+    - name: podinfo
+      downwardAPI:
+        items:
+          - path: "annotations"
+            fieldRef:
+              fieldPath: metadata.annotations

@@ -15,7 +15,8 @@ limitations under the License.
 */
 
 /*
-Some code in here is identical to or modified from code in the PV controller of kubernetes, copyright 2016 The Kubernetes Authors.
+Some code in here is identical to or modified from code in the PV controller of
+kubernetes, copyright 2016 The Kubernetes Authors.
 */
 
 package controller
