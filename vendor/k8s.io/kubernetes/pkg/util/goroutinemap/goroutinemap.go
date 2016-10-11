@@ -43,10 +43,7 @@ const (
 	maxDurationBeforeRetry = 2 * time.Minute
 )
 
-// GoRoutineMap defines a type that can run named goroutines and track their
-// state.  It prevents the creation of multiple goroutines with the same name
-// and may prevent recreation of a goroutine until after the a backoff time
-// has elapsed after the last goroutine with that name finished.
+// GoRoutineMap defines the supported set of operations.
 type GoRoutineMap interface {
 	// Run adds operation name to the list of running operations and spawns a
 	// new go routine to execute the operation.
@@ -62,8 +59,8 @@ type GoRoutineMap interface {
 	// and evaluate results after that.
 	Wait()
 
-	// IsOperationPending returns true if the operation is pending (currently
-	// running), otherwise returns false.
+	// IsOperationPending returns true if the operation is pending, otherwise
+	// returns false
 	IsOperationPending(operationName string) bool
 }
 
@@ -85,7 +82,6 @@ type goRoutineMap struct {
 	lock                      sync.RWMutex
 }
 
-// operation holds the state of a single goroutine.
 type operation struct {
 	operationPending bool
 	expBackoff       exponentialbackoff.ExponentialBackoff
@@ -126,8 +122,6 @@ func (grm *goRoutineMap) Run(
 	return nil
 }
 
-// operationComplete handles the completion of a goroutine run in the
-// goRoutineMap.
 func (grm *goRoutineMap) operationComplete(
 	operationName string, err *error) {
 	// Defer operations are executed in Last-In is First-Out order. In this case
