@@ -16,6 +16,8 @@ Decide on a unique name to give the provisioner that follows the naming scheme `
 
 Decide how to run nfs-provisioner. It can be run in Kubernetes as a pod or outside of Kubernetes as a standalone container or binary. See [here](#a-note-on-deciding-how-to-run) for help on deciding between a pod and deployment; in short, if you want to back your shares with persistent storage, running a deployment & service has some benefits.
 
+If you are running in OpenShift, see [here](#a-note-on-running-in-openshift) for information on what authorizations the the pod needs.
+
 ### In Kubernetes - Pod
 
 Edit the `provisioner` argument in the `args` field in `deploy/kube-config/pod.yaml` to be the provisioner's name you decided on. Create the pod.
@@ -88,6 +90,11 @@ $ sudo ./nfs-provisioner -provisioner=matthew/nfs -out-of-cluster=true -master=h
 
 * Otherwise, if you don't care to back your nfs-provisioner's exports with persistent storage, there is no reason to use a service and you can just run it as a pod. Since in this case the pod is provisioning out of ephemeral storage inside the container, the `PersistentVolumes` it provisions will only be useful for as long as the pod is running anyway.
 
+#### A note on running in OpenShift
+
+The pod requires authorization to `list` all `StorageClasses`, `PersistentVolumeClaims`, and `PersistentVolumes` in the cluster. 
+
+The pod will respect the rule for supplemental groups imposed by its PSP, SCC, or namespace when it associates a supplemental group with each of the PVs it creates. For example, if the PSP says the pod can only run with supplemental groups in the range 5000 to 6000, PVs it provisions will have supplemental group annotations within that range. In order to respect the rule the pod needs to be able to `get` its PSP, SCC, or namespace.
 
 #### Arguments 
 
