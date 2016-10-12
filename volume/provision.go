@@ -18,6 +18,7 @@ package volume
 
 import (
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"math/big"
@@ -32,16 +33,22 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/guelfey/go.dbus"
-	"k8s.io/client-go/1.4/discovery"
+	"k8s.io/client-go/1.4/dynamic"
 	"k8s.io/client-go/1.4/kubernetes"
+	"k8s.io/client-go/1.4/pkg/api/unversioned"
 	"k8s.io/client-go/1.4/pkg/api/v1"
 	"k8s.io/client-go/1.4/pkg/apis/extensions/v1beta1"
+	"k8s.io/client-go/1.4/pkg/runtime"
 )
 
 const (
 	// ValidatedPSPAnnotation is the annotation on the pod object that specifies
 	// the name of the PSP the pod validated against, if any.
 	ValidatedPSPAnnotation = "kubernetes.io/psp"
+
+	// ValidatedSCCAnnotation is the annotation on the pod object that specifies
+	// the name of the SCC the pod validated against, if any.
+	ValidatedSCCAnnotation = "openshift.io/scc"
 
 	// VolumeGidAnnotationKey is the key of the annotation on the PersistentVolume
 	// object that specifies a supplemental GID.
@@ -63,32 +70,19 @@ const (
 	createdBy    = "nfs-dynamic-provisioner"
 )
 
-func NewNFSProvisioner(exportDir string, client kubernetes.Interface, discoveryClient discovery.DiscoveryInterface, useGanesha bool, ganeshaConfig string) Provisioner {
+func NewNFSProvisioner(exportDir string, client kubernetes.Interface, dynamicClient *dynamic.Client, useGanesha bool, ganeshaConfig string) Provisioner {
 	provisioner := &nfsProvisioner{
-		exportDir:               exportDir,
-		client:                  client,
-		discoveryClient:         discoveryClient,
-		useGanesha:              useGanesha,
-		ganeshaConfig:           ganeshaConfig,
-		nextExportId:            0,
-		mutex:                   &sync.Mutex{},
-		ranges:                  []v1beta1.IDRange{{Min: int64(0), Max: int64(65533)}},
-		downwardAnnotationsFile: "/podinfo/annotations",
-		podIPEnv:                "MY_POD_IP",
-		serviceEnv:              "MY_SERVICE_NAME",
-		namespaceEnv:            "MY_POD_NAMESPACE",
+		exportDir:     exportDir,
+		client:        client,
+		useGanesha:    useGanesha,
+		ganeshaConfig: ganeshaConfig,
+		nextExportId:  0,
+		mutex:         &sync.Mutex{},
+		podIPEnv:      "MY_POD_IP",
+		serviceEnv:    "MY_SERVICE_NAME",
+		namespaceEnv:  "MY_POD_NAMESPACE",
 	}
-
-	psp, err := provisioner.getPSP()
-	if err != nil {
-		// TODO is this an error to fail on?
-		glog.Infof("error getting provisioner pod's psp, falling back to random gid")
-	} else {
-		ranges := getPSPSupplementalGroups(psp)
-		if ranges != nil {
-			provisioner.ranges = ranges
-		}
-	}
+	provisioner.ranges = getSupplementalGroupsRanges(client, dynamicClient, "/podinfo/annotations", os.Getenv(provisioner.namespaceEnv))
 
 	return provisioner
 }
@@ -100,9 +94,6 @@ type nfsProvisioner struct {
 	// Client, needed for getting a service cluster IP to put as the NFS server of
 	// provisioned PVs
 	client kubernetes.Interface
-
-	// Discovery client, needed for discovering if SCC's are supported
-	discoveryClient discovery.DiscoveryInterface
 
 	// Whether to use NFS Ganesha (D-Bus method calls) or kernel NFS server
 	// (exportfs)
@@ -119,10 +110,6 @@ type nfsProvisioner struct {
 
 	// Ranges of gids to assign to PV's
 	ranges []v1beta1.IDRange
-
-	// Path of the file where the provisioner pod's annotations are exposed via a
-	// downward API volume. Needed to discover what PSP the pod validated against.
-	downwardAnnotationsFile string
 
 	// Environment variables the provisioner pod needs valid values for in order to
 	// put a service cluster IP as the server of provisioned NFS PVs, passed in
@@ -204,7 +191,7 @@ func (p *nfsProvisioner) createVolume(options VolumeOptions) (string, string, in
 	}
 	capacity := options.Capacity.Value()
 	// Available blocks * size per block = available space in bytes
-	available := int64(stat.Bavail) * int64(stat.Bsize)
+	available := int64(stat.Bavail) * stat.Bsize
 	if capacity > available {
 		return "", "", 0, "", 0, fmt.Errorf("not enough available space %v bytes to satisfy claim for %v bytes", available, capacity)
 	}
@@ -476,32 +463,72 @@ func (p *nfsProvisioner) removeFromFile(path string, toRemove string) error {
 	return nil
 }
 
-// getPSP returns the PSP the provisioner pod validated against
-func (p *nfsProvisioner) getPSP() (*v1beta1.PodSecurityPolicy, error) {
-	pspName, err := p.getPodAnnotation(ValidatedPSPAnnotation)
+// getSupplementalGroupsRanges gets the ranges of SupplementalGroups the
+// provisioner pod is allowed to run as. Range rules can be imposed by a PSP,
+// SCC or namespace (latter two in openshift only).
+func getSupplementalGroupsRanges(client kubernetes.Interface, dynamicClient *dynamic.Client, downwardAnnotationsFile string, namespace string) []v1beta1.IDRange {
+	sccName, err := getPodAnnotation(downwardAnnotationsFile, ValidatedSCCAnnotation)
 	if err != nil {
-		return nil, fmt.Errorf("error getting pod annotation %s: %v", ValidatedPSPAnnotation, err)
+		glog.Errorf("error getting pod annotation %s: %v", ValidatedSCCAnnotation, err)
+	} else if sccName != "" {
+		sccResource := unversioned.APIResource{Name: "securitycontextconstraints", Namespaced: false, Kind: "SecurityContextConstraints"}
+		sccClient := dynamicClient.Resource(&sccResource, "")
+		scc, err := sccClient.Get(sccName)
+		if err != nil {
+			glog.Errorf("error getting provisioner pod's scc: %v", err)
+		} else {
+			ranges := getSCCSupplementalGroups(scc)
+			if ranges != nil && len(ranges) > 0 {
+				return ranges
+			}
+		}
 	}
-	psp, err := p.client.Extensions().PodSecurityPolicies().Get(pspName)
+
+	pspName, err := getPodAnnotation(downwardAnnotationsFile, ValidatedPSPAnnotation)
 	if err != nil {
-		return nil, err
+		glog.Errorf("error getting pod annotation %s: %v", ValidatedPSPAnnotation, err)
+	} else if pspName != "" {
+		psp, err := client.Extensions().PodSecurityPolicies().Get(pspName)
+		if err != nil {
+			glog.Errorf("error getting provisioner pod's psp: %v", err)
+		} else {
+			ranges := getPSPSupplementalGroups(psp)
+			if ranges != nil && len(ranges) > 0 {
+				return ranges
+			}
+		}
 	}
-	return psp, nil
+
+	ns, err := client.Core().Namespaces().Get(namespace)
+	if err != nil {
+		glog.Errorf("error getting namespace %s: %v", namespace, err)
+	} else {
+		ranges, err := getPreallocatedSupplementalGroups(ns)
+		if err != nil {
+			glog.Errorf("error getting preallcoated supplemental groups: %v", err)
+		} else if ranges != nil && len(ranges) > 0 {
+			return ranges
+		}
+	}
+
+	return []v1beta1.IDRange{{Min: int64(0), Max: int64(65533)}}
 }
 
 // getPodAnnotation returns the value of the given annotation on the provisioner
 // pod or an empty string if the annotation doesn't exist.
-func (p *nfsProvisioner) getPodAnnotation(annotation string) (string, error) {
-	read, err := ioutil.ReadFile(p.downwardAnnotationsFile)
+func getPodAnnotation(downwardAnnotationsFile string, annotation string) (string, error) {
+	read, err := ioutil.ReadFile(downwardAnnotationsFile)
 	if err != nil {
 		return "", fmt.Errorf("error reading downward API annotations volume: %v", err)
 	}
-	re := regexp.MustCompile("^" + annotation + "=\".*\"$")
+	re := regexp.MustCompile(annotation + "=\".*\"$")
 	line := re.Find(read)
 	if line == nil {
 		return "", nil
 	}
-	return string(line), nil
+	re = regexp.MustCompile("\"(.*?)\"")
+	value := re.FindStringSubmatch(string(line))[1]
+	return value, nil
 }
 
 // getPSPSupplementalGroups returns the SupplementalGroup Ranges of the PSP or
@@ -514,4 +541,35 @@ func getPSPSupplementalGroups(psp *v1beta1.PodSecurityPolicy) []v1beta1.IDRange 
 		return nil
 	}
 	return psp.Spec.SupplementalGroups.Ranges
+}
+
+// TODO "Type" vs "Rule"
+// SupplementalGroupsStrategyOptions defines the strategy type and options used to create the strategy.
+type SupplementalGroupsStrategyOptions struct {
+	// Type is the strategy that will dictate what supplemental groups is used in the SecurityContext.
+	Type v1beta1.SupplementalGroupsStrategyType `json:"type,omitempty" protobuf:"bytes,1,opt,name=type,casttype=SupplementalGroupsStrategyType"`
+	// Ranges are the allowed ranges of supplemental groups.  If you would like to force a single
+	// supplemental group then supply a single range with the same start and end.
+	Ranges []v1beta1.IDRange `json:"ranges,omitempty" protobuf:"bytes,2,rep,name=ranges"`
+}
+
+// getSCCSupplementalGroups returns the SupplementalGroup Ranges of the SCC or
+// nil if the SCC doesn't impose gid range rules.
+func getSCCSupplementalGroups(scc *runtime.Unstructured) []v1beta1.IDRange {
+	if scc == nil {
+		return nil
+	}
+	data, _ := scc.MarshalJSON()
+	var v map[string]interface{}
+	_ = json.Unmarshal(data, &v)
+	if _, ok := v["supplementalGroups"]; !ok {
+		return nil
+	}
+	data, _ = json.Marshal(v["supplementalGroups"])
+	supplementalGroups := SupplementalGroupsStrategyOptions{}
+	_ = json.Unmarshal(data, &supplementalGroups)
+	if supplementalGroups.Type != v1beta1.SupplementalGroupsStrategyMustRunAs {
+		return nil
+	}
+	return supplementalGroups.Ranges
 }

@@ -19,9 +19,7 @@ package main
 import (
 	"flag"
 	"os"
-	"os/signal"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/golang/glog"
@@ -30,8 +28,9 @@ import (
 	"github.com/wongma7/nfs-provisioner/server"
 	vol "github.com/wongma7/nfs-provisioner/volume"
 
-	"k8s.io/client-go/1.4/discovery"
+	"k8s.io/client-go/1.4/dynamic"
 	"k8s.io/client-go/1.4/kubernetes"
+	"k8s.io/client-go/1.4/pkg/api/unversioned"
 	"k8s.io/client-go/1.4/pkg/util/validation"
 	"k8s.io/client-go/1.4/pkg/util/validation/field"
 	"k8s.io/client-go/1.4/pkg/util/wait"
@@ -70,17 +69,8 @@ func main() {
 		glog.Infof("Starting NFS server!")
 		err := server.Start(ganeshaConfig)
 		if err != nil {
-			glog.Errorf("Error starting NFS server: %v", err)
-			stopServerAndExit()
+			glog.Fatalf("Error starting NFS server: %v", err)
 		}
-
-		// On interrupt or SIGTERM, stop the NFS server
-		c := make(chan os.Signal, 2)
-		signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-		go func() {
-			<-c
-			stopServerAndExit()
-		}()
 	}
 
 	var config *rest.Config
@@ -91,21 +81,19 @@ func main() {
 		config, err = rest.InClusterConfig()
 	}
 	if err != nil {
-		glog.Errorf("Failed to create config: %v", err)
-		stopServerAndExit()
+		glog.Fatalf("Failed to create config: %v", err)
 	}
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		glog.Errorf("Failed to create client: %v", err)
-		stopServerAndExit()
+		glog.Fatalf("Failed to create client: %v", err)
 	}
-	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
+	clientPool := dynamic.NewClientPool(config, dynamic.LegacyAPIPathResolverFunc)
+	dynamicClient, err := clientPool.ClientForGroupVersion(unversioned.GroupVersion{Group: "", Version: "v1"})
 	if err != nil {
-		glog.Errorf("Failed to create discovery client: %v", err)
-		stopServerAndExit()
+		glog.Fatalf("Failed to create dynamic client: %v", err)
 	}
 
-	nfsProvisioner := vol.NewNFSProvisioner("/export/", clientset, discoveryClient, *useGanesha, ganeshaConfig)
+	nfsProvisioner := vol.NewNFSProvisioner("/export/", clientset, dynamicClient, *useGanesha, ganeshaConfig)
 
 	// Start the provision controller which will dynamically provision NFS PVs
 	pc := controller.NewProvisionController(clientset, 15*time.Second, *provisioner, nfsProvisioner)
@@ -125,13 +113,4 @@ func validateProvisioner(provisioner string, fldPath *field.Path) field.ErrorLis
 		}
 	}
 	return allErrs
-}
-
-func stopServerAndExit() {
-	if *runServer {
-		glog.Infof("Stopping NFS server!")
-		server.Stop()
-	}
-
-	os.Exit(1)
 }
