@@ -33,6 +33,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/guelfey/go.dbus"
+	"github.com/wongma7/nfs-provisioner/controller"
 	"k8s.io/client-go/1.4/dynamic"
 	"k8s.io/client-go/1.4/kubernetes"
 	"k8s.io/client-go/1.4/pkg/api/unversioned"
@@ -70,7 +71,7 @@ const (
 	createdBy    = "nfs-dynamic-provisioner"
 )
 
-func NewNFSProvisioner(exportDir string, client kubernetes.Interface, dynamicClient *dynamic.Client, useGanesha bool, ganeshaConfig string) Provisioner {
+func NewNFSProvisioner(exportDir string, client kubernetes.Interface, dynamicClient *dynamic.Client, useGanesha bool, ganeshaConfig string) controller.Provisioner {
 	provisioner := &nfsProvisioner{
 		exportDir:     exportDir,
 		client:        client,
@@ -119,11 +120,11 @@ type nfsProvisioner struct {
 	namespaceEnv string
 }
 
-var _ Provisioner = &nfsProvisioner{}
+var _ controller.Provisioner = &nfsProvisioner{}
 
 // Provision creates a volume i.e. the storage asset and returns a PV object for
 // the volume.
-func (p *nfsProvisioner) Provision(options VolumeOptions) (*v1.PersistentVolume, error) {
+func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.PersistentVolume, error) {
 	server, path, gid, added, exportId, err := p.createVolume(options)
 	if err != nil {
 		return nil, err
@@ -168,7 +169,7 @@ func (p *nfsProvisioner) Provision(options VolumeOptions) (*v1.PersistentVolume,
 // directory under /export and exports it. Returns the server IP, the path, and
 // gid. Also returns the block or line it added to either the ganesha config or
 // /etc/exports, respectively. If using ganesha, returns a non-zero Export_Id.
-func (p *nfsProvisioner) createVolume(options VolumeOptions) (string, string, int64, string, int, error) {
+func (p *nfsProvisioner) createVolume(options controller.VolumeOptions) (string, string, int64, string, int, error) {
 	// TODO take and validate Parameters
 	if options.Parameters != nil {
 		return "", "", 0, "", 0, fmt.Errorf("invalid parameter: no StorageClass parameters are supported")

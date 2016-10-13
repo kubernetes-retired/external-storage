@@ -31,8 +31,6 @@ import (
 
 	// TODO get rid of this and use https://github.com/kubernetes/kubernetes/pull/32718
 	"github.com/wongma7/nfs-provisioner/framework"
-	vol "github.com/wongma7/nfs-provisioner/volume"
-
 	"k8s.io/client-go/1.4/kubernetes"
 	core_v1 "k8s.io/client-go/1.4/kubernetes/typed/core/v1"
 	"k8s.io/client-go/1.4/pkg/api"
@@ -81,10 +79,10 @@ type provisionController struct {
 	provisionerName string
 
 	// The provisioner the controller will use to provision and delete volumes.
-	// Presumably this implementer of vol.Provisioner carries its own
+	// Presumably this implementer of Provisioner carries its own
 	// volume-specific options and such that it needs in order to provision
 	// volumes.
-	provisioner vol.Provisioner
+	provisioner Provisioner
 
 	claimSource      cache.ListerWatcher
 	claimController  *framework.Controller
@@ -110,7 +108,7 @@ func NewProvisionController(
 	client kubernetes.Interface,
 	resyncPeriod time.Duration,
 	provisionerName string,
-	provisioner vol.Provisioner,
+	provisioner Provisioner,
 ) *provisionController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(&core_v1.EventSinkImpl{Interface: client.Core().Events(v1.NamespaceAll)})
@@ -337,7 +335,7 @@ func (ctrl *provisionController) provisionClaimOperation(claim *v1.PersistentVol
 		return
 	}
 
-	options := vol.VolumeOptions{
+	options := VolumeOptions{
 		Capacity:                      claim.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)],
 		AccessModes:                   claim.Spec.AccessModes,
 		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,

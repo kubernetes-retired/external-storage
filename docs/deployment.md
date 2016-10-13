@@ -22,7 +22,7 @@ Decide on a unique name to give the provisioner that follows the naming scheme `
 
 Decide how to run nfs-provisioner. It can be run in Kubernetes as a pod or outside of Kubernetes as a standalone container or binary. See [here](#a-note-on-deciding-how-to-run) for help on deciding between a pod and deployment; in short, if you want to back your shares with persistent storage, running a deployment & service has some benefits.
 
-If you are running in OpenShift, see [here](#a-note-on-running-in-openshift) for information on what authorizations the the pod needs.
+If you are running in OpenShift, see [here](#a-note-on-running-in-openshift) for information on what authorizations the pod needs.
 
 ### In Kubernetes - Pod
 

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package volume
+package controller
 
 import (
 	"k8s.io/client-go/1.4/pkg/api/resource"
