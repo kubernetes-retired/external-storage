@@ -19,6 +19,7 @@
 # This is where the result of the go build goes
 /output*/
 /_output*/
+/_output
 
 # Emacs save files
 *~
@@ -60,6 +61,9 @@ network_closure.sh
 .kubeconfig
 
 .tags*
+
+# Version file for dockerized build
+.dockerized-kube-version-defs
 
 # Web UI
 /www/master/node_modules/

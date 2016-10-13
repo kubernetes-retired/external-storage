@@ -119,11 +119,15 @@ check test: generated_files
 
 # Build and run integration tests.
 #
+# Args:
+#   WHAT: Directory names to test.  All *_test.go files under these
+#     directories will be run.  If not specified, "everything" will be tested.
+#
 # Example:
 #   make test-integration
 .PHONY: test-integration
 test-integration: generated_files
-	hack/make-rules/test-integration.sh
+	hack/make-rules/test-integration.sh $(WHAT)
 
 # Build and run end-to-end tests.
 #
@@ -152,7 +156,7 @@ test-e2e: ginkgo generated_files
 #  DELETE_INSTANCES: For REMOTE=true only.  Delete any instances created as
 #    part of this test run.  Defaults to false.
 #  ARTIFACTS: For REMOTE=true only.  Local directory to scp test artifacts into
-#    from the remote hosts.  Defaults to ""/tmp/_artifacts".
+#    from the remote hosts.  Defaults to "/tmp/_artifacts".
 #  REPORT: For REMOTE=false only.  Local directory to write juntil xml results
 #    to.  Defaults to "/tmp/".
 #  CLEANUP: For REMOTE=true only.  If false, do not stop processes or delete
@@ -164,6 +168,7 @@ test-e2e: ginkgo generated_files
 #  INSTANCE_METADATA: For REMOTE=true and running on GCE only.
 #  GUBERNATOR: For REMOTE=true only. Produce link to Gubernator to view logs.
 #	 Defaults to false.
+#  PARALLELISM: The number of gingko nodes to run.  Defaults to 8.
 #
 # Example:
 #   make test-e2e-node FOCUS=Kubelet SKIP=container
@@ -202,13 +207,14 @@ clean: clean_meta
 clean_meta:
 	rm -rf $(META_DIR)
 
-# Remove all auto-generated artifacts.
+# Remove all auto-generated artifacts. Generated artifacts in staging folder should not be removed as they are not
+# generated using generated_files.
 #
 # Example:
 #   make clean_generated
 .PHONY: clean_generated
 clean_generated:
-	find . -type f -name $(GENERATED_FILE_PREFIX)\* | xargs rm -f
+	find . -type f -name $(GENERATED_FILE_PREFIX)\* | grep -v "[.]/staging/.*" | xargs rm -f
 
 # Run 'go vet'.
 #

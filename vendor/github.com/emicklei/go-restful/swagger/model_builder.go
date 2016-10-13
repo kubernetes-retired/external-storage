@@ -43,6 +43,12 @@ func (b modelBuilder) addModelFrom(sample interface{}) {
 }
 
 func (b modelBuilder) addModel(st reflect.Type, nameOverride string) *Model {
+	// Turn pointers into simpler types so further checks are
+	// correct.
+	if st.Kind() == reflect.Ptr {
+		st = st.Elem()
+	}
+
 	modelName := b.keyFrom(st)
 	if nameOverride != "" {
 		modelName = nameOverride
@@ -134,6 +140,11 @@ func (b modelBuilder) buildProperty(field reflect.StructField, model *Model, mod
 	jsonName = b.jsonNameOfField(field)
 	if len(jsonName) == 0 {
 		// empty name signals skip property
+		return "", "", prop
+	}
+
+	if field.Name == "XMLName" && field.Type.String() == "xml.Name" {
+		// property is metadata for the xml.Name attribute, can be skipped
 		return "", "", prop
 	}
 
