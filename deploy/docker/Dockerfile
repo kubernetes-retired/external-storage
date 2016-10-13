@@ -1,7 +1,7 @@
 # Modified from https://github.com/rootfs/nfs-ganesha-docker by Huamin Chen
 FROM fedora:24
 
-RUN dnf install -y tar gcc git cmake autoconf libtool bison flex make gcc-c++ krb5-devel dbus-devel dbus-x11 rpcbind hostname && dnf clean all
+RUN dnf install -y tar gcc git cmake autoconf libtool bison flex make gcc-c++ krb5-devel dbus-devel dbus-x11 rpcbind hostname nfs-utils && dnf clean all
 RUN mkdir /var/run/dbus
 RUN mkdir -p /export
 

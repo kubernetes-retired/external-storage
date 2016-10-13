@@ -35,6 +35,12 @@ func Start(ganeshaConfig string) error {
 			return fmt.Errorf("Starting rpcbind failed with error: %v, output: %s", err, out)
 		}
 	}
+
+	cmd = exec.Command("/usr/sbin/rpc.statd")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("rpc.statd failed with error: %v, output: %s", err, out)
+	}
+
 	// Start dbus, needed for ganesha dynamic exports
 	cmd = exec.Command("dbus-daemon", "--system")
 	if out, err := cmd.CombinedOutput(); err != nil {
