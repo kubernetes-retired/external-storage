@@ -379,6 +379,7 @@ func (p *nfsProvisioner) ganeshaExport(path string) (string, int, error) {
 		"\tAccess_Type = RW;\n" +
 		"\tSquash = root_id_squash;\n" +
 		"\tSecType = sys;\n" +
+		"\tFilesystem_id = " + strconv.Itoa(exportId) + "." + strconv.Itoa(exportId) + ";\n" +
 		"\tFSAL {\n\t\tName = VFS;\n\t}\n}\n"
 
 	// Add the export block to the ganesha config file
