@@ -1,9 +1,15 @@
 ## Deployment
 
-Build nfs-provisioner and a Docker image for it.
+Build nfs-provisioner and a Docker image for it. Or pull/let Kubernetes pull the image from Docker Hub.
 
 ```
 $ make container
+```
+
+or
+
+```
+$ docker pull wongma7/nfs-provisioner:latest
 ```
 
 Bring up a cluster.
