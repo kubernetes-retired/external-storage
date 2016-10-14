@@ -342,29 +342,6 @@ func (p *nfsProvisioner) getServer() (string, error) {
 	return service.Spec.ClusterIP, nil
 }
 
-// generateSupplementalGroup generates a random SupplementalGroup from the
-// provisioners ranges of SupplementalGroups. Picks a random range then a random
-// value within it
-// TODO make this better
-func (p *nfsProvisioner) generateSupplementalGroup() (int64, error) {
-	if len(p.ranges) == 0 {
-		return 0, fmt.Errorf("provisioner has empty ranges, can't generate SupplementalGroup")
-	}
-	rng := p.ranges[0]
-	if len(p.ranges) > 0 {
-		i, err := rand.Int(rand.Reader, big.NewInt(int64(len(p.ranges))))
-		if err != nil {
-			return 0, fmt.Errorf("error getting rand value: %v", err)
-		}
-		rng = p.ranges[i.Int64()]
-	}
-	i, err := rand.Int(rand.Reader, big.NewInt(rng.Max-rng.Min+1))
-	if err != nil {
-		return 0, fmt.Errorf("error getting rand value: %v", err)
-	}
-	return rng.Min + i.Int64(), nil
-}
-
 // ganeshaExport exports the given directory using NFS Ganesha, assuming it is
 // running and can be connected to using D-Bus. Returns the block it added to
 // the ganesha config file and the block's Export_Id.
@@ -486,6 +463,29 @@ func (p *nfsProvisioner) removeFromFile(path string, toRemove string) error {
 
 	p.mutex.Unlock()
 	return nil
+}
+
+// generateSupplementalGroup generates a random SupplementalGroup from the
+// provisioners ranges of SupplementalGroups. Picks a random range then a random
+// value within it
+// TODO make this better
+func (p *nfsProvisioner) generateSupplementalGroup() (int64, error) {
+	if len(p.ranges) == 0 {
+		return 0, fmt.Errorf("provisioner has empty ranges, can't generate SupplementalGroup")
+	}
+	rng := p.ranges[0]
+	if len(p.ranges) > 0 {
+		i, err := rand.Int(rand.Reader, big.NewInt(int64(len(p.ranges))))
+		if err != nil {
+			return 0, fmt.Errorf("error getting rand value: %v", err)
+		}
+		rng = p.ranges[i.Int64()]
+	}
+	i, err := rand.Int(rand.Reader, big.NewInt(rng.Max-rng.Min+1))
+	if err != nil {
+		return 0, fmt.Errorf("error getting rand value: %v", err)
+	}
+	return rng.Min + i.Int64(), nil
 }
 
 // getSupplementalGroupsRanges gets the ranges of SupplementalGroups the
