@@ -33,6 +33,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/guelfey/go.dbus"
+	"github.com/openshift/origin/pkg/security/uid"
 	"github.com/wongma7/nfs-provisioner/controller"
 	"k8s.io/client-go/1.4/dynamic"
 	"k8s.io/client-go/1.4/kubernetes"
@@ -50,6 +51,10 @@ const (
 	// ValidatedSCCAnnotation is the annotation on the pod object that specifies
 	// the name of the SCC the pod validated against, if any.
 	ValidatedSCCAnnotation = "openshift.io/scc"
+	UIDRangeAnnotation     = "openshift.io/sa.scc.uid-range"
+	// SupplementalGroupsAnnotation contains a comma delimited list of allocated supplemental groups
+	// for the namespace.  Groups are in the form of a Block which supports {start}/{length} or {start}-{end}
+	SupplementalGroupsAnnotation = "openshift.io/sa.scc.supplemental-groups"
 
 	// VolumeGidAnnotationKey is the key of the annotation on the PersistentVolume
 	// object that specifies a supplemental GID.
@@ -125,14 +130,16 @@ var _ controller.Provisioner = &nfsProvisioner{}
 // Provision creates a volume i.e. the storage asset and returns a PV object for
 // the volume.
 func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.PersistentVolume, error) {
-	server, path, gid, added, exportId, err := p.createVolume(options)
+	server, path, supGroup, added, exportId, err := p.createVolume(options)
 	if err != nil {
 		return nil, err
 	}
 
 	annotations := make(map[string]string)
 	annotations[annCreatedBy] = createdBy
-	annotations[VolumeGidAnnotationKey] = strconv.FormatInt(gid, 10)
+	if supGroup != 0 {
+		annotations[VolumeGidAnnotationKey] = strconv.FormatUint(supGroup, 10)
+	}
 	if p.useGanesha {
 		annotations[annBlock] = added
 		annotations[annExportId] = strconv.Itoa(exportId)
@@ -167,12 +174,24 @@ func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 
 // createVolume creates a volume i.e. the storage asset. It creates a unique
 // directory under /export and exports it. Returns the server IP, the path, and
-// gid. Also returns the block or line it added to either the ganesha config or
-// /etc/exports, respectively. If using ganesha, returns a non-zero Export_Id.
-func (p *nfsProvisioner) createVolume(options controller.VolumeOptions) (string, string, int64, string, int, error) {
-	// TODO take and validate Parameters
-	if options.Parameters != nil {
-		return "", "", 0, "", 0, fmt.Errorf("invalid parameter: no StorageClass parameters are supported")
+// zero/non-zero supplemental group. Also returns the block or line it added to
+// either the ganesha config or /etc/exports, respectively. If using ganesha,
+// returns a non-zero Export_Id.
+func (p *nfsProvisioner) createVolume(options controller.VolumeOptions) (string, string, uint64, string, int, error) {
+	gid := "none"
+	for k, v := range options.Parameters {
+		switch strings.ToLower(k) {
+		case "gid":
+			if strings.ToLower(v) == "none" {
+				gid = "none"
+			} else if i, err := strconv.ParseUint(v, 10, 64); err == nil && i != 0 {
+				gid = v
+			} else {
+				return "", "", 0, "", 0, fmt.Errorf("invalid value for parameter gid: %v. valid values are: 'none' or a non-zero integer", v)
+			}
+		default:
+			return "", "", 0, "", 0, fmt.Errorf("invalid parameter: %q", k)
+		}
 	}
 
 	// TODO implement options.ProvisionerSelector parsing
@@ -198,34 +217,37 @@ func (p *nfsProvisioner) createVolume(options controller.VolumeOptions) (string,
 	}
 
 	// TODO quota, something better than just directories
-	// TODO figure out permissions: gid, chgrp, root_squash
 	// Create the path for the volume unless it already exists. It has to exist
 	// when AddExport or exportfs is called.
 	path := fmt.Sprintf(p.exportDir+"%s", options.PVName)
 	if _, err := os.Stat(path); err == nil {
 		return "", "", 0, "", 0, fmt.Errorf("error creating volume, the path already exists")
 	}
-	// Execute permission is required for stat, which kubelet uses during unmount.
-	if err := os.MkdirAll(path, 0071); err != nil {
+
+	perm := os.FileMode(0777)
+	if gid != "none" {
+		// Execute permission is required for stat, which kubelet uses during unmount.
+		perm = os.FileMode(0071)
+	}
+	if err := os.MkdirAll(path, perm); err != nil {
 		return "", "", 0, "", 0, fmt.Errorf("error creating dir for volume: %v", err)
 	}
 	// Due to umask, need to chmod
-	cmd := exec.Command("chmod", "071", path)
+	cmd := exec.Command("chmod", strconv.FormatInt(int64(perm), 8), path)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		os.RemoveAll(path)
 		return "", "", 0, "", 0, fmt.Errorf("chmod failed with error: %v, output: %s", err, out)
 	}
 
-	gid, err := p.generateSupplementalGroup()
-	if err != nil {
-		return "", "", 0, "", 0, fmt.Errorf("error generating SupplementalGroup: %v", err)
-	}
-	cmd = exec.Command("chgrp", strconv.FormatInt(gid, 10), path)
-	out, err = cmd.CombinedOutput()
-	if err != nil {
-		os.RemoveAll(path)
-		return "", "", 0, "", 0, fmt.Errorf("chgrp failed with error: %v, output: %s", err, out)
+	if gid != "none" {
+		groupId, _ := strconv.ParseUint(gid, 10, 64)
+		cmd = exec.Command("chgrp", strconv.FormatUint(groupId, 10), path)
+		out, err = cmd.CombinedOutput()
+		if err != nil {
+			os.RemoveAll(path)
+			return "", "", 0, "", 0, fmt.Errorf("chgrp failed with error: %v, output: %s", err, out)
+		}
 	}
 
 	if p.useGanesha {
@@ -234,14 +256,14 @@ func (p *nfsProvisioner) createVolume(options controller.VolumeOptions) (string,
 			os.RemoveAll(path)
 			return "", "", 0, "", 0, err
 		}
-		return server, path, gid, block, exportId, nil
+		return server, path, 0, block, exportId, nil
 	} else {
 		line, err := p.kernelExport(path)
 		if err != nil {
 			os.RemoveAll(path)
 			return "", "", 0, "", 0, err
 		}
-		return server, path, gid, line, 0, nil
+		return server, path, 0, line, 0, nil
 	}
 }
 
@@ -407,6 +429,7 @@ func (p *nfsProvisioner) ganeshaExport(path string) (string, int, error) {
 // kernelExport exports the given directory using the NFS server, assuming it is
 // running. Returns the line it added to /etc/exports.
 func (p *nfsProvisioner) kernelExport(path string) (string, error) {
+	// TODO assign fsid here as well
 	line := "\n" + path + " *(rw,insecure,root_squash)\n"
 
 	// Add the export directory line to /etc/exports
@@ -513,7 +536,7 @@ func getSupplementalGroupsRanges(client kubernetes.Interface, dynamicClient *dyn
 		}
 	}
 
-	return []v1beta1.IDRange{{Min: int64(0), Max: int64(65533)}}
+	return []v1beta1.IDRange{{Min: int64(1), Max: int64(65533)}}
 }
 
 // getPodAnnotation returns the value of the given annotation on the provisioner
@@ -574,4 +597,68 @@ func getSCCSupplementalGroups(scc *runtime.Unstructured) []v1beta1.IDRange {
 		return nil
 	}
 	return supplementalGroups.Ranges
+}
+
+// getSupplementalGroupsAnnotation provides a backwards compatible way to get supplemental groups
+// annotations from a namespace by looking for SupplementalGroupsAnnotation and falling back to
+// UIDRangeAnnotation if it is not found.
+// openshift/origin pkg/security/scc/matcher.go
+func getSupplementalGroupsAnnotation(ns *v1.Namespace) (string, error) {
+	groups, ok := ns.Annotations[SupplementalGroupsAnnotation]
+	if !ok {
+		glog.V(4).Infof("unable to find supplemental group annotation %s falling back to %s", SupplementalGroupsAnnotation, UIDRangeAnnotation)
+
+		groups, ok = ns.Annotations[UIDRangeAnnotation]
+		if !ok {
+			return "", fmt.Errorf("unable to find supplemental group or uid annotation for namespace %s", ns.Name)
+		}
+	}
+
+	if len(groups) == 0 {
+		return "", fmt.Errorf("unable to find groups using %s and %s annotations", SupplementalGroupsAnnotation, UIDRangeAnnotation)
+	}
+	return groups, nil
+}
+
+// getPreallocatedSupplementalGroups gets the annotated value from the namespace.
+// openshift/origin pkg/security/scc/matcher.go
+func getPreallocatedSupplementalGroups(ns *v1.Namespace) ([]v1beta1.IDRange, error) {
+	groups, err := getSupplementalGroupsAnnotation(ns)
+	if err != nil {
+		return nil, err
+	}
+	glog.V(4).Infof("got preallocated value for groups: %s in namespace %s", groups, ns.Name)
+
+	blocks, err := parseSupplementalGroupAnnotation(groups)
+	if err != nil {
+		return nil, err
+	}
+
+	idRanges := []v1beta1.IDRange{}
+	for _, block := range blocks {
+		rng := v1beta1.IDRange{
+			Min: int64(block.Start),
+			Max: int64(block.End),
+		}
+		idRanges = append(idRanges, rng)
+	}
+	return idRanges, nil
+}
+
+// parseSupplementalGroupAnnotation parses the group annotation into blocks.
+// openshift/origin pkg/security/scc/matcher.go
+func parseSupplementalGroupAnnotation(groups string) ([]uid.Block, error) {
+	blocks := []uid.Block{}
+	segments := strings.Split(groups, ",")
+	for _, segment := range segments {
+		block, err := uid.ParseBlock(segment)
+		if err != nil {
+			return nil, err
+		}
+		blocks = append(blocks, block)
+	}
+	if len(blocks) == 0 {
+		return nil, fmt.Errorf("no blocks parsed from annotation %s", groups)
+	}
+	return blocks, nil
 }

@@ -100,9 +100,7 @@ $ sudo ./nfs-provisioner -provisioner=matthew/nfs -out-of-cluster=true -master=h
 
 The pod requires authorization to `list` all `StorageClasses`, `PersistentVolumeClaims`, and `PersistentVolumes` in the cluster. 
 
-The pod will respect the rule for supplemental groups imposed by its PSP, SCC, or namespace when it associates a supplemental group with each of the PVs it creates. For example, if the PSP says the pod can only run with supplemental groups in the range 5000 to 6000, PVs it provisions will have supplemental group annotations within that range. In order to respect the rule the pod needs to be able to `get` its PSP, SCC, or namespace.
-
-#### Arguments 
+#### Arguments
 
 * `provisioner` - Name of the provisioner. The provisioner will only provision volumes for claims that request a StorageClass with a provisioner field set equal to this name.
 * `out-of-cluster` - If the provisioner is being run out of cluster. Set the master or kubeconfig flag accordingly if true. Default false.
