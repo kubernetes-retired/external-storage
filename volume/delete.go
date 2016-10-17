@@ -31,11 +31,11 @@ import (
 func (p *nfsProvisioner) Delete(volume *v1.PersistentVolume) error {
 	// TODO quota, something better than just directories
 
-	if !p.Exists(volume) {
+	path := fmt.Sprintf(p.exportDir+"%s", volume.ObjectMeta.Name)
+	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return fmt.Errorf("Delete called on a volume that doesn't exist, presumably because this provisioner never created it")
 	}
 
-	path := fmt.Sprintf(p.exportDir+"%s", volume.ObjectMeta.Name)
 	if err := os.RemoveAll(path); err != nil {
 		return fmt.Errorf("error deleting volume by removing its path: %v", err)
 	}
@@ -109,17 +109,4 @@ func (p *nfsProvisioner) kernelUnexport(volume *v1.PersistentVolume) error {
 	}
 
 	return nil
-}
-
-// Exists returns true if the directory backing the given PV exists and so can
-// be deleted. Since multiple NFS provisioners can be running, we can't assume
-// that the underlying volume was created by *this* one. This is a convenience
-// function to call before calling Delete; Delete will still fail if this isn't
-// true but presumably one wants to fail earlier than that.
-func (p *nfsProvisioner) Exists(volume *v1.PersistentVolume) bool {
-	path := fmt.Sprintf(p.exportDir+"%s", volume.ObjectMeta.Name)
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return false
-	}
-	return true
 }

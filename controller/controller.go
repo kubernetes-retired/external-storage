@@ -288,13 +288,6 @@ func (ctrl *ProvisionController) shouldDelete(volume *v1.PersistentVolume) bool 
 		return false
 	}
 
-	// Check if the volume even exists for deletion rather than trying, failing,
-	// and sending a bad event to the PV. This is kind of specific to NFS but it's
-	// better than every running provisioner spamming events.
-	if !ctrl.provisioner.Exists(volume) {
-		return false
-	}
-
 	return true
 }
 

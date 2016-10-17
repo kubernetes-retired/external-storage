@@ -33,9 +33,6 @@ type Provisioner interface {
 	// Delete removes the storage asset that was created by Provision backing the
 	// given PV. Does not delete the PV object itself.
 	Delete(*v1.PersistentVolume) error
-	// Exists returns true if the storage asset backing the given PV was created by
-	// this provisioner and so can be deleted.
-	Exists(*v1.PersistentVolume) bool
 }
 
 // VolumeOptions contains option information about a volume
