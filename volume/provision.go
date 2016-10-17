@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"math/big"
 	"os"
 	"os/exec"
@@ -64,12 +65,13 @@ const (
 	// deletion.
 	annBlock = "EXPORT_block"
 
-	// A PV annotation for the Export_Id of this PV's backing ganesha EXPORT,
-	// needed for ganesha deletion.
-	annExportId = "Export_Id"
-
 	// A PV annotation for the line in /etc/exports, needed for kernel deletion.
 	annLine = "etcexports_line"
+
+	// A PV annotation for the Export_Id/fsid of this PV's backing ganesha/kernel
+	// EXPORT, needed for ganesha deletion. Also used for clearing up space in the
+	// exportIds map for assigning unique Export_Id/fsid.
+	annExportId = "Export_Id"
 
 	// are we allowed to set this? else make up our own
 	annCreatedBy = "kubernetes.io/createdby"
@@ -82,12 +84,25 @@ func NewNFSProvisioner(exportDir string, client kubernetes.Interface, dynamicCli
 		client:        client,
 		useGanesha:    useGanesha,
 		ganeshaConfig: ganeshaConfig,
-		nextExportId:  0,
-		mutex:         &sync.Mutex{},
+		mapMutex:      &sync.Mutex{},
+		fileMutex:     &sync.Mutex{},
 		podIPEnv:      "MY_POD_IP",
 		serviceEnv:    "MY_SERVICE_NAME",
 		namespaceEnv:  "MY_POD_NAMESPACE",
 	}
+
+	configPath := ganeshaConfig
+	re := regexp.MustCompile("Export_Id = ([0-9]+);")
+	if !useGanesha {
+		configPath = "/etc/exports"
+		re = regexp.MustCompile("fsid=([0-9]+)")
+	}
+	var err error
+	provisioner.exportIds, err = getExportIds(configPath, re)
+	if err != nil {
+		glog.Errorf("error while populating exportIds map, there may be errors exporting later if exportIds are reused: %v", err)
+	}
+
 	provisioner.ranges = getSupplementalGroupsRanges(client, dynamicClient, "/podinfo/annotations", os.Getenv(provisioner.namespaceEnv))
 
 	return provisioner
@@ -108,11 +123,15 @@ type nfsProvisioner struct {
 	// The path of the NFS Ganesha configuration file
 	ganeshaConfig string
 
-	// Incremented for assigning each export a unique ID, required by ganesha
-	nextExportId int
+	// Incremented for assigning each export a unique ID, required by ganesha and
+	// used as fsid for both ganesha and kernel NFS
+	exportIds map[uint16]bool
+
+	// Lock for accessing exportIds
+	mapMutex *sync.Mutex
 
 	// Lock for writing to the ganesha config or /etc/exports file
-	mutex *sync.Mutex
+	fileMutex *sync.Mutex
 
 	// Ranges of gids to assign to PV's
 	ranges []v1beta1.IDRange
@@ -137,12 +156,12 @@ func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 
 	annotations := make(map[string]string)
 	annotations[annCreatedBy] = createdBy
+	annotations[annExportId] = strconv.FormatUint(uint64(exportId), 10)
 	if supGroup != 0 {
 		annotations[VolumeGidAnnotationKey] = strconv.FormatUint(supGroup, 10)
 	}
 	if p.useGanesha {
 		annotations[annBlock] = added
-		annotations[annExportId] = strconv.Itoa(exportId)
 	} else {
 		annotations[annLine] = added
 	}
@@ -177,7 +196,7 @@ func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 // zero/non-zero supplemental group. Also returns the block or line it added to
 // either the ganesha config or /etc/exports, respectively. If using ganesha,
 // returns a non-zero Export_Id.
-func (p *nfsProvisioner) createVolume(options controller.VolumeOptions) (string, string, uint64, string, int, error) {
+func (p *nfsProvisioner) createVolume(options controller.VolumeOptions) (string, string, uint64, string, uint16, error) {
 	gid := "none"
 	for k, v := range options.Parameters {
 		switch strings.ToLower(k) {
@@ -258,12 +277,12 @@ func (p *nfsProvisioner) createVolume(options controller.VolumeOptions) (string,
 		}
 		return server, path, 0, block, exportId, nil
 	} else {
-		line, err := p.kernelExport(path)
+		line, exportId, err := p.kernelExport(path)
 		if err != nil {
 			os.RemoveAll(path)
 			return "", "", 0, "", 0, err
 		}
-		return server, path, 0, line, 0, nil
+		return server, path, 0, line, exportId, nil
 	}
 }
 
@@ -346,40 +365,19 @@ func (p *nfsProvisioner) getServer() (string, error) {
 // running and can be connected to using D-Bus. Returns the block it added to
 // the ganesha config file and the block's Export_Id.
 // https://github.com/nfs-ganesha/nfs-ganesha/wiki/Dbusinterface
-func (p *nfsProvisioner) ganeshaExport(path string) (string, int, error) {
+func (p *nfsProvisioner) ganeshaExport(path string) (string, uint16, error) {
 	// Create the export block to add to the ganesha config file
-	p.mutex.Lock()
-	read, err := ioutil.ReadFile(p.ganeshaConfig)
-	if err != nil {
-		p.mutex.Unlock()
-		return "", 0, err
-	}
-	// TODO there's probably a better way to do this. HAVE to assign unique IDs
-	// across restarts, etc.
-	// If zero, this is the first add: find the maximum existing ID and the next
-	// ID to assign will be that maximum plus 1. Otherwise just keep incrementing.
-	if p.nextExportId == 0 {
-		re := regexp.MustCompile("Export_Id = [0-9]+;")
-		lines := re.FindAll(read, -1)
-		for _, line := range lines {
-			digits := regexp.MustCompile("[0-9]+").Find(line)
-			if id, _ := strconv.Atoi(string(digits)); id > p.nextExportId {
-				p.nextExportId = id
-			}
-		}
-	}
-	p.nextExportId++
-	exportId := p.nextExportId
-	p.mutex.Unlock()
+	exportId := p.generateExportId()
+	exportIdStr := strconv.FormatUint(uint64(exportId), 10)
 
 	block := "\nEXPORT\n{\n"
-	block = block + "\tExport_Id = " + strconv.Itoa(exportId) + ";\n"
+	block = block + "\tExport_Id = " + exportIdStr + ";\n"
 	block = block + "\tPath = " + path + ";\n" +
 		"\tPseudo = " + path + ";\n" +
 		"\tAccess_Type = RW;\n" +
 		"\tSquash = root_id_squash;\n" +
 		"\tSecType = sys;\n" +
-		"\tFilesystem_id = " + strconv.Itoa(exportId) + "." + strconv.Itoa(exportId) + ";\n" +
+		"\tFilesystem_id = " + exportIdStr + "." + exportIdStr + ";\n" +
 		"\tFSAL {\n\t\tName = VFS;\n\t}\n}\n"
 
 	// Add the export block to the ganesha config file
@@ -405,13 +403,15 @@ func (p *nfsProvisioner) ganeshaExport(path string) (string, int, error) {
 
 // kernelExport exports the given directory using the NFS server, assuming it is
 // running. Returns the line it added to /etc/exports.
-func (p *nfsProvisioner) kernelExport(path string) (string, error) {
-	// TODO assign fsid here as well
-	line := "\n" + path + " *(rw,insecure,root_squash)\n"
+func (p *nfsProvisioner) kernelExport(path string) (string, uint16, error) {
+	exportId := p.generateExportId()
+	exportIdStr := strconv.FormatUint(uint64(exportId), 10)
+
+	line := "\n" + path + " *(rw,insecure,root_squash,fsid=" + exportIdStr + ")\n"
 
 	// Add the export directory line to /etc/exports
 	if err := p.addToFile("/etc/exports", line); err != nil {
-		return "", fmt.Errorf("error adding export directory to /etc/exports: %v", err)
+		return "", 0, fmt.Errorf("error adding export directory to /etc/exports: %v", err)
 	}
 
 	// Execute exportfs
@@ -419,50 +419,64 @@ func (p *nfsProvisioner) kernelExport(path string) (string, error) {
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		p.removeFromFile("/etc/exports", line)
-		return "", fmt.Errorf("exportfs -r failed with error: %v, output: %s", err, out)
+		return "", 0, fmt.Errorf("exportfs -r failed with error: %v, output: %s", err, out)
 	}
 
-	return line, nil
+	return line, exportId, nil
 }
 
 func (p *nfsProvisioner) addToFile(path string, toAdd string) error {
-	p.mutex.Lock()
+	p.fileMutex.Lock()
 
 	file, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
-		p.mutex.Unlock()
+		p.fileMutex.Unlock()
 		return err
 	}
 	defer file.Close()
 
 	if _, err = file.WriteString(toAdd); err != nil {
-		p.mutex.Unlock()
+		p.fileMutex.Unlock()
 		return err
 	}
 	file.Sync()
 
-	p.mutex.Unlock()
+	p.fileMutex.Unlock()
 	return nil
 }
 
 func (p *nfsProvisioner) removeFromFile(path string, toRemove string) error {
-	p.mutex.Lock()
+	p.fileMutex.Lock()
 
 	read, err := ioutil.ReadFile(path)
 	if err != nil {
-		p.mutex.Unlock()
+		p.fileMutex.Unlock()
 		return err
 	}
 
 	removed := strings.Replace(string(read), toRemove, "", -1)
 	err = ioutil.WriteFile(path, []byte(removed), 0)
 	if err != nil {
-		p.mutex.Unlock()
+		p.fileMutex.Unlock()
 		return err
 	}
 
-	p.mutex.Unlock()
+	p.fileMutex.Unlock()
 	return nil
+}
+
+// generateExportId fills a vacant exportId in the map and returns it for use.
+func (p *nfsProvisioner) generateExportId() uint16 {
+	p.mapMutex.Lock()
+	id := uint16(1)
+	for ; id <= math.MaxUint16; id++ {
+		if _, ok := p.exportIds[id]; !ok {
+			break
+		}
+	}
+	p.exportIds[id] = true
+	p.mapMutex.Unlock()
+	return id
 }
 
 // generateSupplementalGroup generates a random SupplementalGroup from the
@@ -486,6 +500,33 @@ func (p *nfsProvisioner) generateSupplementalGroup() (int64, error) {
 		return 0, fmt.Errorf("error getting rand value: %v", err)
 	}
 	return rng.Min + i.Int64(), nil
+}
+
+// getExportIds populates the exportIds map with pre-existing exportIds found in
+// the given config file. Takes as argument the regex it should use to find each
+// exportId in the file i.e. Export_Id or fsid.
+func getExportIds(configPath string, re *regexp.Regexp) (map[uint16]bool, error) {
+	exportIds := map[uint16]bool{}
+
+	digitsRe := "([0-9]+)"
+	if !strings.Contains(re.String(), digitsRe) {
+		return exportIds, fmt.Errorf("regexp %s doesn't contain digits submatch %s", re.String(), digitsRe)
+	}
+
+	read, err := ioutil.ReadFile(configPath)
+	if err != nil {
+		return exportIds, err
+	}
+
+	allMatches := re.FindAllSubmatch(read, -1)
+	for _, match := range allMatches {
+		digits := match[1]
+		if id, err := strconv.ParseUint(string(digits), 10, 16); err == nil {
+			exportIds[uint16(id)] = true
+		}
+	}
+
+	return exportIds, nil
 }
 
 // getSupplementalGroupsRanges gets the ranges of SupplementalGroups the

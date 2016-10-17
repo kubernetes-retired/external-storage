@@ -58,7 +58,8 @@ func (p *nfsProvisioner) ganeshaUnexport(volume *v1.PersistentVolume) error {
 	if !ok {
 		return fmt.Errorf("PV doesn't have an annotation %s, can't remove the export from the server", annExportId)
 	}
-	exportId, _ := strconv.Atoi(ann)
+	exportId, _ := strconv.ParseUint(ann, 10, 16)
+	delete(p.exportIds, uint16(exportId))
 
 	// Call RemoveExport using dbus
 	conn, err := dbus.SystemBus()
@@ -72,7 +73,7 @@ func (p *nfsProvisioner) ganeshaUnexport(volume *v1.PersistentVolume) error {
 	}
 
 	// Error removing the EXPORT block from file is not really an error, ganesha
-	// will just not export it next time around
+	// will just not export it next time around because the dir doesn't exist
 	block, ok := volume.Annotations[annBlock]
 	if !ok {
 		return fmt.Errorf("PV doesn't have an annotation %s, removed the export from the server but can't remove the export from the config file", annBlock)
@@ -86,6 +87,12 @@ func (p *nfsProvisioner) ganeshaUnexport(volume *v1.PersistentVolume) error {
 }
 
 func (p *nfsProvisioner) kernelUnexport(volume *v1.PersistentVolume) error {
+	if ann, ok := volume.Annotations[annExportId]; ok {
+		// If PV doesn't have this annotation it's no big deal for knfs
+		exportId, _ := strconv.ParseUint(ann, 10, 16)
+		delete(p.exportIds, uint16(exportId))
+	}
+
 	line, ok := volume.Annotations[annLine]
 	if !ok {
 		return fmt.Errorf("PV doesn't have an annotation %s, can't remove the export from /etc/exports", annLine)
