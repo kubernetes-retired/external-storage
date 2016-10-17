@@ -59,7 +59,9 @@ func (p *nfsProvisioner) ganeshaUnexport(volume *v1.PersistentVolume) error {
 		return fmt.Errorf("PV doesn't have an annotation %s, can't remove the export from the server", annExportId)
 	}
 	exportId, _ := strconv.ParseUint(ann, 10, 16)
+	p.mapMutex.Lock()
 	delete(p.exportIds, uint16(exportId))
+	p.mapMutex.Unlock()
 
 	// Call RemoveExport using dbus
 	conn, err := dbus.SystemBus()
@@ -90,7 +92,9 @@ func (p *nfsProvisioner) kernelUnexport(volume *v1.PersistentVolume) error {
 	if ann, ok := volume.Annotations[annExportId]; ok {
 		// If PV doesn't have this annotation it's no big deal for knfs
 		exportId, _ := strconv.ParseUint(ann, 10, 16)
+		p.mapMutex.Lock()
 		delete(p.exportIds, uint16(exportId))
+		p.mapMutex.Unlock()
 	}
 
 	line, ok := volume.Annotations[annLine]
