@@ -242,7 +242,7 @@ func (p *nfsProvisioner) createVolume(options controller.VolumeOptions) (string,
 }
 
 // createDirectory creates the directory at the given path with appropriate
-// permissions and ownership according to the given gid string.
+// permissions and ownership according to the given gid parameter string.
 func (p *nfsProvisioner) createDirectory(path, gid string) error {
 	// TODO quota, something better than just directories
 	if _, err := os.Stat(path); err == nil {
@@ -278,9 +278,8 @@ func (p *nfsProvisioner) createDirectory(path, gid string) error {
 	return nil
 }
 
-// createExport creating the export by adding a block to the appropriate config
-// file and exporting it, according to the appropriate method for ganesha or
-// kernel NFS.
+// createExport creates the export by adding a block to the appropriate config
+// file and exporting it, using the appropriate method.
 func (p *nfsProvisioner) createExport(path string) (string, uint16, error) {
 	var block string
 	var exportId uint16
@@ -371,7 +370,7 @@ func (p *nfsProvisioner) exportKernel() error {
 	return nil
 }
 
-// generateExportId fills a vacant exportId in the map and returns it for use.
+// generateExportId generates a unique exportId to assign an export
 func (p *nfsProvisioner) generateExportId() uint16 {
 	p.mapMutex.Lock()
 	id := uint16(1)
