@@ -222,7 +222,7 @@ func (p *nfsProvisioner) createVolume(options controller.VolumeOptions) (string,
 
 	server, err := p.getServer()
 	if err != nil {
-		return "", "", 0, "", 0, fmt.Errorf("error getting NFS server IP for created volume: %v", err)
+		return "", "", 0, "", 0, fmt.Errorf("error getting NFS server IP for volume: %v", err)
 	}
 
 	path := fmt.Sprintf(p.exportDir+"%s", options.PVName)
@@ -234,6 +234,7 @@ func (p *nfsProvisioner) createVolume(options controller.VolumeOptions) (string,
 
 	block, exportId, err := p.createExport(path)
 	if err != nil {
+		os.RemoveAll(path)
 		return "", "", 0, "", 0, fmt.Errorf("error creating export for volume: %v", err)
 	}
 
@@ -304,7 +305,6 @@ func (p *nfsProvisioner) createExport(path string) (string, uint16, error) {
 		err = p.exportKernel()
 	}
 	if err != nil {
-		os.RemoveAll(path)
 		p.removeFromFile(config, block)
 		return "", 0, err
 	}
