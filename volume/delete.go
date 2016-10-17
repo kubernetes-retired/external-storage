@@ -97,11 +97,11 @@ func (p *nfsProvisioner) kernelUnexport(volume *v1.PersistentVolume) error {
 		p.mapMutex.Unlock()
 	}
 
-	line, ok := volume.Annotations[annLine]
+	block, ok := volume.Annotations[annBlock]
 	if !ok {
-		return fmt.Errorf("PV doesn't have an annotation %s, can't remove the export from /etc/exports", annLine)
+		return fmt.Errorf("PV doesn't have an annotation %s, can't remove the export from /etc/exports", annBlock)
 	}
-	if err := p.removeFromFile("/etc/exports", line); err != nil {
+	if err := p.removeFromFile("/etc/exports", block); err != nil {
 		return fmt.Errorf("error removing the export from /etc/exports: %v", err)
 	}
 
