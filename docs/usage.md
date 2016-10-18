@@ -3,6 +3,7 @@
 The nfs-provisioner has been deployed and is now watching for claims it should provision volumes for. No such claims can exist until a properly configured `StorageClass` for claims to request is created.
 
 Edit the `provisioner` field in `deploy/kube-config/class.yaml` to be the provisioner's name. Configure the `parameters`.
+
 ### Parameters
 * `gid`: `"none"` or a [supplemental group](http://kubernetes.io/docs/user-guide/security-context/) like `"1001"`. NFS shares will be created with permissions such that only pods running with the supplemental group can read & write to the share. Or if `"none"`, anybody can write to the share. Default (if omitted) `"none"`.
 
@@ -22,7 +23,7 @@ $ kubectl create -f deploy/kube-config/claim.yaml
 persistentvolumeclaim "nfs" created
 ```
 
-The nfs-provisioner provisions a PV for the PVC you just created.
+The nfs-provisioner provisions a PV for the PVC you just created. Its reclaim policy is Delete, so it and its backing storage will be deleted by the provisioner when the PVC is deleted.
 
 ```
 $ kubectl get pv
@@ -43,12 +44,14 @@ write-pod         0/1       Completed   0          41s
 Once you are done with the PVC, delete it and the provisioner will delete the PV and its backing storage.
 
 ```
+$ kubectl delete pod write-pod
+pod "write-pod" deleted
 $ kubectl delete pvc nfs
 persistentvolumeclaim "nfs" deleted
 $ kubectl get pv
 ```
 
-Note that deleting or stopping a provisioner won't delete the `PersistentVolume` objects it created.
+Note that deleting or stopping a provisioner won't delete the `PersistentVolume` objects it created. **And due to an issue in kubernetes, deleting or stopping a provisioner while pods have shares mounted, then deleting one of those pods, can wedge the kubelet because the kubelet will not be able to unmount the shares while the provisioner is down.** Issue [here](https://github.com/kubernetes/kubernetes/issues/31272)
 
 If at any point things don't work correctly, check the provisioner's logs using `kubectl logs` and look for events in the PVs and PVCs using `kubectl describe`.
 
