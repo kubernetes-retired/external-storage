@@ -12,7 +12,7 @@ or
 $ docker pull wongma7/nfs-provisioner:latest
 ```
 
-Bring up a cluster.
+Bring up a 1.4+ cluster.
 
 ```
 $ API_HOST=172.17.0.1 KUBE_ENABLE_CLUSTER_DNS=true hack/local-up-cluster.sh
