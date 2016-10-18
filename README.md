@@ -4,7 +4,6 @@ nfs-provisioner is an out-of-tree dynamic provisioner for Kubernetes. You can us
 It works just like in-tree dynamic provisioners: a `StorageClass` object can specify an instance of nfs-provisioner to be its `provisioner` like it specifies in-tree provisioners such as GCE or AWS. Then, the instance of nfs-provisioner will watch for `PersistentVolumeClaims` that ask for the `StorageClass` and automatically create NFS-backed `PersistentVolumes` for them. For more information on how dynamic provisioning works, see [the docs](http://kubernetes.io/docs/user-guide/persistent-volumes/) or [this blog post](http://blog.kubernetes.io/2016/10/dynamic-provisioning-and-storage-in-kubernetes.html).
 
 ## Quickstart
-
 Create a provisioner pod with the name `matthew/nfs`, by specifying the arg "-provisioner=matthew/nfs".
 ```
 $ kubectl create -f deploy/kube-config/pod.yaml
@@ -38,6 +37,9 @@ To deploy nfs-provisioner on a Kubernetes cluster see [Deployment](docs/deployme
 To use nfs-provisioner once it is deployed see [Usage](docs/usage.md).
 
 For information on running multiple instances of nfs-provisioner see [Running Multiple Provisioners](docs/multiple.md).
+
+## Community
+Kubernetes Storage SIG: https://github.com/kubernetes/community/tree/master/sig-storage
 
 ## Roadmap
 October
