@@ -71,9 +71,17 @@ const (
 	// are we allowed to set this? else make up our own
 	annCreatedBy = "kubernetes.io/createdby"
 	createdBy    = "nfs-dynamic-provisioner"
+
+	podIPEnv     = "MY_POD_IP"
+	serviceEnv   = "MY_SERVICE_NAME"
+	namespaceEnv = "MY_POD_NAMESPACE"
 )
 
 func NewNFSProvisioner(exportDir string, client kubernetes.Interface, dynamicClient *dynamic.Client, useGanesha bool, ganeshaConfig string) controller.Provisioner {
+	return newProvisionerInternal(exportDir, client, dynamicClient, useGanesha, ganeshaConfig)
+}
+
+func newProvisionerInternal(exportDir string, client kubernetes.Interface, dynamicClient *dynamic.Client, useGanesha bool, ganeshaConfig string) *nfsProvisioner {
 	provisioner := &nfsProvisioner{
 		exportDir:     exportDir,
 		client:        client,
@@ -81,9 +89,9 @@ func NewNFSProvisioner(exportDir string, client kubernetes.Interface, dynamicCli
 		ganeshaConfig: ganeshaConfig,
 		mapMutex:      &sync.Mutex{},
 		fileMutex:     &sync.Mutex{},
-		podIPEnv:      "MY_POD_IP",
-		serviceEnv:    "MY_SERVICE_NAME",
-		namespaceEnv:  "MY_POD_NAMESPACE",
+		podIPEnv:      podIPEnv,
+		serviceEnv:    serviceEnv,
+		namespaceEnv:  namespaceEnv,
 	}
 
 	configPath := ganeshaConfig
@@ -98,7 +106,7 @@ func NewNFSProvisioner(exportDir string, client kubernetes.Interface, dynamicCli
 		glog.Errorf("error while populating exportIds map, there may be errors exporting later if exportIds are reused: %v", err)
 	}
 
-	provisioner.ranges = getSupplementalGroupsRanges(client, dynamicClient, "/podinfo/annotations", os.Getenv(provisioner.namespaceEnv))
+	// provisioner.ranges = getSupplementalGroupsRanges(client, dynamicClient, "/podinfo/annotations", os.Getenv(provisioner.namespaceEnv))
 
 	return provisioner
 }

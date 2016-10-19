@@ -79,7 +79,7 @@ func TestController(t *testing.T) {
 	}
 }
 
-func newStorageClass(name string, provisioner string) *v1beta1.StorageClass {
+func newStorageClass(name, provisioner string) *v1beta1.StorageClass {
 	return &v1beta1.StorageClass{
 		ObjectMeta: v1.ObjectMeta{
 			Name: name,
@@ -161,8 +161,4 @@ func (p *testProvisioner) Provision(options VolumeOptions) (*v1.PersistentVolume
 
 func (p *testProvisioner) Delete(volume *v1.PersistentVolume) error {
 	return nil
-}
-
-func (p *testProvisioner) Exists(volume *v1.PersistentVolume) bool {
-	return true
 }
