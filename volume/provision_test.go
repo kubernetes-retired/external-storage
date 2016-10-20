@@ -33,19 +33,6 @@ import (
 	"testing"
 )
 
-func evaluate(t *testing.T, name string, expectError bool, err error, expected interface{}, got interface{}, output string) {
-	if !expectError && err != nil {
-		t.Logf("test case: %s", name)
-		t.Errorf("unexpected error getting %s: %v", output, err)
-	} else if expectError && err == nil {
-		t.Logf("test case: %s", name)
-		t.Errorf("expected error but got %s: %v", output, got)
-	} else if !reflect.DeepEqual(expected, got) {
-		t.Logf("test case: %s", name)
-		t.Errorf("expected %s %v but got %s %v", output, expected, output, got)
-	}
-}
-
 func TestValidateOptions(t *testing.T) {
 	tmpDir := utiltesting.MkTmpdirOrDie("nfsProvisionTest")
 	defer os.RemoveAll(tmpDir)
@@ -350,5 +337,18 @@ func newEndpoints(name string, ips []string, ports []endpointPort) *v1.Endpoints
 				Ports:             epPorts,
 			},
 		},
+	}
+}
+
+func evaluate(t *testing.T, name string, expectError bool, err error, expected interface{}, got interface{}, output string) {
+	if !expectError && err != nil {
+		t.Logf("test case: %s", name)
+		t.Errorf("unexpected error getting %s: %v", output, err)
+	} else if expectError && err == nil {
+		t.Logf("test case: %s", name)
+		t.Errorf("expected error but got %s: %v", output, got)
+	} else if !reflect.DeepEqual(expected, got) {
+		t.Logf("test case: %s", name)
+		t.Errorf("expected %s %v but got %s %v", output, expected, output, got)
 	}
 }

@@ -26,16 +26,10 @@ import (
 	"k8s.io/client-go/1.4/pkg/runtime"
 	"k8s.io/client-go/1.4/pkg/types"
 
-	// "flag"
 	"reflect"
 	"testing"
 	"time"
 )
-
-func init() {
-	// flag.Set("v", "5")
-	// flag.Set("alsologtostderr", "true")
-}
 
 func TestController(t *testing.T) {
 	tests := []struct {
