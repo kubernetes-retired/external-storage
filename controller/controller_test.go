@@ -31,6 +31,8 @@ import (
 	"time"
 )
 
+// TODO failed provision, failed pv save, failed delete, failed pv delete?
+
 func TestController(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -112,14 +114,14 @@ func TestShouldProvision(t *testing.T) {
 			name:            "no such class",
 			provisionerName: "foo.bar/baz",
 			class:           newStorageClass("class-1", "foo.bar/baz"),
-			claim:           newClaim("claim-1", "1-1", "class-2", "foo"),
+			claim:           newClaim("claim-1", "1-1", "class-2", ""),
 			expectedShould:  false,
 		},
 		{
 			name:            "not this provisioner's job",
 			provisionerName: "foo.bar/baz",
 			class:           newStorageClass("class-1", "abc.def/ghi"),
-			claim:           newClaim("claim-1", "1-1", "class-1", "foo"),
+			claim:           newClaim("claim-1", "1-1", "class-1", ""),
 			expectedShould:  false,
 		},
 	}
