@@ -17,12 +17,14 @@ limitations under the License.
 package volume
 
 import (
+	"github.com/wongma7/nfs-provisioner/controller"
 	"k8s.io/client-go/1.4/kubernetes/fake"
+	"k8s.io/client-go/1.4/pkg/api/resource"
+	"k8s.io/client-go/1.4/pkg/api/unversioned"
 	"k8s.io/client-go/1.4/pkg/api/v1"
 	"k8s.io/client-go/1.4/pkg/runtime"
 	utiltesting "k8s.io/client-go/1.4/pkg/util/testing"
 
-	// "flag"
 	"io/ioutil"
 	"os"
 	"reflect"
@@ -30,6 +32,100 @@ import (
 	"strconv"
 	"testing"
 )
+
+func evaluate(t *testing.T, name string, expectError bool, err error, expected interface{}, got interface{}, output string) {
+	if !expectError && err != nil {
+		t.Logf("test case: %s", name)
+		t.Errorf("unexpected error getting %s: %v", output, err)
+	} else if expectError && err == nil {
+		t.Logf("test case: %s", name)
+		t.Errorf("expected error but got %s: %v", output, got)
+	} else if !reflect.DeepEqual(expected, got) {
+		t.Logf("test case: %s", name)
+		t.Errorf("expected %s %v but got %s %v", output, expected, output, got)
+	}
+}
+
+func TestValidateOptions(t *testing.T) {
+	tmpDir := utiltesting.MkTmpdirOrDie("nfsProvisionTest")
+	defer os.RemoveAll(tmpDir)
+
+	tests := []struct {
+		name        string
+		options     controller.VolumeOptions
+		expectedGid string
+		expectError bool
+	}{
+		{
+			name:        "empty parameters",
+			options:     controller.VolumeOptions{Parameters: map[string]string{}, Capacity: resource.MustParse("1Ki")},
+			expectedGid: "none",
+			expectError: false,
+		},
+		{
+			name:        "gid parameter value 'none'",
+			options:     controller.VolumeOptions{Parameters: map[string]string{"gid": "none"}, Capacity: resource.MustParse("1Ki")},
+			expectedGid: "none",
+			expectError: false,
+		},
+		{
+			name:        "gid parameter value id",
+			options:     controller.VolumeOptions{Parameters: map[string]string{"gid": "1"}, Capacity: resource.MustParse("1Ki")},
+			expectedGid: "1",
+			expectError: false,
+		},
+		{
+			name:        "bad parameter name",
+			options:     controller.VolumeOptions{Parameters: map[string]string{"foo": "bar"}},
+			expectedGid: "",
+			expectError: true,
+		},
+		{
+			name:        "bad gid parameter value string",
+			options:     controller.VolumeOptions{Parameters: map[string]string{"gid": "foo"}},
+			expectedGid: "",
+			expectError: true,
+		},
+		{
+			name:        "bad gid parameter value zero",
+			options:     controller.VolumeOptions{Parameters: map[string]string{"gid": "0"}},
+			expectedGid: "",
+			expectError: true,
+		},
+		{
+			name:        "bad gid parameter value negative",
+			options:     controller.VolumeOptions{Parameters: map[string]string{"gid": "-1"}},
+			expectedGid: "",
+			expectError: true,
+		},
+		// TODO non-nil selector
+		{
+			name:        "non-nil selector",
+			options:     controller.VolumeOptions{Selector: &unversioned.LabelSelector{MatchLabels: nil}},
+			expectedGid: "",
+			expectError: true,
+		},
+		{
+			name:        "bad capacity",
+			options:     controller.VolumeOptions{Capacity: resource.MustParse("1Ei")},
+			expectedGid: "",
+			expectError: true,
+		},
+	}
+	for _, test := range tests {
+		client := fake.NewSimpleClientset()
+		path := tmpDir + "/test"
+		_, err := os.Create(path)
+		if err != nil {
+			t.Errorf("Error creating file %s: %v", path, err)
+		}
+		p := newProvisionerInternal(tmpDir, client, nil, true, path)
+		os.RemoveAll(path)
+
+		gid, err := p.validateOptions(test.options)
+		evaluate(t, test.name, test.expectError, err, test.expectedGid, gid, "gid")
+	}
+}
 
 func TestAddToRemoveFromFile(t *testing.T) {
 	tmpDir := utiltesting.MkTmpdirOrDie("nfsProvisionTest")
@@ -65,14 +161,15 @@ func TestGetExportIds(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	tests := []struct {
+		name              string
 		useGanesha        bool
 		configContents    string
 		re                *regexp.Regexp
 		expectedExportIds map[uint16]bool
 		expectError       bool
 	}{
-		// ganesha exports 1, 3
 		{
+			name: "ganesha exports 1, 3",
 			configContents: "\nEXPORT\n{\n" +
 				"\tExport_Id = 1;\n" +
 				"\tFilesystem_id = 1.1;\n" +
@@ -85,16 +182,16 @@ func TestGetExportIds(t *testing.T) {
 			expectedExportIds: map[uint16]bool{1: true, 3: true},
 			expectError:       false,
 		},
-		// kernel exports 1, 3
 		{
+			name: "kernel exports 1, 3",
 			configContents: "\n foo *(rw,insecure,root_squash,fsid=1)\n" +
 				"\n bar *(rw,insecure,root_squash,fsid=3)\n",
 			re:                regexp.MustCompile("fsid=([0-9]+)"),
 			expectedExportIds: map[uint16]bool{1: true, 3: true},
 			expectError:       false,
 		},
-		// bad regex
 		{
+			name: "bad regex",
 			configContents: "\nEXPORT\n{\n" +
 				"\tExport_Id = 1;\n" +
 				"\tFilesystem_id = 1.1;\n" +
@@ -110,14 +207,8 @@ func TestGetExportIds(t *testing.T) {
 		if err != nil {
 			t.Errorf("Error writing file %s: %v", path, err)
 		}
-
 		exportIds, err := getExportIds(path, test.re)
-		if !test.expectError && err != nil {
-			t.Errorf("Error getting export ids: %v", err)
-		}
-		if !reflect.DeepEqual(test.expectedExportIds, exportIds) {
-			t.Errorf("Expected %v but got %v", test.expectedExportIds, exportIds)
-		}
+		evaluate(t, test.name, test.expectError, err, test.expectedExportIds, exportIds, "export ids")
 	}
 }
 
@@ -126,6 +217,7 @@ func TestGetServer(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	tests := []struct {
+		name           string
 		objs           []runtime.Object
 		podIP          string
 		service        string
@@ -133,8 +225,8 @@ func TestGetServer(t *testing.T) {
 		expectedServer string
 		expectError    bool
 	}{
-		// valid service
 		{
+			name: "valid service",
 			objs: []runtime.Object{
 				newService("foo", "1.1.1.1"),
 				newEndpoints("foo", []string{"2.2.2.2"}, []endpointPort{{2049, v1.ProtocolTCP}, {20048, v1.ProtocolTCP}, {111, v1.ProtocolUDP}, {111, v1.ProtocolTCP}}),
@@ -145,8 +237,8 @@ func TestGetServer(t *testing.T) {
 			expectedServer: "1.1.1.1",
 			expectError:    false,
 		},
-		// invalid service, ports don't match exactly
 		{
+			name: "invalid service, ports don't match exactly",
 			objs: []runtime.Object{
 				newService("foo", "1.1.1.1"),
 				newEndpoints("foo", []string{"2.2.2.2"}, []endpointPort{{2049, v1.ProtocolTCP}, {20048, v1.ProtocolTCP}, {111, v1.ProtocolUDP}, {999999, v1.ProtocolTCP}}),
@@ -157,8 +249,8 @@ func TestGetServer(t *testing.T) {
 			expectedServer: "",
 			expectError:    true,
 		},
-		// invalid service, points to different pod IP
 		{
+			name: "invalid service, points to different pod IP",
 			objs: []runtime.Object{
 				newService("foo", "1.1.1.1"),
 				newEndpoints("foo", []string{"3.3.3.3"}, []endpointPort{{2049, v1.ProtocolTCP}, {20048, v1.ProtocolTCP}, {111, v1.ProtocolUDP}, {111, v1.ProtocolTCP}}),
@@ -169,8 +261,8 @@ func TestGetServer(t *testing.T) {
 			expectedServer: "",
 			expectError:    true,
 		},
-		// service but no namespace
 		{
+			name: "service but no namespace",
 			objs: []runtime.Object{
 				newService("foo", "1.1.1.1"),
 				newEndpoints("foo", []string{"2.2.2.2"}, []endpointPort{{2049, v1.ProtocolTCP}, {20048, v1.ProtocolTCP}, {111, v1.ProtocolUDP}, {111, v1.ProtocolTCP}}),
@@ -181,8 +273,8 @@ func TestGetServer(t *testing.T) {
 			expectedServer: "",
 			expectError:    true,
 		},
-		// no service, should fallback to podIP
 		{
+			name:           "no service, should fallback to podIP",
 			objs:           []runtime.Object{},
 			podIP:          "2.2.2.2",
 			service:        "",
@@ -209,14 +301,10 @@ func TestGetServer(t *testing.T) {
 			t.Errorf("Error creating file %s: %v", path, err)
 		}
 		p := newProvisionerInternal(tmpDir, client, nil, true, path)
+		os.RemoveAll(path)
 
 		server, err := p.getServer()
-		if !test.expectError && err != nil {
-			t.Errorf("Error getting server: %v", err)
-		}
-		if test.expectedServer != server {
-			t.Errorf("Expected %s but got %s", test.expectedServer, server)
-		}
+		evaluate(t, test.name, test.expectError, err, test.expectedServer, server, "server")
 
 		os.Unsetenv(podIPEnv)
 		os.Unsetenv(serviceEnv)

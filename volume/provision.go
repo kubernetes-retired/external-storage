@@ -196,36 +196,9 @@ func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 // zero/non-zero supplemental group, the block it added to either the ganesha
 // config or /etc/exports, and the exportId
 func (p *nfsProvisioner) createVolume(options controller.VolumeOptions) (string, string, uint64, string, uint16, error) {
-	gid := "none"
-	for k, v := range options.Parameters {
-		switch strings.ToLower(k) {
-		case "gid":
-			if strings.ToLower(v) == "none" {
-				gid = "none"
-			} else if i, err := strconv.ParseUint(v, 10, 64); err == nil && i != 0 {
-				gid = v
-			} else {
-				return "", "", 0, "", 0, fmt.Errorf("invalid value for parameter gid: %v. valid values are: 'none' or a non-zero integer", v)
-			}
-		default:
-			return "", "", 0, "", 0, fmt.Errorf("invalid parameter: %q", k)
-		}
-	}
-
-	// TODO implement options.ProvisionerSelector parsing
-	// TODO pv.Labels MUST be set to match claim.spec.selector
-	if options.Selector != nil {
-		return "", "", 0, "", 0, fmt.Errorf("claim.Spec.Selector is not supported")
-	}
-
-	var stat syscall.Statfs_t
-	if err := syscall.Statfs(p.exportDir, &stat); err != nil {
-		return "", "", 0, "", 0, fmt.Errorf("error calling statfs on %v: %v", p.exportDir, err)
-	}
-	capacity := options.Capacity.Value()
-	available := int64(stat.Bavail) * stat.Bsize
-	if capacity > available {
-		return "", "", 0, "", 0, fmt.Errorf("insufficient available space %v bytes to satisfy claim for %v bytes", available, capacity)
+	gid, err := p.validateOptions(options)
+	if err != nil {
+		return "", "", 0, "", 0, fmt.Errorf("error validating options for volume: %v", err)
 	}
 
 	server, err := p.getServer()
@@ -247,6 +220,42 @@ func (p *nfsProvisioner) createVolume(options controller.VolumeOptions) (string,
 	}
 
 	return server, path, 0, block, exportId, nil
+}
+
+func (p *nfsProvisioner) validateOptions(options controller.VolumeOptions) (string, error) {
+	gid := "none"
+	for k, v := range options.Parameters {
+		switch strings.ToLower(k) {
+		case "gid":
+			if strings.ToLower(v) == "none" {
+				gid = "none"
+			} else if i, err := strconv.ParseUint(v, 10, 64); err == nil && i != 0 {
+				gid = v
+			} else {
+				return "", fmt.Errorf("invalid value for parameter gid: %v. valid values are: 'none' or a non-zero integer", v)
+			}
+		default:
+			return "", fmt.Errorf("invalid parameter: %q", k)
+		}
+	}
+
+	// TODO implement options.ProvisionerSelector parsing
+	// TODO pv.Labels MUST be set to match claim.spec.selector
+	if options.Selector != nil {
+		return "", fmt.Errorf("claim.Spec.Selector is not supported")
+	}
+
+	var stat syscall.Statfs_t
+	if err := syscall.Statfs(p.exportDir, &stat); err != nil {
+		return "", fmt.Errorf("error calling statfs on %v: %v", p.exportDir, err)
+	}
+	capacity := options.Capacity.Value()
+	available := int64(stat.Bavail) * stat.Bsize
+	if capacity > available {
+		return "", fmt.Errorf("insufficient available space %v bytes to satisfy claim for %v bytes", available, capacity)
+	}
+
+	return gid, nil
 }
 
 // createDirectory creates the directory at the given path with appropriate
