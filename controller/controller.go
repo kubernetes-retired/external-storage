@@ -280,6 +280,10 @@ func (ctrl *ProvisionController) shouldDelete(volume *v1.PersistentVolume) bool 
 		return false
 	}
 
+	if volume.Spec.PersistentVolumeReclaimPolicy != v1.PersistentVolumeReclaimDelete {
+		return false
+	}
+
 	if !hasAnnotation(volume.ObjectMeta, annDynamicallyProvisioned) {
 		return false
 	}
