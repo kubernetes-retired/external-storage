@@ -488,7 +488,3 @@ func getClaimClass(claim *v1.PersistentVolumeClaim) string {
 func claimToClaimKey(claim *v1.PersistentVolumeClaim) string {
 	return fmt.Sprintf("%s/%s", claim.Namespace, claim.Name)
 }
-
-func claimrefToClaimKey(claimref *v1.ObjectReference) string {
-	return fmt.Sprintf("%s/%s", claimref.Namespace, claimref.Name)
-}

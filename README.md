@@ -56,5 +56,6 @@ October
 * Add CI & testing
 
 November
+* Look at running without --privileged flag
 * Add filesystem quotas for PV usage
 * Support running as PetSet
