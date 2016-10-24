@@ -17,7 +17,6 @@ limitations under the License.
 package volume
 
 import (
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"math"
@@ -32,29 +31,14 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/guelfey/go.dbus"
-	"github.com/openshift/origin/pkg/security/uid"
 	"github.com/wongma7/nfs-provisioner/controller"
 	"k8s.io/client-go/1.4/dynamic"
 	"k8s.io/client-go/1.4/kubernetes"
-	"k8s.io/client-go/1.4/pkg/api/unversioned"
 	"k8s.io/client-go/1.4/pkg/api/v1"
 	"k8s.io/client-go/1.4/pkg/apis/extensions/v1beta1"
-	"k8s.io/client-go/1.4/pkg/runtime"
 )
 
 const (
-	// ValidatedPSPAnnotation is the annotation on the pod object that specifies
-	// the name of the PSP the pod validated against, if any.
-	ValidatedPSPAnnotation = "kubernetes.io/psp"
-
-	// ValidatedSCCAnnotation is the annotation on the pod object that specifies
-	// the name of the SCC the pod validated against, if any.
-	ValidatedSCCAnnotation = "openshift.io/scc"
-	UIDRangeAnnotation     = "openshift.io/sa.scc.uid-range"
-	// SupplementalGroupsAnnotation contains a comma delimited list of allocated supplemental groups
-	// for the namespace.  Groups are in the form of a Block which supports {start}/{length} or {start}-{end}
-	SupplementalGroupsAnnotation = "openshift.io/sa.scc.supplemental-groups"
-
 	// VolumeGidAnnotationKey is the key of the annotation on the PersistentVolume
 	// object that specifies a supplemental GID.
 	VolumeGidAnnotationKey = "pv.beta.kubernetes.io/gid"
@@ -105,8 +89,6 @@ func newProvisionerInternal(exportDir string, client kubernetes.Interface, dynam
 	if err != nil {
 		glog.Errorf("error while populating exportIds map, there may be errors exporting later if exportIds are reused: %v", err)
 	}
-
-	// provisioner.ranges = getSupplementalGroupsRanges(client, dynamicClient, "/podinfo/annotations", os.Getenv(provisioner.namespaceEnv))
 
 	return provisioner
 }
@@ -541,179 +523,4 @@ func getExportIds(configPath string, re *regexp.Regexp) (map[uint16]bool, error)
 	}
 
 	return exportIds, nil
-}
-
-// getSupplementalGroupsRanges gets the ranges of SupplementalGroups the
-// provisioner pod is allowed to run as. Range rules can be imposed by a PSP,
-// SCC or namespace (latter two in openshift only).
-func getSupplementalGroupsRanges(client kubernetes.Interface, dynamicClient *dynamic.Client, downwardAnnotationsFile string, namespace string) []v1beta1.IDRange {
-	sccName, err := getPodAnnotation(downwardAnnotationsFile, ValidatedSCCAnnotation)
-	if err != nil {
-		glog.Errorf("error getting pod annotation %s: %v", ValidatedSCCAnnotation, err)
-	} else if sccName != "" {
-		sccResource := unversioned.APIResource{Name: "securitycontextconstraints", Namespaced: false, Kind: "SecurityContextConstraints"}
-		sccClient := dynamicClient.Resource(&sccResource, "")
-		scc, err := sccClient.Get(sccName)
-		if err != nil {
-			glog.Errorf("error getting provisioner pod's scc: %v", err)
-		} else {
-			ranges := getSCCSupplementalGroups(scc)
-			if ranges != nil && len(ranges) > 0 {
-				return ranges
-			}
-		}
-	}
-
-	pspName, err := getPodAnnotation(downwardAnnotationsFile, ValidatedPSPAnnotation)
-	if err != nil {
-		glog.Errorf("error getting pod annotation %s: %v", ValidatedPSPAnnotation, err)
-	} else if pspName != "" {
-		psp, err := client.Extensions().PodSecurityPolicies().Get(pspName)
-		if err != nil {
-			glog.Errorf("error getting provisioner pod's psp: %v", err)
-		} else {
-			ranges := getPSPSupplementalGroups(psp)
-			if ranges != nil && len(ranges) > 0 {
-				return ranges
-			}
-		}
-	}
-
-	ns, err := client.Core().Namespaces().Get(namespace)
-	if err != nil {
-		glog.Errorf("error getting namespace %s: %v", namespace, err)
-	} else {
-		ranges, err := getPreallocatedSupplementalGroups(ns)
-		if err != nil {
-			glog.Errorf("error getting preallcoated supplemental groups: %v", err)
-		} else if ranges != nil && len(ranges) > 0 {
-			return ranges
-		}
-	}
-
-	return []v1beta1.IDRange{{Min: int64(1), Max: int64(65533)}}
-}
-
-// getPodAnnotation returns the value of the given annotation on the provisioner
-// pod or an empty string if the annotation doesn't exist.
-func getPodAnnotation(downwardAnnotationsFile string, annotation string) (string, error) {
-	read, err := ioutil.ReadFile(downwardAnnotationsFile)
-	if err != nil {
-		return "", fmt.Errorf("error reading downward API annotations volume: %v", err)
-	}
-	re := regexp.MustCompile(annotation + "=\".*\"$")
-	line := re.Find(read)
-	if line == nil {
-		return "", nil
-	}
-	re = regexp.MustCompile("\"(.*?)\"")
-	value := re.FindStringSubmatch(string(line))[1]
-	return value, nil
-}
-
-// getPSPSupplementalGroups returns the SupplementalGroup Ranges of the PSP or
-// nil if the PSP doesn't impose gid range rules.
-func getPSPSupplementalGroups(psp *v1beta1.PodSecurityPolicy) []v1beta1.IDRange {
-	if psp == nil {
-		return nil
-	}
-	if psp.Spec.SupplementalGroups.Rule != v1beta1.SupplementalGroupsStrategyMustRunAs {
-		return nil
-	}
-	return psp.Spec.SupplementalGroups.Ranges
-}
-
-// TODO "Type" vs "Rule"
-// SupplementalGroupsStrategyOptions defines the strategy type and options used to create the strategy.
-type SupplementalGroupsStrategyOptions struct {
-	// Type is the strategy that will dictate what supplemental groups is used in the SecurityContext.
-	Type v1beta1.SupplementalGroupsStrategyType `json:"type,omitempty" protobuf:"bytes,1,opt,name=type,casttype=SupplementalGroupsStrategyType"`
-	// Ranges are the allowed ranges of supplemental groups.  If you would like to force a single
-	// supplemental group then supply a single range with the same start and end.
-	Ranges []v1beta1.IDRange `json:"ranges,omitempty" protobuf:"bytes,2,rep,name=ranges"`
-}
-
-// getSCCSupplementalGroups returns the SupplementalGroup Ranges of the SCC or
-// nil if the SCC doesn't impose gid range rules.
-func getSCCSupplementalGroups(scc *runtime.Unstructured) []v1beta1.IDRange {
-	if scc == nil {
-		return nil
-	}
-	data, _ := scc.MarshalJSON()
-	var v map[string]interface{}
-	_ = json.Unmarshal(data, &v)
-	if _, ok := v["supplementalGroups"]; !ok {
-		return nil
-	}
-	data, _ = json.Marshal(v["supplementalGroups"])
-	supplementalGroups := SupplementalGroupsStrategyOptions{}
-	_ = json.Unmarshal(data, &supplementalGroups)
-	if supplementalGroups.Type != v1beta1.SupplementalGroupsStrategyMustRunAs {
-		return nil
-	}
-	return supplementalGroups.Ranges
-}
-
-// getSupplementalGroupsAnnotation provides a backwards compatible way to get supplemental groups
-// annotations from a namespace by looking for SupplementalGroupsAnnotation and falling back to
-// UIDRangeAnnotation if it is not found.
-// openshift/origin pkg/security/scc/matcher.go
-func getSupplementalGroupsAnnotation(ns *v1.Namespace) (string, error) {
-	groups, ok := ns.Annotations[SupplementalGroupsAnnotation]
-	if !ok {
-		glog.V(4).Infof("unable to find supplemental group annotation %s falling back to %s", SupplementalGroupsAnnotation, UIDRangeAnnotation)
-
-		groups, ok = ns.Annotations[UIDRangeAnnotation]
-		if !ok {
-			return "", fmt.Errorf("unable to find supplemental group or uid annotation for namespace %s", ns.Name)
-		}
-	}
-
-	if len(groups) == 0 {
-		return "", fmt.Errorf("unable to find groups using %s and %s annotations", SupplementalGroupsAnnotation, UIDRangeAnnotation)
-	}
-	return groups, nil
-}
-
-// getPreallocatedSupplementalGroups gets the annotated value from the namespace.
-// openshift/origin pkg/security/scc/matcher.go
-func getPreallocatedSupplementalGroups(ns *v1.Namespace) ([]v1beta1.IDRange, error) {
-	groups, err := getSupplementalGroupsAnnotation(ns)
-	if err != nil {
-		return nil, err
-	}
-	glog.V(4).Infof("got preallocated value for groups: %s in namespace %s", groups, ns.Name)
-
-	blocks, err := parseSupplementalGroupAnnotation(groups)
-	if err != nil {
-		return nil, err
-	}
-
-	idRanges := []v1beta1.IDRange{}
-	for _, block := range blocks {
-		rng := v1beta1.IDRange{
-			Min: int64(block.Start),
-			Max: int64(block.End),
-		}
-		idRanges = append(idRanges, rng)
-	}
-	return idRanges, nil
-}
-
-// parseSupplementalGroupAnnotation parses the group annotation into blocks.
-// openshift/origin pkg/security/scc/matcher.go
-func parseSupplementalGroupAnnotation(groups string) ([]uid.Block, error) {
-	blocks := []uid.Block{}
-	segments := strings.Split(groups, ",")
-	for _, segment := range segments {
-		block, err := uid.ParseBlock(segment)
-		if err != nil {
-			return nil, err
-		}
-		blocks = append(blocks, block)
-	}
-	if len(blocks) == 0 {
-		return nil, fmt.Errorf("no blocks parsed from annotation %s", groups)
-	}
-	return blocks, nil
 }
