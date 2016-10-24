@@ -15,7 +15,7 @@ $ docker pull wongma7/nfs-provisioner:latest
 Bring up a 1.4+ cluster.
 
 ```
-$ API_HOST=172.17.0.1 KUBE_ENABLE_CLUSTER_DNS=true hack/local-up-cluster.sh
+$ ALLOW_PRIVILEGED=true ALLOW_SECURITY_CONTEXT=true API_HOST=0.0.0.0 KUBE_ENABLE_CLUSTER_DNS=true hack/local-up-cluster.sh
 ```
 
 Decide on a unique name to give the provisioner that follows the naming scheme `<vendor name>/<provisioner name>`. The provisioner will only provision volumes for claims that request a `StorageClass` with a `provisioner` field set equal to this name. For example, the names of the in-tree GCE and AWS provisioners are `kubernetes.io/gce-pd` and `kubernetes.io/aws-ebs`.

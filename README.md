@@ -57,3 +57,4 @@ October
 
 November
 * Add filesystem quotas for PV usage
+* Support running as PetSet
