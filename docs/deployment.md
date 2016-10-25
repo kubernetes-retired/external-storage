@@ -1,18 +1,32 @@
-## Deployment
+# Deployment
 
-Build nfs-provisioner and a Docker image for it. Or pull/let Kubernetes pull the image from Docker Hub.
+## Getting the provisioner image
+To get the Docker image onto your machine you can either build it or pull the latest version from Docker Hub.
+
+### Building
+Building the project will only work if the project is in your `GOPATH`. Download the project into your `GOPATH` directory by using `go get` or cloning it manually.
 
 ```
+$ go get github.com/wongma7/nfs-provisioner
+```
+
+Now build the project and the Docker image by running `make container` in the project directory.
+
+```
+$ cd $GOPATH/src/github.com/wongma7/nfs-provisioner
 $ make container
 ```
 
-or
+### Pulling
+
+If you are running in Kubernetes, it will pull the image from Docker Hub for you. Or you can do it yourself.
 
 ```
 $ docker pull wongma7/nfs-provisioner:latest
 ```
 
-Bring up a 1.4+ cluster.
+## Deploying the provisioner
+Now the Docker image is on your machine. Bring up a 1.4+ cluster if you don't have one up already.
 
 ```
 $ ALLOW_PRIVILEGED=true ALLOW_SECURITY_CONTEXT=true API_HOST=0.0.0.0 KUBE_ENABLE_CLUSTER_DNS=true hack/local-up-cluster.sh
@@ -20,9 +34,15 @@ $ ALLOW_PRIVILEGED=true ALLOW_SECURITY_CONTEXT=true API_HOST=0.0.0.0 KUBE_ENABLE
 
 Decide on a unique name to give the provisioner that follows the naming scheme `<vendor name>/<provisioner name>`. The provisioner will only provision volumes for claims that request a `StorageClass` with a `provisioner` field set equal to this name. For example, the names of the in-tree GCE and AWS provisioners are `kubernetes.io/gce-pd` and `kubernetes.io/aws-ebs`.
 
-Decide how to run nfs-provisioner. It can be run in Kubernetes as a pod or outside of Kubernetes as a standalone container or binary. See [here](#a-note-on-deciding-how-to-run) for help on deciding between a pod and deployment; in short, if you want to back your shares with persistent storage, running a deployment & service has some benefits.
+Decide how to run nfs-provisioner and follow one of the below sections. See [here](#a-note-on-deciding-how-to-run) for help on deciding between a pod and deployment; in short, if you want to back your shares with persistent storage, running a deployment & service has some benefits. If you are running in OpenShift, see [here](#a-note-on-running-in-openshift) for information on what authorizations the pod needs.
 
-If you are running in OpenShift, see [here](#a-note-on-running-in-openshift) for information on what authorizations the pod needs.
+* [In Kubernetes - Pod](#in-kubernetes---pod)
+* [In Kubernetes - Deployment](#in-kubernetes---deployment)
+* [Outside of Kubernetes - container](#outside-of-kubernetes---container)
+* [Outside of Kubernetes - binary](#outside-of-kubernetes---binary)
+
+
+Once you finished deploying the provisioner, go to [Usage](usage.md) for info on how to use it.
 
 ### In Kubernetes - Pod
 
@@ -89,6 +109,8 @@ or
 ```
 $ sudo ./nfs-provisioner -provisioner=matthew/nfs -out-of-cluster=true -master=http://172.17.0.1:8080 -run-server=false -use-ganesha=false
 ```
+
+---
 
 #### A note on deciding how to run
 
