@@ -23,14 +23,10 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-
 	"github.com/wongma7/nfs-provisioner/controller"
 	"github.com/wongma7/nfs-provisioner/server"
 	vol "github.com/wongma7/nfs-provisioner/volume"
-
-	"k8s.io/client-go/1.4/dynamic"
 	"k8s.io/client-go/1.4/kubernetes"
-	"k8s.io/client-go/1.4/pkg/api/unversioned"
 	"k8s.io/client-go/1.4/pkg/util/validation"
 	"k8s.io/client-go/1.4/pkg/util/validation/field"
 	"k8s.io/client-go/1.4/pkg/util/wait"
@@ -87,13 +83,8 @@ func main() {
 	if err != nil {
 		glog.Fatalf("Failed to create client: %v", err)
 	}
-	clientPool := dynamic.NewClientPool(config, dynamic.LegacyAPIPathResolverFunc)
-	dynamicClient, err := clientPool.ClientForGroupVersion(unversioned.GroupVersion{Group: "", Version: "v1"})
-	if err != nil {
-		glog.Fatalf("Failed to create dynamic client: %v", err)
-	}
 
-	nfsProvisioner := vol.NewNFSProvisioner("/export/", clientset, dynamicClient, *useGanesha, ganeshaConfig)
+	nfsProvisioner := vol.NewNFSProvisioner("/export/", clientset, *useGanesha, ganeshaConfig)
 
 	// Start the provision controller which will dynamically provision NFS PVs
 	pc := controller.NewProvisionController(clientset, 15*time.Second, *provisioner, nfsProvisioner)

@@ -32,10 +32,8 @@ import (
 	"github.com/golang/glog"
 	"github.com/guelfey/go.dbus"
 	"github.com/wongma7/nfs-provisioner/controller"
-	"k8s.io/client-go/1.4/dynamic"
 	"k8s.io/client-go/1.4/kubernetes"
 	"k8s.io/client-go/1.4/pkg/api/v1"
-	"k8s.io/client-go/1.4/pkg/apis/extensions/v1beta1"
 )
 
 const (
@@ -61,11 +59,11 @@ const (
 	namespaceEnv = "MY_POD_NAMESPACE"
 )
 
-func NewNFSProvisioner(exportDir string, client kubernetes.Interface, dynamicClient *dynamic.Client, useGanesha bool, ganeshaConfig string) controller.Provisioner {
-	return newNFSProvisionerInternal(exportDir, client, dynamicClient, useGanesha, ganeshaConfig)
+func NewNFSProvisioner(exportDir string, client kubernetes.Interface, useGanesha bool, ganeshaConfig string) controller.Provisioner {
+	return newNFSProvisionerInternal(exportDir, client, useGanesha, ganeshaConfig)
 }
 
-func newNFSProvisionerInternal(exportDir string, client kubernetes.Interface, dynamicClient *dynamic.Client, useGanesha bool, ganeshaConfig string) *nfsProvisioner {
+func newNFSProvisionerInternal(exportDir string, client kubernetes.Interface, useGanesha bool, ganeshaConfig string) *nfsProvisioner {
 	provisioner := &nfsProvisioner{
 		exportDir:    exportDir,
 		client:       client,
@@ -111,9 +109,6 @@ type nfsProvisioner struct {
 
 	// Lock for writing to the ganesha config or /etc/exports file
 	fileMutex *sync.Mutex
-
-	// Ranges of gids to assign to PV's
-	ranges []v1beta1.IDRange
 
 	// Environment variables the provisioner pod needs valid values for in order to
 	// put a service cluster IP as the server of provisioned NFS PVs, passed in

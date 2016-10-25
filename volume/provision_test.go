@@ -106,7 +106,7 @@ func TestValidateOptions(t *testing.T) {
 		if err != nil {
 			t.Errorf("Error creating file %s: %v", path, err)
 		}
-		p := newNFSProvisionerInternal(tmpDir, client, nil, true, path)
+		p := newNFSProvisionerInternal(tmpDir, client, true, path)
 		os.RemoveAll(path)
 
 		gid, err := p.validateOptions(test.options)
@@ -124,7 +124,7 @@ func TestAddToRemoveFromFile(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error creating file %s: %v", path, err)
 	}
-	p := newNFSProvisionerInternal(tmpDir, client, nil, true, path)
+	p := newNFSProvisionerInternal(tmpDir, client, true, path)
 
 	toAdd := "abc\nxyz\n"
 	p.addToFile(path, toAdd)
@@ -287,7 +287,7 @@ func TestGetServer(t *testing.T) {
 		if err != nil {
 			t.Errorf("Error creating file %s: %v", path, err)
 		}
-		p := newNFSProvisionerInternal(tmpDir, client, nil, true, path)
+		p := newNFSProvisionerInternal(tmpDir, client, true, path)
 		os.RemoveAll(path)
 
 		server, err := p.getServer()
