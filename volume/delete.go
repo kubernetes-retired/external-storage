@@ -37,31 +37,39 @@ func (p *nfsProvisioner) Delete(volume *v1.PersistentVolume) error {
 	}
 
 	if err := os.RemoveAll(path); err != nil {
-		return fmt.Errorf("error deleting volume by removing its path: %v", err)
+		return fmt.Errorf("error deleting volume by removing its backing path: %v", err)
 	}
 
-	var err error
-	if p.useGanesha {
-		err = p.ganeshaUnexport(volume)
-	} else {
-		err = p.kernelUnexport(volume)
+	if ann, ok := volume.Annotations[annExportId]; ok {
+		// If PV doesn't have this annotation it's no big deal for knfs
+		exportId, _ := strconv.ParseUint(ann, 10, 16)
+		p.mapMutex.Lock()
+		delete(p.exportIds, uint16(exportId))
+		p.mapMutex.Unlock()
 	}
+
+	block, ok := volume.Annotations[annBlock]
+	if !ok {
+		return fmt.Errorf("removed the volume's backing path but can't remove the export from the config file because PV doesn't have an annotation %s", annBlock)
+	}
+	if err := p.removeFromFile(p.exporter.GetConfig(), block); err != nil {
+		return fmt.Errorf("removed the volume's backing path but error removing the export from the config file %s: %v", p.exporter.GetConfig(), err)
+	}
+
+	err := p.exporter.Unexport(volume)
 	if err != nil {
-		return fmt.Errorf("removed the path backing the volume but error unexporting it: %v", err)
+		return fmt.Errorf("removed the volume's backing path and export from the config file but error unexporting it: %v", err)
 	}
 
 	return nil
 }
 
-func (p *nfsProvisioner) ganeshaUnexport(volume *v1.PersistentVolume) error {
+func (e *ganeshaExporter) Unexport(volume *v1.PersistentVolume) error {
 	ann, ok := volume.Annotations[annExportId]
 	if !ok {
 		return fmt.Errorf("PV doesn't have an annotation %s, can't remove the export from the server", annExportId)
 	}
 	exportId, _ := strconv.ParseUint(ann, 10, 16)
-	p.mapMutex.Lock()
-	delete(p.exportIds, uint16(exportId))
-	p.mapMutex.Unlock()
 
 	// Call RemoveExport using dbus
 	conn, err := dbus.SystemBus()
@@ -74,37 +82,10 @@ func (p *nfsProvisioner) ganeshaUnexport(volume *v1.PersistentVolume) error {
 		return fmt.Errorf("error calling org.ganesha.nfsd.exportmgr.RemoveExport: %v", call.Err)
 	}
 
-	// Error removing the EXPORT block from file is not really an error, ganesha
-	// will just not export it next time around because the dir doesn't exist
-	block, ok := volume.Annotations[annBlock]
-	if !ok {
-		return fmt.Errorf("PV doesn't have an annotation %s, removed the export from the server but can't remove the export from the config file", annBlock)
-	}
-	if err := p.removeFromFile(p.ganeshaConfig, block); err != nil {
-		return fmt.Errorf("removed the export from the server but error removing the export from the config file: %v", err)
-	}
-
 	return nil
-
 }
 
-func (p *nfsProvisioner) kernelUnexport(volume *v1.PersistentVolume) error {
-	if ann, ok := volume.Annotations[annExportId]; ok {
-		// If PV doesn't have this annotation it's no big deal for knfs
-		exportId, _ := strconv.ParseUint(ann, 10, 16)
-		p.mapMutex.Lock()
-		delete(p.exportIds, uint16(exportId))
-		p.mapMutex.Unlock()
-	}
-
-	block, ok := volume.Annotations[annBlock]
-	if !ok {
-		return fmt.Errorf("PV doesn't have an annotation %s, can't remove the export from /etc/exports", annBlock)
-	}
-	if err := p.removeFromFile("/etc/exports", block); err != nil {
-		return fmt.Errorf("error removing the export from /etc/exports: %v", err)
-	}
-
+func (e *kernelExporter) Unexport(volume *v1.PersistentVolume) error {
 	// Execute exportfs
 	cmd := exec.Command("exportfs", "-r")
 	out, err := cmd.CombinedOutput()

@@ -41,7 +41,6 @@ Decide how to run nfs-provisioner and follow one of the below sections. See [her
 * [Outside of Kubernetes - container](#outside-of-kubernetes---container)
 * [Outside of Kubernetes - binary](#outside-of-kubernetes---binary)
 
-
 Once you finished deploying the provisioner, go to [Usage](usage.md) for info on how to use it.
 
 ### In Kubernetes - Pod
