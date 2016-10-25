@@ -31,15 +31,16 @@ import (
 func (p *nfsProvisioner) Delete(volume *v1.PersistentVolume) error {
 	// TODO quota, something better than just directories
 
+	// delete Directory
 	path := fmt.Sprintf(p.exportDir+"%s", volume.ObjectMeta.Name)
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return fmt.Errorf("Delete called on a volume that doesn't exist, presumably because this provisioner never created it")
 	}
-
 	if err := os.RemoveAll(path); err != nil {
 		return fmt.Errorf("error deleting volume by removing its backing path: %v", err)
 	}
 
+	// delete Export
 	if ann, ok := volume.Annotations[annExportId]; ok {
 		// If PV doesn't have this annotation it's no big deal for knfs
 		exportId, _ := strconv.ParseUint(ann, 10, 16)

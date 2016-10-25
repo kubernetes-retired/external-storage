@@ -62,10 +62,10 @@ const (
 )
 
 func NewNFSProvisioner(exportDir string, client kubernetes.Interface, dynamicClient *dynamic.Client, useGanesha bool, ganeshaConfig string) controller.Provisioner {
-	return newProvisionerInternal(exportDir, client, dynamicClient, useGanesha, ganeshaConfig)
+	return newNFSProvisionerInternal(exportDir, client, dynamicClient, useGanesha, ganeshaConfig)
 }
 
-func newProvisionerInternal(exportDir string, client kubernetes.Interface, dynamicClient *dynamic.Client, useGanesha bool, ganeshaConfig string) *nfsProvisioner {
+func newNFSProvisionerInternal(exportDir string, client kubernetes.Interface, dynamicClient *dynamic.Client, useGanesha bool, ganeshaConfig string) *nfsProvisioner {
 	provisioner := &nfsProvisioner{
 		exportDir:    exportDir,
 		client:       client,
@@ -76,16 +76,13 @@ func newProvisionerInternal(exportDir string, client kubernetes.Interface, dynam
 		namespaceEnv: namespaceEnv,
 	}
 
-	var re *regexp.Regexp
 	if useGanesha {
 		provisioner.exporter = &ganeshaExporter{ganeshaConfig: ganeshaConfig}
-		re = regexp.MustCompile("Export_Id = ([0-9]+);")
 	} else {
 		provisioner.exporter = &kernelExporter{}
-		re = regexp.MustCompile("fsid=([0-9]+)")
 	}
 	var err error
-	provisioner.exportIds, err = getExportIds(provisioner.exporter.GetConfig(), re)
+	provisioner.exportIds, err = provisioner.exporter.GetConfigExportIds()
 	if err != nil {
 		glog.Errorf("error while populating exportIds map, there may be errors exporting later if exportIds are reused: %v", err)
 	}
@@ -236,193 +233,6 @@ func (p *nfsProvisioner) validateOptions(options controller.VolumeOptions) (stri
 	return gid, nil
 }
 
-// createDirectory creates the directory at the given path with appropriate
-// permissions and ownership according to the given gid parameter string.
-func (p *nfsProvisioner) createDirectory(path, gid string) error {
-	// TODO quota, something better than just directories
-	if _, err := os.Stat(path); err == nil {
-		return fmt.Errorf("error creating volume, the path already exists")
-	}
-
-	perm := os.FileMode(0777)
-	if gid != "none" {
-		// Execute permission is required for stat, which kubelet uses during unmount.
-		perm = os.FileMode(0071)
-	}
-	if err := os.MkdirAll(path, perm); err != nil {
-		return fmt.Errorf("error creating dir for volume: %v", err)
-	}
-	// Due to umask, need to chmod
-	cmd := exec.Command("chmod", strconv.FormatInt(int64(perm), 8), path)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		os.RemoveAll(path)
-		return fmt.Errorf("chmod failed with error: %v, output: %s", err, out)
-	}
-
-	if gid != "none" {
-		groupId, _ := strconv.ParseUint(gid, 10, 64)
-		cmd = exec.Command("chgrp", strconv.FormatUint(groupId, 10), path)
-		out, err = cmd.CombinedOutput()
-		if err != nil {
-			os.RemoveAll(path)
-			return fmt.Errorf("chgrp failed with error: %v, output: %s", err, out)
-		}
-	}
-
-	return nil
-}
-
-// createExport creates the export by adding a block to the appropriate config
-// file and exporting it, using the appropriate method.
-func (p *nfsProvisioner) createExport(path string) (string, uint16, error) {
-	exportId := p.generateExportId()
-	exportIdStr := strconv.FormatUint(uint64(exportId), 10)
-
-	config := p.exporter.GetConfig()
-	block := p.exporter.CreateBlock(exportIdStr, path)
-
-	// Add the export block to the config file
-	if err := p.addToFile(config, block); err != nil {
-		return "", 0, fmt.Errorf("error adding export block to the config file %s: %v", config, err)
-	}
-
-	err := p.exporter.Export(path)
-	if err != nil {
-		p.removeFromFile(config, block)
-		return "", 0, err
-	}
-
-	return block, exportId, nil
-}
-
-// generateExportId generates a unique exportId to assign an export
-func (p *nfsProvisioner) generateExportId() uint16 {
-	p.mapMutex.Lock()
-	id := uint16(1)
-	for ; id <= math.MaxUint16; id++ {
-		if _, ok := p.exportIds[id]; !ok {
-			break
-		}
-	}
-	p.exportIds[id] = true
-	p.mapMutex.Unlock()
-	return id
-}
-
-type exporter interface {
-	GetConfig() string
-	CreateBlock(string, string) string
-	Export(string) error
-	Unexport(*v1.PersistentVolume) error
-}
-
-type ganeshaExporter struct {
-	ganeshaConfig string
-}
-
-var _ exporter = &ganeshaExporter{}
-
-func (e *ganeshaExporter) GetConfig() string {
-	return e.ganeshaConfig
-}
-
-// CreateBlock creates the text block to add to the ganesha config file.
-func (e *ganeshaExporter) CreateBlock(exportId, path string) string {
-	return "\nEXPORT\n{\n" +
-		"\tExport_Id = " + exportId + ";\n" +
-		"\tPath = " + path + ";\n" +
-		"\tPseudo = " + path + ";\n" +
-		"\tAccess_Type = RW;\n" +
-		"\tSquash = root_id_squash;\n" +
-		"\tSecType = sys;\n" +
-		"\tFilesystem_id = " + exportId + "." + exportId + ";\n" +
-		"\tFSAL {\n\t\tName = VFS;\n\t}\n}\n"
-}
-
-// Export exports the given directory using NFS Ganesha, assuming it is running
-// and can be connected to using D-Bus.
-func (e *ganeshaExporter) Export(path string) error {
-	// Call AddExport using dbus
-	conn, err := dbus.SystemBus()
-	if err != nil {
-		return fmt.Errorf("error getting dbus session bus: %v", err)
-	}
-	obj := conn.Object("org.ganesha.nfsd", "/org/ganesha/nfsd/ExportMgr")
-	call := obj.Call("org.ganesha.nfsd.exportmgr.AddExport", 0, e.ganeshaConfig, fmt.Sprintf("export(path = %s)", path))
-	if call.Err != nil {
-		return fmt.Errorf("error calling org.ganesha.nfsd.exportmgr.AddExport: %v", call.Err)
-	}
-
-	return nil
-}
-
-type kernelExporter struct {
-}
-
-var _ exporter = &kernelExporter{}
-
-func (e *kernelExporter) GetConfig() string {
-	return "/etc/exports"
-}
-
-// CreateBlock creates the text block to add to the /etc/exports file.
-func (e *kernelExporter) CreateBlock(exportId, path string) string {
-	return "\n" + path + " *(rw,insecure,root_squash,fsid=" + exportId + ")\n"
-}
-
-// Export exports all directories listed in /etc/exports
-func (e *kernelExporter) Export(_ string) error {
-	// Execute exportfs
-	cmd := exec.Command("exportfs", "-r")
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("exportfs -r failed with error: %v, output: %s", err, out)
-	}
-
-	return nil
-}
-
-func (p *nfsProvisioner) addToFile(path string, toAdd string) error {
-	p.fileMutex.Lock()
-
-	file, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0600)
-	if err != nil {
-		p.fileMutex.Unlock()
-		return err
-	}
-	defer file.Close()
-
-	if _, err = file.WriteString(toAdd); err != nil {
-		p.fileMutex.Unlock()
-		return err
-	}
-	file.Sync()
-
-	p.fileMutex.Unlock()
-	return nil
-}
-
-func (p *nfsProvisioner) removeFromFile(path string, toRemove string) error {
-	p.fileMutex.Lock()
-
-	read, err := ioutil.ReadFile(path)
-	if err != nil {
-		p.fileMutex.Unlock()
-		return err
-	}
-
-	removed := strings.Replace(string(read), toRemove, "", -1)
-	err = ioutil.WriteFile(path, []byte(removed), 0)
-	if err != nil {
-		p.fileMutex.Unlock()
-		return err
-	}
-
-	p.fileMutex.Unlock()
-	return nil
-}
-
 // getServer gets the server IP to put in a provisioned PV's spec.
 func (p *nfsProvisioner) getServer() (string, error) {
 	// Use either `hostname -i` or podIPEnv as the fallback server
@@ -498,10 +308,206 @@ func (p *nfsProvisioner) getServer() (string, error) {
 	return service.Spec.ClusterIP, nil
 }
 
-// getExportIds populates the exportIds map with pre-existing exportIds found in
-// the given config file. Takes as argument the regex it should use to find each
-// exportId in the file i.e. Export_Id or fsid.
-func getExportIds(config string, re *regexp.Regexp) (map[uint16]bool, error) {
+// createDirectory creates the directory at the given path with appropriate
+// permissions and ownership according to the given gid parameter string.
+func (p *nfsProvisioner) createDirectory(path, gid string) error {
+	// TODO quota, something better than just directories
+	if _, err := os.Stat(path); err == nil {
+		return fmt.Errorf("error creating volume, the path already exists")
+	}
+
+	perm := os.FileMode(0777)
+	if gid != "none" {
+		// Execute permission is required for stat, which kubelet uses during unmount.
+		perm = os.FileMode(0071)
+	}
+	if err := os.MkdirAll(path, perm); err != nil {
+		return fmt.Errorf("error creating dir for volume: %v", err)
+	}
+	// Due to umask, need to chmod
+	cmd := exec.Command("chmod", strconv.FormatInt(int64(perm), 8), path)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		os.RemoveAll(path)
+		return fmt.Errorf("chmod failed with error: %v, output: %s", err, out)
+	}
+
+	if gid != "none" {
+		groupId, _ := strconv.ParseUint(gid, 10, 64)
+		cmd = exec.Command("chgrp", strconv.FormatUint(groupId, 10), path)
+		out, err = cmd.CombinedOutput()
+		if err != nil {
+			os.RemoveAll(path)
+			return fmt.Errorf("chgrp failed with error: %v, output: %s", err, out)
+		}
+	}
+
+	return nil
+}
+
+// createExport creates the export by adding a block to the appropriate config
+// file and exporting it, using the appropriate method.
+func (p *nfsProvisioner) createExport(path string) (string, uint16, error) {
+	exportId := p.generateExportId()
+	exportIdStr := strconv.FormatUint(uint64(exportId), 10)
+
+	config := p.exporter.GetConfig()
+	block := p.exporter.CreateBlock(exportIdStr, path)
+
+	// Add the export block to the config file
+	if err := p.addToFile(config, block); err != nil {
+		return "", 0, fmt.Errorf("error adding export block to the config file %s: %v", config, err)
+	}
+
+	err := p.exporter.Export(path)
+	if err != nil {
+		p.removeFromFile(config, block)
+		return "", 0, err
+	}
+
+	return block, exportId, nil
+}
+
+// generateExportId generates a unique exportId to assign an export
+func (p *nfsProvisioner) generateExportId() uint16 {
+	p.mapMutex.Lock()
+	id := uint16(1)
+	for ; id <= math.MaxUint16; id++ {
+		if _, ok := p.exportIds[id]; !ok {
+			break
+		}
+	}
+	p.exportIds[id] = true
+	p.mapMutex.Unlock()
+	return id
+}
+
+func (p *nfsProvisioner) addToFile(path string, toAdd string) error {
+	p.fileMutex.Lock()
+
+	file, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0600)
+	if err != nil {
+		p.fileMutex.Unlock()
+		return err
+	}
+	defer file.Close()
+
+	if _, err = file.WriteString(toAdd); err != nil {
+		p.fileMutex.Unlock()
+		return err
+	}
+	file.Sync()
+
+	p.fileMutex.Unlock()
+	return nil
+}
+
+func (p *nfsProvisioner) removeFromFile(path string, toRemove string) error {
+	p.fileMutex.Lock()
+
+	read, err := ioutil.ReadFile(path)
+	if err != nil {
+		p.fileMutex.Unlock()
+		return err
+	}
+
+	removed := strings.Replace(string(read), toRemove, "", -1)
+	err = ioutil.WriteFile(path, []byte(removed), 0)
+	if err != nil {
+		p.fileMutex.Unlock()
+		return err
+	}
+
+	p.fileMutex.Unlock()
+	return nil
+}
+
+type exporter interface {
+	GetConfig() string
+	GetConfigExportIds() (map[uint16]bool, error)
+	CreateBlock(string, string) string
+	Export(string) error
+	Unexport(*v1.PersistentVolume) error
+}
+
+type ganeshaExporter struct {
+	ganeshaConfig string
+}
+
+var _ exporter = &ganeshaExporter{}
+
+func (e *ganeshaExporter) GetConfig() string {
+	return e.ganeshaConfig
+}
+
+func (e *ganeshaExporter) GetConfigExportIds() (map[uint16]bool, error) {
+	return getConfigExportIds(e.GetConfig(), regexp.MustCompile("Export_Id = ([0-9]+);"))
+}
+
+// CreateBlock creates the text block to add to the ganesha config file.
+func (e *ganeshaExporter) CreateBlock(exportId, path string) string {
+	return "\nEXPORT\n{\n" +
+		"\tExport_Id = " + exportId + ";\n" +
+		"\tPath = " + path + ";\n" +
+		"\tPseudo = " + path + ";\n" +
+		"\tAccess_Type = RW;\n" +
+		"\tSquash = root_id_squash;\n" +
+		"\tSecType = sys;\n" +
+		"\tFilesystem_id = " + exportId + "." + exportId + ";\n" +
+		"\tFSAL {\n\t\tName = VFS;\n\t}\n}\n"
+}
+
+// Export exports the given directory using NFS Ganesha, assuming it is running
+// and can be connected to using D-Bus.
+func (e *ganeshaExporter) Export(path string) error {
+	// Call AddExport using dbus
+	conn, err := dbus.SystemBus()
+	if err != nil {
+		return fmt.Errorf("error getting dbus session bus: %v", err)
+	}
+	obj := conn.Object("org.ganesha.nfsd", "/org/ganesha/nfsd/ExportMgr")
+	call := obj.Call("org.ganesha.nfsd.exportmgr.AddExport", 0, e.ganeshaConfig, fmt.Sprintf("export(path = %s)", path))
+	if call.Err != nil {
+		return fmt.Errorf("error calling org.ganesha.nfsd.exportmgr.AddExport: %v", call.Err)
+	}
+
+	return nil
+}
+
+type kernelExporter struct {
+}
+
+var _ exporter = &kernelExporter{}
+
+func (e *kernelExporter) GetConfig() string {
+	return "/etc/exports"
+}
+
+func (e *kernelExporter) GetConfigExportIds() (map[uint16]bool, error) {
+	return getConfigExportIds(e.GetConfig(), regexp.MustCompile("fsid=([0-9]+)"))
+}
+
+// CreateBlock creates the text block to add to the /etc/exports file.
+func (e *kernelExporter) CreateBlock(exportId, path string) string {
+	return "\n" + path + " *(rw,insecure,root_squash,fsid=" + exportId + ")\n"
+}
+
+// Export exports all directories listed in /etc/exports
+func (e *kernelExporter) Export(_ string) error {
+	// Execute exportfs
+	cmd := exec.Command("exportfs", "-r")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("exportfs -r failed with error: %v, output: %s", err, out)
+	}
+
+	return nil
+}
+
+// getConfigExportIds populates the exportIds map with pre-existing exportIds
+// found in the given config file. Takes as argument the regex it should use to
+// find each exportId in the file i.e. Export_Id or fsid.
+func getConfigExportIds(config string, re *regexp.Regexp) (map[uint16]bool, error) {
 	exportIds := map[uint16]bool{}
 
 	digitsRe := "([0-9]+)"

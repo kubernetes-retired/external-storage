@@ -106,7 +106,7 @@ func TestValidateOptions(t *testing.T) {
 		if err != nil {
 			t.Errorf("Error creating file %s: %v", path, err)
 		}
-		p := newProvisionerInternal(tmpDir, client, nil, true, path)
+		p := newNFSProvisionerInternal(tmpDir, client, nil, true, path)
 		os.RemoveAll(path)
 
 		gid, err := p.validateOptions(test.options)
@@ -124,7 +124,7 @@ func TestAddToRemoveFromFile(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error creating file %s: %v", path, err)
 	}
-	p := newProvisionerInternal(tmpDir, client, nil, true, path)
+	p := newNFSProvisionerInternal(tmpDir, client, nil, true, path)
 
 	toAdd := "abc\nxyz\n"
 	p.addToFile(path, toAdd)
@@ -143,7 +143,7 @@ func TestAddToRemoveFromFile(t *testing.T) {
 	}
 }
 
-func TestGetExportIds(t *testing.T) {
+func TestGetConfigExportIds(t *testing.T) {
 	tmpDir := utiltesting.MkTmpdirOrDie("nfsProvisionTest")
 	defer os.RemoveAll(tmpDir)
 
@@ -194,7 +194,7 @@ func TestGetExportIds(t *testing.T) {
 		if err != nil {
 			t.Errorf("Error writing file %s: %v", path, err)
 		}
-		exportIds, err := getExportIds(path, test.re)
+		exportIds, err := getConfigExportIds(path, test.re)
 		evaluate(t, test.name, test.expectError, err, test.expectedExportIds, exportIds, "export ids")
 	}
 }
@@ -287,7 +287,7 @@ func TestGetServer(t *testing.T) {
 		if err != nil {
 			t.Errorf("Error creating file %s: %v", path, err)
 		}
-		p := newProvisionerInternal(tmpDir, client, nil, true, path)
+		p := newNFSProvisionerInternal(tmpDir, client, nil, true, path)
 		os.RemoveAll(path)
 
 		server, err := p.getServer()
