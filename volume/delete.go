@@ -44,9 +44,7 @@ func (p *nfsProvisioner) Delete(volume *v1.PersistentVolume) error {
 	if ann, ok := volume.Annotations[annExportId]; ok {
 		// If PV doesn't have this annotation it's no big deal for knfs
 		exportId, _ := strconv.ParseUint(ann, 10, 16)
-		p.mapMutex.Lock()
-		delete(p.exportIds, uint16(exportId))
-		p.mapMutex.Unlock()
+		p.deleteExportId(uint16(exportId))
 	}
 
 	block, ok := volume.Annotations[annBlock]

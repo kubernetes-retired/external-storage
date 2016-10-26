@@ -351,13 +351,15 @@ func (p *nfsProvisioner) createExport(path string) (string, uint16, error) {
 
 	// Add the export block to the config file
 	if err := p.addToFile(config, block); err != nil {
-		return "", 0, fmt.Errorf("error adding export block to the config file %s: %v", config, err)
+		p.deleteExportId(exportId)
+		return "", 0, fmt.Errorf("error adding export block %s to config %s: %v", block, config, err)
 	}
 
 	err := p.exporter.Export(path)
 	if err != nil {
+		p.deleteExportId(exportId)
 		p.removeFromFile(config, block)
-		return "", 0, err
+		return "", 0, fmt.Errorf("error exporting export block %s in config %s: %v", block, config, err)
 	}
 
 	return block, exportId, nil
@@ -375,6 +377,12 @@ func (p *nfsProvisioner) generateExportId() uint16 {
 	p.exportIds[id] = true
 	p.mapMutex.Unlock()
 	return id
+}
+
+func (p *nfsProvisioner) deleteExportId(exportId uint16) {
+	p.mapMutex.Lock()
+	delete(p.exportIds, exportId)
+	p.mapMutex.Unlock()
 }
 
 func (p *nfsProvisioner) addToFile(path string, toAdd string) error {
