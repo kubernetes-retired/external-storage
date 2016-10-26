@@ -56,7 +56,7 @@ pod "nfs-provisioner" created
 
 Edit the `provisioner` argument in the `args` field in `deploy/kube-config/deployment.yaml` to be the provisioner's name you decided on. 
 
-`deploy/kube-config/deployment.yaml` specifies a `hostPath` volume and a `nodeSelector`. You can substitute the `hostPath` volume with your own persistent storage if you like, just mount it at `/export`. Pick a node to deploy nfs-provisioner on and label it to match the `nodeSelector`.
+`deploy/kube-config/deployment.yaml` specifies a `hostPath` volume and a `nodeSelector`. You can substitute the `hostPath` volume with your own persistent storage if you like, just mount it at `/export`. Pick a node to deploy nfs-provisioner on and label it to match the `nodeSelector`.  Be sure that the hostPath directory exists on each target host (/exports by default): `mkdir -p /exports`
 
 ```
 $ kubectl label node 127.0.0.1 app=matthew-nfs
@@ -79,7 +79,7 @@ deployment "nfs-provisioner" created
 
 ### Outside of Kubernetes - container
 
-The container is going to need to run with `out-of-cluster` set true and one of `master` or `kubeconfig` set. For the `kubeconfig` argument to work, the config file needs to be inside the container somehow. This can be done by copying the kubeconfig file into the folder where the Dockerfile is and adding a line like `COPY config /config` to the Dockerfile before building the image.
+The container is going to need to run with `out-of-cluster` set true and one of `master` or `kubeconfig` set. For the `kubeconfig` argument to work, the config file needs to be inside the container somehow. This can be done by copying the kubeconfig file into the folder where the Dockerfile is and adding a line like `COPY config /config` to the Dockerfile before building the image.  
 
 Run nfs-provisioner with `provisioner` equal to the name you decided on, `out-of-cluster` set true and one of `master` or `kubeconfig` set. It needs to be run with Docker's `privileged` flag.
 
