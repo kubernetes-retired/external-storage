@@ -29,7 +29,7 @@ $ docker pull wongma7/nfs-provisioner:latest
 Now the Docker image is on your machine. Bring up a 1.4+ cluster if you don't have one up already.
 
 ```
-$ ALLOW_PRIVILEGED=true ALLOW_SECURITY_CONTEXT=true API_HOST=0.0.0.0 KUBE_ENABLE_CLUSTER_DNS=true hack/local-up-cluster.sh
+$ ALLOW_SECURITY_CONTEXT=true API_HOST=0.0.0.0 KUBE_ENABLE_CLUSTER_DNS=true hack/local-up-cluster.sh
 ```
 
 Decide on a unique name to give the provisioner that follows the naming scheme `<vendor name>/<provisioner name>`. The provisioner will only provision volumes for claims that request a `StorageClass` with a `provisioner` field set equal to this name. For example, the names of the in-tree GCE and AWS provisioners are `kubernetes.io/gce-pd` and `kubernetes.io/aws-ebs`.
@@ -81,16 +81,16 @@ deployment "nfs-provisioner" created
 
 The container is going to need to run with `out-of-cluster` set true and one of `master` or `kubeconfig` set. For the `kubeconfig` argument to work, the config file needs to be inside the container somehow. This can be done by copying the kubeconfig file into the folder where the Dockerfile is and adding a line like `COPY config /config` to the Dockerfile before building the image.  
 
-Run nfs-provisioner with `provisioner` equal to the name you decided on, `out-of-cluster` set true and one of `master` or `kubeconfig` set. It needs to be run with Docker's `privileged` flag.
+Run nfs-provisioner with `provisioner` equal to the name you decided on, `out-of-cluster` set true and one of `master` or `kubeconfig` set. It needs to be run with capabilities `SYS_ADMIN` and `DAC_READ_SEARCH`.
 
 ```
-$ docker run --privileged wongma7/nfs-provisioner:latest -provisioner=matthew/nfs -out-of-cluster=true -kubeconfig=/config
+$ docker run --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH wongma7/nfs-provisioner:latest -provisioner=matthew/nfs -out-of-cluster=true -kubeconfig=/config
 ```
 
 or
 
 ```
-$ docker run --privileged wongma7/nfs-provisioner:latest -provisioner=matthew/nfs -out-of-cluster=true -master=http://172.17.0.1:8080
+$ docker run --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH wongma7/nfs-provisioner:latest -provisioner=matthew/nfs -out-of-cluster=true -master=http://172.17.0.1:8080
 ```
 
 ### Outside of Kubernetes - binary

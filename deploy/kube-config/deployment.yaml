@@ -23,7 +23,10 @@ spec:
               containerPort: 111
               protocol: UDP
           securityContext:
-            privileged: true
+            capabilities:
+              add:
+                - SYS_ADMIN
+                - DAC_READ_SEARCH
           args:
             - "-provisioner=matthew/nfs"
           env:
