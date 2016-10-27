@@ -83,34 +83,34 @@ deployment "nfs-provisioner" created
 
 ### Outside of Kubernetes - container
 
-The container is going to need to run with `out-of-cluster` set true and one of `master` or `kubeconfig` set. For the `kubeconfig` argument to work, the config file needs to be inside the container somehow. This can be done by copying the kubeconfig file into the folder where the Dockerfile is and adding a line like `COPY config /config` to the Dockerfile before building the image.  
+The container is going to need to run with one of `master` or `kubeconfig` set. For the `kubeconfig` argument to work, the config file needs to be inside the container somehow. This can be done by copying the kubeconfig file into the folder where the Dockerfile is and adding a line like `COPY config /config` to the Dockerfile before building the image.  
 
-Run nfs-provisioner with `provisioner` equal to the name you decided on, `out-of-cluster` set true and one of `master` or `kubeconfig` set. It needs to be run with capabilities `SYS_ADMIN` and `DAC_READ_SEARCH`.
+Run nfs-provisioner with `provisioner` equal to the name you decided on, and one of `master` or `kubeconfig` set. It needs to be run with capabilities `SYS_ADMIN` and `DAC_READ_SEARCH`.
 
 ```
-$ docker run --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH wongma7/nfs-provisioner:latest -provisioner=matthew/nfs -out-of-cluster=true -kubeconfig=/config
+$ docker run --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH wongma7/nfs-provisioner:latest -provisioner=matthew/nfs -kubeconfig=/config
 ```
 
 or
 
 ```
-$ docker run --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH wongma7/nfs-provisioner:latest -provisioner=matthew/nfs -out-of-cluster=true -master=http://172.17.0.1:8080
+$ docker run --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH wongma7/nfs-provisioner:latest -provisioner=matthew/nfs -master=http://172.17.0.1:8080
 ```
 
 ### Outside of Kubernetes - binary
 
 Running nfs-provisioner in this way allows it to manipulate exports directly on the host machine. It runs assuming the host is already running either NFS Ganesha or a kernel NFS server, depending on how the `use-ganesha` flag is set. Use with caution.
 
-Run nfs-provisioner with `provisioner` equal to the name you decided on, `out-of-cluster` set true, one of `master` or `kubeconfig` set, `run-server` set false, and `use-ganesha` set according to how the NFS server is running on the host. It probably needs to be run as root. 
+Run nfs-provisioner with `provisioner` equal to the name you decided on, one of `master` or `kubeconfig` set, `run-server` set false, and `use-ganesha` set according to how the NFS server is running on the host. It probably needs to be run as root. 
 
 ```
-$ sudo ./nfs-provisioner -provisioner=matthew/nfs -out-of-cluster=true -kubeconfig=/config -run-server=false -use-ganesha=false
+$ sudo ./nfs-provisioner -provisioner=matthew/nfs -kubeconfig=/config -run-server=false -use-ganesha=false
 ```
 
 or
 
 ```
-$ sudo ./nfs-provisioner -provisioner=matthew/nfs -out-of-cluster=true -master=http://172.17.0.1:8080 -run-server=false -use-ganesha=false
+$ sudo ./nfs-provisioner -provisioner=matthew/nfs -master=http://172.17.0.1:8080 -run-server=false -use-ganesha=false
 ```
 
 ---
@@ -128,7 +128,6 @@ The pod requires authorization to `list` all `StorageClasses`, `PersistentVolume
 #### Arguments
 
 * `provisioner` - Name of the provisioner. The provisioner will only provision volumes for claims that request a StorageClass with a provisioner field set equal to this name.
-* `out-of-cluster` - If the provisioner is being run out of cluster. Set the master or kubeconfig flag accordingly if true. Default false.
 * `master` - Master URL to build a client config from. Either this or kubeconfig needs to be set if the provisioner is being run out of cluster.
 * `kubeconfig` - Absolute path to the kubeconfig file. Either this or master needs to be set if the provisioner is being run out of cluster.
 * `run-server` - If the provisioner is responsible for running the NFS server, i.e. starting and stopping NFS Ganesha. Default true.
