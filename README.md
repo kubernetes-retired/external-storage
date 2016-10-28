@@ -31,7 +31,7 @@ NAME                                       CAPACITY   ACCESSMODES   RECLAIMPOLIC
 pvc-dce84888-7a9d-11e6-b1ee-5254001e0c1b   1Mi        RWX           Delete          Bound       default/nfs             23s
 ```
 
-Deleting the `PersistentVolumeClaim` will cause the provisioner to delete the `PersistentVolume` and its data. Deleting the provisioner pod won't cause the `PersistentVolume` to be deleted but the data will be gone (unless you mount something persistent at the provisioner pod's export directory; see docs for details).
+Deleting the `PersistentVolumeClaim` will cause the provisioner to delete the `PersistentVolume` and its data.
 
 ## Running
 To deploy nfs-provisioner on a Kubernetes cluster see [Deployment](docs/deployment.md).
@@ -54,8 +54,8 @@ This is still alpha/experimental and will change to reflect the [out-of-tree dyn
 October
 * Release
 * Add CI & testing
+* Support running as DaemonSet
 
 November
-* Look at running without --privileged flag
 * Add filesystem quotas for PV usage
 * Support running as PetSet
