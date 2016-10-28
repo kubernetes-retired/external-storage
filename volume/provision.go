@@ -213,7 +213,8 @@ func (p *nfsProvisioner) validateOptions(options controller.VolumeOptions) (stri
 	}
 
 	// TODO implement options.ProvisionerSelector parsing
-	// TODO pv.Labels MUST be set to match claim.spec.selector
+	// pv.Labels MUST be set to match claim.spec.selector
+	// gid selector? with or without pv annotation?
 	if options.Selector != nil {
 		return "", fmt.Errorf("claim.Spec.Selector is not supported")
 	}
@@ -314,7 +315,7 @@ func (p *nfsProvisioner) getServer() (string, error) {
 // createDirectory creates the directory at the given path with appropriate
 // permissions and ownership according to the given gid parameter string.
 func (p *nfsProvisioner) createDirectory(path, gid string) error {
-	// TODO quota, something better than just directories
+	// TODO quotas
 	if _, err := os.Stat(path); err == nil {
 		return fmt.Errorf("error creating volume, the path already exists")
 	}

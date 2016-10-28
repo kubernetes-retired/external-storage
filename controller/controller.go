@@ -60,8 +60,6 @@ const annClass = "volume.beta.kubernetes.io/storage-class"
 // recognize dynamically provisioned PVs in its decisions).
 const annDynamicallyProvisioned = "pv.kubernetes.io/provisioned-by"
 
-// TODO upstream proposes PV controller will set this on all claims automatically
-// https://github.com/kubernetes/kubernetes/pull/30285
 const annStorageProvisioner = "volume.beta.kubernetes.io/storage-provisioner"
 
 // Number of retries when we create a PV object for a provisioned volume.
@@ -275,7 +273,7 @@ func (ctrl *ProvisionController) shouldProvision(claim *v1.PersistentVolumeClaim
 }
 
 func (ctrl *ProvisionController) shouldDelete(volume *v1.PersistentVolume) bool {
-	// TODO https://github.com/kubernetes/kubernetes/pull/32565 will not Fail PVs
+	// TODO 1.4 we should delete volumeFailed, 1.5 we should not
 	if volume.Status.Phase != v1.VolumeReleased && volume.Status.Phase != v1.VolumeFailed {
 		return false
 	}

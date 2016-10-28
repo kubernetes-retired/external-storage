@@ -29,8 +29,6 @@ import (
 // Delete removes the directory that was created by Provision backing the given
 // PV.
 func (p *nfsProvisioner) Delete(volume *v1.PersistentVolume) error {
-	// TODO quota, something better than just directories
-
 	// delete Directory
 	path := fmt.Sprintf(p.exportDir+"%s", volume.ObjectMeta.Name)
 	if _, err := os.Stat(path); os.IsNotExist(err) {

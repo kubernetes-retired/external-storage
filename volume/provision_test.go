@@ -85,7 +85,7 @@ func TestValidateOptions(t *testing.T) {
 			expectedGid: "",
 			expectError: true,
 		},
-		// TODO non-nil selector
+		// TODO implement options.ProvisionerSelector parsing
 		{
 			name:        "non-nil selector",
 			options:     controller.VolumeOptions{Selector: &unversioned.LabelSelector{MatchLabels: nil}},
