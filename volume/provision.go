@@ -54,9 +54,10 @@ const (
 	annCreatedBy = "kubernetes.io/createdby"
 	createdBy    = "nfs-dynamic-provisioner"
 
-	podIPEnv     = "MY_POD_IP"
-	serviceEnv   = "MY_SERVICE_NAME"
-	namespaceEnv = "MY_POD_NAMESPACE"
+	podIPEnv     = "POD_IP"
+	serviceEnv   = "SERVICE_NAME"
+	namespaceEnv = "POD_NAMESPACE"
+	nodeEnv      = "NODE_NAME"
 )
 
 func NewNFSProvisioner(exportDir string, client kubernetes.Interface, useGanesha bool, ganeshaConfig string) controller.Provisioner {
@@ -72,6 +73,7 @@ func newNFSProvisionerInternal(exportDir string, client kubernetes.Interface, us
 		podIPEnv:     podIPEnv,
 		serviceEnv:   serviceEnv,
 		namespaceEnv: namespaceEnv,
+		nodeEnv:      nodeEnv,
 	}
 
 	if useGanesha {
@@ -116,6 +118,7 @@ type nfsProvisioner struct {
 	podIPEnv     string
 	serviceEnv   string
 	namespaceEnv string
+	nodeEnv      string
 }
 
 var _ controller.Provisioner = &nfsProvisioner{}
@@ -234,7 +237,6 @@ func (p *nfsProvisioner) getServer() (string, error) {
 	var fallbackServer string
 	podIP := os.Getenv(p.podIPEnv)
 	if podIP == "" {
-		glog.Infof("pod IP env %s isn't set or provisioner isn't running as a pod", p.podIPEnv)
 		out, err := exec.Command("hostname", "-i").Output()
 		if err != nil {
 			return "", fmt.Errorf("hostname -i failed with error: %v, output: %s", err, out)
@@ -245,11 +247,17 @@ func (p *nfsProvisioner) getServer() (string, error) {
 	}
 
 	// Try to use the service's cluster IP as the server if serviceEnv is
-	// specified. Otherwise, use fallback here.
+	// specified. If not, try to use nodeName if nodeEnv is specified (assume the
+	// pod is using hostPort). If not again, use fallback here.
 	serviceName := os.Getenv(p.serviceEnv)
 	if serviceName == "" {
-		glog.Infof("service env %s isn't set, falling back to using `hostname -i` or pod IP as server IP", p.serviceEnv)
-		return fallbackServer, nil
+		nodeName := os.Getenv(p.nodeEnv)
+		if nodeName == "" {
+			glog.Infof("service env %s isn't set, using `hostname -i`/pod IP %s as server IP", p.serviceEnv, fallbackServer)
+			return fallbackServer, nil
+		}
+		glog.Infof("service env %s isn't set and node env %s is, using node name %s as server IP", p.serviceEnv, p.nodeEnv, nodeName)
+		return nodeName, nil
 	}
 
 	// From this point forward, rather than fallback & provision non-persistent

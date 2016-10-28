@@ -203,12 +203,14 @@ func TestGetServer(t *testing.T) {
 	tmpDir := utiltesting.MkTmpdirOrDie("nfsProvisionTest")
 	defer os.RemoveAll(tmpDir)
 
+	// service > node > podIP
 	tests := []struct {
 		name           string
 		objs           []runtime.Object
 		podIP          string
 		service        string
 		namespace      string
+		node           string
 		expectedServer string
 		expectError    bool
 	}{
@@ -221,6 +223,7 @@ func TestGetServer(t *testing.T) {
 			podIP:          "2.2.2.2",
 			service:        "foo",
 			namespace:      "default",
+			node:           "",
 			expectedServer: "1.1.1.1",
 			expectError:    false,
 		},
@@ -233,6 +236,7 @@ func TestGetServer(t *testing.T) {
 			podIP:          "2.2.2.2",
 			service:        "foo",
 			namespace:      "default",
+			node:           "",
 			expectedServer: "",
 			expectError:    true,
 		},
@@ -245,11 +249,25 @@ func TestGetServer(t *testing.T) {
 			podIP:          "2.2.2.2",
 			service:        "foo",
 			namespace:      "default",
+			node:           "",
 			expectedServer: "",
 			expectError:    true,
 		},
 		{
-			name: "service but no namespace",
+			name: "invalid service, should error even though valid node",
+			objs: []runtime.Object{
+				newService("foo", "1.1.1.1"),
+				newEndpoints("foo", []string{"3.3.3.3"}, []endpointPort{{2049, v1.ProtocolTCP}, {20048, v1.ProtocolTCP}, {111, v1.ProtocolUDP}, {111, v1.ProtocolTCP}}),
+			},
+			podIP:          "2.2.2.2",
+			service:        "foo",
+			namespace:      "default",
+			node:           "127.0.0.1",
+			expectedServer: "",
+			expectError:    true,
+		},
+		{
+			name: "valid service but no namespace",
 			objs: []runtime.Object{
 				newService("foo", "1.1.1.1"),
 				newEndpoints("foo", []string{"2.2.2.2"}, []endpointPort{{2049, v1.ProtocolTCP}, {20048, v1.ProtocolTCP}, {111, v1.ProtocolUDP}, {111, v1.ProtocolTCP}}),
@@ -257,15 +275,40 @@ func TestGetServer(t *testing.T) {
 			podIP:          "2.2.2.2",
 			service:        "foo",
 			namespace:      "",
+			node:           "",
 			expectedServer: "",
 			expectError:    true,
 		},
 		{
-			name:           "no service, should fallback to podIP",
+			name: "valid service, valid node, should use service",
+			objs: []runtime.Object{
+				newService("foo", "1.1.1.1"),
+				newEndpoints("foo", []string{"2.2.2.2"}, []endpointPort{{2049, v1.ProtocolTCP}, {20048, v1.ProtocolTCP}, {111, v1.ProtocolUDP}, {111, v1.ProtocolTCP}}),
+			},
+			podIP:          "2.2.2.2",
+			service:        "foo",
+			namespace:      "default",
+			node:           "127.0.0.1",
+			expectedServer: "1.1.1.1",
+			expectError:    false,
+		},
+		{
+			name:           "no service, valid node, should use node",
 			objs:           []runtime.Object{},
 			podIP:          "2.2.2.2",
 			service:        "",
 			namespace:      "",
+			node:           "127.0.0.1",
+			expectedServer: "127.0.0.1",
+			expectError:    false,
+		},
+		{
+			name:           "no service, no node, should use podIP",
+			objs:           []runtime.Object{},
+			podIP:          "2.2.2.2",
+			service:        "",
+			namespace:      "",
+			node:           "",
 			expectedServer: "2.2.2.2",
 			expectError:    false,
 		},
@@ -279,6 +322,9 @@ func TestGetServer(t *testing.T) {
 		}
 		if test.namespace != "" {
 			os.Setenv(namespaceEnv, test.namespace)
+		}
+		if test.node != "" {
+			os.Setenv(nodeEnv, test.node)
 		}
 
 		client := fake.NewSimpleClientset(test.objs...)
@@ -296,6 +342,7 @@ func TestGetServer(t *testing.T) {
 		os.Unsetenv(podIPEnv)
 		os.Unsetenv(serviceEnv)
 		os.Unsetenv(namespaceEnv)
+		os.Unsetenv(nodeEnv)
 	}
 }
 
