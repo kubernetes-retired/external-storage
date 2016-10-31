@@ -61,7 +61,7 @@ Edit the `provisioner` argument in the `args` field in `deploy/kube-config/deplo
 
 `deploy/kube-config/deployment.yaml` specifies a `hostPath` volume `/srv` mounted at `/export`. The `/export` directory is where all provisioned `PersistentVolumes'` data is stored, so by mounting a volume there, you specify it as the backing storage for PVs.
 
-`deploy/kube-config/deployment.yaml` also specifies a `nodeSelector` to target a node/host. Choose a node to deploy nfs-provisioner on and be sure that the `hostPath` directory exists on the node: `mkdir -p /srv`.
+`deploy/kube-config/deployment.yaml` also specifies a `nodeSelector` to target a node/host. Choose a node to deploy nfs-provisioner on and be sure that the `hostPath` directory exists on the node: `mkdir -p /srv`. If SELinux is enforcing on the node, you may need to make the container [privileged](http://kubernetes.io/docs/user-guide/security-context/) or change the security context of the `hostPath` directory on the node: `sudo chcon -Rt svirt_sandbox_file_t /srv`.
 
 Label the chosen node to match the `nodeSelector`.
 
@@ -88,9 +88,9 @@ deployment "nfs-provisioner" created
 
 Edit the `provisioner` argument in the `args` field in `deploy/kube-config/daemonset.yaml` to be the provisioner's name you decided on. 
 
-`deploy/kube-config/daemonset.yaml` specifies a `hostPath` volume `/srv` mounted at `/export`. The `/export` directory is where all provisioned `PersistentVolumes'` data is stored, so by mounting a volume there, you specify it as the backing storage for PVs.
+`deploy/kube-config/daemonset.yaml` specifies a `hostPath` volume `/srv` mounted at `/export`. The `/export` directory is where all provisioned `PersistentVolumes'` data is stored, so by mounting a volume there, you specify it as the backing storage for PVs. 
 
-`deploy/kube-config/daemonset.yaml` also specifies a `nodeSelector` to target nodes/hosts. Choose nodes to deploy nfs-provisioner on and be sure that the `hostPath` directory exists on each node: `mkdir -p /srv`.
+`deploy/kube-config/daemonset.yaml` also specifies a `nodeSelector` to target nodes/hosts. Choose nodes to deploy nfs-provisioner on and be sure that the `hostPath` directory exists on each node: `mkdir -p /srv`. If SELinux is enforcing on the nodes, you may need to make the container [privileged](http://kubernetes.io/docs/user-guide/security-context/) or change the security context of the `hostPath` directory on the node: `sudo chcon -Rt svirt_sandbox_file_t /srv`.
 
 `deploy/kube-config/daemonset.yaml` specifies a `hostPort` for NFS, TCP 2049, to expose on the node, so be sure that this port is available on each node. The daemon set's pods will use the node's name as the NFS server IP to put on their `PersistentVolumes`.
 
