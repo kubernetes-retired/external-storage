@@ -181,12 +181,12 @@ func (p *nfsProvisioner) createVolume(options controller.VolumeOptions) (string,
 
 	path := fmt.Sprintf(p.exportDir+"%s", options.PVName)
 
-	err = p.createDirectory(path, gid)
+	err = p.createDirectory(options.PVName, gid)
 	if err != nil {
 		return "", "", 0, "", 0, fmt.Errorf("error creating directory for volume: %v", err)
 	}
 
-	block, exportId, err := p.createExport(path)
+	block, exportId, err := p.createExport(options.PVName)
 	if err != nil {
 		os.RemoveAll(path)
 		return "", "", 0, "", 0, fmt.Errorf("error creating export for volume: %v", err)
@@ -312,10 +312,11 @@ func (p *nfsProvisioner) getServer() (string, error) {
 	return service.Spec.ClusterIP, nil
 }
 
-// createDirectory creates the directory at the given path with appropriate
+// createDirectory creates the given directory in exportDir with appropriate
 // permissions and ownership according to the given gid parameter string.
-func (p *nfsProvisioner) createDirectory(path, gid string) error {
+func (p *nfsProvisioner) createDirectory(directory, gid string) error {
 	// TODO quotas
+	path := fmt.Sprintf(p.exportDir+"%s", directory)
 	if _, err := os.Stat(path); err == nil {
 		return fmt.Errorf("error creating volume, the path already exists")
 	}
@@ -351,7 +352,9 @@ func (p *nfsProvisioner) createDirectory(path, gid string) error {
 
 // createExport creates the export by adding a block to the appropriate config
 // file and exporting it, using the appropriate method.
-func (p *nfsProvisioner) createExport(path string) (string, uint16, error) {
+func (p *nfsProvisioner) createExport(directory string) (string, uint16, error) {
+	path := fmt.Sprintf(p.exportDir+"%s", directory)
+
 	exportId := p.generateExportId()
 	exportIdStr := strconv.FormatUint(uint64(exportId), 10)
 
