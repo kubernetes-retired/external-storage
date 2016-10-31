@@ -66,6 +66,7 @@ func NewNFSProvisioner(exportDir string, client kubernetes.Interface, useGanesha
 
 func newNFSProvisionerInternal(exportDir string, client kubernetes.Interface, useGanesha bool, ganeshaConfig string) *nfsProvisioner {
 	provisioner := &nfsProvisioner{
+		// TODO exportDir must have trailing slash!
 		exportDir:    exportDir,
 		client:       client,
 		mapMutex:     &sync.Mutex{},

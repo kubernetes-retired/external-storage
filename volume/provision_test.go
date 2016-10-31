@@ -100,17 +100,19 @@ func TestValidateOptions(t *testing.T) {
 			expectError: true,
 		},
 	}
-	for _, test := range tests {
-		client := fake.NewSimpleClientset()
-		conf := tmpDir + "/test"
-		_, err := os.Create(conf)
-		if err != nil {
-			t.Errorf("Error creating file %s: %v", conf, err)
-		}
-		p := newNFSProvisionerInternal(tmpDir, client, true, conf)
-		os.RemoveAll(conf)
 
+	client := fake.NewSimpleClientset()
+	conf := tmpDir + "/test"
+	_, err := os.Create(conf)
+	if err != nil {
+		t.Errorf("Error creating file %s: %v", conf, err)
+	}
+	p := newNFSProvisionerInternal(tmpDir+"/", client, true, conf)
+	os.RemoveAll(conf)
+
+	for _, test := range tests {
 		gid, err := p.validateOptions(test.options)
+
 		evaluate(t, test.name, test.expectError, err, test.expectedGid, gid, "gid")
 	}
 }
@@ -163,31 +165,40 @@ func TestCreateDirectory(t *testing.T) {
 			expectError:  true,
 		},
 	}
-	for _, test := range tests {
-		client := fake.NewSimpleClientset()
-		conf := tmpDir + "/test"
-		_, err := os.Create(conf)
-		if err != nil {
-			t.Errorf("Error creating file %s: %v", conf, err)
-		}
-		p := newNFSProvisionerInternal(tmpDir, client, true, conf)
-		os.RemoveAll(conf)
 
+	client := fake.NewSimpleClientset()
+	conf := tmpDir + "/test"
+	_, err := os.Create(conf)
+	if err != nil {
+		t.Errorf("Error creating file %s: %v", conf, err)
+	}
+	p := newNFSProvisionerInternal(tmpDir+"/", client, true, conf)
+	os.RemoveAll(conf)
+
+	for _, test := range tests {
 		path := p.exportDir + test.directory
 		defer os.RemoveAll(path)
+
 		err = p.createDirectory(test.directory, test.gid)
+
 		var gid uint32
 		var perm os.FileMode
 		if !test.expectError {
-			fi, _ = os.Stat(path)
-			gid = fi.Sys().(*syscall.Stat_t).Gid
-			perm = fi.Mode().Perm()
+			fi, err := os.Stat(path)
+			if err != nil {
+				t.Logf("test case: %s", test.name)
+				t.Errorf("stat %s failed with error: %v", path, err)
+			} else {
+				gid = fi.Sys().(*syscall.Stat_t).Gid
+				perm = fi.Mode().Perm()
+			}
 		}
+
 		evaluate(t, test.name, test.expectError, err, test.expectedGid, gid, "gid owner")
 		evaluate(t, test.name, test.expectError, err, test.expectedPerm, perm, "permission bits")
 	}
-
 }
+
 func TestAddToRemoveFromFile(t *testing.T) {
 	tmpDir := utiltesting.MkTmpdirOrDie("nfsProvisionTest")
 	defer os.RemoveAll(tmpDir)
@@ -198,7 +209,7 @@ func TestAddToRemoveFromFile(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error creating file %s: %v", conf, err)
 	}
-	p := newNFSProvisionerInternal(tmpDir, client, true, conf)
+	p := newNFSProvisionerInternal(tmpDir+"/", client, true, conf)
 
 	toAdd := "abc\nxyz\n"
 	p.addToFile(conf, toAdd)
@@ -268,7 +279,9 @@ func TestGetConfigExportIds(t *testing.T) {
 		if err != nil {
 			t.Errorf("Error writing file %s: %v", conf, err)
 		}
+
 		exportIds, err := getConfigExportIds(conf, test.re)
+
 		evaluate(t, test.name, test.expectError, err, test.expectedExportIds, exportIds, "export ids")
 	}
 }
@@ -407,10 +420,11 @@ func TestGetServer(t *testing.T) {
 		if err != nil {
 			t.Errorf("Error creating file %s: %v", conf, err)
 		}
-		p := newNFSProvisionerInternal(tmpDir, client, true, conf)
+		p := newNFSProvisionerInternal(tmpDir+"/", client, true, conf)
 		os.RemoveAll(conf)
 
 		server, err := p.getServer()
+
 		evaluate(t, test.name, test.expectError, err, test.expectedServer, server, "server")
 
 		os.Unsetenv(podIPEnv)
