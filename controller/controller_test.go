@@ -17,6 +17,11 @@ limitations under the License.
 package controller
 
 import (
+	"errors"
+	"reflect"
+	"testing"
+	"time"
+
 	"k8s.io/client-go/1.4/kubernetes/fake"
 	"k8s.io/client-go/1.4/pkg/api"
 	"k8s.io/client-go/1.4/pkg/api/resource"
@@ -26,11 +31,6 @@ import (
 	"k8s.io/client-go/1.4/pkg/runtime"
 	"k8s.io/client-go/1.4/pkg/types"
 	testclient "k8s.io/client-go/1.4/testing"
-
-	"errors"
-	"reflect"
-	"testing"
-	"time"
 )
 
 func TestController(t *testing.T) {
