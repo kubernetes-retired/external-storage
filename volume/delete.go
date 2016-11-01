@@ -48,7 +48,7 @@ func (p *nfsProvisioner) deleteDirectory(volume *v1.PersistentVolume) error {
 		return fmt.Errorf("Delete called on a volume that doesn't exist, presumably because this provisioner never created it")
 	}
 	if err := os.RemoveAll(path); err != nil {
-		return fmt.Errorf("error removing backing path: %v", err)
+		return fmt.Errorf("error deleting backing path: %v", err)
 	}
 
 	return nil
@@ -63,7 +63,7 @@ func (p *nfsProvisioner) deleteExport(volume *v1.PersistentVolume) error {
 
 	block, ok := volume.Annotations[annBlock]
 	if !ok {
-		return fmt.Errorf("can't remove the export from the config file %s because PV doesn't have an annotation %s", p.exporter.GetConfig(), annBlock)
+		return fmt.Errorf("PV doesn't have an annotation %s, can't remove the export from the config file %s ", p.exporter.GetConfig(), annBlock)
 	}
 	if err := p.removeFromFile(p.exporter.GetConfig(), block); err != nil {
 		return fmt.Errorf("error removing the export from the config file %s: %v", p.exporter.GetConfig(), err)
@@ -71,7 +71,7 @@ func (p *nfsProvisioner) deleteExport(volume *v1.PersistentVolume) error {
 
 	err := p.exporter.Unexport(volume)
 	if err != nil {
-		return fmt.Errorf("removed export from the config file but error unexporting it: %v", err)
+		return fmt.Errorf("removed export from the config file %s but error unexporting it: %v", p.exporter.GetConfig(), err)
 	}
 
 	return nil
