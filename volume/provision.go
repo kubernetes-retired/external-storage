@@ -61,14 +61,21 @@ const (
 )
 
 func NewNFSProvisioner(exportDir string, client kubernetes.Interface, useGanesha bool, ganeshaConfig string) controller.Provisioner {
-	return newNFSProvisionerInternal(exportDir, client, useGanesha, ganeshaConfig)
+	var exporter exporter
+	if useGanesha {
+		exporter = &ganeshaExporter{ganeshaConfig: ganeshaConfig}
+	} else {
+		exporter = &kernelExporter{}
+	}
+	return newNFSProvisionerInternal(exportDir, client, exporter)
 }
 
-func newNFSProvisionerInternal(exportDir string, client kubernetes.Interface, useGanesha bool, ganeshaConfig string) *nfsProvisioner {
+func newNFSProvisionerInternal(exportDir string, client kubernetes.Interface, exporter exporter) *nfsProvisioner {
 	provisioner := &nfsProvisioner{
 		// TODO exportDir must have trailing slash!
 		exportDir:    exportDir,
 		client:       client,
+		exporter:     exporter,
 		mapMutex:     &sync.Mutex{},
 		fileMutex:    &sync.Mutex{},
 		podIPEnv:     podIPEnv,
@@ -77,11 +84,6 @@ func newNFSProvisionerInternal(exportDir string, client kubernetes.Interface, us
 		nodeEnv:      nodeEnv,
 	}
 
-	if useGanesha {
-		provisioner.exporter = &ganeshaExporter{ganeshaConfig: ganeshaConfig}
-	} else {
-		provisioner.exporter = &kernelExporter{}
-	}
 	var err error
 	provisioner.exportIds, err = provisioner.exporter.GetConfigExportIds()
 	if err != nil {

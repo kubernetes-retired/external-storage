@@ -373,7 +373,7 @@ func newProvisionedVolume(storageClass *v1beta1.StorageClass, claim *v1.Persiste
 	// pv.Annotations["volume.beta.kubernetes.io/storage-class"] MUST be set to name of the storage class requested by the claim.
 	volume.Annotations = map[string]string{annDynamicallyProvisioned: storageClass.Provisioner, annClass: storageClass.Name}
 
-	// TODO non-nil selector
+	// TODO implement options.ProvisionerSelector parsing
 	// pv.Labels MUST be set to match claim.spec.selector. The provisioner MAY add additional labels.
 
 	return volume
