@@ -29,16 +29,32 @@ import (
 // Delete removes the directory that was created by Provision backing the given
 // PV.
 func (p *nfsProvisioner) Delete(volume *v1.PersistentVolume) error {
-	// delete Directory
+	err := p.deleteDirectory(volume)
+	if err != nil {
+		return fmt.Errorf("error deleting volume's backing path: %v", err)
+	}
+
+	err = p.deleteExport(volume)
+	if err != nil {
+		return fmt.Errorf("deleted the volume's backing path but error deleting export: %v", err)
+	}
+
+	return nil
+}
+
+func (p *nfsProvisioner) deleteDirectory(volume *v1.PersistentVolume) error {
 	path := fmt.Sprintf(p.exportDir+"%s", volume.ObjectMeta.Name)
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return fmt.Errorf("Delete called on a volume that doesn't exist, presumably because this provisioner never created it")
 	}
 	if err := os.RemoveAll(path); err != nil {
-		return fmt.Errorf("error deleting volume by removing its backing path: %v", err)
+		return fmt.Errorf("error removing backing path: %v", err)
 	}
 
-	// delete Export
+	return nil
+}
+
+func (p *nfsProvisioner) deleteExport(volume *v1.PersistentVolume) error {
 	if ann, ok := volume.Annotations[annExportId]; ok {
 		// If PV doesn't have this annotation it's no big deal for knfs
 		exportId, _ := strconv.ParseUint(ann, 10, 16)
@@ -47,15 +63,15 @@ func (p *nfsProvisioner) Delete(volume *v1.PersistentVolume) error {
 
 	block, ok := volume.Annotations[annBlock]
 	if !ok {
-		return fmt.Errorf("removed the volume's backing path but can't remove the export from the config file because PV doesn't have an annotation %s", annBlock)
+		return fmt.Errorf("can't remove the export from the config file %s because PV doesn't have an annotation %s", p.exporter.GetConfig(), annBlock)
 	}
 	if err := p.removeFromFile(p.exporter.GetConfig(), block); err != nil {
-		return fmt.Errorf("removed the volume's backing path but error removing the export from the config file %s: %v", p.exporter.GetConfig(), err)
+		return fmt.Errorf("error removing the export from the config file %s: %v", p.exporter.GetConfig(), err)
 	}
 
 	err := p.exporter.Unexport(volume)
 	if err != nil {
-		return fmt.Errorf("removed the volume's backing path and export from the config file but error unexporting it: %v", err)
+		return fmt.Errorf("removed export from the config file but error unexporting it: %v", err)
 	}
 
 	return nil

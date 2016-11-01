@@ -36,6 +36,148 @@ import (
 	utiltesting "k8s.io/client-go/1.4/pkg/util/testing"
 )
 
+func TestCreateVolume(t *testing.T) {
+	tmpDir := utiltesting.MkTmpdirOrDie("nfsProvisionTest")
+	defer os.RemoveAll(tmpDir)
+
+	tests := []struct {
+		name             string
+		options          controller.VolumeOptions
+		envKey           string
+		expectedServer   string
+		expectedPath     string
+		expectedGroup    uint64
+		expectedBlock    string
+		expectedExportId uint16
+		expectError      bool
+	}{
+		{
+			name: "succeed creating volume",
+			options: controller.VolumeOptions{
+				Capacity:                      resource.MustParse("1Ki"),
+				AccessModes:                   []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany},
+				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
+				PVName:     "pvc-1",
+				Parameters: map[string]string{},
+			},
+			envKey:           podIPEnv,
+			expectedServer:   "1.1.1.1",
+			expectedPath:     tmpDir + "/pvc-1",
+			expectedGroup:    0,
+			expectedBlock:    "\nExport_Id = 1;\n",
+			expectedExportId: 1,
+			expectError:      false,
+		},
+		{
+			name: "succeed creating volume again",
+			options: controller.VolumeOptions{
+				Capacity:                      resource.MustParse("1Ki"),
+				AccessModes:                   []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany},
+				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
+				PVName:     "pvc-2",
+				Parameters: map[string]string{},
+			},
+			envKey:           podIPEnv,
+			expectedServer:   "1.1.1.1",
+			expectedPath:     tmpDir + "/pvc-2",
+			expectedGroup:    0,
+			expectedBlock:    "\nExport_Id = 2;\n",
+			expectedExportId: 2,
+			expectError:      false,
+		},
+		{
+			name: "bad parameter",
+			options: controller.VolumeOptions{
+				Capacity:                      resource.MustParse("1Ki"),
+				AccessModes:                   []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany},
+				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
+				PVName:     "pvc-3",
+				Parameters: map[string]string{"foo": "bar"},
+			},
+			envKey:           podIPEnv,
+			expectedServer:   "",
+			expectedPath:     "",
+			expectedGroup:    0,
+			expectedBlock:    "",
+			expectedExportId: 0,
+			expectError:      true,
+		},
+		{
+			name: "bad server",
+			options: controller.VolumeOptions{
+				Capacity:                      resource.MustParse("1Ki"),
+				AccessModes:                   []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany},
+				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
+				PVName:     "pvc-4",
+				Parameters: map[string]string{},
+			},
+			envKey:           serviceEnv,
+			expectedServer:   "",
+			expectedPath:     "",
+			expectedGroup:    0,
+			expectedBlock:    "",
+			expectedExportId: 0,
+			expectError:      true,
+		},
+		{
+			name: "dir already exists",
+			options: controller.VolumeOptions{
+				Capacity:                      resource.MustParse("1Ki"),
+				AccessModes:                   []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany},
+				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
+				PVName:     "pvc-1",
+				Parameters: map[string]string{},
+			},
+			envKey:           podIPEnv,
+			expectedServer:   "",
+			expectedPath:     "",
+			expectedGroup:    0,
+			expectedBlock:    "",
+			expectedExportId: 0,
+			expectError:      true,
+		},
+		{
+			name: "error exporting",
+			options: controller.VolumeOptions{
+				Capacity:                      resource.MustParse("1Ki"),
+				AccessModes:                   []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany},
+				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
+				PVName:     "FAIL_TO_EXPORT_ME",
+				Parameters: map[string]string{},
+			},
+			envKey:           podIPEnv,
+			expectedServer:   "",
+			expectedPath:     "",
+			expectedGroup:    0,
+			expectedBlock:    "",
+			expectedExportId: 0,
+			expectError:      true,
+		},
+	}
+
+	client := fake.NewSimpleClientset()
+	conf := tmpDir + "/test"
+	_, err := os.Create(conf)
+	if err != nil {
+		t.Errorf("Error creating file %s: %v", conf, err)
+	}
+	p := newNFSProvisionerInternal(tmpDir+"/", client, &testExporter{config: conf})
+
+	for _, test := range tests {
+		os.Setenv(test.envKey, "1.1.1.1")
+
+		server, path, supGroup, block, exportId, err := p.createVolume(test.options)
+
+		evaluate(t, test.name, test.expectError, err, test.expectedServer, server, "server")
+		evaluate(t, test.name, test.expectError, err, test.expectedPath, path, "path")
+		evaluate(t, test.name, test.expectError, err, test.expectedGroup, supGroup, "group")
+		evaluate(t, test.name, test.expectError, err, test.expectedBlock, block, "block")
+		evaluate(t, test.name, test.expectError, err, test.expectedExportId, exportId, "export id")
+
+		os.Unsetenv(test.envKey)
+	}
+}
+
 func TestValidateOptions(t *testing.T) {
 	tmpDir := utiltesting.MkTmpdirOrDie("nfsProvisionTest")
 	defer os.RemoveAll(tmpDir)
@@ -456,148 +598,6 @@ func newEndpoints(name string, ips []string, ports []endpointPort) *v1.Endpoints
 				Ports:             epPorts,
 			},
 		},
-	}
-}
-
-func TestCreateVolume(t *testing.T) {
-	tmpDir := utiltesting.MkTmpdirOrDie("nfsProvisionTest")
-	defer os.RemoveAll(tmpDir)
-
-	tests := []struct {
-		name             string
-		options          controller.VolumeOptions
-		envKey           string
-		expectedServer   string
-		expectedPath     string
-		expectedGroup    uint64
-		expectedBlock    string
-		expectedExportId uint16
-		expectError      bool
-	}{
-		{
-			name:   "succeed creating volume",
-			envKey: podIPEnv,
-			options: controller.VolumeOptions{
-				Capacity:                      resource.MustParse("1Ki"),
-				AccessModes:                   []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany},
-				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
-				PVName:     "pvc-1",
-				Parameters: map[string]string{},
-			},
-			expectedServer:   "1.1.1.1",
-			expectedPath:     tmpDir + "/pvc-1",
-			expectedGroup:    0,
-			expectedBlock:    "\nExport_Id = 1;\n",
-			expectedExportId: 1,
-			expectError:      false,
-		},
-		{
-			name:   "succeed creating volume again",
-			envKey: podIPEnv,
-			options: controller.VolumeOptions{
-				Capacity:                      resource.MustParse("1Ki"),
-				AccessModes:                   []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany},
-				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
-				PVName:     "pvc-2",
-				Parameters: map[string]string{},
-			},
-			expectedServer:   "1.1.1.1",
-			expectedPath:     tmpDir + "/pvc-2",
-			expectedGroup:    0,
-			expectedBlock:    "\nExport_Id = 2;\n",
-			expectedExportId: 2,
-			expectError:      false,
-		},
-		{
-			name:   "bad parameter",
-			envKey: podIPEnv,
-			options: controller.VolumeOptions{
-				Capacity:                      resource.MustParse("1Ki"),
-				AccessModes:                   []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany},
-				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
-				PVName:     "pvc-3",
-				Parameters: map[string]string{"foo": "bar"},
-			},
-			expectedServer:   "",
-			expectedPath:     "",
-			expectedGroup:    0,
-			expectedBlock:    "",
-			expectedExportId: 0,
-			expectError:      true,
-		},
-		{
-			name:   "bad server",
-			envKey: serviceEnv,
-			options: controller.VolumeOptions{
-				Capacity:                      resource.MustParse("1Ki"),
-				AccessModes:                   []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany},
-				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
-				PVName:     "pvc-4",
-				Parameters: map[string]string{},
-			},
-			expectedServer:   "",
-			expectedPath:     "",
-			expectedGroup:    0,
-			expectedBlock:    "",
-			expectedExportId: 0,
-			expectError:      true,
-		},
-		{
-			name:   "dir already exists",
-			envKey: podIPEnv,
-			options: controller.VolumeOptions{
-				Capacity:                      resource.MustParse("1Ki"),
-				AccessModes:                   []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany},
-				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
-				PVName:     "pvc-1",
-				Parameters: map[string]string{},
-			},
-			expectedServer:   "",
-			expectedPath:     "",
-			expectedGroup:    0,
-			expectedBlock:    "",
-			expectedExportId: 0,
-			expectError:      true,
-		},
-		{
-			name:   "error exporting",
-			envKey: podIPEnv,
-			options: controller.VolumeOptions{
-				Capacity:                      resource.MustParse("1Ki"),
-				AccessModes:                   []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany},
-				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
-				PVName:     "FAIL_TO_EXPORT_ME",
-				Parameters: map[string]string{},
-			},
-			expectedServer:   "",
-			expectedPath:     "",
-			expectedGroup:    0,
-			expectedBlock:    "",
-			expectedExportId: 0,
-			expectError:      true,
-		},
-	}
-
-	client := fake.NewSimpleClientset()
-	conf := tmpDir + "/test"
-	_, err := os.Create(conf)
-	if err != nil {
-		t.Errorf("Error creating file %s: %v", conf, err)
-	}
-	p := newNFSProvisionerInternal(tmpDir+"/", client, &testExporter{config: conf})
-
-	for _, test := range tests {
-		os.Setenv(test.envKey, "1.1.1.1")
-
-		server, path, supGroup, block, exportId, err := p.createVolume(test.options)
-
-		evaluate(t, test.name, test.expectError, err, test.expectedServer, server, "server")
-		evaluate(t, test.name, test.expectError, err, test.expectedPath, path, "path")
-		evaluate(t, test.name, test.expectError, err, test.expectedGroup, supGroup, "group")
-		evaluate(t, test.name, test.expectError, err, test.expectedBlock, block, "block")
-		evaluate(t, test.name, test.expectError, err, test.expectedExportId, exportId, "export id")
-
-		os.Unsetenv(test.envKey)
 	}
 }
 
