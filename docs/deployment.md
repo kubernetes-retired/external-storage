@@ -48,10 +48,21 @@ Once you finished deploying the provisioner, go to [Usage](usage.md) for info on
 
 ### In Kubernetes - Pod
 
-Edit the `provisioner` argument in the `args` field in `deploy/kube-config/pod.yaml` to be the provisioner's name you decided on. Create the pod.
+Edit the `provisioner` argument in the `args` field in `deploy/kube-config/pod.yaml` to be the provisioner's name you decided on.
+
+Note that you will see provisioning errors with certain Docker storage drivers (`overlay`, `aufs`), because NFS Ganesha requires support for "file handles." To get around this, you may mount an `emptyDir` volume at `/export`, as in `deploy/kube-config/pod_emptydir.yaml`.
+
+Create the pod.
 
 ```
 $ kubectl create -f deploy/kube-config/pod.yaml
+pod "nfs-provisioner" created
+```
+
+or
+
+```
+$ kubectl create -f deploy/kube-config/pod_emptydir.yaml
 pod "nfs-provisioner" created
 ```
 
