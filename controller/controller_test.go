@@ -48,13 +48,13 @@ func TestController(t *testing.T) {
 			objs: []runtime.Object{
 				newStorageClass("class-1", "foo.bar/baz"),
 				newStorageClass("class-2", "abc.def/ghi"),
-				newClaim("claim-1", "uid-1-1", "class-1", ""),
-				newClaim("claim-2", "uid-1-2", "class-2", ""),
+				newClaim("claim-1", "uid-1-1", "class-1", "", nil),
+				newClaim("claim-2", "uid-1-2", "class-2", "", nil),
 			},
 			provisionerName: "foo.bar/baz",
 			provisioner:     newTestProvisioner(),
 			expectedVolumes: []v1.PersistentVolume{
-				*newProvisionedVolume(newStorageClass("class-1", "foo.bar/baz"), newClaim("claim-1", "uid-1-1", "class-1", "")),
+				*newProvisionedVolume(newStorageClass("class-1", "foo.bar/baz"), newClaim("claim-1", "uid-1-1", "class-1", "", nil)),
 			},
 		},
 		{
@@ -72,7 +72,7 @@ func TestController(t *testing.T) {
 		{
 			name: "don't provision for claim-1 because it's already bound",
 			objs: []runtime.Object{
-				newClaim("claim-1", "uid-1-1", "class-1", "volume-1"),
+				newClaim("claim-1", "uid-1-1", "class-1", "volume-1", nil),
 			},
 			provisionerName: "foo.bar/baz",
 			provisioner:     newTestProvisioner(),
@@ -81,7 +81,7 @@ func TestController(t *testing.T) {
 		{
 			name: "don't provision for claim-1 because its class doesn't exist",
 			objs: []runtime.Object{
-				newClaim("claim-1", "uid-1-1", "class-1", ""),
+				newClaim("claim-1", "uid-1-1", "class-1", "", nil),
 			},
 			provisionerName: "foo.bar/baz",
 			provisioner:     newTestProvisioner(),
@@ -113,7 +113,7 @@ func TestController(t *testing.T) {
 			name: "provisioner fails to provision for claim-1: no pv is created",
 			objs: []runtime.Object{
 				newStorageClass("class-1", "foo.bar/baz"),
-				newClaim("claim-1", "uid-1-1", "class-1", ""),
+				newClaim("claim-1", "uid-1-1", "class-1", "", nil),
 			},
 			provisionerName: "foo.bar/baz",
 			provisioner:     newBadTestProvisioner(),
@@ -134,7 +134,7 @@ func TestController(t *testing.T) {
 			name: "try to provision for claim-1 but fail to save the pv object",
 			objs: []runtime.Object{
 				newStorageClass("class-1", "foo.bar/baz"),
-				newClaim("claim-1", "uid-1-1", "class-1", ""),
+				newClaim("claim-1", "uid-1-1", "class-1", "", nil),
 			},
 			provisionerName: "foo.bar/baz",
 			provisioner:     newTestProvisioner(),
@@ -199,29 +199,47 @@ func TestShouldProvision(t *testing.T) {
 			name:            "should provision",
 			provisionerName: "foo.bar/baz",
 			class:           newStorageClass("class-1", "foo.bar/baz"),
-			claim:           newClaim("claim-1", "1-1", "class-1", ""),
+			claim:           newClaim("claim-1", "1-1", "class-1", "", nil),
 			expectedShould:  true,
 		},
 		{
 			name:            "claim already bound",
 			provisionerName: "foo.bar/baz",
 			class:           newStorageClass("class-1", "foo.bar/baz"),
-			claim:           newClaim("claim-1", "1-1", "class-1", "foo"),
+			claim:           newClaim("claim-1", "1-1", "class-1", "foo", nil),
 			expectedShould:  false,
 		},
 		{
 			name:            "no such class",
 			provisionerName: "foo.bar/baz",
 			class:           newStorageClass("class-1", "foo.bar/baz"),
-			claim:           newClaim("claim-1", "1-1", "class-2", ""),
+			claim:           newClaim("claim-1", "1-1", "class-2", "", nil),
 			expectedShould:  false,
 		},
 		{
 			name:            "not this provisioner's job",
 			provisionerName: "foo.bar/baz",
 			class:           newStorageClass("class-1", "abc.def/ghi"),
-			claim:           newClaim("claim-1", "1-1", "class-1", ""),
+			claim:           newClaim("claim-1", "1-1", "class-1", "", nil),
 			expectedShould:  false,
+		},
+		// Kubernetes 1.5 provisioning - annDynamicallyProvisioned is set
+		// and only this annotation is evaluated
+		{
+			name:            "should provision 1.5",
+			provisionerName: "foo.bar/baz",
+			class:           newStorageClass("class-2", "abc.def/ghi"),
+			claim: newClaim("claim-1", "1-1", "class-1", "",
+				map[string]string{annDynamicallyProvisioned: "foo.bar/baz"}),
+			expectedShould: true,
+		},
+		{
+			name:            "unknown provisioner 1.5",
+			provisionerName: "foo.bar/baz",
+			class:           newStorageClass("class-1", "foo.bar/baz"),
+			claim: newClaim("claim-1", "1-1", "class-1", "",
+				map[string]string{annDynamicallyProvisioned: "abc.def/ghi"}),
+			expectedShould: false,
 		},
 	}
 	for _, test := range tests {
@@ -300,8 +318,8 @@ func newStorageClass(name, provisioner string) *v1beta1.StorageClass {
 	}
 }
 
-func newClaim(name, claimUID, provisioner, volumeName string) *v1.PersistentVolumeClaim {
-	return &v1.PersistentVolumeClaim{
+func newClaim(name, claimUID, provisioner, volumeName string, annotations map[string]string) *v1.PersistentVolumeClaim {
+	claim := &v1.PersistentVolumeClaim{
 		ObjectMeta: v1.ObjectMeta{
 			Name:            name,
 			Namespace:       "default",
@@ -323,6 +341,10 @@ func newClaim(name, claimUID, provisioner, volumeName string) *v1.PersistentVolu
 			Phase: v1.ClaimPending,
 		},
 	}
+	for k, v := range annotations {
+		claim.Annotations[k] = v
+	}
+	return claim
 }
 
 func newVolume(name string, phase v1.PersistentVolumePhase, policy v1.PersistentVolumeReclaimPolicy, annotations map[string]string) *v1.PersistentVolume {

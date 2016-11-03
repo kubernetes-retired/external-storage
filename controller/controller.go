@@ -249,6 +249,15 @@ func (ctrl *ProvisionController) shouldProvision(claim *v1.PersistentVolumeClaim
 		return false
 	}
 
+	// Kubernetes 1.5 provisioning with annDynamicallyProvisioned
+	if provisioner, found := claim.Annotations[annDynamicallyProvisioned]; found {
+		if provisioner == ctrl.provisionerName {
+			return true
+		}
+		return false
+	}
+
+	// Kubernetes 1.4 provisioning, evaluating class.Provisioner
 	claimClass := getClaimClass(claim)
 	classObj, found, err := ctrl.classes.GetByKey(claimClass)
 	if err != nil {
@@ -329,6 +338,13 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 	storageClass, ok := classObj.(*v1beta1.StorageClass)
 	if !ok {
 		glog.Errorf("Cannot convert object to StorageClass: %+v", classObj)
+		return
+	}
+	if storageClass.Provisioner != ctrl.provisionerName {
+		// class.Provisioner has either changed since shouldProvision() or
+		// annDynamicallyProvisioned contains different provisioner than
+		// class.Provisioner.
+		glog.Errorf("Unknown provisioner %q requested in storage class %q", claimClass, storageClass.Provisioner)
 		return
 	}
 
