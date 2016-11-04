@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-
 	// TODO get rid of this and use https://github.com/kubernetes/kubernetes/pull/32718
 	"github.com/wongma7/nfs-provisioner/framework"
 	"k8s.io/client-go/1.4/kubernetes"
@@ -37,10 +36,10 @@ import (
 	"k8s.io/client-go/1.4/pkg/api/v1"
 	"k8s.io/client-go/1.4/pkg/apis/storage/v1beta1"
 	"k8s.io/client-go/1.4/pkg/runtime"
+	"k8s.io/client-go/1.4/pkg/version"
 	"k8s.io/client-go/1.4/pkg/watch"
 	"k8s.io/client-go/1.4/tools/cache"
 	"k8s.io/client-go/1.4/tools/record"
-
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 )
 
@@ -84,6 +83,10 @@ type ProvisionController struct {
 	// volumes.
 	provisioner Provisioner
 
+	// Whether we are running in a 1.4 cluster before out-of-tree dynamic
+	// provisioning is officially supported
+	is1dot4 bool
+
 	claimSource      cache.ListerWatcher
 	claimController  *framework.Controller
 	volumeSource     cache.ListerWatcher
@@ -106,6 +109,7 @@ type ProvisionController struct {
 
 func NewProvisionController(
 	client kubernetes.Interface,
+	serverGitVersion string,
 	resyncPeriod time.Duration,
 	provisionerName string,
 	provisioner Provisioner,
@@ -121,10 +125,15 @@ func NewProvisionController(
 		eventRecorder = broadcaster.NewRecorder(v1.EventSource{Component: fmt.Sprintf("%s-%s", provisionerName, strings.TrimSpace(string(out)))})
 	}
 
+	gitVersion := version.MustParse(serverGitVersion)
+	gitVersion1dot5 := version.MustParse("1.5.0")
+	is1dot4 := gitVersion.LT(gitVersion1dot5)
+
 	controller := &ProvisionController{
 		client:                        client,
 		provisionerName:               provisionerName,
 		provisioner:                   provisioner,
+		is1dot4:                       is1dot4,
 		eventRecorder:                 eventRecorder,
 		runningOperations:             goroutinemap.NewGoRoutineMap(false /* exponentialBackOffOnError */),
 		createProvisionedPVRetryCount: createProvisionedPVRetryCount,
@@ -239,12 +248,6 @@ func (ctrl *ProvisionController) updateVolume(oldObj, newObj interface{}) {
 }
 
 func (ctrl *ProvisionController) shouldProvision(claim *v1.PersistentVolumeClaim) bool {
-	// TODO do this and remove all code below VolumeName check
-	// https://github.com/kubernetes/kubernetes/pull/30285
-	// if claim.Annotations[annStorageProvisioner] != provisionerName {
-	// 	return false, nil
-	// }
-
 	if claim.Spec.VolumeName != "" {
 		return false
 	}
@@ -282,9 +285,16 @@ func (ctrl *ProvisionController) shouldProvision(claim *v1.PersistentVolumeClaim
 }
 
 func (ctrl *ProvisionController) shouldDelete(volume *v1.PersistentVolume) bool {
-	// TODO 1.4 we should delete volumeFailed, 1.5 we should not
-	if volume.Status.Phase != v1.VolumeReleased && volume.Status.Phase != v1.VolumeFailed {
-		return false
+	// In 1.5+ we delete only if the volume is in state Released. In 1.4 we must
+	// delete if the volume is in state Failed too.
+	if !ctrl.is1dot4 {
+		if volume.Status.Phase != v1.VolumeReleased {
+			return false
+		}
+	} else {
+		if volume.Status.Phase != v1.VolumeReleased && volume.Status.Phase != v1.VolumeFailed {
+			return false
+		}
 	}
 
 	if volume.Spec.PersistentVolumeReclaimPolicy != v1.PersistentVolumeReclaimDelete {
@@ -333,6 +343,10 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 	}
 	if !found {
 		glog.Errorf("StorageClass %q not found", claimClass)
+		// 3. It tries to find a StorageClass instance referenced by annotation
+		//    `claim.Annotations["volume.beta.kubernetes.io/storage-class"]`. If not
+		//    found, it SHOULD report an error (by sending an event to the claim) and it
+		//    SHOULD retry periodically with step i.
 		return
 	}
 	storageClass, ok := classObj.(*v1beta1.StorageClass)
@@ -349,8 +363,9 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 	}
 
 	options := VolumeOptions{
-		Capacity:                      claim.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)],
-		AccessModes:                   claim.Spec.AccessModes,
+		Capacity:    claim.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)],
+		AccessModes: claim.Spec.AccessModes,
+		// TODO SHOULD be set to `Delete` unless user manually congiures other reclaim policy.
 		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 		PVName:     pvName,
 		Parameters: storageClass.Parameters,

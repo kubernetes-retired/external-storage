@@ -168,7 +168,7 @@ func TestController(t *testing.T) {
 			}
 		}
 		resyncPeriod := 100 * time.Millisecond
-		ctrl := NewProvisionController(client, resyncPeriod, test.provisionerName, test.provisioner)
+		ctrl := NewProvisionController(client, "v1.5.0", resyncPeriod, test.provisionerName, test.provisioner)
 
 		ctrl.createProvisionedPVInterval = 10 * time.Millisecond
 
@@ -246,7 +246,7 @@ func TestShouldProvision(t *testing.T) {
 		client := fake.NewSimpleClientset(test.claim)
 		resyncPeriod := 100 * time.Millisecond
 		provisioner := newTestProvisioner()
-		ctrl := NewProvisionController(client, resyncPeriod, test.provisionerName, provisioner)
+		ctrl := NewProvisionController(client, "v1.5.0", resyncPeriod, test.provisionerName, provisioner)
 
 		err := ctrl.classes.Add(test.class)
 		if err != nil {
@@ -264,42 +264,60 @@ func TestShouldProvision(t *testing.T) {
 
 func TestShouldDelete(t *testing.T) {
 	tests := []struct {
-		name            string
-		provisionerName string
-		volume          *v1.PersistentVolume
-		expectedShould  bool
+		name             string
+		provisionerName  string
+		volume           *v1.PersistentVolume
+		serverGitVersion string
+		expectedShould   bool
 	}{
 		{
-			name:            "should delete",
-			provisionerName: "foo.bar/baz",
-			volume:          newVolume("volume-1", v1.VolumeReleased, v1.PersistentVolumeReclaimDelete, map[string]string{annDynamicallyProvisioned: "foo.bar/baz"}),
-			expectedShould:  true,
-		},
-		// TODO 1.4 we should delete volumeFailed, 1.5 we should not
-		{
-			name:            "volume still bound",
-			provisionerName: "foo.bar/baz",
-			volume:          newVolume("volume-1", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, map[string]string{annDynamicallyProvisioned: "foo.bar/baz"}),
-			expectedShould:  false,
+			name:             "should delete",
+			provisionerName:  "foo.bar/baz",
+			volume:           newVolume("volume-1", v1.VolumeReleased, v1.PersistentVolumeReclaimDelete, map[string]string{annDynamicallyProvisioned: "foo.bar/baz"}),
+			serverGitVersion: "v1.5.0",
+			expectedShould:   true,
 		},
 		{
-			name:            "non-delete reclaim policy",
-			provisionerName: "foo.bar/baz",
-			volume:          newVolume("volume-1", v1.VolumeReleased, v1.PersistentVolumeReclaimRetain, map[string]string{annDynamicallyProvisioned: "foo.bar/baz"}),
-			expectedShould:  false,
+			name:             "1.4 and failed: should delete",
+			provisionerName:  "foo.bar/baz",
+			volume:           newVolume("volume-1", v1.VolumeFailed, v1.PersistentVolumeReclaimDelete, map[string]string{annDynamicallyProvisioned: "foo.bar/baz"}),
+			serverGitVersion: "v1.4.0",
+			expectedShould:   true,
 		},
 		{
-			name:            "not this provisioner's job",
-			provisionerName: "foo.bar/baz",
-			volume:          newVolume("volume-1", v1.VolumeReleased, v1.PersistentVolumeReclaimDelete, map[string]string{annDynamicallyProvisioned: "abc.def/ghi"}),
-			expectedShould:  false,
+			name:             "1.5 and failed: shouldn't delete",
+			provisionerName:  "foo.bar/baz",
+			volume:           newVolume("volume-1", v1.VolumeFailed, v1.PersistentVolumeReclaimDelete, map[string]string{annDynamicallyProvisioned: "foo.bar/baz"}),
+			serverGitVersion: "v1.5.0",
+			expectedShould:   false,
+		},
+		{
+			name:             "volume still bound",
+			provisionerName:  "foo.bar/baz",
+			volume:           newVolume("volume-1", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, map[string]string{annDynamicallyProvisioned: "foo.bar/baz"}),
+			serverGitVersion: "v1.5.0",
+			expectedShould:   false,
+		},
+		{
+			name:             "non-delete reclaim policy",
+			provisionerName:  "foo.bar/baz",
+			volume:           newVolume("volume-1", v1.VolumeReleased, v1.PersistentVolumeReclaimRetain, map[string]string{annDynamicallyProvisioned: "foo.bar/baz"}),
+			serverGitVersion: "v1.5.0",
+			expectedShould:   false,
+		},
+		{
+			name:             "not this provisioner's job",
+			provisionerName:  "foo.bar/baz",
+			volume:           newVolume("volume-1", v1.VolumeReleased, v1.PersistentVolumeReclaimDelete, map[string]string{annDynamicallyProvisioned: "abc.def/ghi"}),
+			serverGitVersion: "v1.5.0",
+			expectedShould:   false,
 		},
 	}
 	for _, test := range tests {
 		client := fake.NewSimpleClientset()
 		resyncPeriod := 100 * time.Millisecond
 		provisioner := newTestProvisioner()
-		ctrl := NewProvisionController(client, resyncPeriod, test.provisionerName, provisioner)
+		ctrl := NewProvisionController(client, test.serverGitVersion, resyncPeriod, test.provisionerName, provisioner)
 
 		should := ctrl.shouldDelete(test.volume)
 		if test.expectedShould != should {
