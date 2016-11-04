@@ -71,8 +71,13 @@ func NewNFSProvisioner(exportDir string, client kubernetes.Interface, useGanesha
 }
 
 func newNFSProvisionerInternal(exportDir string, client kubernetes.Interface, exporter exporter) *nfsProvisioner {
+	if _, err := os.Stat(exportDir); os.IsNotExist(err) {
+		glog.Fatalf("exportDir %s does not exist!", exportDir)
+	}
+	if !strings.HasSuffix(exportDir, "/") {
+		exportDir = exportDir + "/"
+	}
 	provisioner := &nfsProvisioner{
-		// TODO exportDir must have trailing slash!
 		exportDir:    exportDir,
 		client:       client,
 		exporter:     exporter,
