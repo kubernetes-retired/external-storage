@@ -124,16 +124,16 @@ daemonset "nfs-provisioner" created
 
 The container is going to need to run with one of `master` or `kubeconfig` set. For the `kubeconfig` argument to work, the config file needs to be inside the container somehow. This can be done by creating a Docker volume, or copying the kubeconfig file into the folder where the Dockerfile is and adding a line like `COPY config /.kube/config` to the Dockerfile before building the image.
 
-Run nfs-provisioner with `provisioner` equal to the name you decided on, and one of `master` or `kubeconfig` set. It needs to be run with capabilities `SYS_ADMIN` and `DAC_READ_SEARCH`.
+Run nfs-provisioner with `provisioner` equal to the name you decided on, and one of `master` or `kubeconfig` set. It needs to be run with capability `DAC_READ_SEARCH`.
 
 ```
-$ docker run --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH -v /home/joe/.kube:/.kube wongma7/nfs-provisioner:latest -provisioner=matthew/nfs -kubeconfig=/.kube/config
+$ docker run --cap-add DAC_READ_SEARCH -v /home/joe/.kube:/.kube wongma7/nfs-provisioner:latest -provisioner=matthew/nfs -kubeconfig=/.kube/config
 ```
 
 or
 
 ```
-$ docker run --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH wongma7/nfs-provisioner:latest -provisioner=matthew/nfs -master=http://0.0.0.0:8080
+$ docker run --cap-add DAC_READ_SEARCH wongma7/nfs-provisioner:latest -provisioner=matthew/nfs -master=http://0.0.0.0:8080
 ```
 
 ### Outside of Kubernetes - binary

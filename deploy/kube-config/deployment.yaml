@@ -27,7 +27,6 @@ spec:
           securityContext:
             capabilities:
               add:
-                - SYS_ADMIN
                 - DAC_READ_SEARCH
           args:
             - "-provisioner=matthew/nfs"
