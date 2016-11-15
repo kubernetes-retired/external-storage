@@ -84,7 +84,7 @@ func main() {
 	// because out-of-tree provisioners aren't officially supported until 1.5
 	serverVersion, err := clientset.Discovery().ServerVersion()
 	if err != nil {
-		glog.Errorf("Error getting server version.")
+		glog.Fatalf("Error getting server version: %v", err)
 	}
 
 	// Create the provisioner: it implements the Provisioner interface expected by
