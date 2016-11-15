@@ -13,8 +13,8 @@ RUN dnf install -y tar gcc cmake autoconf libtool bison flex make gcc-c++ krb5-d
 	&& cp src/scripts/ganeshactl/org.ganesha.nfsd.conf /etc/dbus-1/system.d/ \
 	&& dnf remove -y tar gcc cmake autoconf libtool bison flex make gcc-c++ krb5-devel dbus-devel && dnf clean all
 
-RUN mkdir /var/run/dbus \
-RUN mkdir -p /export \
+RUN mkdir /var/run/dbus
+RUN mkdir -p /export
 
 # expose mountd 20048/tcp and nfsd 2049/tcp and rpcbind 111/tcp 111/udp
 EXPOSE 2049/tcp 20048/tcp 111/tcp 111/udp
