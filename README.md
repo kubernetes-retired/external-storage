@@ -1,5 +1,5 @@
 # nfs-provisioner
-[![Build Status](https://travis-ci.org/wongma7/nfs-provisioner.svg?branch=master)](https://travis-ci.org/wongma7/nfs-provisioner)
+[![Build Status](https://travis-ci.org/kubernetes-incubator/nfs-provisioner.svg?branch=master)](https://travis-ci.org/kubernetes-incubator/nfs-provisioner)
 
 nfs-provisioner is an out-of-tree dynamic provisioner for Kubernetes 1.4. You can use it to quickly & easily deploy shared storage that works almost anywhere. Or it can help you write your own out-of-tree dynamic provisioner by serving as an example implementation of the requirements detailed in [the proposal](https://github.com/kubernetes/kubernetes/pull/30285).
 
