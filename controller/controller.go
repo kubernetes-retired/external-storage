@@ -28,8 +28,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	// TODO get rid of this and use https://github.com/kubernetes/kubernetes/pull/32718
-	"github.com/wongma7/nfs-provisioner/framework"
 	"k8s.io/client-go/kubernetes"
 	core_v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/pkg/api"
@@ -88,9 +86,9 @@ type ProvisionController struct {
 	is1dot4 bool
 
 	claimSource      cache.ListerWatcher
-	claimController  *framework.Controller
+	claimController  *cache.Controller
 	volumeSource     cache.ListerWatcher
-	volumeController *framework.Controller
+	volumeController *cache.Controller
 	classSource      cache.ListerWatcher
 	classReflector   *cache.Reflector
 
@@ -152,11 +150,11 @@ func NewProvisionController(
 			return client.Core().PersistentVolumeClaims(v1.NamespaceAll).Watch(out)
 		},
 	}
-	controller.claims, controller.claimController = framework.NewInformer(
+	controller.claims, controller.claimController = cache.NewInformer(
 		controller.claimSource,
 		&v1.PersistentVolumeClaim{},
 		resyncPeriod,
-		framework.ResourceEventHandlerFuncs{
+		cache.ResourceEventHandlerFuncs{
 			AddFunc:    controller.addClaim,
 			UpdateFunc: controller.updateClaim,
 			DeleteFunc: nil,
@@ -176,11 +174,11 @@ func NewProvisionController(
 			return client.Core().PersistentVolumes().Watch(out)
 		},
 	}
-	controller.volumes, controller.volumeController = framework.NewInformer(
+	controller.volumes, controller.volumeController = cache.NewInformer(
 		controller.volumeSource,
 		&v1.PersistentVolume{},
 		resyncPeriod,
-		framework.ResourceEventHandlerFuncs{
+		cache.ResourceEventHandlerFuncs{
 			AddFunc:    nil,
 			UpdateFunc: controller.updateVolume,
 			DeleteFunc: nil,
@@ -199,7 +197,7 @@ func NewProvisionController(
 			return client.Storage().StorageClasses().Watch(out)
 		},
 	}
-	controller.classes = cache.NewStore(framework.DeletionHandlingMetaNamespaceKeyFunc)
+	controller.classes = cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc)
 	controller.classReflector = cache.NewReflector(
 		controller.classSource,
 		&v1beta1.StorageClass{},
