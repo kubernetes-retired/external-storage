@@ -45,17 +45,35 @@ The controller, the code for which is in the `controller/` directory, watches PV
 
 So to create your own provisioner, you need to write your own implementation of the interface and pass it to the controller. Ideally you should be able to import the package to create the controller, without modifying any controller code. The passing in of the provisioner to the controller, and initialization of other things they might need (like a client for the Kubernetes API server), is done here in `main.go`.
 
-## Community
-Kubernetes Storage SIG: https://github.com/kubernetes/community/tree/master/sig-storage
-
 ## Roadmap
 This is still alpha/experimental and will change to reflect the [out-of-tree dynamic provisioner proposal](https://github.com/kubernetes/kubernetes/pull/3028)
 
-October
-* Release
-* Add CI & testing
-* Support running as DaemonSet
-
 November
-* Add filesystem quotas for PV usage
-* Support running as PetSet
+* Create a process for releasing (to Docker Hub, etc.)
+* Release 0.1 for kubernetes 1.5
+* Support using the controller as a library
+* Support running the provisioner as a StatefulSet
+
+December
+* Prevent multiple provisioners from racing to provision where possible (in a StatefulSet or DaemonSet)
+* Add configurable retries for failed provisioning and deleting
+
+## Community, discussion, contribution, and support
+
+Learn how to engage with the Kubernetes community on the [community page](http://kubernetes.io/community/).
+
+You can reach the maintainers of this project at:
+
+- Slack: #sig-storage
+
+## Kubernetes Incubator
+
+This is a [Kubernetes Incubator project](https://github.com/kubernetes/community/blob/master/incubator.md). The project was established 2016-11-15. The incubator team for the project is:
+
+- Sponsor: Clayton (@smarterclayton)
+- Champion: Brad (@childsb)
+- SIG: sig-storage
+
+### Code of conduct
+
+Participation in the Kubernetes community is governed by the [Kubernetes Code of Conduct](code-of-conduct.md).
