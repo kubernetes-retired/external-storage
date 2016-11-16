@@ -6,4 +6,4 @@ services: docker
 
 script:
   - make container
-  - go test `go list ./... | grep -v vendor`
+  - make test

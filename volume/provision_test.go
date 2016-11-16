@@ -592,7 +592,7 @@ func newEndpoints(name string, ips []string, ports []endpointPort) *v1.Endpoints
 			Namespace: "default",
 		},
 		Subsets: []v1.EndpointSubset{
-			v1.EndpointSubset{
+			{
 				Addresses:         epAddresses,
 				NotReadyAddresses: []v1.EndpointAddress{},
 				Ports:             epPorts,
