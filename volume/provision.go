@@ -32,8 +32,8 @@ import (
 	"github.com/golang/glog"
 	"github.com/guelfey/go.dbus"
 	"github.com/wongma7/nfs-provisioner/controller"
-	"k8s.io/client-go/1.4/kubernetes"
-	"k8s.io/client-go/1.4/pkg/api/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/pkg/api/v1"
 )
 
 const (

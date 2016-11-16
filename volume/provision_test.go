@@ -28,12 +28,12 @@ import (
 	"testing"
 
 	"github.com/wongma7/nfs-provisioner/controller"
-	"k8s.io/client-go/1.4/kubernetes/fake"
-	"k8s.io/client-go/1.4/pkg/api/resource"
-	"k8s.io/client-go/1.4/pkg/api/unversioned"
-	"k8s.io/client-go/1.4/pkg/api/v1"
-	"k8s.io/client-go/1.4/pkg/runtime"
-	utiltesting "k8s.io/client-go/1.4/pkg/util/testing"
+	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/pkg/api/resource"
+	"k8s.io/client-go/pkg/api/unversioned"
+	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/pkg/runtime"
+	utiltesting "k8s.io/client-go/pkg/util/testing"
 )
 
 func TestCreateVolume(t *testing.T) {

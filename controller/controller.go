@@ -30,16 +30,16 @@ import (
 	"github.com/golang/glog"
 	// TODO get rid of this and use https://github.com/kubernetes/kubernetes/pull/32718
 	"github.com/wongma7/nfs-provisioner/framework"
-	"k8s.io/client-go/1.4/kubernetes"
-	core_v1 "k8s.io/client-go/1.4/kubernetes/typed/core/v1"
-	"k8s.io/client-go/1.4/pkg/api"
-	"k8s.io/client-go/1.4/pkg/api/v1"
-	"k8s.io/client-go/1.4/pkg/apis/storage/v1beta1"
-	"k8s.io/client-go/1.4/pkg/runtime"
-	"k8s.io/client-go/1.4/pkg/version"
-	"k8s.io/client-go/1.4/pkg/watch"
-	"k8s.io/client-go/1.4/tools/cache"
-	"k8s.io/client-go/1.4/tools/record"
+	"k8s.io/client-go/kubernetes"
+	core_v1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/pkg/apis/storage/v1beta1"
+	"k8s.io/client-go/pkg/runtime"
+	"k8s.io/client-go/pkg/version"
+	"k8s.io/client-go/pkg/watch"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 )
 
@@ -142,10 +142,14 @@ func NewProvisionController(
 
 	controller.claimSource = &cache.ListWatch{
 		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-			return client.Core().PersistentVolumeClaims(v1.NamespaceAll).List(options)
+			var out v1.ListOptions
+			v1.Convert_api_ListOptions_To_v1_ListOptions(&options, &out, nil)
+			return client.Core().PersistentVolumeClaims(v1.NamespaceAll).List(out)
 		},
 		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-			return client.Core().PersistentVolumeClaims(v1.NamespaceAll).Watch(options)
+			var out v1.ListOptions
+			v1.Convert_api_ListOptions_To_v1_ListOptions(&options, &out, nil)
+			return client.Core().PersistentVolumeClaims(v1.NamespaceAll).Watch(out)
 		},
 	}
 	controller.claims, controller.claimController = framework.NewInformer(
@@ -161,10 +165,15 @@ func NewProvisionController(
 
 	controller.volumeSource = &cache.ListWatch{
 		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-			return client.Core().PersistentVolumes().List(options)
+			var out v1.ListOptions
+			v1.Convert_api_ListOptions_To_v1_ListOptions(&options, &out, nil)
+			return client.Core().PersistentVolumes().List(out)
 		},
 		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-			return client.Core().PersistentVolumes().Watch(options)
+			var out v1.ListOptions
+			v1.Convert_api_ListOptions_To_v1_ListOptions(&options, &out, nil)
+
+			return client.Core().PersistentVolumes().Watch(out)
 		},
 	}
 	controller.volumes, controller.volumeController = framework.NewInformer(
@@ -180,10 +189,14 @@ func NewProvisionController(
 
 	controller.classSource = &cache.ListWatch{
 		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-			return client.Storage().StorageClasses().List(options)
+			var out v1.ListOptions
+			v1.Convert_api_ListOptions_To_v1_ListOptions(&options, &out, nil)
+			return client.Storage().StorageClasses().List(out)
 		},
 		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-			return client.Storage().StorageClasses().Watch(options)
+			var out v1.ListOptions
+			v1.Convert_api_ListOptions_To_v1_ListOptions(&options, &out, nil)
+			return client.Storage().StorageClasses().Watch(out)
 		},
 	}
 	controller.classes = cache.NewStore(framework.DeletionHandlingMetaNamespaceKeyFunc)

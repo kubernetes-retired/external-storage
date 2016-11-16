@@ -25,12 +25,12 @@ import (
 	"github.com/wongma7/nfs-provisioner/controller"
 	"github.com/wongma7/nfs-provisioner/server"
 	vol "github.com/wongma7/nfs-provisioner/volume"
-	"k8s.io/client-go/1.4/kubernetes"
-	"k8s.io/client-go/1.4/pkg/util/validation"
-	"k8s.io/client-go/1.4/pkg/util/validation/field"
-	"k8s.io/client-go/1.4/pkg/util/wait"
-	"k8s.io/client-go/1.4/rest"
-	"k8s.io/client-go/1.4/tools/clientcmd"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/pkg/util/validation"
+	"k8s.io/client-go/pkg/util/validation/field"
+	"k8s.io/client-go/pkg/util/wait"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 var (
