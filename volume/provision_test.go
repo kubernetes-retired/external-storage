@@ -27,7 +27,7 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/wongma7/nfs-provisioner/controller"
+	"github.com/kubernetes-incubator/nfs-provisioner/controller"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/pkg/api/resource"
 	"k8s.io/client-go/pkg/api/unversioned"
@@ -592,7 +592,7 @@ func newEndpoints(name string, ips []string, ports []endpointPort) *v1.Endpoints
 			Namespace: "default",
 		},
 		Subsets: []v1.EndpointSubset{
-			v1.EndpointSubset{
+			{
 				Addresses:         epAddresses,
 				NotReadyAddresses: []v1.EndpointAddress{},
 				Ports:             epPorts,

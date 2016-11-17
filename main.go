@@ -22,9 +22,9 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/wongma7/nfs-provisioner/controller"
-	"github.com/wongma7/nfs-provisioner/server"
-	vol "github.com/wongma7/nfs-provisioner/volume"
+	"github.com/kubernetes-incubator/nfs-provisioner/controller"
+	"github.com/kubernetes-incubator/nfs-provisioner/server"
+	vol "github.com/kubernetes-incubator/nfs-provisioner/volume"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/util/validation"
 	"k8s.io/client-go/pkg/util/validation/field"
