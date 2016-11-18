@@ -37,6 +37,7 @@ import (
 	"k8s.io/client-go/pkg/util/uuid"
 	"k8s.io/client-go/pkg/util/wait"
 	"k8s.io/client-go/pkg/version"
+	"k8s.io/client-go/pkg/watch"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -433,6 +434,58 @@ func hasRemainingContent(c clientset.Interface, clientPool dynamic.ClientPool, n
 		}
 	}
 	return contentRemaining, nil
+}
+
+// Waits default amount of time (PodStartTimeout) for the specified pod to become running.
+// Returns an error if timeout occurs first, or pod goes in to failed state.
+func WaitForPodRunningInNamespace(c clientset.Interface, pod *v1.Pod) error {
+	// this short-cicuit is needed for cases when we pass a list of pods instead
+	// of newly created pod (e.g. VerifyPods) which means we are getting already
+	// running pod for which waiting does not make sense and will always fail
+	if pod.Status.Phase == v1.PodRunning {
+		return nil
+	}
+	return waitTimeoutForPodRunningInNamespace(c, pod.Name, pod.Namespace, pod.ResourceVersion, PodStartTimeout)
+}
+
+func waitTimeoutForPodRunningInNamespace(c clientset.Interface, podName, namespace, resourceVersion string, timeout time.Duration) error {
+	w, err := c.Core().Pods(namespace).Watch(SingleObject(v1.ObjectMeta{Name: podName, ResourceVersion: resourceVersion}))
+	if err != nil {
+		return err
+	}
+	_, err = watch.Until(timeout, w, PodRunning)
+	return err
+}
+
+// SingleObject returns a ListOptions for watching a single object.
+func SingleObject(meta v1.ObjectMeta) v1.ListOptions {
+	return v1.ListOptions{
+		FieldSelector:   fields.OneTermEqualSelector("metadata.name", meta.Name).String(),
+		ResourceVersion: meta.ResourceVersion,
+	}
+}
+
+// ErrPodCompleted is returned by PodRunning or PodContainerRunning to indicate that
+// the pod has already reached completed state.
+var ErrPodCompleted = fmt.Errorf("pod ran to completion")
+
+// PodRunning returns true if the pod is running, false if the pod has not yet reached running state,
+// returns ErrPodCompleted if the pod has run to completion, or an error in any other case.
+func PodRunning(event watch.Event) (bool, error) {
+	switch event.Type {
+	case watch.Deleted:
+		return false, apierrs.NewNotFound(unversioned.GroupResource{Resource: "pods"}, "")
+	}
+	switch t := event.Object.(type) {
+	case *v1.Pod:
+		switch t.Status.Phase {
+		case v1.PodRunning:
+			return true, nil
+		case v1.PodFailed, v1.PodSucceeded:
+			return false, ErrPodCompleted
+		}
+	}
+	return false, nil
 }
 
 // waitForPodSuccessInNamespaceTimeout returns nil if the pod reached state success, or an error if it reached failure or ran too long.
