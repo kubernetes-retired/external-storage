@@ -21,12 +21,14 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"regexp"
+	"strings"
 )
 
 const defaultGaneshaConfig = "/vfs.conf"
 
 // Start starts the NFS server. If an error is encountered at any point it returns it instantly
-func Start(ganeshaConfig string) error {
+func Start(ganeshaConfig string, gracePeriod uint) error {
 	// Start rpcbind if it is not started yet
 	cmd := exec.Command("/usr/sbin/rpcinfo", "127.0.0.1")
 	if err := cmd.Run(); err != nil {
@@ -58,10 +60,58 @@ func Start(ganeshaConfig string) error {
 			return fmt.Errorf("error writing ganesha config: %v", err)
 		}
 	}
+	err := setGracePeriod(ganeshaConfig, gracePeriod)
+	if err != nil {
+		return fmt.Errorf("error setting grace period to ganesha config: %v", err)
+	}
 	// Start ganesha.nfsd
 	cmd = exec.Command("ganesha.nfsd", "-L", "/var/log/ganesha.log", "-f", ganeshaConfig)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("ganesha.nfsd failed with error: %v, output: %s", err, out)
+	}
+
+	return nil
+}
+
+func setGracePeriod(ganeshaConfig string, gracePeriod uint) error {
+	if gracePeriod > 180 {
+		return fmt.Errorf("grace period cannot be greater than 180")
+	}
+
+	newLine := fmt.Sprintf("Grace_Period = %d;", gracePeriod)
+
+	re := regexp.MustCompile("Grace_Period = [0-9]+;")
+
+	read, err := ioutil.ReadFile(ganeshaConfig)
+	if err != nil {
+		return err
+	}
+
+	old := re.Find(read)
+
+	if old == nil {
+		// Grace_Period line not there, append the whole NFSV4 block.
+		file, err := os.OpenFile(ganeshaConfig, os.O_APPEND|os.O_WRONLY, 0600)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+
+		block := "\nNFSV4\n{\n" +
+			"\t" + newLine + "\n" +
+			"}\n"
+
+		if _, err = file.WriteString(block); err != nil {
+			return err
+		}
+		file.Sync()
+	} else {
+		// Grace_Period line there, just replace it
+		replaced := strings.Replace(string(read), string(old), newLine, -1)
+		err = ioutil.WriteFile(ganeshaConfig, []byte(replaced), 0)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

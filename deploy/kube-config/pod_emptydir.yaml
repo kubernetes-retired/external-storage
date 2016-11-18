@@ -22,6 +22,7 @@ spec:
             - DAC_READ_SEARCH
       args:
         - "-provisioner=matthew/nfs"
+        - "-grace-period=0"
       env:
         - name: POD_IP
           valueFrom:
