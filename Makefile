@@ -20,7 +20,7 @@ VERSION :=
 TAG := $(shell git describe --abbrev=0 --tags HEAD 2>/dev/null)
 COMMIT := $(shell git rev-parse HEAD)
 ifeq ($(TAG),)
-    VERSION := unknown-$(COMMIT)
+    VERSION := latest
 else
     ifeq ($(COMMIT), $(shell git rev-list -n1 $(TAG)))
         VERSION := $(TAG)
