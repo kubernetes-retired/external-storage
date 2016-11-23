@@ -34,7 +34,7 @@ $ ALLOW_SECURITY_CONTEXT=true API_HOST_IP=0.0.0.0 $GOPATH/src/k8s.io/kubernetes/
 
 Decide on a unique name to give the provisioner that follows the naming scheme `<vendor name>/<provisioner name>`. The provisioner will only provision volumes for claims that request a `StorageClass` with a `provisioner` field set equal to this name. For example, the names of the in-tree GCE and AWS provisioners are `kubernetes.io/gce-pd` and `kubernetes.io/aws-ebs`.
 
-Decide how to run nfs-provisioner and follow one of the below sections. If you are okay with provisioned `PersistentVolumes` being backed with just a docker container layer, say, for scratch space, you can run a pod. Otherwise, if you want to back provisioned PVs with persistent storage (`hostPath` volumes in the provided examples), so that all PVs' data persists somewhere, you should run a deployment or a daemon set. See [here](#a-note-on-deciding-how-to-run) for more help on deciding.
+Decide how to run nfs-provisioner and follow one of the below sections. If you want to back your provisioned `PersistentVolumes` with persistent storage (`hostPath` volumes in the provided examples) and want the provisioner pod's NFS server to survive restarts to continue serving them, you should run a deployment or daemon set. Otherwise, you may run a standalone pod. See [here](#a-note-on-deciding-how-to-run) for more help on deciding.
 
 If you are running in OpenShift, see [here](#a-note-on-running-in-openshift) for information on what authorizations the pod needs.
 
@@ -72,26 +72,15 @@ Edit the `provisioner` argument in the `args` field in `deploy/kube-config/deplo
 
 `deploy/kube-config/deployment.yaml` specifies a `hostPath` volume `/srv` mounted at `/export`. The `/export` directory is where all provisioned `PersistentVolumes'` data is stored, so by mounting a volume there, you specify it as the backing storage for PVs.
 
-`deploy/kube-config/deployment.yaml` also specifies a `nodeSelector` to target a node/host. Choose a node to deploy nfs-provisioner on and be sure that the `hostPath` directory exists on the node: `mkdir -p /srv`. If SELinux is enforcing on the node, you may need to make the container [privileged](http://kubernetes.io/docs/user-guide/security-context/) or change the security context of the `hostPath` directory on the node: `sudo chcon -Rt svirt_sandbox_file_t /srv`.
+Note that the `hostPath` directory must exist on the node the provisioner is scheduled to, so you may want to use a `nodeSelector` to choose a particular node and ensure the directory exists there: `mkdir -p /srv`. If SELinux is enforcing on the node, you may need to make the container [privileged](http://kubernetes.io/docs/user-guide/security-context/) or change the security context of the directory on the node: `sudo chcon -Rt svirt_sandbox_file_t /srv`.
 
-Label the chosen node to match the `nodeSelector`.
+`deploy/kube-config/deployment.yaml` also configures a service. The deployment's pod will use the service's cluster IP as the NFS server IP to put on its `PersistentVolumes`, instead of its own unstable pod IP, because the service's name is passed in via the `SERVICE_NAME` env variable.
 
-```
-$ kubectl label node 127.0.0.1 app=matthew-nfs
-node "127.0.0.1" labeled
-```
-
-Create the service. The deployment's pod will use the service's cluster IP as the NFS server IP to put on its `PersistentVolumes`, instead of its own unstable pod IP.
-
-```
-$ kubectl create -f deploy/kube-config/service.yaml
-service "nfs-provisioner" created
-```
-
-Create the deployment.
+Create the deployment and its service.
 
 ```
 $ kubectl create -f deploy/kube-config/deployment.yaml 
+service "nfs-provisioner" created
 deployment "nfs-provisioner" created
 ```
 
@@ -99,7 +88,7 @@ deployment "nfs-provisioner" created
 
 Edit the `provisioner` argument in the `args` field in `deploy/kube-config/daemonset.yaml` to be the provisioner's name you decided on. 
 
-`deploy/kube-config/daemonset.yaml` specifies a `hostPath` volume `/srv` mounted at `/export`. The `/export` directory is where all provisioned `PersistentVolumes'` data is stored, so by mounting a volume there, you specify it as the backing storage for PVs. 
+`deploy/kube-config/daemonset.yaml` specifies a `hostPath` volume `/srv` mounted at `/export`. The `/export` directory is where all provisioned `PersistentVolumes'` data is stored, so by mounting a volume there, you specify it as the backing storage for PVs.
 
 `deploy/kube-config/daemonset.yaml` also specifies a `nodeSelector` to target nodes/hosts. Choose nodes to deploy nfs-provisioner on and be sure that the `hostPath` directory exists on each node: `mkdir -p /srv`. If SELinux is enforcing on the nodes, you may need to make the container [privileged](http://kubernetes.io/docs/user-guide/security-context/) or change the security context of the `hostPath` directory on the node: `sudo chcon -Rt svirt_sandbox_file_t /srv`.
 
@@ -156,11 +145,11 @@ $ sudo ./nfs-provisioner -provisioner=matthew/nfs -master=http://0.0.0.0:8080 -r
 
 #### A note on deciding how to run
 
-* If you want to back your nfs-provisioner's `PersistentVolumes` with persistent storage, you can mount something at the `/export` directory, where each PV will have its own unique folder containing its data. In this case you should run a deployment targeted by a service, so that the PVs are more likely to stay usable/mountable for longer than the lifetime of a single nfs-provisioner pod. The deployment's nfs-provisioner pod will use the service's cluster IP as the NFS server IP to put on its `PersistentVolumes`, instead of its own unstable pod IP, provided the name of the service is passed in via the `SERVICE_NAME` environment variable. And if the pod dies, the deployment will start another, which will re-export the folders in `/export` to that same cluster IP.
+* If you want to back your nfs-provisioner's `PersistentVolumes` with persistent storage, you can mount something at the `/export` directory, where the state of the provisioner's NFS server and each PV's data is preserved. In this case you should run a deployment targeted by a service, so that the NFS server can survive restarts and the PVs are more likely to stay usable/mountable for longer than the lifetime of a single nfs-provisioner pod. The deployment's provisioner pod will use a service's cluster IP as the NFS server IP to put on its `PersistentVolumes`, instead of its own unstable pod IP, provided the name of the service is passed in via the `SERVICE_NAME` environment variable. And if the pod dies, the deployment will start another, which will re-export the folders in `/export` to that same cluster IP or domain.
 
-* Running a daemon set is recommended for a special case of the above. Say you have multiple sources of persistent storage, e.g. the local storage on each node that you can expose to Kubernetes through `hostPath` volumes. Instead of creating multiple pairs of deployments and services on each node, you can simply label each node and run a daemon set. The daemon set's nfs-provisioner pods will use the node's (resolvable) name as the NFS server IP to put on its `PersistentVolumes`, provided the node name is passed in via the `NODE_NAME` environment variable and `hostPort` is specified for the container's NFS port, TCP 2049. Similar to above, if a pod in the set dies, the daemon set will start another, which will re-export the folders in `/export` to the same node name.
+* Running a daemon set is recommended for a special case of the above. Say you have multiple sources of persistent storage, e.g. the local storage on each node that you can expose to Kubernetes through `hostPath` volumes. Instead of creating multiple deployments for each node, you can simply label each node and run a daemon set. The daemon set's nfs-provisioner pods will use the node's (resolvable) name as the NFS server IP to put on its `PersistentVolumes`, provided the node name is passed in via the `NODE_NAME` environment variable and `hostPort` is specified for the container's NFS port, TCP 2049. Similar to above, if a pod in the set dies, the daemon set will start another, which will re-export the folders in `/export` to the same node name.
 
-* Otherwise, if you don't care to back your nfs-provisioner's `PersistentVolumes` with persistent storage, there is no reason to use a service and you can just run a pod. Since in this case the pod is backing PVs with a Docker container layer, the PVs will only be useful for as long as the pod is running anyway.
+* Otherwise, if you don't care to back your nfs-provisioner's `PersistentVolumes` with persistent storage, you can just run a standalone pod. Since in this case the pod is backing PVs with a Docker container layer or `emptyDir` volume, the PVs will only be useful for as long as the pod is running anyway.
 
 #### A note on running in OpenShift
 

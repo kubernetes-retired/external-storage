@@ -1,3 +1,23 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: nfs-provisioner
+  labels:
+    app: nfs-provisioner
+spec:
+  ports:
+    - name: nfs
+      port: 2049
+    - name: mountd
+      port: 20048
+    - name: rpcbind
+      port: 111
+    - name: rpcbind-udp
+      port: 111
+      protocol: UDP
+  selector:
+    app: nfs-provisioner
+---
 kind: Deployment
 apiVersion: extensions/v1beta1
 metadata:
@@ -7,10 +27,8 @@ spec:
   template:
     metadata:
       labels:
-        app: matthew-nfs
+        app: nfs-provisioner
     spec:
-      nodeSelector:
-        app: matthew-nfs
       containers:
         - name: nfs-provisioner
           image: wongma7/nfs-provisioner
