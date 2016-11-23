@@ -14,11 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/*
-Some code in here is identical to or modified from code in the PV controller of
-kubernetes, copyright 2016 The Kubernetes Authors.
-*/
-
 package controller
 
 import (
@@ -59,12 +54,6 @@ const annDynamicallyProvisioned = "pv.kubernetes.io/provisioned-by"
 
 const annStorageProvisioner = "volume.beta.kubernetes.io/storage-provisioner"
 
-// Number of retries when we create a PV object for a provisioned volume.
-const createProvisionedPVRetryCount = 5
-
-// Interval between retries when we create a PV object for a provisioned volume.
-const createProvisionedPVInterval = 10 * time.Second
-
 // ProvisionController is a controller that provisions PersistentVolumes for
 // PersistentVolumeClaims.
 type ProvisionController struct {
@@ -101,16 +90,22 @@ type ProvisionController struct {
 	// Map of scheduled/running operations.
 	runningOperations goroutinemap.GoRoutineMap
 
+	// Number of retries when we create a PV object for a provisioned volume.
 	createProvisionedPVRetryCount int
-	createProvisionedPVInterval   time.Duration
+
+	// Interval between retries when we create a PV object for a provisioned volume.
+	createProvisionedPVInterval time.Duration
 }
 
 func NewProvisionController(
 	client kubernetes.Interface,
-	serverGitVersion string,
 	resyncPeriod time.Duration,
 	provisionerName string,
 	provisioner Provisioner,
+	serverGitVersion string,
+	createProvisionedPVRetryCount int,
+	createProvisionedPVInterval time.Duration,
+	exponentialBackOffOnError bool,
 ) *ProvisionController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(&core_v1.EventSinkImpl{Interface: client.Core().Events(v1.NamespaceAll)})
@@ -133,7 +128,7 @@ func NewProvisionController(
 		provisioner:                   provisioner,
 		is1dot4:                       is1dot4,
 		eventRecorder:                 eventRecorder,
-		runningOperations:             goroutinemap.NewGoRoutineMap(false /* exponentialBackOffOnError */),
+		runningOperations:             goroutinemap.NewGoRoutineMap(exponentialBackOffOnError),
 		createProvisionedPVRetryCount: createProvisionedPVRetryCount,
 		createProvisionedPVInterval:   createProvisionedPVInterval,
 	}
