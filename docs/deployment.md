@@ -111,7 +111,7 @@ daemonset "nfs-provisioner" created
 
 ### Outside of Kubernetes - container
 
-The container is going to need to run with one of `master` or `kubeconfig` set. For the `kubeconfig` argument to work, the config file needs to be inside the container somehow. This can be done by creating a Docker volume, or copying the kubeconfig file into the folder where the Dockerfile is and adding a line like `COPY config /.kube/config` to the Dockerfile before building the image.
+The container is going to need to run with one of `master` or `kubeconfig` set. For the `kubeconfig` argument to work, the config file, and any certificate files it references by path like `certificate-authority: /var/run/kubernetes/apiserver.crt`, need to be inside the container somehow. This can be done by creating Docker volumes, or copying the files into the folder where the Dockerfile is and adding lines like `COPY config /.kube/config` to the Dockerfile before building the image. 
 
 Run nfs-provisioner with `provisioner` equal to the name you decided on, and one of `master` or `kubeconfig` set. It needs to be run with capability `DAC_READ_SEARCH`.
 
