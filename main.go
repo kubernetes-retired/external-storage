@@ -87,8 +87,8 @@ func main() {
 		glog.Fatalf("Failed to create client: %v", err)
 	}
 
-	// The controller needs to know what version what the server version is
-	// because out-of-tree provisioners aren't officially supported until 1.5
+	// The controller needs to know what the server version is because out-of-tree
+	// provisioners aren't officially supported until 1.5
 	serverVersion, err := clientset.Discovery().ServerVersion()
 	if err != nil {
 		glog.Fatalf("Error getting server version: %v", err)
@@ -99,7 +99,7 @@ func main() {
 	nfsProvisioner := vol.NewNFSProvisioner("/export/", clientset, *useGanesha, ganeshaConfig)
 
 	// Start the provision controller which will dynamically provision NFS PVs
-	pc := controller.NewProvisionController(clientset, serverVersion.GitVersion, 15*time.Second, *provisioner, nfsProvisioner)
+	pc := controller.NewProvisionController(clientset, 15*time.Second, *provisioner, nfsProvisioner, serverVersion.GitVersion, 5, 10*time.Second, true)
 	pc.Run(wait.NeverStop)
 }
 
