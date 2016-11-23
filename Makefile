@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-.PHONY: all build container quick-container push test clean
-
 IMAGE = wongma7/nfs-provisioner
 
 VERSION :=
@@ -29,26 +27,35 @@ else
     endif
 endif
 
-all: build
-
-build:
+all build:
 	go build
+.PHONY: all build
 
-container: build
-	cp nfs-provisioner deploy/docker/nfs-provisioner
-	docker build -t $(IMAGE):$(VERSION) deploy/docker
+container: build quick-container
+.PHONY: container
 
 quick-container:
 	cp nfs-provisioner deploy/docker/nfs-provisioner
 	docker build -t $(IMAGE):$(VERSION) deploy/docker
+.PHONY: quick-container
 
 push: container
 	docker push $(IMAGE):$(VERSION)
+.PHONY: push
 
-test:
+test-integration: verify-gofmt
+	go test `go list ./... | grep -v 'vendor\|e2e'`
+.PHONY: test-integration
+
+test-e2e: verify-gofmt
+	go test ./e2e -v --kubeconfig=$(HOME)/.kube/config
+.PHONY: test-e2e
+
+verify-gofmt:
 	(gofmt -s -w -l `find . -type f -name "*.go" | grep -v vendor`) || exit 1
-	go test `go list ./... | grep -v vendor`
+.PHONY: verify-gofmt
 
 clean:
 	rm -f nfs-provisioner
 	rm -f deploy/docker/nfs-provisioner
+.PHONY: clean
