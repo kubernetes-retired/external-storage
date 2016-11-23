@@ -33,6 +33,8 @@ pvc-dce84888-7a9d-11e6-b1ee-5254001e0c1b   1Mi        RWX           Delete      
 
 Deleting the `PersistentVolumeClaim` will cause the provisioner to delete the `PersistentVolume` and its data.
 
+Deleting the provisioner pod will cause any outstanding `PersistentVolumes` to become unusable and their data to be deleted. See [Deployment](docs/deployment.md) for how to deploy a provisioner that backs its NFS shares with persistent storage and survives restarts.
+
 ## Running
 To deploy nfs-provisioner on a Kubernetes cluster see [Deployment](docs/deployment.md).
 
