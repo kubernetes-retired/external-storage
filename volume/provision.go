@@ -22,6 +22,7 @@ import (
 	"math"
 	"os"
 	"os/exec"
+	"path"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -73,9 +74,6 @@ func NewNFSProvisioner(exportDir string, client kubernetes.Interface, useGanesha
 func newNFSProvisionerInternal(exportDir string, client kubernetes.Interface, exporter exporter) *nfsProvisioner {
 	if _, err := os.Stat(exportDir); os.IsNotExist(err) {
 		glog.Fatalf("exportDir %s does not exist!", exportDir)
-	}
-	if !strings.HasSuffix(exportDir, "/") {
-		exportDir = exportDir + "/"
 	}
 	provisioner := &nfsProvisioner{
 		exportDir:    exportDir,
@@ -187,7 +185,7 @@ func (p *nfsProvisioner) createVolume(options controller.VolumeOptions) (string,
 		return "", "", 0, "", 0, fmt.Errorf("error getting NFS server IP for volume: %v", err)
 	}
 
-	path := fmt.Sprintf(p.exportDir+"%s", options.PVName)
+	path := path.Join(p.exportDir, options.PVName)
 
 	err = p.createDirectory(options.PVName, gid)
 	if err != nil {
@@ -324,7 +322,7 @@ func (p *nfsProvisioner) getServer() (string, error) {
 // permissions and ownership according to the given gid parameter string.
 func (p *nfsProvisioner) createDirectory(directory, gid string) error {
 	// TODO quotas
-	path := fmt.Sprintf(p.exportDir+"%s", directory)
+	path := path.Join(p.exportDir, directory)
 	if _, err := os.Stat(path); err == nil {
 		return fmt.Errorf("error creating volume, the path already exists")
 	}
@@ -361,7 +359,7 @@ func (p *nfsProvisioner) createDirectory(directory, gid string) error {
 // createExport creates the export by adding a block to the appropriate config
 // file and exporting it, using the appropriate method.
 func (p *nfsProvisioner) createExport(directory string) (string, uint16, error) {
-	path := fmt.Sprintf(p.exportDir+"%s", directory)
+	path := path.Join(p.exportDir, directory)
 
 	exportId := p.generateExportId()
 	exportIdStr := strconv.FormatUint(uint64(exportId), 10)
