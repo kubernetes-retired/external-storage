@@ -24,6 +24,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 
@@ -64,8 +65,8 @@ func TestCreateVolume(t *testing.T) {
 			expectedServer:   "1.1.1.1",
 			expectedPath:     tmpDir + "/pvc-1",
 			expectedGroup:    0,
-			expectedBlock:    "\nExport_Id = 1;\n",
-			expectedExportId: 1,
+			expectedBlock:    "\nExport_Id = 0;\n",
+			expectedExportId: 0,
 			expectError:      false,
 		},
 		{
@@ -81,8 +82,8 @@ func TestCreateVolume(t *testing.T) {
 			expectedServer:   "1.1.1.1",
 			expectedPath:     tmpDir + "/pvc-2",
 			expectedGroup:    0,
-			expectedBlock:    "\nExport_Id = 2;\n",
-			expectedExportId: 2,
+			expectedBlock:    "\nExport_Id = 0;\n",
+			expectedExportId: 0,
 			expectError:      false,
 		},
 		{
@@ -335,16 +336,14 @@ func TestAddToRemoveFromFile(t *testing.T) {
 	tmpDir := utiltesting.MkTmpdirOrDie("nfsProvisionTest")
 	defer os.RemoveAll(tmpDir)
 
-	client := fake.NewSimpleClientset()
 	conf := tmpDir + "/test"
 	_, err := os.Create(conf)
 	if err != nil {
 		t.Errorf("Error creating file %s: %v", conf, err)
 	}
-	p := newNFSProvisionerInternal(tmpDir+"/", client, &testExporter{})
 
 	toAdd := "abc\nxyz\n"
-	p.addToFile(conf, toAdd)
+	addToFile(&sync.Mutex{}, conf, toAdd)
 
 	read, _ := ioutil.ReadFile(conf)
 	if toAdd != string(read) {
@@ -353,7 +352,7 @@ func TestAddToRemoveFromFile(t *testing.T) {
 
 	toRemove := toAdd
 
-	p.removeFromFile(conf, toRemove)
+	removeFromFile(&sync.Mutex{}, conf, toRemove)
 	read, _ = ioutil.ReadFile(conf)
 	if "" != string(read) {
 		t.Errorf("Expected %s but got %s", "", string(read))
@@ -412,7 +411,7 @@ func TestGetConfigExportIds(t *testing.T) {
 			t.Errorf("Error writing file %s: %v", conf, err)
 		}
 
-		exportIds, err := getConfigExportIds(conf, test.re)
+		exportIds, err := getExistingExportIds(conf, test.re)
 
 		evaluate(t, test.name, test.expectError, err, test.expectedExportIds, exportIds, "export ids")
 	}
@@ -607,16 +606,12 @@ type testExporter struct {
 
 var _ exporter = &testExporter{}
 
-func (e *testExporter) GetConfig() string {
-	return e.config
+func (e *testExporter) AddExportBlock(path string) (string, uint16, error) {
+	return "\nExport_Id = 0;\n", 0, nil
 }
 
-func (e *testExporter) GetConfigExportIds() (map[uint16]bool, error) {
-	return map[uint16]bool{}, nil
-}
-
-func (e *testExporter) CreateBlock(exportId, path string) string {
-	return "\nExport_Id = " + exportId + ";\n"
+func (e *testExporter) RemoveExportBlock(block string, exportId uint16) error {
+	return nil
 }
 
 func (e *testExporter) Export(path string) error {

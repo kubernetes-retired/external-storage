@@ -55,7 +55,7 @@ type genericExporter struct {
 }
 
 func newGenericExporter(ebc exportBlockCreator, config string, re *regexp.Regexp) *genericExporter {
-	exportIds, err := getExistingIds(config, re)
+	exportIds, err := getExistingExportIds(config, re)
 	if err != nil {
 		glog.Errorf("error while populating exportIds map, there may be errors exporting later if exportIds are reused: %v", err)
 	}
@@ -68,10 +68,10 @@ func newGenericExporter(ebc exportBlockCreator, config string, re *regexp.Regexp
 	}
 }
 
-// getExistingIds populates an exportIds map with pre-existing exportIds
+// getExistingExportIds populates an exportIds map with pre-existing exportIds
 // found in the given config file. Takes as argument the regex it should use to
 // find each exportId in the file i.e. Export_Id or fsid.
-func getExistingIds(config string, re *regexp.Regexp) (map[uint16]bool, error) {
+func getExistingExportIds(config string, re *regexp.Regexp) (map[uint16]bool, error) {
 	exportIds := map[uint16]bool{}
 
 	digitsRe := "([0-9]+)"
@@ -93,10 +93,6 @@ func getExistingIds(config string, re *regexp.Regexp) (map[uint16]bool, error) {
 	}
 
 	return exportIds, nil
-}
-
-func (e *genericExporter) CreateExportBlock(_, _ string) string {
-	return ""
 }
 
 func (e *genericExporter) AddExportBlock(path string) (string, uint16, error) {
