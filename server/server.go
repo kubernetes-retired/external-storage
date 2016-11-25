@@ -25,6 +25,7 @@ import (
 	"strings"
 )
 
+// TODO just save conf here in code?
 const defaultGaneshaConfig = "/vfs.conf"
 
 // Start starts the NFS server. If an error is encountered at any point it returns it instantly
