@@ -19,10 +19,8 @@ package volume
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"strconv"
 
-	"github.com/guelfey/go.dbus"
 	"k8s.io/client-go/pkg/api/v1"
 )
 
@@ -72,38 +70,6 @@ func (p *nfsProvisioner) deleteExport(volume *v1.PersistentVolume) error {
 	err := p.exporter.Unexport(volume)
 	if err != nil {
 		return fmt.Errorf("removed export from the config file but error unexporting it: %v", err)
-	}
-
-	return nil
-}
-
-func (e *ganeshaExporter) Unexport(volume *v1.PersistentVolume) error {
-	ann, ok := volume.Annotations[annExportId]
-	if !ok {
-		return fmt.Errorf("PV doesn't have an annotation %s, can't remove the export from the server", annExportId)
-	}
-	exportId, _ := strconv.ParseUint(ann, 10, 16)
-
-	// Call RemoveExport using dbus
-	conn, err := dbus.SystemBus()
-	if err != nil {
-		return fmt.Errorf("error getting dbus session bus: %v", err)
-	}
-	obj := conn.Object("org.ganesha.nfsd", "/org/ganesha/nfsd/ExportMgr")
-	call := obj.Call("org.ganesha.nfsd.exportmgr.RemoveExport", 0, uint16(exportId))
-	if call.Err != nil {
-		return fmt.Errorf("error calling org.ganesha.nfsd.exportmgr.RemoveExport: %v", call.Err)
-	}
-
-	return nil
-}
-
-func (e *kernelExporter) Unexport(volume *v1.PersistentVolume) error {
-	// Execute exportfs
-	cmd := exec.Command("exportfs", "-r")
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("exportfs -r failed with error: %v, output: %s", err, out)
 	}
 
 	return nil
