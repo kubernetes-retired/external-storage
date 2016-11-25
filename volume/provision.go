@@ -19,7 +19,6 @@ package volume
 import (
 	"fmt"
 	"io/ioutil"
-	"math"
 	"os"
 	"os/exec"
 	"path"
@@ -64,9 +63,9 @@ const (
 func NewNFSProvisioner(exportDir string, client kubernetes.Interface, useGanesha bool, ganeshaConfig string) controller.Provisioner {
 	var exporter exporter
 	if useGanesha {
-		exporter = &ganeshaExporter{ganeshaConfig: ganeshaConfig}
+		exporter = newGaneshaExporter(ganeshaConfig)
 	} else {
-		exporter = &kernelExporter{}
+		exporter = newKernelExporter()
 	}
 	return newNFSProvisionerInternal(exportDir, client, exporter)
 }
@@ -75,22 +74,15 @@ func newNFSProvisionerInternal(exportDir string, client kubernetes.Interface, ex
 	if _, err := os.Stat(exportDir); os.IsNotExist(err) {
 		glog.Fatalf("exportDir %s does not exist!", exportDir)
 	}
+
 	provisioner := &nfsProvisioner{
 		exportDir:    exportDir,
 		client:       client,
 		exporter:     exporter,
-		mapMutex:     &sync.Mutex{},
-		fileMutex:    &sync.Mutex{},
 		podIPEnv:     podIPEnv,
 		serviceEnv:   serviceEnv,
 		namespaceEnv: namespaceEnv,
 		nodeEnv:      nodeEnv,
-	}
-
-	var err error
-	provisioner.exportIds, err = provisioner.exporter.GetConfigExportIds()
-	if err != nil {
-		glog.Errorf("error while populating exportIds map, there may be errors exporting later if exportIds are reused: %v", err)
 	}
 
 	return provisioner
@@ -106,17 +98,6 @@ type nfsProvisioner struct {
 
 	// The exporter to use for exporting NFS shares
 	exporter exporter
-
-	// Map to track used exportIds. Each ganesha export needs a unique Export_Id,
-	// and both ganesha and kernel exports need a unique fsid. So we simply assign
-	// each export an exportId and use it as both Export_id and fsid.
-	exportIds map[uint16]bool
-
-	// Lock for accessing exportIds
-	mapMutex *sync.Mutex
-
-	// Lock for writing to the ganesha config or /etc/exports file
-	fileMutex *sync.Mutex
 
 	// Environment variables the provisioner pod needs valid values for in order to
 	// put a service cluster IP as the server of provisioned NFS PVs, passed in
@@ -361,174 +342,62 @@ func (p *nfsProvisioner) createDirectory(directory, gid string) error {
 func (p *nfsProvisioner) createExport(directory string) (string, uint16, error) {
 	path := path.Join(p.exportDir, directory)
 
-	exportId := p.generateExportId()
-	exportIdStr := strconv.FormatUint(uint64(exportId), 10)
-
-	config := p.exporter.GetConfig()
-	block := p.exporter.CreateBlock(exportIdStr, path)
-
-	// Add the export block to the config file
-	if err := p.addToFile(config, block); err != nil {
-		p.deleteExportId(exportId)
-		return "", 0, fmt.Errorf("error adding export block %s to config %s: %v", block, config, err)
+	block, exportId, err := p.exporter.AddExportBlock(path)
+	if err != nil {
+		return "", 0, fmt.Errorf("error adding export block for path %s: %v", path, err)
 	}
 
-	err := p.exporter.Export(path)
+	err = p.exporter.Export(path)
 	if err != nil {
-		p.deleteExportId(exportId)
-		p.removeFromFile(config, block)
-		return "", 0, fmt.Errorf("error exporting export block %s in config %s: %v", block, config, err)
+		p.exporter.RemoveExportBlock(block, exportId)
+		return "", 0, fmt.Errorf("error exporting export block %s: %v", block, err)
 	}
 
 	return block, exportId, nil
 }
 
-// generateExportId generates a unique exportId to assign an export
-func (p *nfsProvisioner) generateExportId() uint16 {
-	p.mapMutex.Lock()
-	id := uint16(1)
-	for ; id <= math.MaxUint16; id++ {
-		if _, ok := p.exportIds[id]; !ok {
-			break
-		}
-	}
-	p.exportIds[id] = true
-	p.mapMutex.Unlock()
-	return id
-}
-
-func (p *nfsProvisioner) deleteExportId(exportId uint16) {
-	p.mapMutex.Lock()
-	delete(p.exportIds, exportId)
-	p.mapMutex.Unlock()
-}
-
-func (p *nfsProvisioner) addToFile(path string, toAdd string) error {
-	p.fileMutex.Lock()
-
-	file, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0600)
-	if err != nil {
-		p.fileMutex.Unlock()
-		return err
-	}
-	defer file.Close()
-
-	if _, err = file.WriteString(toAdd); err != nil {
-		p.fileMutex.Unlock()
-		return err
-	}
-	file.Sync()
-
-	p.fileMutex.Unlock()
-	return nil
-}
-
-func (p *nfsProvisioner) removeFromFile(path string, toRemove string) error {
-	p.fileMutex.Lock()
-
-	read, err := ioutil.ReadFile(path)
-	if err != nil {
-		p.fileMutex.Unlock()
-		return err
-	}
-
-	removed := strings.Replace(string(read), toRemove, "", -1)
-	err = ioutil.WriteFile(path, []byte(removed), 0)
-	if err != nil {
-		p.fileMutex.Unlock()
-		return err
-	}
-
-	p.fileMutex.Unlock()
-	return nil
-}
-
 type exporter interface {
-	GetConfig() string
-	GetConfigExportIds() (map[uint16]bool, error)
-	CreateBlock(string, string) string
+	AddExportBlock(string) (string, uint16, error)
+	RemoveExportBlock(string, uint16) error
 	Export(string) error
 	Unexport(*v1.PersistentVolume) error
 }
 
-type ganeshaExporter struct {
-	ganeshaConfig string
+type exportBlockCreator interface {
+	CreateExportBlock(string, string) string
 }
 
-var _ exporter = &ganeshaExporter{}
+type genericExporter struct {
+	ebc    exportBlockCreator
+	config string
 
-func (e *ganeshaExporter) GetConfig() string {
-	return e.ganeshaConfig
+	// Map to track used exportIds. Each ganesha export needs a unique fsid and
+	// Export_Id, each kernel a unique fsid. Assign each export an exportId and
+	// use it as both fsid and Export_Id.
+	exportIds map[uint16]bool
+
+	mapMutex  *sync.Mutex
+	fileMutex *sync.Mutex
 }
 
-func (e *ganeshaExporter) GetConfigExportIds() (map[uint16]bool, error) {
-	return getConfigExportIds(e.GetConfig(), regexp.MustCompile("Export_Id = ([0-9]+);"))
-}
-
-// CreateBlock creates the text block to add to the ganesha config file.
-func (e *ganeshaExporter) CreateBlock(exportId, path string) string {
-	return "\nEXPORT\n{\n" +
-		"\tExport_Id = " + exportId + ";\n" +
-		"\tPath = " + path + ";\n" +
-		"\tPseudo = " + path + ";\n" +
-		"\tAccess_Type = RW;\n" +
-		"\tSquash = root_id_squash;\n" +
-		"\tSecType = sys;\n" +
-		"\tFilesystem_id = " + exportId + "." + exportId + ";\n" +
-		"\tFSAL {\n\t\tName = VFS;\n\t}\n}\n"
-}
-
-// Export exports the given directory using NFS Ganesha, assuming it is running
-// and can be connected to using D-Bus.
-func (e *ganeshaExporter) Export(path string) error {
-	// Call AddExport using dbus
-	conn, err := dbus.SystemBus()
+func newGenericExporter(ebc exportBlockCreator, config string, re *regexp.Regexp) *genericExporter {
+	exportIds, err := getExistingIds(config, re)
 	if err != nil {
-		return fmt.Errorf("error getting dbus session bus: %v", err)
+		glog.Errorf("error while populating exportIds map, there may be errors exporting later if exportIds are reused: %v", err)
 	}
-	obj := conn.Object("org.ganesha.nfsd", "/org/ganesha/nfsd/ExportMgr")
-	call := obj.Call("org.ganesha.nfsd.exportmgr.AddExport", 0, e.ganeshaConfig, fmt.Sprintf("export(path = %s)", path))
-	if call.Err != nil {
-		return fmt.Errorf("error calling org.ganesha.nfsd.exportmgr.AddExport: %v", call.Err)
+	return &genericExporter{
+		ebc:       ebc,
+		config:    config,
+		exportIds: exportIds,
+		mapMutex:  &sync.Mutex{},
+		fileMutex: &sync.Mutex{},
 	}
-
-	return nil
 }
 
-type kernelExporter struct {
-}
-
-var _ exporter = &kernelExporter{}
-
-func (e *kernelExporter) GetConfig() string {
-	return "/etc/exports"
-}
-
-func (e *kernelExporter) GetConfigExportIds() (map[uint16]bool, error) {
-	return getConfigExportIds(e.GetConfig(), regexp.MustCompile("fsid=([0-9]+)"))
-}
-
-// CreateBlock creates the text block to add to the /etc/exports file.
-func (e *kernelExporter) CreateBlock(exportId, path string) string {
-	return "\n" + path + " *(rw,insecure,root_squash,fsid=" + exportId + ")\n"
-}
-
-// Export exports all directories listed in /etc/exports
-func (e *kernelExporter) Export(_ string) error {
-	// Execute exportfs
-	cmd := exec.Command("exportfs", "-r")
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("exportfs -r failed with error: %v, output: %s", err, out)
-	}
-
-	return nil
-}
-
-// getConfigExportIds populates the exportIds map with pre-existing exportIds
+// getExistingIds populates an exportIds map with pre-existing exportIds
 // found in the given config file. Takes as argument the regex it should use to
 // find each exportId in the file i.e. Export_Id or fsid.
-func getConfigExportIds(config string, re *regexp.Regexp) (map[uint16]bool, error) {
+func getExistingIds(config string, re *regexp.Regexp) (map[uint16]bool, error) {
 	exportIds := map[uint16]bool{}
 
 	digitsRe := "([0-9]+)"
@@ -550,4 +419,106 @@ func getConfigExportIds(config string, re *regexp.Regexp) (map[uint16]bool, erro
 	}
 
 	return exportIds, nil
+}
+
+func (e *genericExporter) CreateExportBlock(_, _ string) string {
+	return ""
+}
+
+func (e *genericExporter) AddExportBlock(path string) (string, uint16, error) {
+	exportId := generateId(e.mapMutex, e.exportIds)
+	exportIdStr := strconv.FormatUint(uint64(exportId), 10)
+
+	block := e.ebc.CreateExportBlock(exportIdStr, path)
+
+	// Add the export block to the config file
+	if err := addToFile(e.fileMutex, e.config, block); err != nil {
+		deleteId(e.mapMutex, e.exportIds, exportId)
+		return "", 0, fmt.Errorf("error adding export block %s to config %s: %v", block, e.config, err)
+	}
+	return block, exportId, nil
+}
+
+func (e *genericExporter) RemoveExportBlock(block string, exportId uint16) error {
+	deleteId(e.mapMutex, e.exportIds, exportId)
+	return removeFromFile(e.fileMutex, e.config, block)
+}
+
+type ganeshaExporter struct {
+	genericExporter
+}
+
+var _ exporter = &ganeshaExporter{}
+
+func newGaneshaExporter(ganeshaConfig string) exporter {
+	return &ganeshaExporter{
+		genericExporter: *newGenericExporter(&ganeshaExportBlockCreator{}, ganeshaConfig, regexp.MustCompile("Export_Id = ([0-9]+);")),
+	}
+}
+
+// Export exports the given directory using NFS Ganesha, assuming it is running
+// and can be connected to using D-Bus.
+func (e *ganeshaExporter) Export(path string) error {
+	// Call AddExport using dbus
+	conn, err := dbus.SystemBus()
+	if err != nil {
+		return fmt.Errorf("error getting dbus session bus: %v", err)
+	}
+	obj := conn.Object("org.ganesha.nfsd", "/org/ganesha/nfsd/ExportMgr")
+	call := obj.Call("org.ganesha.nfsd.exportmgr.AddExport", 0, e.config, fmt.Sprintf("export(path = %s)", path))
+	if call.Err != nil {
+		return fmt.Errorf("error calling org.ganesha.nfsd.exportmgr.AddExport: %v", call.Err)
+	}
+
+	return nil
+}
+
+type ganeshaExportBlockCreator struct{}
+
+var _ exportBlockCreator = &ganeshaExportBlockCreator{}
+
+// CreateBlock creates the text block to add to the ganesha config file.
+func (e *ganeshaExportBlockCreator) CreateExportBlock(exportId, path string) string {
+	return "\nEXPORT\n{\n" +
+		"\tExport_Id = " + exportId + ";\n" +
+		"\tPath = " + path + ";\n" +
+		"\tPseudo = " + path + ";\n" +
+		"\tAccess_Type = RW;\n" +
+		"\tSquash = root_id_squash;\n" +
+		"\tSecType = sys;\n" +
+		"\tFilesystem_id = " + exportId + "." + exportId + ";\n" +
+		"\tFSAL {\n\t\tName = VFS;\n\t}\n}\n"
+}
+
+type kernelExporter struct {
+	genericExporter
+}
+
+var _ exporter = &kernelExporter{}
+
+func newKernelExporter() exporter {
+	return &kernelExporter{
+		genericExporter: *newGenericExporter(&kernelExportBlockCreator{}, "/etc/exports", regexp.MustCompile("fsid=([0-9]+)")),
+	}
+}
+
+// Export exports all directories listed in /etc/exports
+func (e *kernelExporter) Export(_ string) error {
+	// Execute exportfs
+	cmd := exec.Command("exportfs", "-r")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("exportfs -r failed with error: %v, output: %s", err, out)
+	}
+
+	return nil
+}
+
+type kernelExportBlockCreator struct{}
+
+var _ exportBlockCreator = &kernelExportBlockCreator{}
+
+// CreateBlock creates the text block to add to the /etc/exports file.
+func (e *kernelExportBlockCreator) CreateExportBlock(exportId, path string) string {
+	return "\n" + path + " *(rw,insecure,root_squash,fsid=" + exportId + ")\n"
 }
