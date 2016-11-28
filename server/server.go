@@ -25,8 +25,48 @@ import (
 	"strings"
 )
 
-// TODO just save conf here in code?
-const defaultGaneshaConfig = "/vfs.conf"
+var defaultGaneshaConfigContents = []byte(`
+###################################################
+#
+# EXPORT
+#
+# To function, all that is required is an EXPORT
+#
+# Define the absolute minimal export
+#
+###################################################
+
+EXPORT
+{
+	# Export Id (mandatory, each EXPORT must have a unique Export_Id)
+	Export_Id = 0;
+
+	# Exported path (mandatory)
+	Path = /nonexistent;
+
+	# Pseudo Path (required for NFS v4)
+	Pseudo = /nonexistent;
+
+	# Required for access (default is None)
+	# Could use CLIENT blocks instead
+	Access_Type = RW;
+
+	# Exporting FSAL
+	FSAL {
+		Name = VFS;
+	}
+}
+
+NFS_Core_Param
+{
+	MNT_Port = 20048;
+}
+
+NFSV4
+{
+	Grace_Period = 90;
+}
+`)
 
 // Start starts the NFS server. If an error is encountered at any point it returns it instantly
 func Start(ganeshaConfig string, gracePeriod uint) error {
@@ -50,15 +90,11 @@ func Start(ganeshaConfig string, gracePeriod uint) error {
 		return fmt.Errorf("dbus-daemon failed with error: %v, output: %s", err, out)
 	}
 
-	// Copy the default ganesha config to the export directory if one isn't there
+	// Use defaultGaneshaConfigContents if the ganeshaConfig doesn't exist yet
 	if _, err := os.Stat(ganeshaConfig); os.IsNotExist(err) {
-		read, err := ioutil.ReadFile(defaultGaneshaConfig)
+		err = ioutil.WriteFile(ganeshaConfig, defaultGaneshaConfigContents, 0600)
 		if err != nil {
-			return fmt.Errorf("error reading default ganesha config: %v", err)
-		}
-		err = ioutil.WriteFile(ganeshaConfig, read, 0600)
-		if err != nil {
-			return fmt.Errorf("error writing ganesha config: %v", err)
+			return fmt.Errorf("error writing ganesha config %s: %v", ganeshaConfig, err)
 		}
 	}
 	err := setGracePeriod(ganeshaConfig, gracePeriod)
