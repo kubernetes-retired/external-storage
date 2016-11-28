@@ -300,7 +300,7 @@ func (p *nfsProvisioner) getServer() (string, error) {
 func (p *nfsProvisioner) createDirectory(directory, gid string) error {
 	// TODO quotas
 	path := path.Join(p.exportDir, directory)
-	if _, err := os.Stat(path); err == nil {
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		return fmt.Errorf("error creating volume, the path already exists")
 	}
 
