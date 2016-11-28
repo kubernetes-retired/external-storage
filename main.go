@@ -42,7 +42,7 @@ var (
 	gracePeriod = flag.Uint("grace-period", 90, "NFS Ganesha grace period to use in seconds, from 0-180. If the server is not expected to survive restarts, i.e. it is running as a pod & its export directory is not persisted, this can be set to 0. Can only be set if both run-server and use-ganesha are true. Default 90.")
 )
 
-// TODO validate ganeshaConfig existence, etc! it's passed to server (if run-server) and provisioner.
+const exportDir = "/export"
 const ganeshaConfig = "/export/vfs.conf"
 
 func main() {
@@ -97,7 +97,7 @@ func main() {
 
 	// Create the provisioner: it implements the Provisioner interface expected by
 	// the controller
-	nfsProvisioner := vol.NewNFSProvisioner("/export/", clientset, *useGanesha, ganeshaConfig)
+	nfsProvisioner := vol.NewNFSProvisioner(exportDir, clientset, *useGanesha, ganeshaConfig)
 
 	// Start the provision controller which will dynamically provision NFS PVs
 	pc := controller.NewProvisionController(clientset, 15*time.Second, *provisioner, nfsProvisioner, serverVersion.GitVersion, 5, 10*time.Second, true)

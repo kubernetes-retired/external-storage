@@ -19,6 +19,7 @@ package volume
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"os/exec"
 	"regexp"
 	"strconv"
@@ -55,6 +56,10 @@ type genericExporter struct {
 }
 
 func newGenericExporter(ebc exportBlockCreator, config string, re *regexp.Regexp) *genericExporter {
+	if _, err := os.Stat(config); os.IsNotExist(err) {
+		glog.Fatalf("config %s does not exist!", config)
+	}
+
 	exportIds, err := getExistingExportIds(config, re)
 	if err != nil {
 		glog.Errorf("error while populating exportIds map, there may be errors exporting later if exportIds are reused: %v", err)

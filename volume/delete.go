@@ -19,6 +19,7 @@ package volume
 import (
 	"fmt"
 	"os"
+	"path"
 	"strconv"
 
 	"k8s.io/client-go/pkg/api/v1"
@@ -41,7 +42,7 @@ func (p *nfsProvisioner) Delete(volume *v1.PersistentVolume) error {
 }
 
 func (p *nfsProvisioner) deleteDirectory(volume *v1.PersistentVolume) error {
-	path := fmt.Sprintf(p.exportDir+"%s", volume.ObjectMeta.Name)
+	path := path.Join(p.exportDir, volume.ObjectMeta.Name)
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return fmt.Errorf("Delete called on a volume that doesn't exist, presumably because this provisioner never created it")
 	}
