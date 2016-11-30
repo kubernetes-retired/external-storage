@@ -97,7 +97,7 @@ Edit the `provisioner` argument in the `args` field in `deploy/kube-config/daemo
 Label the chosen nodes to match the `nodeSelector`.
 
 ```
-$ kubectl label node 127.0.0.1 app=matthew-nfs
+$ kubectl label node 127.0.0.1 app=nfs-provisioner
 node "127.0.0.1" labeled
 ```
 
