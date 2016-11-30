@@ -6,10 +6,10 @@ spec:
   template:
     metadata:
       labels:
-        app: matthew-nfs
+        app: nfs-provisioner
     spec:
       nodeSelector:
-        app: matthew-nfs
+        app: nfs-provisioner
       containers:
         - name: nfs-provisioner
           image: wongma7/nfs-provisioner
