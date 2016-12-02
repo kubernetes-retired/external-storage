@@ -53,12 +53,12 @@ import (
 	"reflect"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	rl "k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
-	"k8s.io/kubernetes/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/util/wait"
+	rl "github.com/kubernetes-incubator/nfs-provisioner/leaderelection/resourcelock"
+	"k8s.io/client-go/pkg/api/errors"
+	"k8s.io/client-go/pkg/api/unversioned"
+	"k8s.io/client-go/pkg/apis/componentconfig"
+	"k8s.io/client-go/pkg/util/runtime"
+	"k8s.io/client-go/pkg/util/wait"
 
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"

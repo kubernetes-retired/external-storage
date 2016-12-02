@@ -17,8 +17,8 @@ limitations under the License.
 package resourcelock
 
 import (
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/client-go/pkg/api/unversioned"
+	"k8s.io/client-go/tools/record"
 )
 
 const (
