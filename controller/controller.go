@@ -138,6 +138,7 @@ func NewProvisionController(
 		runningOperations:             goroutinemap.NewGoRoutineMap(exponentialBackOffOnError),
 		createProvisionedPVRetryCount: createProvisionedPVRetryCount,
 		createProvisionedPVInterval:   createProvisionedPVInterval,
+		identity:                      identity,
 	}
 
 	controller.claimSource = &cache.ListWatch{
