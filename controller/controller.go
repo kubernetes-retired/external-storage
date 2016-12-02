@@ -29,6 +29,8 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/storage/v1beta1"
 	"k8s.io/client-go/pkg/runtime"
+	"k8s.io/client-go/pkg/types"
+	"k8s.io/client-go/pkg/util/uuid"
 	"k8s.io/client-go/pkg/version"
 	"k8s.io/client-go/pkg/watch"
 	"k8s.io/client-go/tools/cache"
@@ -95,6 +97,9 @@ type ProvisionController struct {
 
 	// Interval between retries when we create a PV object for a provisioned volume.
 	createProvisionedPVInterval time.Duration
+
+	// Identity of this controller
+	identity types.UID
 }
 
 func NewProvisionController(
@@ -107,15 +112,17 @@ func NewProvisionController(
 	createProvisionedPVInterval time.Duration,
 	exponentialBackOffOnError bool,
 ) *ProvisionController {
+	identity := uuid.NewUUID()
+
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(&core_v1.EventSinkImpl{Interface: client.Core().Events(v1.NamespaceAll)})
 	var eventRecorder record.EventRecorder
 	out, err := exec.Command("hostname").Output()
 	if err != nil {
 		glog.Errorf("Error getting hostname for specifying it as source of events: %v", err)
-		eventRecorder = broadcaster.NewRecorder(v1.EventSource{Component: provisionerName})
+		eventRecorder = broadcaster.NewRecorder(v1.EventSource{Component: fmt.Sprintf("%s %s", provisionerName, string(identity))})
 	} else {
-		eventRecorder = broadcaster.NewRecorder(v1.EventSource{Component: fmt.Sprintf("%s-%s", provisionerName, strings.TrimSpace(string(out)))})
+		eventRecorder = broadcaster.NewRecorder(v1.EventSource{Component: fmt.Sprintf("%s %s %s", provisionerName, strings.TrimSpace(string(out)), string(identity))})
 	}
 
 	gitVersion := version.MustParse(serverGitVersion)
@@ -435,6 +442,8 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 		}
 	} else {
 		glog.Infof("volume %q provisioned for claim %q", volume.Name, claimToClaimKey(claim))
+		msg := fmt.Sprintf("Successfully provisioned volume %s", volume.Name)
+		ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, "ProvisioningSucceeded", msg)
 	}
 }
 
