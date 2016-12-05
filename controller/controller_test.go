@@ -167,7 +167,7 @@ func TestController(t *testing.T) {
 			}
 		}
 		resyncPeriod := 100 * time.Millisecond
-		ctrl := NewProvisionController(client, resyncPeriod, test.provisionerName, test.provisioner, "v1.5.0", 5, 10*time.Millisecond, true)
+		ctrl := NewProvisionController(client, resyncPeriod, test.provisionerName, test.provisioner, "v1.5.0", 5, 10*time.Millisecond, false)
 
 		stopCh := make(chan struct{})
 		go ctrl.Run(stopCh)
@@ -243,7 +243,7 @@ func TestShouldProvision(t *testing.T) {
 		client := fake.NewSimpleClientset(test.claim)
 		resyncPeriod := 100 * time.Millisecond
 		provisioner := newTestProvisioner()
-		ctrl := NewProvisionController(client, resyncPeriod, test.provisionerName, provisioner, "v1.5.0", 5, 10*time.Second, true)
+		ctrl := NewProvisionController(client, resyncPeriod, test.provisionerName, provisioner, "v1.5.0", 5, 10*time.Second, false)
 
 		err := ctrl.classes.Add(test.class)
 		if err != nil {
@@ -314,7 +314,7 @@ func TestShouldDelete(t *testing.T) {
 		client := fake.NewSimpleClientset()
 		resyncPeriod := 100 * time.Millisecond
 		provisioner := newTestProvisioner()
-		ctrl := NewProvisionController(client, resyncPeriod, test.provisionerName, provisioner, test.serverGitVersion, 5, 10*time.Second, true)
+		ctrl := NewProvisionController(client, resyncPeriod, test.provisionerName, provisioner, test.serverGitVersion, 5, 10*time.Second, false)
 
 		should := ctrl.shouldDelete(test.volume)
 		if test.expectedShould != should {
