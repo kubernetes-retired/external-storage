@@ -230,8 +230,7 @@ func (ctrl *ProvisionController) addClaim(obj interface{}) {
 	if ctrl.shouldProvision(claim) {
 		opName := fmt.Sprintf("provision-%s[%s]", claimToClaimKey(claim), string(claim.UID))
 		ctrl.scheduleOperation(opName, func() error {
-			ctrl.provisionClaimOperation(claim)
-			return nil
+			return ctrl.provisionClaimOperation(claim)
 		})
 	}
 }
@@ -254,8 +253,7 @@ func (ctrl *ProvisionController) updateVolume(oldObj, newObj interface{}) {
 	if ctrl.shouldDelete(volume) {
 		opName := fmt.Sprintf("delete-%s[%s]", volume.Name, string(volume.UID))
 		ctrl.scheduleOperation(opName, func() error {
-			ctrl.deleteVolumeOperation(volume)
-			return nil
+			return ctrl.deleteVolumeOperation(volume)
 		})
 	}
 }
@@ -325,7 +323,10 @@ func (ctrl *ProvisionController) shouldDelete(volume *v1.PersistentVolume) bool 
 	return true
 }
 
-func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVolumeClaim) {
+// provisionClaimOperation attempts to provision a volume for the given claim.
+// Returns an error for use by goroutinemap when expbackoff is enabled: if nil,
+// the operation is deleted, else the operation may be retried with expbackoff.
+func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVolumeClaim) error {
 	// Most code here is identical to that found in controller.go of kube's PV controller...
 	claimClass := getClaimClass(claim)
 	glog.Infof("provisionClaimOperation [%s] started, class: %q", claimToClaimKey(claim), claimClass)
@@ -338,7 +339,7 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 	if err == nil && volume != nil {
 		// Volume has been already provisioned, nothing to do.
 		glog.Infof("provisionClaimOperation [%s]: volume already exists, skipping", claimToClaimKey(claim))
-		return
+		return nil
 	}
 
 	// Prepare a claimRef to the claim early (to fail before a volume is
@@ -346,13 +347,13 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 	claimRef, err := v1.GetReference(claim)
 	if err != nil {
 		glog.Errorf("unexpected error getting claim reference: %v", err)
-		return
+		return nil
 	}
 
 	classObj, found, err := ctrl.classes.GetByKey(claimClass)
 	if err != nil {
 		glog.Errorf("Error getting StorageClass %q: %v", claimClass, err)
-		return
+		return nil
 	}
 	if !found {
 		glog.Errorf("StorageClass %q not found", claimClass)
@@ -360,19 +361,19 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 		//    `claim.Annotations["volume.beta.kubernetes.io/storage-class"]`. If not
 		//    found, it SHOULD report an error (by sending an event to the claim) and it
 		//    SHOULD retry periodically with step i.
-		return
+		return nil
 	}
 	storageClass, ok := classObj.(*v1beta1.StorageClass)
 	if !ok {
 		glog.Errorf("Cannot convert object to StorageClass: %+v", classObj)
-		return
+		return nil
 	}
 	if storageClass.Provisioner != ctrl.provisionerName {
 		// class.Provisioner has either changed since shouldProvision() or
 		// annDynamicallyProvisioned contains different provisioner than
 		// class.Provisioner.
 		glog.Errorf("Unknown provisioner %q requested in storage class %q", claimClass, storageClass.Provisioner)
-		return
+		return nil
 	}
 
 	options := VolumeOptions{
@@ -389,7 +390,7 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 		strerr := fmt.Sprintf("Failed to provision volume with StorageClass %q: %v", storageClass.Name, err)
 		glog.Errorf("Failed to provision volume for claim %q with StorageClass %q: %v", claimToClaimKey(claim), claim.Name, err)
 		ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, "ProvisioningFailed", strerr)
-		return
+		return err
 	}
 
 	glog.Infof("volume %q for claim %q created", volume.Name, claimToClaimKey(claim))
@@ -445,9 +446,11 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 		msg := fmt.Sprintf("Successfully provisioned volume %s", volume.Name)
 		ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, "ProvisioningSucceeded", msg)
 	}
+
+	return nil
 }
 
-func (ctrl *ProvisionController) deleteVolumeOperation(volume *v1.PersistentVolume) {
+func (ctrl *ProvisionController) deleteVolumeOperation(volume *v1.PersistentVolume) error {
 	glog.Infof("deleteVolumeOperation [%s] started", volume.Name)
 
 	// This method may have been waiting for a volume lock for some time.
@@ -457,18 +460,18 @@ func (ctrl *ProvisionController) deleteVolumeOperation(volume *v1.PersistentVolu
 	newVolume, err := ctrl.client.Core().PersistentVolumes().Get(volume.Name)
 	if err != nil {
 		glog.Infof("error reading peristent volume %q: %v", volume.Name, err)
-		return
+		return nil
 	}
 	if !ctrl.shouldDelete(newVolume) {
 		glog.Infof("volume %q no longer needs deletion, skipping", volume.Name)
-		return
+		return nil
 	}
 
 	if err := ctrl.provisioner.Delete(volume); err != nil {
 		// Delete failed, emit an event.
 		glog.Infof("deletion of volume %q failed: %v", volume.Name, err)
 		ctrl.eventRecorder.Event(volume, v1.EventTypeWarning, "VolumeFailedDelete", err.Error())
-		return
+		return err
 	}
 
 	glog.Infof("deleteVolumeOperation [%s]: success", volume.Name)
@@ -477,10 +480,10 @@ func (ctrl *ProvisionController) deleteVolumeOperation(volume *v1.PersistentVolu
 		// Oops, could not delete the volume and therefore the controller will
 		// try to delete the volume again on next update.
 		glog.Infof("failed to delete volume %q from database: %v", volume.Name, err)
-		return
+		return nil
 	}
 
-	return
+	return nil
 }
 
 // getProvisionedVolumeNameForClaim returns PV.Name for the provisioned volume.
