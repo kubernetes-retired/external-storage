@@ -14,38 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package leaderelection implements leader election of a set of endpoints.
-// It uses an annotation in the endpoints object to store the record of the
-// election state.
-//
-// This implementation does not guarantee that only one client is acting as a
-// leader (a.k.a. fencing). A client observes timestamps captured locally to
-// infer the state of the leader election. Thus the implementation is tolerant
-// to arbitrary clock skew, but is not tolerant to arbitrary clock skew rate.
-//
-// However the level of tolerance to skew rate can be configured by setting
-// RenewDeadline and LeaseDuration appropriately. The tolerance expressed as a
-// maximum tolerated ratio of time passed on the fastest node to time passed on
-// the slowest node can be approximately achieved with a configuration that sets
-// the same ratio of LeaseDuration to RenewDeadline. For example if a user wanted
-// to tolerate some nodes progressing forward in time twice as fast as other nodes,
-// the user could set LeaseDuration to 60 seconds and RenewDeadline to 30 seconds.
-//
-// While not required, some method of clock synchronization between nodes in the
-// cluster is highly recommended. It's important to keep in mind when configuring
-// this client that the tolerance to skew rate varies inversely to master
-// availability.
-//
-// Larger clusters often have a more lenient SLA for API latency. This should be
-// taken into account when configuring the client. The rate of leader transitions
-// should be monitored and RetryPeriod and LeaseDuration should be increased
-// until the rate is stable and acceptably low. It's important to keep in mind
-// when configuring this client that the tolerance to API latency varies inversely
-// to master availability.
-//
-// DISCLAIMER: this is an alpha API. This library will likely change significantly
-// or even be removed entirely in subsequent releases. Depend on this API at
-// your own risk.
+// This is a modified version of kube's leaderelection package which uses a
+// dummy endpoints object & its annotation as a lock. Here a pvc is used and
+// the lock is to help ensure only one provisioner (the leader) is trying to
+// provision a volume for the pvc at a time. So the election lasts only until
+// the task is completed. Adds also a 'TermLimit.'
+// https://github.com/kubernetes/kubernetes/tree/release-1.5/pkg/client/leaderelection
+
 package leaderelection
 
 import (
@@ -53,15 +28,13 @@ import (
 	"reflect"
 	"time"
 
-	rl "github.com/kubernetes-incubator/nfs-provisioner/leaderelection/resourcelock"
+	rl "github.com/kubernetes-incubator/nfs-provisioner/controller/leaderelection/resourcelock"
 	"k8s.io/client-go/pkg/api/errors"
 	"k8s.io/client-go/pkg/api/unversioned"
-	"k8s.io/client-go/pkg/apis/componentconfig"
 	"k8s.io/client-go/pkg/util/runtime"
 	"k8s.io/client-go/pkg/util/wait"
 
 	"github.com/golang/glog"
-	"github.com/spf13/pflag"
 )
 
 const (
@@ -69,9 +42,10 @@ const (
 	DefaultLeaseDuration = 15 * time.Second
 	DefaultRenewDeadline = 10 * time.Second
 	DefaultRetryPeriod   = 2 * time.Second
+	DefaultTermLimit     = 30 * time.Second
 )
 
-// NewLeadereElector creates a LeaderElector from a LeaderElecitionConfig
+// NewLeaderElector creates a LeaderElector from a LeaderElecitionConfig
 func NewLeaderElector(lec LeaderElectionConfig) (*LeaderElector, error) {
 	if lec.LeaseDuration <= lec.RenewDeadline {
 		return nil, fmt.Errorf("leaseDuration must be greater than renewDeadline")
@@ -101,6 +75,10 @@ type LeaderElectionConfig struct {
 	// RetryPeriod is the duration the LeaderElector clients should wait
 	// between tries of actions.
 	RetryPeriod time.Duration
+	// TermLimit is the maximum duration that a leader may remain the leader
+	// to complete the task before it must give up its leadership. 0 for forever
+	// or indefinite.
+	TermLimit time.Duration
 
 	// Callbacks are callbacks that are triggered during certain lifecycle
 	// events of the LeaderElector
@@ -140,26 +118,24 @@ type LeaderElector struct {
 }
 
 // Run starts the leader election loop
-func (le *LeaderElector) Run() {
+func (le *LeaderElector) Run(task <-chan bool) {
 	defer func() {
 		runtime.HandleCrash()
 		le.config.Callbacks.OnStoppedLeading()
 	}()
-	le.acquire()
+	over := le.acquire(task)
+	if over {
+		return
+	}
 	stop := make(chan struct{})
 	go le.config.Callbacks.OnStartedLeading(stop)
-	le.renew()
+	timeout := make(chan bool, 1)
+	go func() {
+		time.Sleep(le.config.TermLimit)
+		timeout <- true
+	}()
+	le.renew(task, timeout)
 	close(stop)
-}
-
-// RunOrDie starts a client with the provided config or panics if the config
-// fails to validate.
-func RunOrDie(lec LeaderElectionConfig) {
-	le, err := NewLeaderElector(lec)
-	if err != nil {
-		panic(err)
-	}
-	le.Run()
 }
 
 // GetLeader returns the identity of the last observed leader or returns the empty string if
@@ -173,27 +149,63 @@ func (le *LeaderElector) IsLeader() bool {
 	return le.observedRecord.HolderIdentity == le.config.Lock.Identity()
 }
 
-// acquire loops calling tryAcquireOrRenew and returns immediately when tryAcquireOrRenew succeeds.
-func (le *LeaderElector) acquire() {
+// acquire loops calling tryAcquireOrRenew and returns immediately when tryAcquireOrRenew succeeds
+// or the task has successfully finished in which case there is no longer a need to acquire
+func (le *LeaderElector) acquire(task <-chan bool) bool {
+	over := false
 	stop := make(chan struct{})
 	wait.JitterUntil(func() {
+		select {
+		case taskSucceeded := <-task:
+			if taskSucceeded {
+				// if the leader succeeded at the task, stop trying to acquire
+				desc := le.config.Lock.Describe()
+				glog.Infof("stopped trying to acquire lease %v, task succeeded", desc)
+				over = true
+				close(stop)
+				return
+			}
+		default:
+		}
 		succeeded := le.tryAcquireOrRenew()
 		le.maybeReportTransition()
 		desc := le.config.Lock.Describe()
 		if !succeeded {
-			glog.V(4).Infof("failed to renew lease %v", desc)
+			glog.V(4).Infof("failed to acquire lease %v", desc)
 			return
 		}
 		le.config.Lock.RecordEvent("became leader")
 		glog.Infof("sucessfully acquired lease %v", desc)
 		close(stop)
 	}, le.config.RetryPeriod, JitterFactor, true, stop)
+
+	return over
 }
 
-// renew loops calling tryAcquireOrRenew and returns immediately when tryAcquireOrRenew fails.
-func (le *LeaderElector) renew() {
+// renew loops calling tryAcquireOrRenew and returns immediately when tryAcquireOrRenew fails
+// or the task has either succeeded or failed in which case leadership must be given up
+func (le *LeaderElector) renew(task <-chan bool, timeout <-chan bool) {
 	stop := make(chan struct{})
 	wait.Until(func() {
+		select {
+		case taskSucceeded := <-task:
+			// if the leader (us) either succeeded or failed at the task, stop trying to renew
+			desc := le.config.Lock.Describe()
+			taskSucceededStr := "succeeded"
+			if !taskSucceeded {
+				taskSucceededStr = "failed"
+			}
+			glog.Infof("stopped trying to renew lease %v, task %s", desc, taskSucceededStr)
+			close(stop)
+			return
+		case <-timeout:
+			// our term limit has ended, let somebody else have a try
+			desc := le.config.Lock.Describe()
+			glog.Infof("stopped trying to renew lease %v, timeout reached", desc)
+			close(stop)
+			return
+		default:
+		}
 		err := wait.Poll(le.config.RetryPeriod, le.config.RenewDeadline, func() (bool, error) {
 			return le.tryAcquireOrRenew(), nil
 		})
@@ -274,34 +286,4 @@ func (l *LeaderElector) maybeReportTransition() {
 	if l.config.Callbacks.OnNewLeader != nil {
 		go l.config.Callbacks.OnNewLeader(l.reportedLeader)
 	}
-}
-
-func DefaultLeaderElectionConfiguration() componentconfig.LeaderElectionConfiguration {
-	return componentconfig.LeaderElectionConfiguration{
-		LeaderElect:   false,
-		LeaseDuration: unversioned.Duration{Duration: DefaultLeaseDuration},
-		RenewDeadline: unversioned.Duration{Duration: DefaultRenewDeadline},
-		RetryPeriod:   unversioned.Duration{Duration: DefaultRetryPeriod},
-	}
-}
-
-// BindFlags binds the common LeaderElectionCLIConfig flags to a flagset
-func BindFlags(l *componentconfig.LeaderElectionConfiguration, fs *pflag.FlagSet) {
-	fs.BoolVar(&l.LeaderElect, "leader-elect", l.LeaderElect, ""+
-		"Start a leader election client and gain leadership before "+
-		"executing the main loop. Enable this when running replicated "+
-		"components for high availability.")
-	fs.DurationVar(&l.LeaseDuration.Duration, "leader-elect-lease-duration", l.LeaseDuration.Duration, ""+
-		"The duration that non-leader candidates will wait after observing a leadership "+
-		"renewal until attempting to acquire leadership of a led but unrenewed leader "+
-		"slot. This is effectively the maximum duration that a leader can be stopped "+
-		"before it is replaced by another candidate. This is only applicable if leader "+
-		"election is enabled.")
-	fs.DurationVar(&l.RenewDeadline.Duration, "leader-elect-renew-deadline", l.RenewDeadline.Duration, ""+
-		"The interval between attempts by the acting master to renew a leadership slot "+
-		"before it stops leading. This must be less than or equal to the lease duration. "+
-		"This is only applicable if leader election is enabled.")
-	fs.DurationVar(&l.RetryPeriod.Duration, "leader-elect-retry-period", l.RetryPeriod.Duration, ""+
-		"The duration the clients should wait between attempting acquisition and renewal "+
-		"of a leadership. This is only applicable if leader election is enabled.")
 }
