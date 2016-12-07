@@ -18,18 +18,28 @@ package controller
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
+	"strconv"
+	"sync"
 	"testing"
 	"time"
 
 	"k8s.io/client-go/kubernetes/fake"
+	fakev1core "k8s.io/client-go/kubernetes/typed/core/v1/fake"
 	"k8s.io/client-go/pkg/api/resource"
 	"k8s.io/client-go/pkg/api/testapi"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/storage/v1beta1"
+	"k8s.io/client-go/pkg/conversion"
 	"k8s.io/client-go/pkg/runtime"
 	"k8s.io/client-go/pkg/types"
 	testclient "k8s.io/client-go/testing"
+	fcache "k8s.io/client-go/tools/cache/testing"
+)
+
+const (
+	resyncPeriod = 100 * time.Millisecond
 )
 
 func TestController(t *testing.T) {
@@ -168,6 +178,9 @@ func TestController(t *testing.T) {
 		}
 		resyncPeriod := 100 * time.Millisecond
 		ctrl := NewProvisionController(client, resyncPeriod, test.provisionerName, test.provisioner, "v1.5.0", 5, 10*time.Millisecond, false)
+		ctrl.leaseDuration = 2 * resyncPeriod
+		ctrl.renewDeadline = resyncPeriod
+		ctrl.retryPeriod = 50 * time.Millisecond
 
 		stopCh := make(chan struct{})
 		go ctrl.Run(stopCh)
@@ -181,6 +194,71 @@ func TestController(t *testing.T) {
 			t.Errorf("expected PVs:\n %v\n but got:\n %v\n", test.expectedVolumes, pvList.Items)
 		}
 		close(stopCh)
+	}
+}
+
+// TODO watches don't work...
+func TestMultipleControllers(t *testing.T) {
+	tests := []struct {
+		name            string
+		objs            []runtime.Object
+		provisionerName string
+		numControllers  int
+		numClaims       int
+		expectedCalls   int
+	}{
+		{
+			name:            "call provision exactly once",
+			objs:            []runtime.Object{},
+			provisionerName: "foo.bar/baz",
+			numControllers:  5,
+			numClaims:       1,
+			expectedCalls:   1,
+		},
+	}
+	for _, test := range tests {
+		client := fake.NewSimpleClientset(test.objs...)
+
+		// Create a reactor to reject Updates if object has already been modified,
+		// like etcd.
+		claimSource := fcache.NewFakePVCControllerSource()
+		reactor := claimReactor{
+			fake:        &fakev1core.FakeCoreV1{Fake: &client.Fake},
+			claims:      make(map[string]*v1.PersistentVolumeClaim),
+			lock:        sync.Mutex{},
+			claimSource: claimSource,
+		}
+		reactor.claims["claim-1"] = newClaim("claim-1", "uid-1-1", "class-1", "", nil)
+		client.PrependReactor("update", "persistentvolumeclaims", reactor.React)
+		client.PrependReactor("get", "persistentvolumeclaims", reactor.React)
+
+		provisioner := newTestProvisioner()
+		ctrls := make([]*ProvisionController, test.numControllers)
+		stopChs := make([]chan struct{}, test.numControllers)
+		for i := 0; i < test.numControllers; i++ {
+			ctrls[i] = NewProvisionController(client, 15*time.Second, test.provisionerName, provisioner, "v1.5.0", 5, 10*time.Millisecond, false)
+			ctrls[i].claimSource = claimSource
+			ctrls[i].claims.Add(newClaim("claim-1", "uid-1-1", "class-1", "", nil))
+			ctrls[i].classes.Add(newStorageClass("class-1", "foo.bar/baz"))
+
+			stopChs[i] = make(chan struct{})
+		}
+
+		for i := 0; i < test.numControllers; i++ {
+			go ctrls[i].addClaim(newClaim("claim-1", "uid-1-1", "class-1", "", nil))
+		}
+
+		// Sleep for 3 election retry periods
+		time.Sleep(3 * ctrls[0].retryPeriod)
+
+		if test.expectedCalls != len(provisioner.provisionCalls) {
+			t.Logf("test case: %s", test.name)
+			t.Errorf("expected provision calls:\n %v\n but got:\n %v\n", test.expectedCalls, len(provisioner.provisionCalls))
+		}
+
+		for _, stopCh := range stopChs {
+			close(stopCh)
+		}
 	}
 }
 
@@ -244,6 +322,9 @@ func TestShouldProvision(t *testing.T) {
 		resyncPeriod := 100 * time.Millisecond
 		provisioner := newTestProvisioner()
 		ctrl := NewProvisionController(client, resyncPeriod, test.provisionerName, provisioner, "v1.5.0", 5, 10*time.Second, false)
+		ctrl.leaseDuration = 2 * resyncPeriod
+		ctrl.renewDeadline = resyncPeriod
+		ctrl.retryPeriod = 50 * time.Millisecond
 
 		err := ctrl.classes.Add(test.class)
 		if err != nil {
@@ -315,6 +396,9 @@ func TestShouldDelete(t *testing.T) {
 		resyncPeriod := 100 * time.Millisecond
 		provisioner := newTestProvisioner()
 		ctrl := NewProvisionController(client, resyncPeriod, test.provisionerName, provisioner, test.serverGitVersion, 5, 10*time.Second, false)
+		ctrl.leaseDuration = 2 * resyncPeriod
+		ctrl.renewDeadline = resyncPeriod
+		ctrl.retryPeriod = 50 * time.Millisecond
 
 		should := ctrl.shouldDelete(test.volume)
 		if test.expectedShould != should {
@@ -337,9 +421,9 @@ func newClaim(name, claimUID, provisioner, volumeName string, annotations map[st
 	claim := &v1.PersistentVolumeClaim{
 		ObjectMeta: v1.ObjectMeta{
 			Name:            name,
-			Namespace:       "default",
+			Namespace:       v1.NamespaceDefault,
 			UID:             types.UID(claimUID),
-			ResourceVersion: "1",
+			ResourceVersion: "0",
 			Annotations:     map[string]string{annClass: provisioner},
 			SelfLink:        testapi.Default.SelfLink("pvc", ""),
 		},
@@ -416,16 +500,26 @@ func newProvisionedVolume(storageClass *v1beta1.StorageClass, claim *v1.Persiste
 	return volume
 }
 
-func newTestProvisioner() Provisioner {
-	return &testProvisioner{}
+func newTestProvisioner() *testProvisioner {
+	return &testProvisioner{make(chan bool, 16)}
 }
 
 type testProvisioner struct {
+	provisionCalls chan bool
 }
 
 var _ Provisioner = &testProvisioner{}
 
 func (p *testProvisioner) Provision(options VolumeOptions) (*v1.PersistentVolume, error) {
+	p.provisionCalls <- true
+
+	// Sleep to simulate work done by Provision...for long enough that
+	// TestMultipleControllers will consistently fail with lock disabled. If
+	// Provision happens too fast, the first controller creates the PV too soon
+	// and the next controllers won't call Provision even though they're clearly
+	// racing
+	time.Sleep(50 * time.Millisecond)
+
 	pv := &v1.PersistentVolume{
 		ObjectMeta: v1.ObjectMeta{
 			Name: options.PVName,
@@ -468,4 +562,57 @@ func (p *badTestProvisioner) Provision(options VolumeOptions) (*v1.PersistentVol
 
 func (p *badTestProvisioner) Delete(volume *v1.PersistentVolume) error {
 	return errors.New("fake error")
+}
+
+type claimReactor struct {
+	fake        *fakev1core.FakeCoreV1
+	claims      map[string]*v1.PersistentVolumeClaim
+	lock        sync.Mutex
+	claimSource *fcache.FakePVCControllerSource
+}
+
+func (r *claimReactor) React(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	switch {
+	case action.Matches("update", "persistentvolumeclaims"):
+		obj := action.(testclient.UpdateAction).GetObject()
+
+		claim := obj.(*v1.PersistentVolumeClaim)
+
+		// Check and bump object version
+		storedClaim, found := r.claims[claim.Name]
+		if found {
+			storedVer, _ := strconv.Atoi(storedClaim.ResourceVersion)
+			requestedVer, _ := strconv.Atoi(claim.ResourceVersion)
+			if storedVer != requestedVer {
+				return true, obj, errors.New("VersionError")
+			}
+			claim.ResourceVersion = strconv.Itoa(storedVer + 1)
+		} else {
+			return true, nil, fmt.Errorf("Cannot update claim %s: claim not found", claim.Name)
+		}
+
+		r.claims[claim.Name] = claim
+		r.claimSource.Modify(claim)
+		return true, claim, nil
+	case action.Matches("get", "persistentvolumeclaims"):
+		name := action.(testclient.GetAction).GetName()
+		claim, found := r.claims[name]
+		if found {
+			clone, err := conversion.NewCloner().DeepCopy(claim)
+			if err != nil {
+				return true, nil, fmt.Errorf("Error cloning claim %s: %v", name, err)
+			}
+			claimClone, ok := clone.(*v1.PersistentVolumeClaim)
+			if !ok {
+				return true, nil, fmt.Errorf("Error casting clone of claim %s: %v", name, claimClone)
+			}
+			return true, claimClone, nil
+		} else {
+			return true, nil, fmt.Errorf("Cannot find claim %s", name)
+		}
+	}
+
+	return false, nil, nil
 }

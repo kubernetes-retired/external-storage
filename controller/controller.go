@@ -490,7 +490,7 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 	volume, err = ctrl.provisioner.Provision(options)
 	if err != nil {
 		strerr := fmt.Sprintf("Failed to provision volume with StorageClass %q: %v", storageClass.Name, err)
-		glog.Errorf("Failed to provision volume for claim %q with StorageClass %q: %v", claimToClaimKey(claim), claim.Name, err)
+		glog.Errorf("Failed to provision volume for claim %q with StorageClass %q: %v", claimToClaimKey(claim), storageClass.Name, err)
 		ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, "ProvisioningFailed", strerr)
 		return err
 	}
@@ -560,7 +560,7 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 func (ctrl *ProvisionController) watchProvisioning(claim *v1.PersistentVolumeClaim) (bool, error) {
 	stopChannel := make(chan struct{})
 	defer close(stopChannel)
-	pvcCh, err := ctrl.watchPVC(claim.Name, claim.Namespace, stopChannel)
+	pvcCh, err := ctrl.watchPVC(claim.Name, claim.Namespace, claim.ResourceVersion, stopChannel)
 	if err != nil {
 		glog.Infof("cannot start watcher for PVC %s/%s: %v", claim.Namespace, claim.Name, err)
 		return false, err
@@ -608,11 +608,12 @@ func (ctrl *ProvisionController) watchProvisioning(claim *v1.PersistentVolumeCla
 }
 
 // watchPVC returns a watch on the given PVC and events involving it
-func (ctrl *ProvisionController) watchPVC(name, namespace string, stopChannel chan struct{}) (<-chan watch.Event, error) {
+func (ctrl *ProvisionController) watchPVC(name, namespace, resourceVersion string, stopChannel chan struct{}) (<-chan watch.Event, error) {
 	pvcSelector, _ := fields.ParseSelector("metadata.name=" + name)
 	options := api.ListOptions{
-		FieldSelector: pvcSelector,
-		Watch:         true,
+		FieldSelector:   pvcSelector,
+		Watch:           true,
+		ResourceVersion: resourceVersion,
 	}
 
 	pvcWatch, err := ctrl.claimSource.Watch(options)
