@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	fakev1core "k8s.io/client-go/kubernetes/typed/core/v1/fake"
 	"k8s.io/client-go/pkg/api/resource"
@@ -177,12 +178,7 @@ func TestController(t *testing.T) {
 				client.Fake.PrependReactor(v, "persistentvolumes", test.reaction)
 			}
 		}
-		resyncPeriod := 100 * time.Millisecond
-		ctrl := NewProvisionController(client, resyncPeriod, test.provisionerName, test.provisioner, "v1.5.0", 5, 10*time.Millisecond, false)
-		ctrl.leaseDuration = 2 * resyncPeriod
-		ctrl.renewDeadline = resyncPeriod
-		ctrl.retryPeriod = 50 * time.Millisecond
-
+		ctrl := newTestProvisionController(client, resyncPeriod, test.provisionerName, test.provisioner, "v1.5.0", false)
 		stopCh := make(chan struct{})
 		go ctrl.Run(stopCh)
 
@@ -245,7 +241,8 @@ func TestMultipleControllers(t *testing.T) {
 		ctrls := make([]*ProvisionController, test.numControllers)
 		stopChs := make([]chan struct{}, test.numControllers)
 		for i := 0; i < test.numControllers; i++ {
-			ctrls[i] = NewProvisionController(client, 15*time.Second, test.provisionerName, provisioner, "v1.5.0", 5, 10*time.Millisecond, false)
+			ctrls[i] = NewProvisionController(client, 15*time.Second, test.provisionerName, provisioner, "v1.5.0", false)
+			ctrls[i].createProvisionedPVInterval = 10 * time.Millisecond
 			ctrls[i].claimSource = claimSource
 			ctrls[i].claims.Add(newClaim("claim-1", "uid-1-1", "class-1", "", nil))
 			ctrls[i].classes.Add(newStorageClass("class-1", "foo.bar/baz"))
@@ -327,12 +324,8 @@ func TestShouldProvision(t *testing.T) {
 	}
 	for _, test := range tests {
 		client := fake.NewSimpleClientset(test.claim)
-		resyncPeriod := 100 * time.Millisecond
 		provisioner := newTestProvisioner()
-		ctrl := NewProvisionController(client, resyncPeriod, test.provisionerName, provisioner, "v1.5.0", 5, 10*time.Second, false)
-		ctrl.leaseDuration = 2 * resyncPeriod
-		ctrl.renewDeadline = resyncPeriod
-		ctrl.retryPeriod = 50 * time.Millisecond
+		ctrl := newTestProvisionController(client, resyncPeriod, test.provisionerName, provisioner, "v1.5.0", false)
 
 		err := ctrl.classes.Add(test.class)
 		if err != nil {
@@ -401,12 +394,8 @@ func TestShouldDelete(t *testing.T) {
 	}
 	for _, test := range tests {
 		client := fake.NewSimpleClientset()
-		resyncPeriod := 100 * time.Millisecond
 		provisioner := newTestProvisioner()
-		ctrl := NewProvisionController(client, resyncPeriod, test.provisionerName, provisioner, test.serverGitVersion, 5, 10*time.Second, false)
-		ctrl.leaseDuration = 2 * resyncPeriod
-		ctrl.renewDeadline = resyncPeriod
-		ctrl.retryPeriod = 50 * time.Millisecond
+		ctrl := newTestProvisionController(client, resyncPeriod, test.provisionerName, provisioner, test.serverGitVersion, false)
 
 		should := ctrl.shouldDelete(test.volume)
 		if test.expectedShould != should {
@@ -414,6 +403,23 @@ func TestShouldDelete(t *testing.T) {
 			t.Errorf("expected should delete %v but got %v\n", test.expectedShould, should)
 		}
 	}
+}
+
+func newTestProvisionController(
+	client kubernetes.Interface,
+	resyncPeriod time.Duration,
+	provisionerName string,
+	provisioner Provisioner,
+	serverGitVersion string,
+	exponentialBackOffOnError bool,
+) *ProvisionController {
+	ctrl := NewProvisionController(client, resyncPeriod, provisionerName, provisioner, serverGitVersion, exponentialBackOffOnError)
+	ctrl.createProvisionedPVInterval = 10 * time.Millisecond
+	ctrl.leaseDuration = 2 * ctrl.resyncPeriod
+	ctrl.renewDeadline = ctrl.resyncPeriod
+	ctrl.retryPeriod = ctrl.resyncPeriod / 2
+	ctrl.termLimit = 2 * ctrl.resyncPeriod
+	return ctrl
 }
 
 func newStorageClass(name, provisioner string) *v1beta1.StorageClass {

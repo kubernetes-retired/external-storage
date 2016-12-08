@@ -60,6 +60,12 @@ const annDynamicallyProvisioned = "pv.kubernetes.io/provisioned-by"
 
 const annStorageProvisioner = "volume.beta.kubernetes.io/storage-provisioner"
 
+// Number of retries when we create a PV object for a provisioned volume.
+const createProvisionedPVRetryCount = 5
+
+// Interval between retries when we create a PV object for a provisioned volume.
+const createProvisionedPVInterval = 10 * time.Second
+
 // ProvisionController is a controller that provisions PersistentVolumes for
 // PersistentVolumeClaims.
 type ProvisionController struct {
@@ -112,7 +118,7 @@ type ProvisionController struct {
 	identity types.UID
 
 	// Parameters of LeaderElectionConfig: set to defaults except in tests
-	leaseDuration, renewDeadline, retryPeriod time.Duration
+	leaseDuration, renewDeadline, retryPeriod, termLimit time.Duration
 
 	// Map of claim UID to LeaderElector: for checking if this controller
 	// is the leader of a given claim
@@ -127,8 +133,6 @@ func NewProvisionController(
 	provisionerName string,
 	provisioner Provisioner,
 	serverGitVersion string,
-	createProvisionedPVRetryCount int,
-	createProvisionedPVInterval time.Duration,
 	exponentialBackOffOnError bool,
 ) *ProvisionController {
 	identity := uuid.NewUUID()
@@ -162,6 +166,7 @@ func NewProvisionController(
 		leaseDuration:                 leaderelection.DefaultLeaseDuration,
 		renewDeadline:                 leaderelection.DefaultRenewDeadline,
 		retryPeriod:                   leaderelection.DefaultRetryPeriod,
+		termLimit:                     leaderelection.DefaultTermLimit,
 		leaderElectors:                make(map[types.UID]*leaderelection.LeaderElector),
 		mapMutex:                      &sync.Mutex{},
 	}
@@ -379,8 +384,7 @@ func (ctrl *ProvisionController) lockProvisionClaimOperation(claim *v1.Persisten
 		LeaseDuration: ctrl.leaseDuration,
 		RenewDeadline: ctrl.renewDeadline,
 		RetryPeriod:   ctrl.retryPeriod,
-		// The provisioner has 2 resyncPeriods to report success/failure via event
-		TermLimit: ctrl.resyncPeriod * 2,
+		TermLimit:     ctrl.termLimit,
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(_ <-chan struct{}) {
 				opName := fmt.Sprintf("provision-%s[%s]", claimToClaimKey(claim), string(claim.UID))

@@ -100,7 +100,7 @@ func main() {
 	nfsProvisioner := vol.NewNFSProvisioner(exportDir, clientset, *useGanesha, ganeshaConfig)
 
 	// Start the provision controller which will dynamically provision NFS PVs
-	pc := controller.NewProvisionController(clientset, 15*time.Second, *provisioner, nfsProvisioner, serverVersion.GitVersion, 5, 10*time.Second, false)
+	pc := controller.NewProvisionController(clientset, 15*time.Second, *provisioner, nfsProvisioner, serverVersion.GitVersion, false)
 	pc.Run(wait.NeverStop)
 }
 
