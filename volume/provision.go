@@ -301,7 +301,7 @@ func (p *nfsProvisioner) createDirectory(directory, gid string) error {
 	// TODO quotas
 	path := path.Join(p.exportDir, directory)
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
-		return fmt.Errorf("error creating volume, the path already exists")
+		return fmt.Errorf("the path already exists")
 	}
 
 	perm := os.FileMode(0777)
@@ -310,7 +310,7 @@ func (p *nfsProvisioner) createDirectory(directory, gid string) error {
 		perm = os.FileMode(0071)
 	}
 	if err := os.MkdirAll(path, perm); err != nil {
-		return fmt.Errorf("error creating dir for volume: %v", err)
+		return err
 	}
 	// Due to umask, need to chmod
 	cmd := exec.Command("chmod", strconv.FormatInt(int64(perm), 8), path)
