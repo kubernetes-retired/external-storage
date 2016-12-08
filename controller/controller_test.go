@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/pkg/conversion"
 	"k8s.io/client-go/pkg/runtime"
 	"k8s.io/client-go/pkg/types"
+	"k8s.io/client-go/pkg/watch"
 	testclient "k8s.io/client-go/testing"
 	fcache "k8s.io/client-go/tools/cache/testing"
 )
@@ -197,11 +198,9 @@ func TestController(t *testing.T) {
 	}
 }
 
-// TODO watches don't work...
 func TestMultipleControllers(t *testing.T) {
 	tests := []struct {
 		name            string
-		objs            []runtime.Object
 		provisionerName string
 		numControllers  int
 		numClaims       int
@@ -209,7 +208,6 @@ func TestMultipleControllers(t *testing.T) {
 	}{
 		{
 			name:            "call provision exactly once",
-			objs:            []runtime.Object{},
 			provisionerName: "foo.bar/baz",
 			numControllers:  5,
 			numClaims:       1,
@@ -217,7 +215,7 @@ func TestMultipleControllers(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		client := fake.NewSimpleClientset(test.objs...)
+		client := fake.NewSimpleClientset()
 
 		// Create a reactor to reject Updates if object has already been modified,
 		// like etcd.
@@ -232,6 +230,17 @@ func TestMultipleControllers(t *testing.T) {
 		client.PrependReactor("update", "persistentvolumeclaims", reactor.React)
 		client.PrependReactor("get", "persistentvolumeclaims", reactor.React)
 
+		// Create a fake watch so each controller can get ProvisioningSucceeded
+		fakeWatch := watch.NewFakeWithChanSize(test.numControllers, false)
+		client.PrependWatchReactor("events", testclient.DefaultWatchReactor(fakeWatch, nil))
+		client.PrependReactor("create", "events", func(action testclient.Action) (bool, runtime.Object, error) {
+			obj := action.(testclient.CreateAction).GetObject()
+			for i := 0; i < test.numControllers; i++ {
+				fakeWatch.Add(obj)
+			}
+			return true, obj, nil
+		})
+
 		provisioner := newTestProvisioner()
 		ctrls := make([]*ProvisionController, test.numControllers)
 		stopChs := make([]chan struct{}, test.numControllers)
@@ -240,7 +249,6 @@ func TestMultipleControllers(t *testing.T) {
 			ctrls[i].claimSource = claimSource
 			ctrls[i].claims.Add(newClaim("claim-1", "uid-1-1", "class-1", "", nil))
 			ctrls[i].classes.Add(newStorageClass("class-1", "foo.bar/baz"))
-
 			stopChs[i] = make(chan struct{})
 		}
 
@@ -517,7 +525,7 @@ func (p *testProvisioner) Provision(options VolumeOptions) (*v1.PersistentVolume
 	// TestMultipleControllers will consistently fail with lock disabled. If
 	// Provision happens too fast, the first controller creates the PV too soon
 	// and the next controllers won't call Provision even though they're clearly
-	// racing
+	// racing when there's no lock
 	time.Sleep(50 * time.Millisecond)
 
 	pv := &v1.PersistentVolume{

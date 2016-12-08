@@ -412,7 +412,7 @@ func (ctrl *ProvisionController) lockProvisionClaimOperation(claim *v1.Persisten
 		success, err := ctrl.watchProvisioning(claim)
 		if err != nil {
 			glog.Errorf("error watching success or failure of provisioning, can't provision for claim %q: %v", claimToClaimKey(claim), err)
-			task <- false
+			task <- true
 			return
 		}
 		task <- success
@@ -583,15 +583,17 @@ func (ctrl *ProvisionController) watchProvisioning(claim *v1.PersistentVolumeCla
 			glog.V(4).Infof("claim update received: %s %s/%s %s", event.Type, claim.Namespace, claim.Name, claim.Status.Phase)
 			switch event.Type {
 			case watch.Added, watch.Modified:
-				if claim.Status.Phase == v1.ClaimBound {
+				if claim.Spec.VolumeName != "" {
 					return true, nil
+				} else if !ctrl.shouldProvision(claim) {
+					return true, fmt.Errorf("pvc was modified to not ask for this provisioner")
 				}
 
 			case watch.Deleted:
-				return false, fmt.Errorf("pvc was deleted")
+				return true, fmt.Errorf("pvc was deleted")
 
 			case watch.Error:
-				return false, fmt.Errorf("pvc watcher failed")
+				return true, fmt.Errorf("pvc watcher failed")
 			default:
 			}
 		case *v1.Event:
