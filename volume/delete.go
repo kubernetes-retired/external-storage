@@ -47,7 +47,7 @@ func (p *nfsProvisioner) deleteDirectory(volume *v1.PersistentVolume) error {
 		return fmt.Errorf("Delete called on a volume that doesn't exist, presumably because this provisioner never created it")
 	}
 	if err := os.RemoveAll(path); err != nil {
-		return fmt.Errorf("error deleting backing path: %v", err)
+		return err
 	}
 
 	return nil
