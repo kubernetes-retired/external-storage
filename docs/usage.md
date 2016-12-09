@@ -53,8 +53,6 @@ $ kubectl get pv
 
 Note that deleting or stopping a provisioner won't delete the `PersistentVolume` objects it created. 
 
-And due to an issue in kubernetes 1.4, deleting or stopping a provisioner while pods have shares mounted, then deleting one of those pods, can wedge the kubelet because the kubelet will not be able to unmount the shares while the provisioner is down. In kubernetes 1.5, this scenario is fixed, but restarting the kubelet while a provisioner is serving shares can still wedge the kubelet. See the [issue here](https://github.com/kubernetes/kubernetes/issues/31272)
-
 If at any point things don't work correctly, check the provisioner's logs using `kubectl logs` and look for events in the PVs and PVCs using `kubectl describe`.
 
 ### Using as default
