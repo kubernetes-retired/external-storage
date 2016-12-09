@@ -237,10 +237,10 @@ func (p *nfsProvisioner) getServer() (string, error) {
 	if serviceName == "" {
 		nodeName := os.Getenv(p.nodeEnv)
 		if nodeName == "" {
-			glog.Infof("service env %s isn't set, using `hostname -i`/pod IP %s as server IP", p.serviceEnv, fallbackServer)
+			glog.Infof("service env %s isn't set and neither is node env %s, using `hostname -i`/pod IP %s as NFS server IP", p.serviceEnv, p.nodeEnv, fallbackServer)
 			return fallbackServer, nil
 		}
-		glog.Infof("service env %s isn't set and node env %s is, using node name %s as server IP", p.serviceEnv, p.nodeEnv, nodeName)
+		glog.Infof("service env %s isn't set and node env %s is, using node name %s as NFS server IP", p.serviceEnv, p.nodeEnv, nodeName)
 		return nodeName, nil
 	}
 

@@ -154,6 +154,7 @@ func (le *LeaderElector) IsLeader() bool {
 func (le *LeaderElector) acquire(task <-chan bool) bool {
 	over := false
 	stop := make(chan struct{})
+	glog.Infof("attempting to acquire leader lease...")
 	wait.JitterUntil(func() {
 		select {
 		case taskSucceeded := <-task:
@@ -256,7 +257,7 @@ func (le *LeaderElector) tryAcquireOrRenew() bool {
 	}
 	if le.observedTime.Add(le.config.LeaseDuration).After(now.Time) &&
 		oldLeaderElectionRecord.HolderIdentity != le.config.Lock.Identity() {
-		glog.Infof("lock is held by %v and has not yet expired", oldLeaderElectionRecord.HolderIdentity)
+		glog.V(4).Infof("lock is held by %v and has not yet expired", oldLeaderElectionRecord.HolderIdentity)
 		return false
 	}
 
