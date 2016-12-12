@@ -162,12 +162,12 @@ func TestCreateVolume(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error creating file %s: %v", conf, err)
 	}
-	p := newNFSProvisionerInternal(tmpDir+"/", client, &testExporter{config: conf})
+	p := newNFSProvisionerInternal(tmpDir+"/", client, &testExporter{config: conf}, newDummyQuotaer())
 
 	for _, test := range tests {
 		os.Setenv(test.envKey, "1.1.1.1")
 
-		server, path, supGroup, block, exportId, err := p.createVolume(test.options)
+		server, path, supGroup, block, exportId, _, _, err := p.createVolume(test.options)
 
 		evaluate(t, test.name, test.expectError, err, test.expectedServer, server, "server")
 		evaluate(t, test.name, test.expectError, err, test.expectedPath, path, "path")
@@ -247,7 +247,7 @@ func TestValidateOptions(t *testing.T) {
 	}
 
 	client := fake.NewSimpleClientset()
-	p := newNFSProvisionerInternal(tmpDir+"/", client, &testExporter{})
+	p := newNFSProvisionerInternal(tmpDir+"/", client, &testExporter{}, newDummyQuotaer())
 
 	for _, test := range tests {
 		gid, err := p.validateOptions(test.options)
@@ -306,7 +306,7 @@ func TestCreateDirectory(t *testing.T) {
 	}
 
 	client := fake.NewSimpleClientset()
-	p := newNFSProvisionerInternal(tmpDir+"/", client, &testExporter{})
+	p := newNFSProvisionerInternal(tmpDir+"/", client, &testExporter{}, newDummyQuotaer())
 
 	for _, test := range tests {
 		path := p.exportDir + test.directory
@@ -411,7 +411,7 @@ func TestGetConfigExportIds(t *testing.T) {
 			t.Errorf("Error writing file %s: %v", conf, err)
 		}
 
-		exportIds, err := getExistingExportIds(conf, test.re)
+		exportIds, err := getExistingIds(conf, test.re)
 
 		evaluate(t, test.name, test.expectError, err, test.expectedExportIds, exportIds, "export ids")
 	}
@@ -546,7 +546,7 @@ func TestGetServer(t *testing.T) {
 		}
 
 		client := fake.NewSimpleClientset(test.objs...)
-		p := newNFSProvisionerInternal(tmpDir+"/", client, &testExporter{})
+		p := newNFSProvisionerInternal(tmpDir+"/", client, &testExporter{}, newDummyQuotaer())
 
 		server, err := p.getServer()
 

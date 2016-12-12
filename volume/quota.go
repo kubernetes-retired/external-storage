@@ -111,8 +111,6 @@ func newXfsQuotaer(xfsPath string) (*xfsQuotaer, error) {
 	return xfsQuotaer, nil
 }
 
-// TODO fix tests, docs (run with --privileged, mount with -o, blah blah)
-// // TODO test creatingg, deleting, creating another. quotas still work? id
 func isXfs(xfsPath string) (bool, error) {
 	cmd := exec.Command("stat", "-f", "-c", "%T", xfsPath)
 	out, err := cmd.Output()
