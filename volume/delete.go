@@ -22,13 +22,26 @@ import (
 	"path"
 	"strconv"
 
+	"github.com/kubernetes-incubator/nfs-provisioner/controller"
 	"k8s.io/client-go/pkg/api/v1"
 )
 
 // Delete removes the directory that was created by Provision backing the given
-// PV.
+// PV and removes its export from the NFS server.
 func (p *nfsProvisioner) Delete(volume *v1.PersistentVolume) error {
-	err := p.deleteDirectory(volume)
+	// Ignore the call if this provisioner was not the one to provision the
+	// volume. It doesn't even attempt to delete it, so it's neither a success
+	// (nil error) nor failure (any other error)
+	provisioned, err := p.provisioned(volume)
+	if err != nil {
+		return fmt.Errorf("error determining if this provisioner was the one to provision volume %q: %v", volume.Name, err)
+	}
+	if !provisioned {
+		strerr := fmt.Sprintf("this provisioner id %s didn't provision volume %q and so can't delete it; id %s did & can", p.identity, volume.Name, volume.Annotations[annProvisionerId])
+		return &controller.IgnoredError{strerr}
+	}
+
+	err = p.deleteDirectory(volume)
 	if err != nil {
 		return fmt.Errorf("error deleting volume's backing path: %v", err)
 	}
@@ -41,10 +54,19 @@ func (p *nfsProvisioner) Delete(volume *v1.PersistentVolume) error {
 	return nil
 }
 
+func (p *nfsProvisioner) provisioned(volume *v1.PersistentVolume) (bool, error) {
+	provisionerId, ok := volume.Annotations[annProvisionerId]
+	if !ok {
+		return false, fmt.Errorf("PV doesn't have an annotation %s", annProvisionerId)
+	}
+
+	return provisionerId == string(p.identity), nil
+}
+
 func (p *nfsProvisioner) deleteDirectory(volume *v1.PersistentVolume) error {
 	path := path.Join(p.exportDir, volume.ObjectMeta.Name)
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return fmt.Errorf("Delete called on a volume that doesn't exist, presumably because this provisioner never created it")
+		return nil
 	}
 	if err := os.RemoveAll(path); err != nil {
 		return err

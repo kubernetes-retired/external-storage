@@ -17,6 +17,8 @@ limitations under the License.
 package controller
 
 import (
+	"fmt"
+
 	"k8s.io/client-go/pkg/api/resource"
 	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/api/v1"
@@ -32,7 +34,21 @@ type Provisioner interface {
 	Provision(VolumeOptions) (*v1.PersistentVolume, error)
 	// Delete removes the storage asset that was created by Provision backing the
 	// given PV. Does not delete the PV object itself.
+	//
+	// May return IgnoredError to indicate that the call has been ignored and no
+	// action taken. In case multiple provisioners are serving the same storage
+	// class, provisioners may ignore PVs they are not responsible for (e.g. ones
+	// they didn't create). The controller will act accordingly, i.e. it won't
+	// emit a misleading VolumeFailedDelete event.
 	Delete(*v1.PersistentVolume) error
+}
+
+type IgnoredError struct {
+	Reason string
+}
+
+func (e *IgnoredError) Error() string {
+	return fmt.Sprintf("ignored because %s", e.Reason)
 }
 
 // VolumeOptions contains option information about a volume

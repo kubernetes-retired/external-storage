@@ -18,6 +18,7 @@ package volume
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
@@ -30,12 +31,17 @@ import (
 	"github.com/kubernetes-incubator/nfs-provisioner/controller"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/pkg/types"
+	"k8s.io/client-go/pkg/util/uuid"
 )
 
 const (
-	// VolumeGidAnnotationKey is the key of the annotation on the PersistentVolume
-	// object that specifies a supplemental GID.
-	VolumeGidAnnotationKey = "pv.beta.kubernetes.io/gid"
+	// Name of the file where an nfsProvisioner will store its identity
+	identityFile = "nfs-provisioner.identity"
+
+	// are we allowed to set this? else make up our own
+	annCreatedBy = "kubernetes.io/createdby"
+	createdBy    = "nfs-dynamic-provisioner"
 
 	// A PV annotation for the entire ganesha EXPORT block or /etc/exports
 	// block, needed for deletion.
@@ -46,9 +52,12 @@ const (
 	// map so the id can be reassigned.
 	annExportId = "Export_Id"
 
-	// are we allowed to set this? else make up our own
-	annCreatedBy = "kubernetes.io/createdby"
-	createdBy    = "nfs-dynamic-provisioner"
+	// VolumeGidAnnotationKey is the key of the annotation on the PersistentVolume
+	// object that specifies a supplemental GID.
+	VolumeGidAnnotationKey = "pv.beta.kubernetes.io/gid"
+
+	// A PV annotation for the identity of the nfsProvisioner that provisioned it
+	annProvisionerId = "Provisioner_Id"
 
 	podIPEnv     = "POD_IP"
 	serviceEnv   = "SERVICE_NAME"
@@ -71,10 +80,27 @@ func newNFSProvisionerInternal(exportDir string, client kubernetes.Interface, ex
 		glog.Fatalf("exportDir %s does not exist!", exportDir)
 	}
 
+	var identity types.UID
+	identityPath := path.Join(exportDir, identityFile)
+	if _, err := os.Stat(identityPath); os.IsNotExist(err) {
+		identity = uuid.NewUUID()
+		err := ioutil.WriteFile(identityPath, []byte(identity), 0600)
+		if err != nil {
+			glog.Fatalf("Error writing identity file %s! %v", identityPath, err)
+		}
+	} else {
+		read, err := ioutil.ReadFile(identityPath)
+		if err != nil {
+			glog.Fatalf("Error reading identity file %s! %v", identityPath, err)
+		}
+		identity = types.UID(strings.TrimSpace(string(read)))
+	}
+
 	provisioner := &nfsProvisioner{
 		exportDir:    exportDir,
 		client:       client,
 		exporter:     exporter,
+		identity:     identity,
 		podIPEnv:     podIPEnv,
 		serviceEnv:   serviceEnv,
 		namespaceEnv: namespaceEnv,
@@ -94,6 +120,10 @@ type nfsProvisioner struct {
 
 	// The exporter to use for exporting NFS shares
 	exporter exporter
+
+	// Identity of this nfsProvisioner, generated & persisted to exportDir or
+	// recovered from there. Used to mark provisioned PVs
+	identity types.UID
 
 	// Environment variables the provisioner pod needs valid values for in order to
 	// put a service cluster IP as the server of provisioned NFS PVs, passed in
@@ -121,6 +151,7 @@ func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 	if supGroup != 0 {
 		annotations[VolumeGidAnnotationKey] = strconv.FormatUint(supGroup, 10)
 	}
+	annotations[annProvisionerId] = string(p.identity)
 
 	pv := &v1.PersistentVolume{
 		ObjectMeta: v1.ObjectMeta{
