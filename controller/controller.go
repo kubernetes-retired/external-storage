@@ -114,7 +114,6 @@ type ProvisionController struct {
 	createProvisionedPVInterval time.Duration
 
 	// Identity of this controller, generated at creation time.
-	// TODO persist an identity, annotate on pvs, use for whether to call delete
 	identity types.UID
 
 	// Parameters of LeaderElectionConfig: set to defaults except in tests
@@ -241,7 +240,7 @@ func NewProvisionController(
 }
 
 func (ctrl *ProvisionController) Run(stopCh <-chan struct{}) {
-	glog.Info("Starting nfs provisioner controller %s!", string(ctrl.identity))
+	glog.Infof("Starting nfs provisioner controller %s!", string(ctrl.identity))
 	go ctrl.claimController.Run(stopCh)
 	go ctrl.volumeController.Run(stopCh)
 	go ctrl.classReflector.RunUntil(stopCh)
@@ -683,10 +682,16 @@ func (ctrl *ProvisionController) deleteVolumeOperation(volume *v1.PersistentVolu
 	}
 
 	if err := ctrl.provisioner.Delete(volume); err != nil {
-		// Delete failed, emit an event.
-		glog.Errorf("Deletion of volume %q failed: %v", volume.Name, err)
-		ctrl.eventRecorder.Event(volume, v1.EventTypeWarning, "VolumeFailedDelete", err.Error())
-		return err
+		if ierr, ok := err.(*IgnoredError); ok {
+			// Delete ignored, do nothing and hope another provisioner will delete it.
+			glog.Infof("deletion of volume %q ignored: %v", volume.Name, ierr)
+			return nil
+		} else {
+			// Delete failed, emit an event.
+			glog.Errorf("Deletion of volume %q failed: %v", volume.Name, err)
+			ctrl.eventRecorder.Event(volume, v1.EventTypeWarning, "VolumeFailedDelete", err.Error())
+			return err
+		}
 	}
 
 	glog.Infof("volume %q deleted", volume.Name)
