@@ -97,7 +97,7 @@ func main() {
 
 	// Create the provisioner: it implements the Provisioner interface expected by
 	// the controller
-	nfsProvisioner := vol.NewNFSProvisioner(exportDir, clientset, *useGanesha, ganeshaConfig)
+	nfsProvisioner := vol.NewNFSProvisioner(exportDir, clientset, *useGanesha, ganeshaConfig, true)
 
 	// Start the provision controller which will dynamically provision NFS PVs
 	pc := controller.NewProvisionController(clientset, 15*time.Second, *provisioner, nfsProvisioner, serverVersion.GitVersion, false)

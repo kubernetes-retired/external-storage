@@ -30,6 +30,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/nfs-provisioner/controller"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/pkg/api/resource"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/types"
 	"k8s.io/client-go/pkg/util/uuid"
@@ -45,12 +46,17 @@ const (
 
 	// A PV annotation for the entire ganesha EXPORT block or /etc/exports
 	// block, needed for deletion.
-	annBlock = "EXPORT_block"
-
+	annExportBlock = "EXPORT_block"
 	// A PV annotation for the exportId of this PV's backing ganesha/kernel export
 	// , needed for ganesha deletion and used for deleting the entry in exportIds
 	// map so the id can be reassigned.
 	annExportId = "Export_Id"
+
+	// A PV annotation for the project quota info block, needed for quota
+	// deletion.
+	annProjectBlock = "Project_block"
+	// A PV annotation for the project quota id, needed for quota deletion
+	annProjectId = "Project_Id"
 
 	// VolumeGidAnnotationKey is the key of the annotation on the PersistentVolume
 	// object that specifies a supplemental GID.
@@ -65,17 +71,27 @@ const (
 	nodeEnv      = "NODE_NAME"
 )
 
-func NewNFSProvisioner(exportDir string, client kubernetes.Interface, useGanesha bool, ganeshaConfig string) controller.Provisioner {
+func NewNFSProvisioner(exportDir string, client kubernetes.Interface, useGanesha bool, ganeshaConfig string, enableXfsQuota bool) controller.Provisioner {
 	var exporter exporter
 	if useGanesha {
 		exporter = newGaneshaExporter(ganeshaConfig)
 	} else {
 		exporter = newKernelExporter()
 	}
-	return newNFSProvisionerInternal(exportDir, client, exporter)
+	var quotaer quotaer
+	var err error
+	if enableXfsQuota {
+		quotaer, err = newXfsQuotaer(exportDir)
+		if err != nil {
+			glog.Fatalf("Error creating xfs quotaer! %v", err)
+		}
+	} else {
+		quotaer = newDummyQuotaer()
+	}
+	return newNFSProvisionerInternal(exportDir, client, exporter, quotaer)
 }
 
-func newNFSProvisionerInternal(exportDir string, client kubernetes.Interface, exporter exporter) *nfsProvisioner {
+func newNFSProvisionerInternal(exportDir string, client kubernetes.Interface, exporter exporter, quotaer quotaer) *nfsProvisioner {
 	if _, err := os.Stat(exportDir); os.IsNotExist(err) {
 		glog.Fatalf("exportDir %s does not exist!", exportDir)
 	}
@@ -100,6 +116,7 @@ func newNFSProvisionerInternal(exportDir string, client kubernetes.Interface, ex
 		exportDir:    exportDir,
 		client:       client,
 		exporter:     exporter,
+		quotaer:      quotaer,
 		identity:     identity,
 		podIPEnv:     podIPEnv,
 		serviceEnv:   serviceEnv,
@@ -121,6 +138,9 @@ type nfsProvisioner struct {
 	// The exporter to use for exporting NFS shares
 	exporter exporter
 
+	// The quotaer to use for setting per-share/directory/project quotas
+	quotaer quotaer
+
 	// Identity of this nfsProvisioner, generated & persisted to exportDir or
 	// recovered from there. Used to mark provisioned PVs
 	identity types.UID
@@ -139,15 +159,17 @@ var _ controller.Provisioner = &nfsProvisioner{}
 // Provision creates a volume i.e. the storage asset and returns a PV object for
 // the volume.
 func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.PersistentVolume, error) {
-	server, path, supGroup, block, exportId, err := p.createVolume(options)
+	server, path, supGroup, exportBlock, exportId, projectBlock, projectId, err := p.createVolume(options)
 	if err != nil {
 		return nil, err
 	}
 
 	annotations := make(map[string]string)
 	annotations[annCreatedBy] = createdBy
+	annotations[annExportBlock] = exportBlock
 	annotations[annExportId] = strconv.FormatUint(uint64(exportId), 10)
-	annotations[annBlock] = block
+	annotations[annProjectBlock] = projectBlock
+	annotations[annProjectId] = strconv.FormatUint(uint64(projectId), 10)
 	if supGroup != 0 {
 		annotations[VolumeGidAnnotationKey] = strconv.FormatUint(supGroup, 10)
 	}
@@ -182,31 +204,38 @@ func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 // directory under /export and exports it. Returns the server IP, the path, a
 // zero/non-zero supplemental group, the block it added to either the ganesha
 // config or /etc/exports, and the exportId
-func (p *nfsProvisioner) createVolume(options controller.VolumeOptions) (string, string, uint64, string, uint16, error) {
+// TODO return values
+func (p *nfsProvisioner) createVolume(options controller.VolumeOptions) (string, string, uint64, string, uint16, string, uint16, error) {
 	gid, err := p.validateOptions(options)
 	if err != nil {
-		return "", "", 0, "", 0, fmt.Errorf("error validating options for volume: %v", err)
+		return "", "", 0, "", 0, "", 0, fmt.Errorf("error validating options for volume: %v", err)
 	}
 
 	server, err := p.getServer()
 	if err != nil {
-		return "", "", 0, "", 0, fmt.Errorf("error getting NFS server IP for volume: %v", err)
+		return "", "", 0, "", 0, "", 0, fmt.Errorf("error getting NFS server IP for volume: %v", err)
 	}
 
 	path := path.Join(p.exportDir, options.PVName)
 
 	err = p.createDirectory(options.PVName, gid)
 	if err != nil {
-		return "", "", 0, "", 0, fmt.Errorf("error creating directory for volume: %v", err)
+		return "", "", 0, "", 0, "", 0, fmt.Errorf("error creating directory for volume: %v", err)
 	}
 
-	block, exportId, err := p.createExport(options.PVName)
+	exportBlock, exportId, err := p.createExport(options.PVName)
 	if err != nil {
 		os.RemoveAll(path)
-		return "", "", 0, "", 0, fmt.Errorf("error creating export for volume: %v", err)
+		return "", "", 0, "", 0, "", 0, fmt.Errorf("error creating export for volume: %v", err)
 	}
 
-	return server, path, 0, block, exportId, nil
+	projectBlock, projectId, err := p.createQuota(options.PVName, options.Capacity)
+	if err != nil {
+		os.RemoveAll(path)
+		return "", "", 0, "", 0, "", 0, fmt.Errorf("error creating quota for volume: %v", err)
+	}
+
+	return server, path, 0, exportBlock, exportId, projectBlock, projectId, nil
 }
 
 func (p *nfsProvisioner) validateOptions(options controller.VolumeOptions) (string, error) {
@@ -365,7 +394,7 @@ func (p *nfsProvisioner) createDirectory(directory, gid string) error {
 }
 
 // createExport creates the export by adding a block to the appropriate config
-// file and exporting it, using the appropriate method.
+// file and exporting it
 func (p *nfsProvisioner) createExport(directory string) (string, uint16, error) {
 	path := path.Join(p.exportDir, directory)
 
@@ -381,4 +410,25 @@ func (p *nfsProvisioner) createExport(directory string) (string, uint16, error) 
 	}
 
 	return block, exportId, nil
+}
+
+// createQuota creates a quota for the directory by adding a project to
+// represent the directory and setting a quota on it
+func (p *nfsProvisioner) createQuota(directory string, capacity resource.Quantity) (string, uint16, error) {
+	path := path.Join(p.exportDir, directory)
+
+	limit := strconv.FormatInt(capacity.Value(), 10)
+
+	block, projectId, err := p.quotaer.AddProject(path, limit)
+	if err != nil {
+		return "", 0, fmt.Errorf("error adding project for path %s: %v", path, err)
+	}
+
+	err = p.quotaer.SetQuota(projectId, path, limit)
+	if err != nil {
+		p.quotaer.RemoveProject(block, projectId)
+		return "", 0, fmt.Errorf("error setting quota for path %s: %v", path, err)
+	}
+
+	return block, projectId, nil
 }
