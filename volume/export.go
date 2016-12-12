@@ -18,12 +18,10 @@ package volume
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"regexp"
 	"strconv"
-	"strings"
 	"sync"
 
 	"github.com/golang/glog"
@@ -60,7 +58,7 @@ func newGenericExporter(ebc exportBlockCreator, config string, re *regexp.Regexp
 		glog.Fatalf("config %s does not exist!", config)
 	}
 
-	exportIds, err := getExistingExportIds(config, re)
+	exportIds, err := getExistingIds(config, re)
 	if err != nil {
 		glog.Errorf("error while populating exportIds map, there may be errors exporting later if exportIds are reused: %v", err)
 	}
@@ -71,33 +69,6 @@ func newGenericExporter(ebc exportBlockCreator, config string, re *regexp.Regexp
 		mapMutex:  &sync.Mutex{},
 		fileMutex: &sync.Mutex{},
 	}
-}
-
-// getExistingExportIds populates an exportIds map with pre-existing exportIds
-// found in the given config file. Takes as argument the regex it should use to
-// find each exportId in the file i.e. Export_Id or fsid.
-func getExistingExportIds(config string, re *regexp.Regexp) (map[uint16]bool, error) {
-	exportIds := map[uint16]bool{}
-
-	digitsRe := "([0-9]+)"
-	if !strings.Contains(re.String(), digitsRe) {
-		return exportIds, fmt.Errorf("regexp %s doesn't contain digits submatch %s", re.String(), digitsRe)
-	}
-
-	read, err := ioutil.ReadFile(config)
-	if err != nil {
-		return exportIds, err
-	}
-
-	allMatches := re.FindAllSubmatch(read, -1)
-	for _, match := range allMatches {
-		digits := match[1]
-		if id, err := strconv.ParseUint(string(digits), 10, 16); err == nil {
-			exportIds[uint16(id)] = true
-		}
-	}
-
-	return exportIds, nil
 }
 
 func (e *genericExporter) AddExportBlock(path string) (string, uint16, error) {
