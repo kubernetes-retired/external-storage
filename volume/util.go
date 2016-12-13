@@ -17,9 +17,12 @@ limitations under the License.
 package volume
 
 import (
+	"fmt"
 	"io/ioutil"
 	"math"
 	"os"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -42,6 +45,32 @@ func deleteId(mutex *sync.Mutex, ids map[uint16]bool, id uint16) {
 	mutex.Lock()
 	delete(ids, id)
 	mutex.Unlock()
+}
+
+// getExistingIds populates a map with existing ids found in the given config
+// file using the given regexp. Regexp must have a "digits" submatch.
+func getExistingIds(config string, re *regexp.Regexp) (map[uint16]bool, error) {
+	ids := map[uint16]bool{}
+
+	digitsRe := "([0-9]+)"
+	if !strings.Contains(re.String(), digitsRe) {
+		return ids, fmt.Errorf("regexp %s doesn't contain digits submatch %s", re.String(), digitsRe)
+	}
+
+	read, err := ioutil.ReadFile(config)
+	if err != nil {
+		return ids, err
+	}
+
+	allMatches := re.FindAllSubmatch(read, -1)
+	for _, match := range allMatches {
+		digits := match[1]
+		if id, err := strconv.ParseUint(string(digits), 10, 16); err == nil {
+			ids[uint16(id)] = true
+		}
+	}
+
+	return ids, nil
 }
 
 func addToFile(mutex *sync.Mutex, path string, toAdd string) error {

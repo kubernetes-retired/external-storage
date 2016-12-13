@@ -51,6 +51,11 @@ func (p *nfsProvisioner) Delete(volume *v1.PersistentVolume) error {
 		return fmt.Errorf("deleted the volume's backing path but error deleting export: %v", err)
 	}
 
+	err = p.deleteQuota(volume)
+	if err != nil {
+		return fmt.Errorf("deleted the volume's backing path & export but error deleting quota: %v", err)
+	}
+
 	return nil
 }
 
@@ -76,24 +81,50 @@ func (p *nfsProvisioner) deleteDirectory(volume *v1.PersistentVolume) error {
 }
 
 func (p *nfsProvisioner) deleteExport(volume *v1.PersistentVolume) error {
-	exportIdStr, ok := volume.Annotations[annExportId]
-	if !ok {
-		return fmt.Errorf("PV doesn't have an annotation %s, can't remove the export from the config file", annExportId)
-	}
-	exportId, _ := strconv.ParseUint(exportIdStr, 10, 16)
-	block, ok := volume.Annotations[annBlock]
-	if !ok {
-		return fmt.Errorf("PV doesn't have an annotation %s, can't remove the export from the config file", annBlock)
+	block, exportId, err := getBlockAndId(volume, annExportBlock, annExportId)
+	if err != nil {
+		return fmt.Errorf("error getting block &/or id from annotations: %v", err)
 	}
 
 	if err := p.exporter.RemoveExportBlock(block, uint16(exportId)); err != nil {
 		return fmt.Errorf("error removing the export from the config file: %v", err)
 	}
 
-	err := p.exporter.Unexport(volume)
-	if err != nil {
+	if err := p.exporter.Unexport(volume); err != nil {
 		return fmt.Errorf("removed export from the config file but error unexporting it: %v", err)
 	}
 
 	return nil
+}
+
+func (p *nfsProvisioner) deleteQuota(volume *v1.PersistentVolume) error {
+	block, projectId, err := getBlockAndId(volume, annProjectBlock, annProjectId)
+	if err != nil {
+		return fmt.Errorf("error getting block &/or id from annotations: %v", err)
+	}
+
+	if err := p.quotaer.RemoveProject(block, uint16(projectId)); err != nil {
+		return fmt.Errorf("error removing the quota project from the projects file: %v", err)
+	}
+
+	if err := p.quotaer.UnsetQuota(); err != nil {
+		return fmt.Errorf("removed quota project from the project file but error unsetting the quota: %v", err)
+	}
+
+	return nil
+}
+
+func getBlockAndId(volume *v1.PersistentVolume, annBlock, annId string) (string, uint16, error) {
+	block, ok := volume.Annotations[annBlock]
+	if !ok {
+		return "", 0, fmt.Errorf("PV doesn't have an annotation with key %s", annBlock)
+	}
+
+	idStr, ok := volume.Annotations[annId]
+	if !ok {
+		return "", 0, fmt.Errorf("PV doesn't have an annotation %s", annId)
+	}
+	id, _ := strconv.ParseUint(idStr, 10, 16)
+
+	return block, uint16(id), nil
 }

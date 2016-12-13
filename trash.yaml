@@ -9,6 +9,7 @@ github.com/coreos/go-oidc	5a7f09a
 github.com/coreos/pkg	v3-2-g447b7ec
 github.com/davecgh/go-spew	v1.1.0
 github.com/docker/distribution	v2.6.0-rc.1-4-g7694c31
+github.com/docker/docker	docs-v1.12.0-rc4-2016-07-15-3908-gab65ac6
 github.com/emicklei/go-restful	v1.2-92-g858e58f
 github.com/fsnotify/fsnotify	v1.4.2-2-gfd9ec7d
 github.com/ghodss/yaml	bea76d6
