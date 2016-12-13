@@ -58,9 +58,7 @@ Create the pod.
 $ kubectl create -f deploy/kube-config/pod.yaml
 pod "nfs-provisioner" created
 ```
-
 or
-
 ```
 $ kubectl create -f deploy/kube-config/pod_emptydir.yaml
 pod "nfs-provisioner" created
@@ -117,27 +115,39 @@ Run nfs-provisioner with `provisioner` equal to the name you decided on, and one
 ```
 $ docker run --cap-add DAC_READ_SEARCH -v $HOME/.kube:/.kube:Z wongma7/nfs-provisioner:latest -provisioner=matthew/nfs -kubeconfig=/.kube/config
 ```
-
 or
-
 ```
 $ docker run --cap-add DAC_READ_SEARCH wongma7/nfs-provisioner:latest -provisioner=matthew/nfs -master=http://172.17.0.1:8080
 ```
 
+You may want to create & mount a Docker volume at `/export` in the container. The `/export` directory is where the provisioner stores its provisioned `PersistentVolumes'` data, so by mounting a volume there, you specify it as the backing storage for provisioned PVs. The volume can then be reused by another container if the original container stops. Without Kubernetes you will have to manage the lifecycle yourself. You should give the container a stable IP somehow so that it can survive a restart to continue serving the shares in the volume.
+
+You may also want to enable per-PV quota enforcement. It is based on xfs project level quotas and so requires that the volume mounted at `/export` be xfs mounted with the prjquota/pquota option. It also requires that it has the privilege to run `xfs_quota`.
+
+With the two above options, the run command will look something like this.
+
+```
+$ docker run --privileged -v $HOME/.kube:/.kube:Z -v /xfs:/export:Z wongma7/nfs-provisioner:latest -provisioner=matthew/nfs -kubeconfig=/.kube/config -enable-xfs-quota=true
+```
+
 ### Outside of Kubernetes - binary
 
-Running nfs-provisioner in this way allows it to manipulate exports directly on the host machine. It runs assuming the host is already running either NFS Ganesha or a kernel NFS server, depending on how the `use-ganesha` flag is set. Use with caution.
+Running nfs-provisioner in this way allows it to manipulate exports directly on the host machine. It will create & store all its data at `/export` so ensure the directory exists and is available for use. It runs assuming the host is already running either NFS Ganesha or a kernel NFS server, depending on how the `use-ganesha` flag is set. Use with caution.
 
 Run nfs-provisioner with `provisioner` equal to the name you decided on, one of `master` or `kubeconfig` set, `run-server` set false, and `use-ganesha` set according to how the NFS server is running on the host. It probably needs to be run as root. 
 
 ```
 $ sudo ./nfs-provisioner -provisioner=matthew/nfs -kubeconfig=$HOME/.kube/config -run-server=false -use-ganesha=false
 ```
-
 or
-
 ```
 $ sudo ./nfs-provisioner -provisioner=matthew/nfs -master=http://0.0.0.0:8080 -run-server=false -use-ganesha=false
+```
+
+You may want to enable per-PV quota enforcement. It is based on xfs project level quotas and so requires that the volume mounted at `/export` be xfs mounted with the prjquota/pquota option. Add the `-enable-xfs-quota=true` argument to enable it.
+
+```
+$ sudo ./nfs-provisioner -provisioner=matthew/nfs -kubeconfig=$HOME/.kube/config -run-server=false -use-ganesha=false -enable-xfs-quota=true
 ```
 
 ---
