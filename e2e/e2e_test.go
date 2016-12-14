@@ -191,19 +191,8 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 			By("scaling the deployment down to 0 then back to 1")
 			// err = framework.ScaleDeployment(c, ns, deployment.Name, 0, false)
 			// Expect(err).NotTo(HaveOccurred())
-			deployment, err = c.Extensions().Deployments(ns).Get(deployment.Name)
-			Expect(err).NotTo(HaveOccurred())
-			replicas := int32(0)
-			deployment.Spec.Replicas = &replicas
-			deployment, err = c.Extensions().Deployments(ns).Update(deployment)
-			framework.ExpectNoError(framework.WaitForDeploymentPodsRunning(c, ns, deployment.Name))
-
-			deployment, err = c.Extensions().Deployments(ns).Get(deployment.Name)
-			Expect(err).NotTo(HaveOccurred())
-			replicas = int32(1)
-			deployment.Spec.Replicas = &replicas
-			deployment, err = c.Extensions().Deployments(ns).Update(deployment)
-			framework.ExpectNoError(framework.WaitForDeploymentPodsRunning(c, ns, deployment.Name))
+			scaleDeployment(c, ns, deployment.Name, 0)
+			scaleDeployment(c, ns, deployment.Name, 1)
 
 			testRead(c, claim)
 			testDelete(c, claim, pv)
@@ -391,6 +380,7 @@ func startProvisionerDeployment(c clientset.Interface, ns string) (*v1.Service, 
 		Expect(err).NotTo(HaveOccurred())
 	}
 	deployment.Spec.Template.Spec.Volumes[0].HostPath.Path = tmpDir
+	deployment.Spec.Template.Spec.Containers[0].Image = "wongma7/nfs-provisioner:latest"
 	deployment.Spec.Template.Spec.Containers[0].Args = []string{
 		fmt.Sprintf("-provisioner=%s", pluginName),
 		"-grace-period=10",
@@ -460,4 +450,16 @@ func deployFromManifest(fileName string) *extensions.Deployment {
 	Expect(runtime.DecodeInto(api.Codecs.UniversalDecoder(), json, &deployment)).NotTo(HaveOccurred())
 
 	return &deployment
+}
+
+func scaleDeployment(c clientset.Interface, ns, name string, newSize int32) {
+	deployment, err := c.Extensions().Deployments(ns).Get(name)
+	Expect(err).NotTo(HaveOccurred())
+	deployment.Spec.Replicas = &newSize
+	updatedDeployment, err := c.Extensions().Deployments(ns).Update(deployment)
+	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(framework.WaitForDeploymentPodsRunning(c, ns, updatedDeployment.Name))
+	// Above is not enough. Just sleep to prevent conflict when doing Update.
+	// kubectl Scaler would be ideal. or WaitForDeploymentStatus
+	time.Sleep(5 * time.Second)
 }
