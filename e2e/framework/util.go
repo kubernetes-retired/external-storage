@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/fields"
+	"k8s.io/client-go/pkg/labels"
 	"k8s.io/client-go/pkg/master/ports"
 	"k8s.io/client-go/pkg/runtime"
 	"k8s.io/client-go/pkg/util/sets"
@@ -861,4 +862,70 @@ func getKubeletPods(c clientset.Interface, node, resource string) (*v1.PodList, 
 		return &v1.PodList{}, err
 	}
 	return result, nil
+}
+
+func WaitForPodToDisappear(c clientset.Interface, ns, podName string, label labels.Selector, interval, timeout time.Duration) error {
+	return wait.PollImmediate(interval, timeout, func() (bool, error) {
+		Logf("Waiting for pod %s to disappear", podName)
+		options := v1.ListOptions{LabelSelector: label.String()}
+		pods, err := c.Core().Pods(ns).List(options)
+		if err != nil {
+			return false, err
+		}
+		found := false
+		for _, pod := range pods.Items {
+			if pod.Name == podName {
+				Logf("Pod %s still exists", podName)
+				found = true
+				break
+			}
+		}
+		if !found {
+			Logf("Pod %s no longer exists", podName)
+			return true, nil
+		}
+		return false, nil
+	})
+}
+
+func WaitForDeploymentPodsRunning(c clientset.Interface, ns, name string) error {
+	deployment, err := c.Extensions().Deployments(ns).Get(name)
+	if err != nil {
+		return err
+	}
+	selector := labels.SelectorFromSet(labels.Set(deployment.Spec.Selector.MatchLabels))
+	err = WaitForPodsWithLabelRunning(c, ns, selector)
+	if err != nil {
+		return fmt.Errorf("Error while waiting for Deployment %s pods to be running: %v", name, err)
+	}
+	return nil
+}
+
+// Wait up to 1 minute for all matching pods to become Running and at least one
+// matching pod exists.
+func WaitForPodsWithLabelRunning(c clientset.Interface, ns string, label labels.Selector) error {
+	running := false
+	options := v1.ListOptions{LabelSelector: label.String()}
+	podClient := c.Core().Pods(ns)
+waitLoop:
+	for start := time.Now(); time.Since(start) < 1*time.Minute; time.Sleep(5 * time.Second) {
+		pods, err := podClient.List(options)
+		if err != nil {
+			continue waitLoop
+		}
+		if len(pods.Items) == 0 {
+			continue waitLoop
+		}
+		for _, p := range pods.Items {
+			if p.Status.Phase != v1.PodRunning {
+				continue waitLoop
+			}
+		}
+		running = true
+		break
+	}
+	if !running {
+		return fmt.Errorf("Timeout while waiting for pods with labels %q to be running", label.String())
+	}
+	return nil
 }
