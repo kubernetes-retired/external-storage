@@ -5,7 +5,7 @@ metadata:
 spec:
   containers:
     - name: nfs-provisioner
-      image: wongma7/nfs-provisioner
+      image: wongma7/nfs-provisioner:v1.0.0
       ports:
         - name: nfs
           containerPort: 2049
