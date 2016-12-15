@@ -17,15 +17,25 @@ limitations under the License.
 package e2e
 
 import (
+	"bytes"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path"
+	"strings"
 	"time"
 
 	"github.com/kubernetes-incubator/nfs-provisioner/e2e/framework"
+	"github.com/opencontainers/runc/libcontainer/selinux"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/resource"
 	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/api/v1"
+	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	"k8s.io/client-go/pkg/apis/storage/v1beta1"
+	"k8s.io/client-go/pkg/runtime"
+	utilyaml "k8s.io/client-go/pkg/util/yaml"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -52,6 +62,13 @@ const (
 )
 
 func testDynamicProvisioning(client clientset.Interface, claim *v1.PersistentVolumeClaim) {
+	pv := testCreate(client, claim)
+	testWrite(client, claim)
+	testRead(client, claim)
+	testDelete(client, claim, pv)
+}
+
+func testCreate(client clientset.Interface, claim *v1.PersistentVolumeClaim) *v1.PersistentVolume {
 	err := framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, framework.Poll, framework.ClaimProvisionTimeout)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -80,26 +97,38 @@ func testDynamicProvisioning(client clientset.Interface, claim *v1.PersistentVol
 	Expect(pv.Spec.ClaimRef.Name).To(Equal(claim.ObjectMeta.Name))
 	Expect(pv.Spec.ClaimRef.Namespace).To(Equal(claim.ObjectMeta.Namespace))
 
-	// We start two pods:
-	// - The first writes 'hello word' to the /mnt/test (= the volume).
-	// - The second one runs grep 'hello world' on /mnt/test.
-	// If both succeed, Kubernetes actually allocated something that is
-	// persistent across pods.
+	return pv
+}
+
+// We start two pods, first in testWrite and second in testRead:
+// - The first writes 'hello word' to the /mnt/test (= the volume).
+// - The second one runs grep 'hello world' on /mnt/test.
+// If both succeed, Kubernetes actually allocated something that is
+// persistent across pods.
+func testWrite(client clientset.Interface, claim *v1.PersistentVolumeClaim) {
 	By("checking the created volume is writable")
 	runInPodWithVolume(client, claim.Namespace, claim.Name, "echo 'hello world' > /mnt/test/data")
 
+	// Unlike cloud providers, kubelet should unmount NFS quickly
+	By("Sleeping to let kubelet destroy all pods")
+	time.Sleep(5 * time.Second)
+}
+
+func testRead(client clientset.Interface, claim *v1.PersistentVolumeClaim) {
 	By("checking the created volume is readable and retains data")
 	runInPodWithVolume(client, claim.Namespace, claim.Name, "grep 'hello world' /mnt/test/data")
 
 	// Unlike cloud providers, kubelet should unmount NFS quickly
 	By("Sleeping to let kubelet destroy all pods")
 	time.Sleep(5 * time.Second)
+}
 
+func testDelete(client clientset.Interface, claim *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) {
 	By("deleting the claim")
 	framework.ExpectNoError(client.Core().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, nil))
 
 	// Wait for the PV to get deleted too.
-	framework.ExpectNoError(framework.WaitForPersistentVolumeDeleted(client, pv.Name, 5*time.Second, 5*time.Minute))
+	framework.ExpectNoError(framework.WaitForPersistentVolumeDeleted(client, pv.Name, 5*time.Second, 1*time.Minute))
 }
 
 var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
@@ -113,7 +142,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 		ns = f.Namespace.Name
 	})
 
-	framework.KubeDescribe("Out-of-tree DynamicProvisioner", func() {
+	framework.KubeDescribe("Out-of-tree DynamicProvisioner nfs-provisioner", func() {
 		It("should create and delete persistent volumes [Slow]", func() {
 			By("creating an out-of-tree dynamic provisioner pod")
 			pod := startProvisionerPod(c, ns)
@@ -135,6 +164,40 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 
 			testDynamicProvisioning(c, claim)
 		})
+		It("should survive a restart [Slow]", func() {
+			By("creating an out-of-tree dynamic provisioner deployment of 1 replica")
+			service, deployment := startProvisionerDeployment(c, ns)
+			defer c.Extensions().Deployments(ns).Delete(deployment.Name, nil)
+			defer c.Core().Services(ns).Delete(service.Name, nil)
+
+			By("creating a StorageClass")
+			class := newStorageClass()
+			_, err := c.Storage().StorageClasses().Create(class)
+			defer c.Storage().StorageClasses().Delete(class.Name, nil)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("creating a claim with a dynamic provisioning annotation")
+			claim := newClaim(ns)
+			defer func() {
+				c.Core().PersistentVolumeClaims(ns).Delete(claim.Name, nil)
+			}()
+			claim, err = c.Core().PersistentVolumeClaims(ns).Create(claim)
+			Expect(err).NotTo(HaveOccurred())
+
+			pv := testCreate(c, claim)
+			testWrite(c, claim)
+			testRead(c, claim)
+
+			By("scaling the deployment down to 0 then back to 1")
+			// err = framework.ScaleDeployment(c, ns, deployment.Name, 0, false)
+			// Expect(err).NotTo(HaveOccurred())
+			scaleDeployment(c, ns, deployment.Name, 0)
+			scaleDeployment(c, ns, deployment.Name, 1)
+
+			testRead(c, claim)
+			testDelete(c, claim, pv)
+		})
+
 	})
 })
 
@@ -298,4 +361,105 @@ func startProvisionerPod(c clientset.Interface, ns string) *v1.Pod {
 	By("sleeping a bit to give the provisioner time to start")
 	time.Sleep(5 * time.Second)
 	return pod
+}
+
+func startProvisionerDeployment(c clientset.Interface, ns string) (*v1.Service, *extensions.Deployment) {
+	gopath := os.Getenv("GOPATH")
+	service := svcFromManifest(path.Join(gopath, "src/github.com/kubernetes-incubator/nfs-provisioner/deploy/kube-config/deployment.yaml"))
+
+	deployment := deployFromManifest(path.Join(gopath, "src/github.com/kubernetes-incubator/nfs-provisioner/deploy/kube-config/deployment.yaml"))
+
+	tmpDir, err := ioutil.TempDir("", "nfs-provisioner-deployment")
+	Expect(err).NotTo(HaveOccurred())
+	if selinux.SelinuxEnabled() {
+		fcon, err := selinux.Getfilecon(tmpDir)
+		Expect(err).NotTo(HaveOccurred())
+		context := selinux.NewContext(fcon)
+		context["type"] = "svirt_sandbox_file_t"
+		err = selinux.Chcon(tmpDir, context.Get(), false)
+		Expect(err).NotTo(HaveOccurred())
+	}
+	deployment.Spec.Template.Spec.Volumes[0].HostPath.Path = tmpDir
+	deployment.Spec.Template.Spec.Containers[0].Image = "wongma7/nfs-provisioner:latest"
+	deployment.Spec.Template.Spec.Containers[0].Args = []string{
+		fmt.Sprintf("-provisioner=%s", pluginName),
+		"-grace-period=10",
+	}
+
+	service, err = c.Core().Services(ns).Create(service)
+	framework.ExpectNoError(err, "Failed to create %s service: %v", service.Name, err)
+
+	deployment, err = c.Extensions().Deployments(ns).Create(deployment)
+	framework.ExpectNoError(err, "Failed to create %s deployment: %v", deployment.Name, err)
+
+	framework.ExpectNoError(framework.WaitForDeploymentPodsRunning(c, ns, deployment.Name))
+
+	By("sleeping a bit to give the provisioner time to start")
+	time.Sleep(5 * time.Second)
+
+	return service, deployment
+}
+
+// svcFromManifest reads a .json/yaml file and returns the json of the desired
+func svcFromManifest(fileName string) *v1.Service {
+	var service v1.Service
+	data, err := ioutil.ReadFile(fileName)
+	Expect(err).NotTo(HaveOccurred())
+
+	r := ioutil.NopCloser(bytes.NewReader(data))
+	decoder := utilyaml.NewDocumentDecoder(r)
+	var chunk []byte
+	for {
+		chunk = make([]byte, len(data))
+		_, err := decoder.Read(chunk)
+		chunk = bytes.Trim(chunk, "\x00")
+		Expect(err).NotTo(HaveOccurred())
+		if strings.Contains(string(chunk), "kind: Service") {
+			break
+		}
+	}
+
+	json, err := utilyaml.ToJSON(chunk)
+	Expect(err).NotTo(HaveOccurred())
+	Expect(runtime.DecodeInto(api.Codecs.UniversalDecoder(), json, &service)).NotTo(HaveOccurred())
+
+	return &service
+}
+
+// deployFromManifest reads a .json/yaml file and returns the json of the desired
+func deployFromManifest(fileName string) *extensions.Deployment {
+	var deployment extensions.Deployment
+	data, err := ioutil.ReadFile(fileName)
+	Expect(err).NotTo(HaveOccurred())
+
+	r := ioutil.NopCloser(bytes.NewReader(data))
+	decoder := utilyaml.NewDocumentDecoder(r)
+	var chunk []byte
+	for {
+		chunk = make([]byte, len(data))
+		_, err := decoder.Read(chunk)
+		chunk = bytes.Trim(chunk, "\x00")
+		Expect(err).NotTo(HaveOccurred())
+		if strings.Contains(string(chunk), "kind: Deployment") {
+			break
+		}
+	}
+
+	json, err := utilyaml.ToJSON(chunk)
+	Expect(err).NotTo(HaveOccurred())
+	Expect(runtime.DecodeInto(api.Codecs.UniversalDecoder(), json, &deployment)).NotTo(HaveOccurred())
+
+	return &deployment
+}
+
+func scaleDeployment(c clientset.Interface, ns, name string, newSize int32) {
+	deployment, err := c.Extensions().Deployments(ns).Get(name)
+	Expect(err).NotTo(HaveOccurred())
+	deployment.Spec.Replicas = &newSize
+	updatedDeployment, err := c.Extensions().Deployments(ns).Update(deployment)
+	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(framework.WaitForDeploymentPodsRunning(c, ns, updatedDeployment.Name))
+	// Above is not enough. Just sleep to prevent conflict when doing Update.
+	// kubectl Scaler would be ideal. or WaitForDeploymentStatus
+	time.Sleep(5 * time.Second)
 }

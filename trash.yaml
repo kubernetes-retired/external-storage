@@ -32,6 +32,7 @@ github.com/mailru/easyjson	159cdb8
 github.com/mitchellh/mapstructure	f3009df
 github.com/onsi/ginkgo	v1.2.0-87-g00054c0
 github.com/onsi/gomega	v1.0-149-g2b6ed62
+github.com/opencontainers/runc v1.0.0-rc2-173-g083933f
 github.com/pborman/uuid	v1.0-17-g3d4f2ba
 github.com/pelletier/go-buffruneio	df1e16f
 github.com/pelletier/go-toml	v0.3.5-16-g45932ad
