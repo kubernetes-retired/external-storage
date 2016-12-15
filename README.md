@@ -33,6 +33,8 @@ pvc-dce84888-7a9d-11e6-b1ee-5254001e0c1b   1Mi        RWX           Delete      
 
 Deleting the `PersistentVolumeClaim` will cause the provisioner to delete the `PersistentVolume` and its data.
 
+Deleting the provisioner pod will cause any outstanding `PersistentVolumes` to become unusable and their data to be deleted. See [Deployment](docs/deployment.md) for how to deploy a provisioner that backs its NFS shares with persistent storage and survives restarts.
+
 ## Running
 To deploy nfs-provisioner on a Kubernetes cluster see [Deployment](docs/deployment.md).
 
@@ -46,7 +48,7 @@ The controller, the code for which is in the `controller/` directory, watches PV
 So to create your own provisioner, you need to write your own implementation of the interface and pass it to the controller. Ideally you should be able to import the package to create the controller, without modifying any controller code. The passing in of the provisioner to the controller, and initialization of other things they might need (like a client for the Kubernetes API server), is done here in `main.go`.
 
 ## Roadmap
-This is still alpha/experimental and will change to reflect the [out-of-tree dynamic provisioner proposal](https://github.com/kubernetes/kubernetes/pull/3028)
+This is still alpha/experimental and will change to reflect the [out-of-tree dynamic provisioner proposal](https://github.com/kubernetes/kubernetes/pull/30285)
 
 November
 * Create a process for releasing (to Docker Hub, etc.)

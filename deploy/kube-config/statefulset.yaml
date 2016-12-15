@@ -71,4 +71,3 @@ spec:
         - name: export-volume
           hostPath:
             path: /srv
- 

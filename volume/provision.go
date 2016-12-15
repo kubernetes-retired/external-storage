@@ -19,40 +19,51 @@ package volume
 import (
 	"fmt"
 	"io/ioutil"
-	"math"
 	"os"
 	"os/exec"
+	"path"
 	"reflect"
-	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 
 	"github.com/golang/glog"
-	"github.com/guelfey/go.dbus"
 	"github.com/kubernetes-incubator/nfs-provisioner/controller"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/pkg/api/resource"
 	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/pkg/types"
+	"k8s.io/client-go/pkg/util/uuid"
 )
 
 const (
-	// VolumeGidAnnotationKey is the key of the annotation on the PersistentVolume
-	// object that specifies a supplemental GID.
-	VolumeGidAnnotationKey = "pv.beta.kubernetes.io/gid"
+	// Name of the file where an nfsProvisioner will store its identity
+	identityFile = "nfs-provisioner.identity"
+
+	// are we allowed to set this? else make up our own
+	annCreatedBy = "kubernetes.io/createdby"
+	createdBy    = "nfs-dynamic-provisioner"
 
 	// A PV annotation for the entire ganesha EXPORT block or /etc/exports
 	// block, needed for deletion.
-	annBlock = "EXPORT_block"
-
+	annExportBlock = "EXPORT_block"
 	// A PV annotation for the exportId of this PV's backing ganesha/kernel export
 	// , needed for ganesha deletion and used for deleting the entry in exportIds
 	// map so the id can be reassigned.
 	annExportId = "Export_Id"
 
-	// are we allowed to set this? else make up our own
-	annCreatedBy = "kubernetes.io/createdby"
-	createdBy    = "nfs-dynamic-provisioner"
+	// A PV annotation for the project quota info block, needed for quota
+	// deletion.
+	annProjectBlock = "Project_block"
+	// A PV annotation for the project quota id, needed for quota deletion
+	annProjectId = "Project_Id"
+
+	// VolumeGidAnnotationKey is the key of the annotation on the PersistentVolume
+	// object that specifies a supplemental GID.
+	VolumeGidAnnotationKey = "pv.beta.kubernetes.io/gid"
+
+	// A PV annotation for the identity of the nfsProvisioner that provisioned it
+	annProvisionerId = "Provisioner_Id"
 
 	podIPEnv     = "POD_IP"
 	serviceEnv   = "SERVICE_NAME"
@@ -60,39 +71,57 @@ const (
 	nodeEnv      = "NODE_NAME"
 )
 
-func NewNFSProvisioner(exportDir string, client kubernetes.Interface, useGanesha bool, ganeshaConfig string) controller.Provisioner {
+func NewNFSProvisioner(exportDir string, client kubernetes.Interface, useGanesha bool, ganeshaConfig string, enableXfsQuota bool) controller.Provisioner {
 	var exporter exporter
 	if useGanesha {
-		exporter = &ganeshaExporter{ganeshaConfig: ganeshaConfig}
+		exporter = newGaneshaExporter(ganeshaConfig)
 	} else {
-		exporter = &kernelExporter{}
+		exporter = newKernelExporter()
 	}
-	return newNFSProvisionerInternal(exportDir, client, exporter)
+	var quotaer quotaer
+	var err error
+	if enableXfsQuota {
+		quotaer, err = newXfsQuotaer(exportDir)
+		if err != nil {
+			glog.Fatalf("Error creating xfs quotaer! %v", err)
+		}
+	} else {
+		quotaer = newDummyQuotaer()
+	}
+	return newNFSProvisionerInternal(exportDir, client, exporter, quotaer)
 }
 
-func newNFSProvisionerInternal(exportDir string, client kubernetes.Interface, exporter exporter) *nfsProvisioner {
+func newNFSProvisionerInternal(exportDir string, client kubernetes.Interface, exporter exporter, quotaer quotaer) *nfsProvisioner {
 	if _, err := os.Stat(exportDir); os.IsNotExist(err) {
 		glog.Fatalf("exportDir %s does not exist!", exportDir)
 	}
-	if !strings.HasSuffix(exportDir, "/") {
-		exportDir = exportDir + "/"
+
+	var identity types.UID
+	identityPath := path.Join(exportDir, identityFile)
+	if _, err := os.Stat(identityPath); os.IsNotExist(err) {
+		identity = uuid.NewUUID()
+		err := ioutil.WriteFile(identityPath, []byte(identity), 0600)
+		if err != nil {
+			glog.Fatalf("Error writing identity file %s! %v", identityPath, err)
+		}
+	} else {
+		read, err := ioutil.ReadFile(identityPath)
+		if err != nil {
+			glog.Fatalf("Error reading identity file %s! %v", identityPath, err)
+		}
+		identity = types.UID(strings.TrimSpace(string(read)))
 	}
+
 	provisioner := &nfsProvisioner{
 		exportDir:    exportDir,
 		client:       client,
 		exporter:     exporter,
-		mapMutex:     &sync.Mutex{},
-		fileMutex:    &sync.Mutex{},
+		quotaer:      quotaer,
+		identity:     identity,
 		podIPEnv:     podIPEnv,
 		serviceEnv:   serviceEnv,
 		namespaceEnv: namespaceEnv,
 		nodeEnv:      nodeEnv,
-	}
-
-	var err error
-	provisioner.exportIds, err = provisioner.exporter.GetConfigExportIds()
-	if err != nil {
-		glog.Errorf("error while populating exportIds map, there may be errors exporting later if exportIds are reused: %v", err)
 	}
 
 	return provisioner
@@ -109,16 +138,12 @@ type nfsProvisioner struct {
 	// The exporter to use for exporting NFS shares
 	exporter exporter
 
-	// Map to track used exportIds. Each ganesha export needs a unique Export_Id,
-	// and both ganesha and kernel exports need a unique fsid. So we simply assign
-	// each export an exportId and use it as both Export_id and fsid.
-	exportIds map[uint16]bool
+	// The quotaer to use for setting per-share/directory/project quotas
+	quotaer quotaer
 
-	// Lock for accessing exportIds
-	mapMutex *sync.Mutex
-
-	// Lock for writing to the ganesha config or /etc/exports file
-	fileMutex *sync.Mutex
+	// Identity of this nfsProvisioner, generated & persisted to exportDir or
+	// recovered from there. Used to mark provisioned PVs
+	identity types.UID
 
 	// Environment variables the provisioner pod needs valid values for in order to
 	// put a service cluster IP as the server of provisioned NFS PVs, passed in
@@ -134,18 +159,21 @@ var _ controller.Provisioner = &nfsProvisioner{}
 // Provision creates a volume i.e. the storage asset and returns a PV object for
 // the volume.
 func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.PersistentVolume, error) {
-	server, path, supGroup, block, exportId, err := p.createVolume(options)
+	server, path, supGroup, exportBlock, exportId, projectBlock, projectId, err := p.createVolume(options)
 	if err != nil {
 		return nil, err
 	}
 
 	annotations := make(map[string]string)
 	annotations[annCreatedBy] = createdBy
+	annotations[annExportBlock] = exportBlock
 	annotations[annExportId] = strconv.FormatUint(uint64(exportId), 10)
-	annotations[annBlock] = block
+	annotations[annProjectBlock] = projectBlock
+	annotations[annProjectId] = strconv.FormatUint(uint64(projectId), 10)
 	if supGroup != 0 {
 		annotations[VolumeGidAnnotationKey] = strconv.FormatUint(supGroup, 10)
 	}
+	annotations[annProvisionerId] = string(p.identity)
 
 	pv := &v1.PersistentVolume{
 		ObjectMeta: v1.ObjectMeta{
@@ -176,31 +204,38 @@ func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 // directory under /export and exports it. Returns the server IP, the path, a
 // zero/non-zero supplemental group, the block it added to either the ganesha
 // config or /etc/exports, and the exportId
-func (p *nfsProvisioner) createVolume(options controller.VolumeOptions) (string, string, uint64, string, uint16, error) {
+// TODO return values
+func (p *nfsProvisioner) createVolume(options controller.VolumeOptions) (string, string, uint64, string, uint16, string, uint16, error) {
 	gid, err := p.validateOptions(options)
 	if err != nil {
-		return "", "", 0, "", 0, fmt.Errorf("error validating options for volume: %v", err)
+		return "", "", 0, "", 0, "", 0, fmt.Errorf("error validating options for volume: %v", err)
 	}
 
 	server, err := p.getServer()
 	if err != nil {
-		return "", "", 0, "", 0, fmt.Errorf("error getting NFS server IP for volume: %v", err)
+		return "", "", 0, "", 0, "", 0, fmt.Errorf("error getting NFS server IP for volume: %v", err)
 	}
 
-	path := fmt.Sprintf(p.exportDir+"%s", options.PVName)
+	path := path.Join(p.exportDir, options.PVName)
 
 	err = p.createDirectory(options.PVName, gid)
 	if err != nil {
-		return "", "", 0, "", 0, fmt.Errorf("error creating directory for volume: %v", err)
+		return "", "", 0, "", 0, "", 0, fmt.Errorf("error creating directory for volume: %v", err)
 	}
 
-	block, exportId, err := p.createExport(options.PVName)
+	exportBlock, exportId, err := p.createExport(options.PVName)
 	if err != nil {
 		os.RemoveAll(path)
-		return "", "", 0, "", 0, fmt.Errorf("error creating export for volume: %v", err)
+		return "", "", 0, "", 0, "", 0, fmt.Errorf("error creating export for volume: %v", err)
 	}
 
-	return server, path, 0, block, exportId, nil
+	projectBlock, projectId, err := p.createQuota(options.PVName, options.Capacity)
+	if err != nil {
+		os.RemoveAll(path)
+		return "", "", 0, "", 0, "", 0, fmt.Errorf("error creating quota for volume: %v", err)
+	}
+
+	return server, path, 0, exportBlock, exportId, projectBlock, projectId, nil
 }
 
 func (p *nfsProvisioner) validateOptions(options controller.VolumeOptions) (string, error) {
@@ -262,10 +297,10 @@ func (p *nfsProvisioner) getServer() (string, error) {
 	if serviceName == "" {
 		nodeName := os.Getenv(p.nodeEnv)
 		if nodeName == "" {
-			glog.Infof("service env %s isn't set, using `hostname -i`/pod IP %s as server IP", p.serviceEnv, fallbackServer)
+			glog.Infof("service env %s isn't set and neither is node env %s, using `hostname -i`/pod IP %s as NFS server IP", p.serviceEnv, p.nodeEnv, fallbackServer)
 			return fallbackServer, nil
 		}
-		glog.Infof("service env %s isn't set and node env %s is, using node name %s as server IP", p.serviceEnv, p.nodeEnv, nodeName)
+		glog.Infof("service env %s isn't set and node env %s is, using node name %s as NFS server IP", p.serviceEnv, p.nodeEnv, nodeName)
 		return nodeName, nil
 	}
 
@@ -324,9 +359,9 @@ func (p *nfsProvisioner) getServer() (string, error) {
 // permissions and ownership according to the given gid parameter string.
 func (p *nfsProvisioner) createDirectory(directory, gid string) error {
 	// TODO quotas
-	path := fmt.Sprintf(p.exportDir+"%s", directory)
-	if _, err := os.Stat(path); err == nil {
-		return fmt.Errorf("error creating volume, the path already exists")
+	path := path.Join(p.exportDir, directory)
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		return fmt.Errorf("the path already exists")
 	}
 
 	perm := os.FileMode(0777)
@@ -335,7 +370,7 @@ func (p *nfsProvisioner) createDirectory(directory, gid string) error {
 		perm = os.FileMode(0071)
 	}
 	if err := os.MkdirAll(path, perm); err != nil {
-		return fmt.Errorf("error creating dir for volume: %v", err)
+		return err
 	}
 	// Due to umask, need to chmod
 	cmd := exec.Command("chmod", strconv.FormatInt(int64(perm), 8), path)
@@ -359,197 +394,41 @@ func (p *nfsProvisioner) createDirectory(directory, gid string) error {
 }
 
 // createExport creates the export by adding a block to the appropriate config
-// file and exporting it, using the appropriate method.
+// file and exporting it
 func (p *nfsProvisioner) createExport(directory string) (string, uint16, error) {
-	path := fmt.Sprintf(p.exportDir+"%s", directory)
+	path := path.Join(p.exportDir, directory)
 
-	exportId := p.generateExportId()
-	exportIdStr := strconv.FormatUint(uint64(exportId), 10)
-
-	config := p.exporter.GetConfig()
-	block := p.exporter.CreateBlock(exportIdStr, path)
-
-	// Add the export block to the config file
-	if err := p.addToFile(config, block); err != nil {
-		p.deleteExportId(exportId)
-		return "", 0, fmt.Errorf("error adding export block %s to config %s: %v", block, config, err)
+	block, exportId, err := p.exporter.AddExportBlock(path)
+	if err != nil {
+		return "", 0, fmt.Errorf("error adding export block for path %s: %v", path, err)
 	}
 
-	err := p.exporter.Export(path)
+	err = p.exporter.Export(path)
 	if err != nil {
-		p.deleteExportId(exportId)
-		p.removeFromFile(config, block)
-		return "", 0, fmt.Errorf("error exporting export block %s in config %s: %v", block, config, err)
+		p.exporter.RemoveExportBlock(block, exportId)
+		return "", 0, fmt.Errorf("error exporting export block %s: %v", block, err)
 	}
 
 	return block, exportId, nil
 }
 
-// generateExportId generates a unique exportId to assign an export
-func (p *nfsProvisioner) generateExportId() uint16 {
-	p.mapMutex.Lock()
-	id := uint16(1)
-	for ; id <= math.MaxUint16; id++ {
-		if _, ok := p.exportIds[id]; !ok {
-			break
-		}
-	}
-	p.exportIds[id] = true
-	p.mapMutex.Unlock()
-	return id
-}
+// createQuota creates a quota for the directory by adding a project to
+// represent the directory and setting a quota on it
+func (p *nfsProvisioner) createQuota(directory string, capacity resource.Quantity) (string, uint16, error) {
+	path := path.Join(p.exportDir, directory)
 
-func (p *nfsProvisioner) deleteExportId(exportId uint16) {
-	p.mapMutex.Lock()
-	delete(p.exportIds, exportId)
-	p.mapMutex.Unlock()
-}
+	limit := strconv.FormatInt(capacity.Value(), 10)
 
-func (p *nfsProvisioner) addToFile(path string, toAdd string) error {
-	p.fileMutex.Lock()
-
-	file, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0600)
+	block, projectId, err := p.quotaer.AddProject(path, limit)
 	if err != nil {
-		p.fileMutex.Unlock()
-		return err
+		return "", 0, fmt.Errorf("error adding project for path %s: %v", path, err)
 	}
-	defer file.Close()
 
-	if _, err = file.WriteString(toAdd); err != nil {
-		p.fileMutex.Unlock()
-		return err
-	}
-	file.Sync()
-
-	p.fileMutex.Unlock()
-	return nil
-}
-
-func (p *nfsProvisioner) removeFromFile(path string, toRemove string) error {
-	p.fileMutex.Lock()
-
-	read, err := ioutil.ReadFile(path)
+	err = p.quotaer.SetQuota(projectId, path, limit)
 	if err != nil {
-		p.fileMutex.Unlock()
-		return err
+		p.quotaer.RemoveProject(block, projectId)
+		return "", 0, fmt.Errorf("error setting quota for path %s: %v", path, err)
 	}
 
-	removed := strings.Replace(string(read), toRemove, "", -1)
-	err = ioutil.WriteFile(path, []byte(removed), 0)
-	if err != nil {
-		p.fileMutex.Unlock()
-		return err
-	}
-
-	p.fileMutex.Unlock()
-	return nil
-}
-
-type exporter interface {
-	GetConfig() string
-	GetConfigExportIds() (map[uint16]bool, error)
-	CreateBlock(string, string) string
-	Export(string) error
-	Unexport(*v1.PersistentVolume) error
-}
-
-type ganeshaExporter struct {
-	ganeshaConfig string
-}
-
-var _ exporter = &ganeshaExporter{}
-
-func (e *ganeshaExporter) GetConfig() string {
-	return e.ganeshaConfig
-}
-
-func (e *ganeshaExporter) GetConfigExportIds() (map[uint16]bool, error) {
-	return getConfigExportIds(e.GetConfig(), regexp.MustCompile("Export_Id = ([0-9]+);"))
-}
-
-// CreateBlock creates the text block to add to the ganesha config file.
-func (e *ganeshaExporter) CreateBlock(exportId, path string) string {
-	return "\nEXPORT\n{\n" +
-		"\tExport_Id = " + exportId + ";\n" +
-		"\tPath = " + path + ";\n" +
-		"\tPseudo = " + path + ";\n" +
-		"\tAccess_Type = RW;\n" +
-		"\tSquash = root_id_squash;\n" +
-		"\tSecType = sys;\n" +
-		"\tFilesystem_id = " + exportId + "." + exportId + ";\n" +
-		"\tFSAL {\n\t\tName = VFS;\n\t}\n}\n"
-}
-
-// Export exports the given directory using NFS Ganesha, assuming it is running
-// and can be connected to using D-Bus.
-func (e *ganeshaExporter) Export(path string) error {
-	// Call AddExport using dbus
-	conn, err := dbus.SystemBus()
-	if err != nil {
-		return fmt.Errorf("error getting dbus session bus: %v", err)
-	}
-	obj := conn.Object("org.ganesha.nfsd", "/org/ganesha/nfsd/ExportMgr")
-	call := obj.Call("org.ganesha.nfsd.exportmgr.AddExport", 0, e.ganeshaConfig, fmt.Sprintf("export(path = %s)", path))
-	if call.Err != nil {
-		return fmt.Errorf("error calling org.ganesha.nfsd.exportmgr.AddExport: %v", call.Err)
-	}
-
-	return nil
-}
-
-type kernelExporter struct {
-}
-
-var _ exporter = &kernelExporter{}
-
-func (e *kernelExporter) GetConfig() string {
-	return "/etc/exports"
-}
-
-func (e *kernelExporter) GetConfigExportIds() (map[uint16]bool, error) {
-	return getConfigExportIds(e.GetConfig(), regexp.MustCompile("fsid=([0-9]+)"))
-}
-
-// CreateBlock creates the text block to add to the /etc/exports file.
-func (e *kernelExporter) CreateBlock(exportId, path string) string {
-	return "\n" + path + " *(rw,insecure,root_squash,fsid=" + exportId + ")\n"
-}
-
-// Export exports all directories listed in /etc/exports
-func (e *kernelExporter) Export(_ string) error {
-	// Execute exportfs
-	cmd := exec.Command("exportfs", "-r")
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("exportfs -r failed with error: %v, output: %s", err, out)
-	}
-
-	return nil
-}
-
-// getConfigExportIds populates the exportIds map with pre-existing exportIds
-// found in the given config file. Takes as argument the regex it should use to
-// find each exportId in the file i.e. Export_Id or fsid.
-func getConfigExportIds(config string, re *regexp.Regexp) (map[uint16]bool, error) {
-	exportIds := map[uint16]bool{}
-
-	digitsRe := "([0-9]+)"
-	if !strings.Contains(re.String(), digitsRe) {
-		return exportIds, fmt.Errorf("regexp %s doesn't contain digits submatch %s", re.String(), digitsRe)
-	}
-
-	read, err := ioutil.ReadFile(config)
-	if err != nil {
-		return exportIds, err
-	}
-
-	allMatches := re.FindAllSubmatch(read, -1)
-	for _, match := range allMatches {
-		digits := match[1]
-		if id, err := strconv.ParseUint(string(digits), 10, 16); err == nil {
-			exportIds[uint16(id)] = true
-		}
-	}
-
-	return exportIds, nil
+	return block, projectId, nil
 }

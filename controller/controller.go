@@ -14,26 +14,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/*
-Some code in here is identical to or modified from code in the PV controller of
-kubernetes, copyright 2016 The Kubernetes Authors.
-*/
-
 package controller
 
 import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/kubernetes-incubator/nfs-provisioner/controller/leaderelection"
+	rl "github.com/kubernetes-incubator/nfs-provisioner/controller/leaderelection/resourcelock"
 	"k8s.io/client-go/kubernetes"
 	core_v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/storage/v1beta1"
+	"k8s.io/client-go/pkg/fields"
 	"k8s.io/client-go/pkg/runtime"
+	"k8s.io/client-go/pkg/types"
+	"k8s.io/client-go/pkg/util/uuid"
 	"k8s.io/client-go/pkg/version"
 	"k8s.io/client-go/pkg/watch"
 	"k8s.io/client-go/tools/cache"
@@ -70,6 +71,11 @@ const createProvisionedPVInterval = 10 * time.Second
 type ProvisionController struct {
 	client kubernetes.Interface
 
+	// How often the controller relists PVCs, PVs, & storage classes. OnUpdate
+	// will be called even if nothing has changed, meaning failed operations may
+	// be retried on a PVC/PV every resyncPeriod regardless of whether it changed
+	resyncPeriod time.Duration
+
 	// The name of the provisioner for which this controller dynamically
 	// provisions volumes. The value of annDynamicallyProvisioned and
 	// annStorageProvisioner to set & watch for, respectively
@@ -101,26 +107,43 @@ type ProvisionController struct {
 	// Map of scheduled/running operations.
 	runningOperations goroutinemap.GoRoutineMap
 
+	// Number of retries when we create a PV object for a provisioned volume.
 	createProvisionedPVRetryCount int
-	createProvisionedPVInterval   time.Duration
+
+	// Interval between retries when we create a PV object for a provisioned volume.
+	createProvisionedPVInterval time.Duration
+
+	// Identity of this controller, generated at creation time.
+	identity types.UID
+
+	// Parameters of LeaderElectionConfig: set to defaults except in tests
+	leaseDuration, renewDeadline, retryPeriod, termLimit time.Duration
+
+	// Map of claim UID to LeaderElector: for checking if this controller
+	// is the leader of a given claim
+	leaderElectors map[types.UID]*leaderelection.LeaderElector
+
+	mapMutex *sync.Mutex
 }
 
 func NewProvisionController(
 	client kubernetes.Interface,
-	serverGitVersion string,
 	resyncPeriod time.Duration,
 	provisionerName string,
 	provisioner Provisioner,
+	serverGitVersion string,
+	exponentialBackOffOnError bool,
 ) *ProvisionController {
+	identity := uuid.NewUUID()
+
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(&core_v1.EventSinkImpl{Interface: client.Core().Events(v1.NamespaceAll)})
 	var eventRecorder record.EventRecorder
 	out, err := exec.Command("hostname").Output()
 	if err != nil {
-		glog.Errorf("Error getting hostname for specifying it as source of events: %v", err)
-		eventRecorder = broadcaster.NewRecorder(v1.EventSource{Component: provisionerName})
+		eventRecorder = broadcaster.NewRecorder(v1.EventSource{Component: fmt.Sprintf("%s %s", provisionerName, string(identity))})
 	} else {
-		eventRecorder = broadcaster.NewRecorder(v1.EventSource{Component: fmt.Sprintf("%s-%s", provisionerName, strings.TrimSpace(string(out)))})
+		eventRecorder = broadcaster.NewRecorder(v1.EventSource{Component: fmt.Sprintf("%s %s %s", provisionerName, strings.TrimSpace(string(out)), string(identity))})
 	}
 
 	gitVersion := version.MustParse(serverGitVersion)
@@ -129,13 +152,21 @@ func NewProvisionController(
 
 	controller := &ProvisionController{
 		client:                        client,
+		resyncPeriod:                  resyncPeriod,
 		provisionerName:               provisionerName,
 		provisioner:                   provisioner,
 		is1dot4:                       is1dot4,
 		eventRecorder:                 eventRecorder,
-		runningOperations:             goroutinemap.NewGoRoutineMap(false /* exponentialBackOffOnError */),
+		runningOperations:             goroutinemap.NewGoRoutineMap(exponentialBackOffOnError),
 		createProvisionedPVRetryCount: createProvisionedPVRetryCount,
 		createProvisionedPVInterval:   createProvisionedPVInterval,
+		identity:                      identity,
+		leaseDuration:                 leaderelection.DefaultLeaseDuration,
+		renewDeadline:                 leaderelection.DefaultRenewDeadline,
+		retryPeriod:                   leaderelection.DefaultRetryPeriod,
+		termLimit:                     leaderelection.DefaultTermLimit,
+		leaderElectors:                make(map[types.UID]*leaderelection.LeaderElector),
+		mapMutex:                      &sync.Mutex{},
 	}
 
 	controller.claimSource = &cache.ListWatch{
@@ -209,7 +240,7 @@ func NewProvisionController(
 }
 
 func (ctrl *ProvisionController) Run(stopCh <-chan struct{}) {
-	glog.Info("Starting nfs provisioner controller!")
+	glog.Infof("Starting nfs provisioner controller %s!", string(ctrl.identity))
 	go ctrl.claimController.Run(stopCh)
 	go ctrl.volumeController.Run(stopCh)
 	go ctrl.classReflector.RunUntil(stopCh)
@@ -226,11 +257,21 @@ func (ctrl *ProvisionController) addClaim(obj interface{}) {
 	}
 
 	if ctrl.shouldProvision(claim) {
-		opName := fmt.Sprintf("provision-%s[%s]", claimToClaimKey(claim), string(claim.UID))
-		ctrl.scheduleOperation(opName, func() error {
-			ctrl.provisionClaimOperation(claim)
-			return nil
-		})
+		ctrl.mapMutex.Lock()
+		le, ok := ctrl.leaderElectors[claim.UID]
+		ctrl.mapMutex.Unlock()
+		if ok && le.IsLeader() {
+			opName := fmt.Sprintf("provision-%s[%s]", claimToClaimKey(claim), string(claim.UID))
+			ctrl.scheduleOperation(opName, func() error {
+				return ctrl.provisionClaimOperation(claim)
+			})
+		} else {
+			opName := fmt.Sprintf("lock-provision-%s[%s]", claimToClaimKey(claim), string(claim.UID))
+			ctrl.scheduleOperation(opName, func() error {
+				ctrl.lockProvisionClaimOperation(claim)
+				return nil
+			})
+		}
 	}
 }
 
@@ -252,8 +293,7 @@ func (ctrl *ProvisionController) updateVolume(oldObj, newObj interface{}) {
 	if ctrl.shouldDelete(volume) {
 		opName := fmt.Sprintf("delete-%s[%s]", volume.Name, string(volume.UID))
 		ctrl.scheduleOperation(opName, func() error {
-			ctrl.deleteVolumeOperation(volume)
-			return nil
+			return ctrl.deleteVolumeOperation(volume)
 		})
 	}
 }
@@ -275,11 +315,11 @@ func (ctrl *ProvisionController) shouldProvision(claim *v1.PersistentVolumeClaim
 	claimClass := getClaimClass(claim)
 	classObj, found, err := ctrl.classes.GetByKey(claimClass)
 	if err != nil {
-		glog.Errorf("Error getting StorageClass %q: %v", claimClass, err)
+		glog.Errorf("Error getting StorageClass %q of claim %q: %v", claimClass, claimToClaimKey(claim), err)
 		return false
 	}
 	if !found {
-		glog.Errorf("StorageClass %q not found", claimClass)
+		glog.Errorf("StorageClass %q of claim %q not found", claimClass, claimToClaimKey(claim))
 		return false
 	}
 	class, ok := classObj.(*v1beta1.StorageClass)
@@ -323,10 +363,77 @@ func (ctrl *ProvisionController) shouldDelete(volume *v1.PersistentVolume) bool 
 	return true
 }
 
-func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVolumeClaim) {
+// lockProvisionClaimOperation wraps provisionClaimOperation. In case other
+// controllers are serving the same claims, to prevent them all from creating
+// volumes for a claim & racing to submit their PV, each controller creates a
+// LeaderElector to instead race for the leadership (lock), where only the
+// leader is tasked with provisioning & may try to do so
+func (ctrl *ProvisionController) lockProvisionClaimOperation(claim *v1.PersistentVolumeClaim) {
+	rl := rl.ProvisionPVCLock{
+		PVCMeta: claim.ObjectMeta,
+		Client:  ctrl.client,
+		LockConfig: rl.ResourceLockConfig{
+			Identity:      string(ctrl.identity),
+			EventRecorder: ctrl.eventRecorder,
+		},
+	}
+	le, err := leaderelection.NewLeaderElector(leaderelection.LeaderElectionConfig{
+		Lock:          &rl,
+		LeaseDuration: ctrl.leaseDuration,
+		RenewDeadline: ctrl.renewDeadline,
+		RetryPeriod:   ctrl.retryPeriod,
+		TermLimit:     ctrl.termLimit,
+		Callbacks: leaderelection.LeaderCallbacks{
+			OnStartedLeading: func(_ <-chan struct{}) {
+				opName := fmt.Sprintf("provision-%s[%s]", claimToClaimKey(claim), string(claim.UID))
+				ctrl.scheduleOperation(opName, func() error {
+					return ctrl.provisionClaimOperation(claim)
+				})
+			},
+			OnStoppedLeading: func() {
+				// Since it's possible to stop renewing voluntarily, give others a
+				// chance to acquire.
+				time.Sleep(ctrl.leaseDuration + ctrl.retryPeriod)
+			},
+		},
+	})
+	if err != nil {
+		glog.Errorf("Error creating LeaderElector, can't provision for claim %q: %v", claimToClaimKey(claim), err)
+		return
+	}
+
+	ctrl.mapMutex.Lock()
+	ctrl.leaderElectors[claim.UID] = le
+	ctrl.mapMutex.Unlock()
+
+	// To determine when to stop trying to acquire/renew the lock, watch for
+	// provisioning success/failure. (The leader could get the result of its
+	// operation but it has to watch anyway)
+	task := make(chan bool, 1)
+	go func() {
+		success, err := ctrl.watchProvisioning(claim)
+		if err != nil {
+			glog.Errorf("Error watching for provisioning success, can't provision for claim %q: %v", claimToClaimKey(claim), err)
+			task <- true
+			return
+		}
+		task <- success
+	}()
+
+	le.Run(task)
+
+	ctrl.mapMutex.Lock()
+	delete(ctrl.leaderElectors, claim.UID)
+	ctrl.mapMutex.Unlock()
+}
+
+// provisionClaimOperation attempts to provision a volume for the given claim.
+// Returns an error for use by goroutinemap when expbackoff is enabled: if nil,
+// the operation is deleted, else the operation may be retried with expbackoff.
+func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVolumeClaim) error {
 	// Most code here is identical to that found in controller.go of kube's PV controller...
 	claimClass := getClaimClass(claim)
-	glog.Infof("provisionClaimOperation [%s] started, class: %q", claimToClaimKey(claim), claimClass)
+	glog.V(4).Infof("provisionClaimOperation [%s] started, class: %q", claimToClaimKey(claim), claimClass)
 
 	//  A previous doProvisionClaim may just have finished while we were waiting for
 	//  the locks. Check that PV (with deterministic name) hasn't been provisioned
@@ -335,42 +442,42 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 	volume, err := ctrl.client.Core().PersistentVolumes().Get(pvName)
 	if err == nil && volume != nil {
 		// Volume has been already provisioned, nothing to do.
-		glog.Infof("provisionClaimOperation [%s]: volume already exists, skipping", claimToClaimKey(claim))
-		return
+		glog.V(4).Infof("provisionClaimOperation [%s]: volume already exists, skipping", claimToClaimKey(claim))
+		return nil
 	}
 
 	// Prepare a claimRef to the claim early (to fail before a volume is
 	// provisioned)
 	claimRef, err := v1.GetReference(claim)
 	if err != nil {
-		glog.Errorf("unexpected error getting claim reference: %v", err)
-		return
+		glog.Errorf("Unexpected error getting claim reference to claim %q: %v", claimToClaimKey(claim), err)
+		return nil
 	}
 
 	classObj, found, err := ctrl.classes.GetByKey(claimClass)
 	if err != nil {
-		glog.Errorf("Error getting StorageClass %q: %v", claimClass, err)
-		return
+		glog.Errorf("Error getting StorageClass %q of claim %q: %v", claimClass, claimToClaimKey(claim), err)
+		return nil
 	}
 	if !found {
-		glog.Errorf("StorageClass %q not found", claimClass)
+		glog.Errorf("StorageClass %q of claim %q not found", claimClass, claimToClaimKey(claim))
 		// 3. It tries to find a StorageClass instance referenced by annotation
 		//    `claim.Annotations["volume.beta.kubernetes.io/storage-class"]`. If not
 		//    found, it SHOULD report an error (by sending an event to the claim) and it
 		//    SHOULD retry periodically with step i.
-		return
+		return nil
 	}
 	storageClass, ok := classObj.(*v1beta1.StorageClass)
 	if !ok {
 		glog.Errorf("Cannot convert object to StorageClass: %+v", classObj)
-		return
+		return nil
 	}
 	if storageClass.Provisioner != ctrl.provisionerName {
 		// class.Provisioner has either changed since shouldProvision() or
 		// annDynamicallyProvisioned contains different provisioner than
 		// class.Provisioner.
-		glog.Errorf("Unknown provisioner %q requested in storage class %q", claimClass, storageClass.Provisioner)
-		return
+		glog.Errorf("Unknown provisioner %q requested in storage class %q of claim %q", storageClass.Provisioner, claimClass, claimToClaimKey(claim))
+		return nil
 	}
 
 	options := VolumeOptions{
@@ -385,9 +492,9 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 	volume, err = ctrl.provisioner.Provision(options)
 	if err != nil {
 		strerr := fmt.Sprintf("Failed to provision volume with StorageClass %q: %v", storageClass.Name, err)
-		glog.Errorf("Failed to provision volume for claim %q with StorageClass %q: %v", claimToClaimKey(claim), claim.Name, err)
+		glog.Errorf("Failed to provision volume for claim %q with StorageClass %q: %v", claimToClaimKey(claim), storageClass.Name, err)
 		ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, "ProvisioningFailed", strerr)
-		return
+		return err
 	}
 
 	glog.Infof("volume %q for claim %q created", volume.Name, claimToClaimKey(claim))
@@ -400,7 +507,7 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 
 	// Try to create the PV object several times
 	for i := 0; i < ctrl.createProvisionedPVRetryCount; i++ {
-		glog.Infof("provisionClaimOperation [%s]: trying to save volume %s", claimToClaimKey(claim), volume.Name)
+		glog.V(4).Infof("provisionClaimOperation [%s]: trying to save volume %s", claimToClaimKey(claim), volume.Name)
 		if _, err = ctrl.client.Core().PersistentVolumes().Create(volume); err == nil {
 			// Save succeeded.
 			glog.Infof("volume %q for claim %q saved", volume.Name, claimToClaimKey(claim))
@@ -417,13 +524,13 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 		// Emit some event here and try to delete the storage asset several
 		// times.
 		strerr := fmt.Sprintf("Error creating provisioned PV object for claim %s: %v. Deleting the volume.", claimToClaimKey(claim), err)
-		glog.Info(strerr)
+		glog.Error(strerr)
 		ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, "ProvisioningFailed", strerr)
 
 		for i := 0; i < ctrl.createProvisionedPVRetryCount; i++ {
 			if err = ctrl.provisioner.Delete(volume); err == nil {
 				// Delete succeeded
-				glog.Infof("provisionClaimOperation [%s]: cleaning volume %s succeeded", claimToClaimKey(claim), volume.Name)
+				glog.V(4).Infof("provisionClaimOperation [%s]: cleaning volume %s succeeded", claimToClaimKey(claim), volume.Name)
 				break
 			}
 			// Delete failed, try again after a while.
@@ -435,16 +542,131 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 			// Delete failed several times. There is an orphaned volume and there
 			// is nothing we can do about it.
 			strerr := fmt.Sprintf("Error cleaning provisioned volume for claim %s: %v. Please delete manually.", claimToClaimKey(claim), err)
-			glog.Info(strerr)
+			glog.Error(strerr)
 			ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, "ProvisioningCleanupFailed", strerr)
 		}
 	} else {
 		glog.Infof("volume %q provisioned for claim %q", volume.Name, claimToClaimKey(claim))
+		msg := fmt.Sprintf("Successfully provisioned volume %s", volume.Name)
+		ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, "ProvisioningSucceeded", msg)
+	}
+
+	return nil
+}
+
+// watchProvisioning watches for events that indicate a controller (including
+// this one) has succeeded/failed to provision a volume for the given claim. This
+// result can be used by the controller to decide to give up trying to provision
+// for the claim as early as possible: to give others a chance if it failed, or to
+// give up trying if it/somebody succeeded.
+func (ctrl *ProvisionController) watchProvisioning(claim *v1.PersistentVolumeClaim) (bool, error) {
+	stopChannel := make(chan struct{})
+	defer close(stopChannel)
+	pvcCh, err := ctrl.watchPVC(claim.Name, claim.Namespace, claim.ResourceVersion, stopChannel)
+	if err != nil {
+		glog.Infof("cannot start watcher for PVC %s/%s: %v", claim.Namespace, claim.Name, err)
+		return false, err
+	}
+
+	// Get the PV that would result from ProvisioningSucceeded in case watch
+	// started just after it was created
+	pvName := ctrl.getProvisionedVolumeNameForClaim(claim)
+	volume, err := ctrl.client.Core().PersistentVolumes().Get(pvName)
+	if err == nil && volume != nil {
+		return true, nil
+	}
+
+	for {
+		event := <-pvcCh
+		switch event.Object.(type) {
+		case *v1.PersistentVolumeClaim:
+			// PVC changed
+			claim := event.Object.(*v1.PersistentVolumeClaim)
+			glog.V(4).Infof("claim update received: %s %s/%s %s", event.Type, claim.Namespace, claim.Name, claim.Status.Phase)
+			switch event.Type {
+			case watch.Added, watch.Modified:
+				if claim.Spec.VolumeName != "" {
+					return true, nil
+				} else if !ctrl.shouldProvision(claim) {
+					return true, fmt.Errorf("pvc was modified to not ask for this provisioner")
+				}
+
+			case watch.Deleted:
+				return true, fmt.Errorf("pvc was deleted")
+
+			case watch.Error:
+				return true, fmt.Errorf("pvc watcher failed")
+			default:
+			}
+		case *v1.Event:
+			// Event received
+			claimEvent := event.Object.(*v1.Event)
+			glog.V(4).Infof("claim event received: %s %s/%s %s/%s %s", event.Type, claimEvent.Namespace, claimEvent.Name, claimEvent.InvolvedObject.Namespace, claimEvent.InvolvedObject.Name, claimEvent.Reason)
+			if claimEvent.Reason == "ProvisioningSucceeded" {
+				return true, nil
+			} else if claimEvent.Reason == "ProvisioningFailed" {
+				return false, nil
+			}
+		}
 	}
 }
 
-func (ctrl *ProvisionController) deleteVolumeOperation(volume *v1.PersistentVolume) {
-	glog.Infof("deleteVolumeOperation [%s] started", volume.Name)
+// watchPVC returns a watch on the given PVC and events involving it
+func (ctrl *ProvisionController) watchPVC(name, namespace, resourceVersion string, stopChannel chan struct{}) (<-chan watch.Event, error) {
+	pvcSelector, _ := fields.ParseSelector("metadata.name=" + name)
+	options := api.ListOptions{
+		FieldSelector:   pvcSelector,
+		Watch:           true,
+		ResourceVersion: resourceVersion,
+	}
+
+	pvcWatch, err := ctrl.claimSource.Watch(options)
+	if err != nil {
+		return nil, err
+	}
+
+	eventSelector, _ := fields.ParseSelector("involvedObject.name=" + name)
+	eventWatch, err := ctrl.client.Core().Events(namespace).Watch(v1.ListOptions{
+		FieldSelector: eventSelector.String(),
+		Watch:         true,
+	})
+	if err != nil {
+		pvcWatch.Stop()
+		return nil, err
+	}
+
+	eventCh := make(chan watch.Event, 0)
+
+	go func() {
+		defer eventWatch.Stop()
+		defer pvcWatch.Stop()
+		defer close(eventCh)
+
+		for {
+			select {
+			case _ = <-stopChannel:
+				return
+
+			case pvcEvent, ok := <-pvcWatch.ResultChan():
+				if !ok {
+					return
+				}
+				eventCh <- pvcEvent
+
+			case eventEvent, ok := <-eventWatch.ResultChan():
+				if !ok {
+					return
+				}
+				eventCh <- eventEvent
+			}
+		}
+	}()
+
+	return eventCh, nil
+}
+
+func (ctrl *ProvisionController) deleteVolumeOperation(volume *v1.PersistentVolume) error {
+	glog.V(4).Infof("deleteVolumeOperation [%s] started", volume.Name)
 
 	// This method may have been waiting for a volume lock for some time.
 	// Our check does not have to be as sophisticated as PV controller's, we can
@@ -452,31 +674,39 @@ func (ctrl *ProvisionController) deleteVolumeOperation(volume *v1.PersistentVolu
 	// ours to delete
 	newVolume, err := ctrl.client.Core().PersistentVolumes().Get(volume.Name)
 	if err != nil {
-		glog.Infof("error reading peristent volume %q: %v", volume.Name, err)
-		return
+		return nil
 	}
 	if !ctrl.shouldDelete(newVolume) {
 		glog.Infof("volume %q no longer needs deletion, skipping", volume.Name)
-		return
+		return nil
 	}
 
 	if err := ctrl.provisioner.Delete(volume); err != nil {
-		// Delete failed, emit an event.
-		glog.Infof("deletion of volume %q failed: %v", volume.Name, err)
-		ctrl.eventRecorder.Event(volume, v1.EventTypeWarning, "VolumeFailedDelete", err.Error())
-		return
+		if ierr, ok := err.(*IgnoredError); ok {
+			// Delete ignored, do nothing and hope another provisioner will delete it.
+			glog.Infof("deletion of volume %q ignored: %v", volume.Name, ierr)
+			return nil
+		} else {
+			// Delete failed, emit an event.
+			glog.Errorf("Deletion of volume %q failed: %v", volume.Name, err)
+			ctrl.eventRecorder.Event(volume, v1.EventTypeWarning, "VolumeFailedDelete", err.Error())
+			return err
+		}
 	}
 
-	glog.Infof("deleteVolumeOperation [%s]: success", volume.Name)
+	glog.Infof("volume %q deleted", volume.Name)
+
+	glog.V(4).Infof("deleteVolumeOperation [%s]: success", volume.Name)
 	// Delete the volume
 	if err = ctrl.client.Core().PersistentVolumes().Delete(volume.Name, nil); err != nil {
 		// Oops, could not delete the volume and therefore the controller will
 		// try to delete the volume again on next update.
 		glog.Infof("failed to delete volume %q from database: %v", volume.Name, err)
-		return
+		return nil
 	}
 
-	return
+	glog.Infof("volume %q deleted from database", volume.Name)
+	return nil
 }
 
 // getProvisionedVolumeNameForClaim returns PV.Name for the provisioned volume.
@@ -493,9 +723,9 @@ func (ctrl *ProvisionController) scheduleOperation(operationName string, operati
 	err := ctrl.runningOperations.Run(operationName, operation)
 	if err != nil {
 		if goroutinemap.IsAlreadyExists(err) {
-			glog.Infof("operation %q is already running, skipping", operationName)
+			glog.V(4).Infof("operation %q is already running, skipping", operationName)
 		} else {
-			glog.Errorf("error scheduling operaion %q: %v", operationName, err)
+			glog.Errorf("Error scheduling operaion %q: %v", operationName, err)
 		}
 	}
 }
