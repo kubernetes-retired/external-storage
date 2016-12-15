@@ -1,7 +1,7 @@
 # Deployment
 
 ## Getting the provisioner image
-To get the Docker image onto the machine where you want to run nfs-provisioner, you can either build it or pull the latest version from Docker Hub.
+To get the Docker image onto the machine where you want to run nfs-provisioner, you can either build it or pull the newest release from Docker Hub. You may use the unstable `latest` tag if you wish, but all the example yamls reference the newest versioned release tag.
 
 ### Building
 Building the project will only work if the project is in your `GOPATH`. Download the project into your `GOPATH` directory by using `go get` or cloning it manually.
@@ -10,10 +10,11 @@ Building the project will only work if the project is in your `GOPATH`. Download
 $ go get github.com/kubernetes-incubator/nfs-provisioner
 ```
 
-Now build the project and the Docker image by running `make container` in the project directory.
+Now build the project and the Docker image by checking out the latest release and running `make container` in the project directory.
 
 ```
 $ cd $GOPATH/src/github.com/kubernetes-incubator/nfs-provisioner
+$ git checkout tags/v1.0.0
 $ make container
 ```
 
@@ -22,7 +23,7 @@ $ make container
 If you are running in Kubernetes, it will pull the image from Docker Hub for you. Or you can do it yourself.
 
 ```
-$ docker pull wongma7/nfs-provisioner:latest
+$ docker pull wongma7/nfs-provisioner:v1.0.0
 ```
 
 ## Deploying the provisioner
@@ -117,11 +118,11 @@ The container is going to need to run with one of `master` or `kubeconfig` set. 
 Run nfs-provisioner with `provisioner` equal to the name you decided on, and one of `master` or `kubeconfig` set. It needs to be run with capability `DAC_READ_SEARCH`.
 
 ```
-$ docker run --cap-add DAC_READ_SEARCH -v $HOME/.kube:/.kube:Z wongma7/nfs-provisioner:latest -provisioner=matthew/nfs -kubeconfig=/.kube/config
+$ docker run --cap-add DAC_READ_SEARCH -v $HOME/.kube:/.kube:Z wongma7/nfs-provisioner:v1.0.0 -provisioner=matthew/nfs -kubeconfig=/.kube/config
 ```
 or
 ```
-$ docker run --cap-add DAC_READ_SEARCH wongma7/nfs-provisioner:latest -provisioner=matthew/nfs -master=http://172.17.0.1:8080
+$ docker run --cap-add DAC_READ_SEARCH wongma7/nfs-provisioner:v1.0.0 -provisioner=matthew/nfs -master=http://172.17.0.1:8080
 ```
 
 You may want to create & mount a Docker volume at `/export` in the container. The `/export` directory is where the provisioner stores its provisioned `PersistentVolumes'` data, so by mounting a volume there, you specify it as the backing storage for provisioned PVs. The volume can then be reused by another container if the original container stops. Without Kubernetes you will have to manage the lifecycle yourself. You should give the container a stable IP somehow so that it can survive a restart to continue serving the shares in the volume.
@@ -131,7 +132,7 @@ You may also want to enable per-PV quota enforcement. It is based on xfs project
 With the two above options, the run command will look something like this.
 
 ```
-$ docker run --privileged -v $HOME/.kube:/.kube:Z -v /xfs:/export:Z wongma7/nfs-provisioner:latest -provisioner=matthew/nfs -kubeconfig=/.kube/config -enable-xfs-quota=true
+$ docker run --privileged -v $HOME/.kube:/.kube:Z -v /xfs:/export:Z wongma7/nfs-provisioner:v1.0.0 -provisioner=matthew/nfs -kubeconfig=/.kube/config -enable-xfs-quota=true
 ```
 
 ### Outside of Kubernetes - binary

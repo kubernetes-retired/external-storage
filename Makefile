@@ -23,7 +23,7 @@ else
     ifeq ($(COMMIT), $(shell git rev-list -n1 $(TAG)))
         VERSION := $(TAG)
     else
-        VERSION := $(TAG)-$(COMMIT)
+        VERSION := latest
     endif
 endif
 
