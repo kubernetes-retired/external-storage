@@ -1,7 +1,7 @@
 # Deployment
 
 ## Getting the provisioner image
-To get the Docker image onto the machine where you want to run nfs-provisioner, you can either build it or pull the latest version from Docker Hub.
+To get the Docker image onto the machine where you want to run nfs-provisioner, you can either build it or pull the newest release from Docker Hub. You may use the unstable `latest` tag if you wish, but all the example yamls reference the newest versioned release tag.
 
 ### Building
 Building the project will only work if the project is in your `GOPATH`. Download the project into your `GOPATH` directory by using `go get` or cloning it manually.
@@ -10,10 +10,11 @@ Building the project will only work if the project is in your `GOPATH`. Download
 $ go get github.com/kubernetes-incubator/nfs-provisioner
 ```
 
-Now build the project and the Docker image by running `make container` in the project directory.
+Now build the project and the Docker image by checking out the latest release and running `make container` in the project directory.
 
 ```
 $ cd $GOPATH/src/github.com/kubernetes-incubator/nfs-provisioner
+$ git checkout tags/v1.0.0
 $ make container
 ```
 
