@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-IMAGE = wongma7/nfs-provisioner
+IMAGE = quay.io/kubernetes_incubator/nfs-provisioner
 
 VERSION :=
 TAG := $(shell git describe --abbrev=0 --tags HEAD 2>/dev/null)
