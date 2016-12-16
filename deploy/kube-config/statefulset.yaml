@@ -51,7 +51,7 @@ spec:
               add:
                 - DAC_READ_SEARCH
           args:
-            - "-provisioner=matthew/nfs"
+            - "-provisioner=example.com/nfs"
           env:
             - name: POD_IP
               valueFrom:

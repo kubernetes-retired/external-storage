@@ -54,7 +54,7 @@ import (
 const StorageClassAnnotation = "volume.beta.kubernetes.io/storage-class"
 
 const (
-	pluginName = "matthew/nfs"
+	pluginName = "example.com/nfs"
 	// Requested size of the volume
 	requestedSize = "1500Mi"
 	// Expected size of the volume is the same, unlike cloud providers

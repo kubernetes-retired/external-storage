@@ -6,19 +6,19 @@ nfs-provisioner is an out-of-tree dynamic provisioner for Kubernetes 1.4. You ca
 It works just like in-tree dynamic provisioners: a `StorageClass` object can specify an instance of nfs-provisioner to be its `provisioner` like it specifies in-tree provisioners such as GCE or AWS. Then, the instance of nfs-provisioner will watch for `PersistentVolumeClaims` that ask for the `StorageClass` and automatically create NFS-backed `PersistentVolumes` for them. For more information on how dynamic provisioning works, see [the docs](http://kubernetes.io/docs/user-guide/persistent-volumes/) or [this blog post](http://blog.kubernetes.io/2016/10/dynamic-provisioning-and-storage-in-kubernetes.html).
 
 ## Quickstart
-Create a provisioner pod with the name `matthew/nfs`, by specifying the arg "-provisioner=matthew/nfs".
+Create a provisioner pod with the name `example.com/nfs`, by specifying the arg "-provisioner=example.com/nfs".
 ```
 $ kubectl create -f deploy/kube-config/pod.yaml
 pod "nfs-provisioner" created
 ```
 
-Create a `StorageClass` named "matthew" with `provisioner: matthew/nfs`.
+Create a `StorageClass` named "example-nfs" with `provisioner: example.com/nfs`.
 ```
 $ kubectl create -f deploy/kube-config/class.yaml
-storageclass "matthew" created
+storageclass "example-nfs" created
 ```
 
-Create a `PersistentVolumeClaim` with annotation `volume.beta.kubernetes.io/storage-class: "matthew"`
+Create a `PersistentVolumeClaim` with annotation `volume.beta.kubernetes.io/storage-class: "example-nfs"`
 ```
 $ kubectl create -f deploy/kube-config/claim.yaml
 persistentvolumeclaim "nfs" created
