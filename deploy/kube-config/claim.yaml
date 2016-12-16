@@ -3,7 +3,7 @@ apiVersion: v1
 metadata:
   name: nfs
   annotations:
-    volume.beta.kubernetes.io/storage-class: "matthew"
+    volume.beta.kubernetes.io/storage-class: "example-nfs"
 spec:
   accessModes:
     - ReadWriteMany

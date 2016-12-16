@@ -54,7 +54,7 @@ import (
 const StorageClassAnnotation = "volume.beta.kubernetes.io/storage-class"
 
 const (
-	pluginName = "matthew/nfs"
+	pluginName = "example.com/nfs"
 	// Requested size of the volume
 	requestedSize = "1500Mi"
 	// Expected size of the volume is the same, unlike cloud providers
@@ -304,7 +304,7 @@ func startProvisionerPod(c clientset.Interface, ns string) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "nfs-provisioner",
-					Image: "wongma7/nfs-provisioner:latest",
+					Image: "quay.io/kubernetes_incubator/nfs-provisioner:latest",
 					SecurityContext: &v1.SecurityContext{
 						Capabilities: &v1.Capabilities{
 							Add: []v1.Capability{"DAC_READ_SEARCH"},
@@ -380,7 +380,7 @@ func startProvisionerDeployment(c clientset.Interface, ns string) (*v1.Service, 
 		Expect(err).NotTo(HaveOccurred())
 	}
 	deployment.Spec.Template.Spec.Volumes[0].HostPath.Path = tmpDir
-	deployment.Spec.Template.Spec.Containers[0].Image = "wongma7/nfs-provisioner:latest"
+	deployment.Spec.Template.Spec.Containers[0].Image = "quay.io/kubernetes_incubator/nfs-provisioner:latest"
 	deployment.Spec.Template.Spec.Containers[0].Args = []string{
 		fmt.Sprintf("-provisioner=%s", pluginName),
 		"-grace-period=10",

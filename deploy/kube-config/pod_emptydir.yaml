@@ -5,7 +5,7 @@ metadata:
 spec:
   containers:
     - name: nfs-provisioner
-      image: wongma7/nfs-provisioner:v1.0.0
+      image: quay.io/kubernetes_incubator/nfs-provisioner:v1.0.0
       ports:
         - name: nfs
           containerPort: 2049
@@ -21,7 +21,7 @@ spec:
           add:
             - DAC_READ_SEARCH
       args:
-        - "-provisioner=matthew/nfs"
+        - "-provisioner=example.com/nfs"
         - "-grace-period=0"
       env:
         - name: POD_IP

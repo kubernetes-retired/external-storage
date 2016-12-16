@@ -11,7 +11,7 @@ Name the `StorageClass` however you like; the name is how claims will request th
  
 ```
 $ kubectl create -f deploy/kube-config/class.yaml
-storageclass "matthew" created
+storageclass "example-nfs" created
 ```
 
 Now if everything is working correctly, when you create a claim requesting the class you just created, the provisioner will automatically create a volume.
