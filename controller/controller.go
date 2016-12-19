@@ -240,7 +240,7 @@ func NewProvisionController(
 }
 
 func (ctrl *ProvisionController) Run(stopCh <-chan struct{}) {
-	glog.Infof("Starting nfs provisioner controller %s!", string(ctrl.identity))
+	glog.Infof("Starting provisioner controller %s!", string(ctrl.identity))
 	go ctrl.claimController.Run(stopCh)
 	go ctrl.volumeController.Run(stopCh)
 	go ctrl.classReflector.RunUntil(stopCh)
