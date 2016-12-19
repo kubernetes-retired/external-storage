@@ -4,7 +4,7 @@ Prior to the release of the dynamic provisioning feature, [promoted to beta in K
 
 But what if Kubernetes does not yet include a provisioner for your preferred volume plugin? Kubernetes 1.5 introduces support for [external or out-of-tree provisioners](https://github.com/kubernetes/kubernetes/pull/30285): it now respects any `StorageClass` that specifies a provisioner it doesn't recognize, letting an external provisioner, which can be written, shipped and run independent of Kubernetes, handle it instead. [nfs-provisioner](https://github.com/kubernetes-incubator/nfs-provisioner) is an example of such an external provisioner. 
 
-nfs-provisioner creates NFS-backed PV's, leveraging the NFS volume plugin of Kubernetes, so given the ubiquity of NFS it will work almost anywhere. It's ideal for local clusters and dev work, any place a PV is wanted but not the manual work of creating one. We'll demonstrate how to get it quickly up and running, following a variation of the [official NFS example](https://github.com/kubernetes/kubernetes/tree/release-1.5/examples/volumes/nfs).
+nfs-provisioner creates NFS-backed PV's, leveraging the NFS volume plugin of Kubernetes, so given the ubiquity of NFS it will work almost anywhere. It's ideal for local clusters and dev work, any place a PV is wanted but not the manual work of creating one. We'll demonstrate how to get it quickly up and running, following a variation of the Kubernetes repo's [NFS example](https://github.com/kubernetes/kubernetes/tree/release-1.5/examples/volumes/nfs).
 
 Because it just needs to be able to talk to the Kubernetes API (using [client-go](https://github.com/kubernetes/client-go)), there is a lot of flexibility in how it is run. It can be run in Kubernetes as a `Pod`, `Deployment`, `StatefulSet`, or `DaemonSet`; as a standalone Docker container; or as a standalone binary. We'll demonstrate running as a deployment. All the yaml files we'll use can be found under the `demo` directory of the repo, [here](https://github.com/kubernetes-incubator/nfs-provisioner/tree/master/demo).
 
@@ -76,7 +76,7 @@ If you don't see a PV bound to your PVC, check the deployment's provisioner pod'
 
 Now we have an NFS-backed PVC & PV pair that is exactly like what is expected by the official Kubernetes NFS example, so we'll finish the [example](https://github.com/kubernetes/kubernetes/tree/release-1.5/examples/volumes/nfs#setup-the-fake-backend) to show our storage works, can be shared, and persists. If you don't need that proof, you can skip ahead to the part where we discuss deleting and cleaning up the provisioner and its storage.
 
-We setup the fake backend that updates index.html on the NFS server every 10 seconds. And check that our mounts are working.
+We setup the fake backend that updates `index.html` on the NFS server every 10 seconds. And check that our mounts are working.
 
 ```console
 $ kubectl create -f demo/nfs-busybox-rc.yaml
@@ -156,7 +156,7 @@ persistentvolumeclaim "nfs" deleted
 $ kubectl get pv
 ```
 
-Note that deleting an nfs-provisioner instance won't delete the PV's it created, so before we do so we need to make sure none still exist as they would be useless for as long as the provisioner is down.
+Note that deleting an nfs-provisioner instance won't delete the PV's it created, so before we do so we need to make sure none still exist as they would be useless for as long as the provisioner is gone.
 
 ```console
 $ kubectl delete deployment nfs-provisioner
