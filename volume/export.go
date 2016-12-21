@@ -96,9 +96,9 @@ type ganeshaExporter struct {
 
 var _ exporter = &ganeshaExporter{}
 
-func newGaneshaExporter(ganeshaConfig string) exporter {
+func newGaneshaExporter(ganeshaConfig string, rootSquash bool) exporter {
 	return &ganeshaExporter{
-		genericExporter: *newGenericExporter(&ganeshaExportBlockCreator{}, ganeshaConfig, regexp.MustCompile("Export_Id = ([0-9]+);")),
+		genericExporter: *newGenericExporter(&ganeshaExportBlockCreator{rootSquash}, ganeshaConfig, regexp.MustCompile("Export_Id = ([0-9]+);")),
 	}
 }
 
@@ -140,18 +140,25 @@ func (e *ganeshaExporter) Unexport(volume *v1.PersistentVolume) error {
 	return nil
 }
 
-type ganeshaExportBlockCreator struct{}
+type ganeshaExportBlockCreator struct {
+	// Whether to export with squash = root_id_squash, not no_root_squash
+	rootSquash bool
+}
 
 var _ exportBlockCreator = &ganeshaExportBlockCreator{}
 
 // CreateBlock creates the text block to add to the ganesha config file.
 func (e *ganeshaExportBlockCreator) CreateExportBlock(exportId, path string) string {
+	squash := "no_root_squash"
+	if e.rootSquash {
+		squash = "root_id_squash"
+	}
 	return "\nEXPORT\n{\n" +
 		"\tExport_Id = " + exportId + ";\n" +
 		"\tPath = " + path + ";\n" +
 		"\tPseudo = " + path + ";\n" +
 		"\tAccess_Type = RW;\n" +
-		"\tSquash = root_id_squash;\n" +
+		"\tSquash = " + squash + ";\n" +
 		"\tSecType = sys;\n" +
 		"\tFilesystem_id = " + exportId + "." + exportId + ";\n" +
 		"\tFSAL {\n\t\tName = VFS;\n\t}\n}\n"
@@ -163,9 +170,9 @@ type kernelExporter struct {
 
 var _ exporter = &kernelExporter{}
 
-func newKernelExporter() exporter {
+func newKernelExporter(rootSquash bool) exporter {
 	return &kernelExporter{
-		genericExporter: *newGenericExporter(&kernelExportBlockCreator{}, "/etc/exports", regexp.MustCompile("fsid=([0-9]+)")),
+		genericExporter: *newGenericExporter(&kernelExportBlockCreator{rootSquash}, "/etc/exports", regexp.MustCompile("fsid=([0-9]+)")),
 	}
 }
 
@@ -192,11 +199,18 @@ func (e *kernelExporter) Unexport(volume *v1.PersistentVolume) error {
 	return nil
 }
 
-type kernelExportBlockCreator struct{}
+type kernelExportBlockCreator struct {
+	// Whether to export with option root_squash, not no_root_squash
+	rootSquash bool
+}
 
 var _ exportBlockCreator = &kernelExportBlockCreator{}
 
 // CreateBlock creates the text block to add to the /etc/exports file.
 func (e *kernelExportBlockCreator) CreateExportBlock(exportId, path string) string {
-	return "\n" + path + " *(rw,insecure,root_squash,fsid=" + exportId + ")\n"
+	squash := "no_root_squash"
+	if e.rootSquash {
+		squash = "root_squash"
+	}
+	return "\n" + path + " *(rw,insecure," + squash + ",fsid=" + exportId + ")\n"
 }
