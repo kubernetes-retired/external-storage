@@ -71,12 +71,12 @@ const (
 	nodeEnv      = "NODE_NAME"
 )
 
-func NewNFSProvisioner(exportDir string, client kubernetes.Interface, useGanesha bool, ganeshaConfig string, enableXfsQuota bool) controller.Provisioner {
+func NewNFSProvisioner(exportDir string, client kubernetes.Interface, useGanesha bool, ganeshaConfig string, rootSquash bool, enableXfsQuota bool) controller.Provisioner {
 	var exporter exporter
 	if useGanesha {
-		exporter = newGaneshaExporter(ganeshaConfig)
+		exporter = newGaneshaExporter(ganeshaConfig, rootSquash)
 	} else {
-		exporter = newKernelExporter()
+		exporter = newKernelExporter(rootSquash)
 	}
 	var quotaer quotaer
 	var err error
