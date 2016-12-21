@@ -5,7 +5,7 @@ The nfs-provisioner has been deployed and is now watching for claims it should p
 Edit the `provisioner` field in `deploy/kube-config/class.yaml` to be the provisioner's name. Configure the `parameters`.
 
 ### Parameters
-* `gid`: `"none"` or a [supplemental group](http://kubernetes.io/docs/user-guide/security-context/) like `"1001"`. NFS shares will be created with permissions such that only pods running with the supplemental group can read & write to the share. Or if `"none"`, anybody can write to the share. Default (if omitted) `"none"`.
+* `gid`: `"none"` or a [supplemental group](http://kubernetes.io/docs/user-guide/security-context/) like `"1001"`. NFS shares will be created with permissions such that only pods running with the supplemental group can read & write to the share. Or if `"none"`, anybody can write to the share. This will only work in conjunction with the `root-squash` flag set true.  Default (if omitted) `"none"`.
 
 Name the `StorageClass` however you like; the name is how claims will request this class. Create the class.
  
