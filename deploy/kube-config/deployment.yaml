@@ -31,7 +31,7 @@ spec:
     spec:
       containers:
         - name: nfs-provisioner
-          image: quay.io/kubernetes_incubator/nfs-provisioner:v1.0.0
+          image: quay.io/kubernetes_incubator/nfs-provisioner:v1.0.1
           ports:
             - name: nfs
               containerPort: 2049
