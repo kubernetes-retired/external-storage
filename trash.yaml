@@ -15,7 +15,7 @@ github.com/fsnotify/fsnotify	v1.4.2-2-gfd9ec7d
 github.com/ghodss/yaml	bea76d6
 github.com/go-openapi/jsonpointer	8d96a2d
 github.com/go-openapi/jsonreference	36d33bf
-github.com/go-openapi/spec	d1c18b3
+github.com/go-openapi/spec	3a04341
 github.com/go-openapi/swag	3b6d86c
 github.com/gogo/protobuf	v0.3-127-g8d70fb3
 github.com/golang/glog	23def4e
