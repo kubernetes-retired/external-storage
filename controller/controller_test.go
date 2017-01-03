@@ -493,10 +493,9 @@ func newVolume(name string, phase v1.PersistentVolumePhase, policy v1.Persistent
 func newProvisionedVolume(storageClass *v1beta1.StorageClass, claim *v1.PersistentVolumeClaim) *v1.PersistentVolume {
 	// pv.Spec MUST be set to match requirements in claim.Spec, especially access mode and PV size. The provisioned volume size MUST NOT be smaller than size requested in the claim, however it MAY be larger.
 	options := VolumeOptions{
-		Capacity:                      claim.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)],
-		AccessModes:                   claim.Spec.AccessModes,
 		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 		PVName:     "pvc-" + string(claim.ObjectMeta.UID),
+		PVC:        claim,
 		Parameters: storageClass.Parameters,
 	}
 	volume, _ := newTestProvisioner().Provision(options)
@@ -540,9 +539,9 @@ func (p *testProvisioner) Provision(options VolumeOptions) (*v1.PersistentVolume
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: options.PersistentVolumeReclaimPolicy,
-			AccessModes:                   options.AccessModes,
+			AccessModes:                   options.PVC.Spec.AccessModes,
 			Capacity: v1.ResourceList{
-				v1.ResourceName(v1.ResourceStorage): options.Capacity,
+				v1.ResourceName(v1.ResourceStorage): options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)],
 			},
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				NFS: &v1.NFSVolumeSource{

@@ -19,8 +19,6 @@ package controller
 import (
 	"fmt"
 
-	"k8s.io/client-go/pkg/api/resource"
-	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/api/v1"
 )
 
@@ -54,17 +52,16 @@ func (e *IgnoredError) Error() string {
 // VolumeOptions contains option information about a volume
 // https://github.com/kubernetes/kubernetes/blob/release-1.4/pkg/volume/plugins.go
 type VolumeOptions struct {
-	// Capacity is the size of a volume.
-	Capacity resource.Quantity
-	// AccessModes of a volume
-	AccessModes []v1.PersistentVolumeAccessMode
 	// Reclamation policy for a persistent volume
 	PersistentVolumeReclaimPolicy v1.PersistentVolumeReclaimPolicy
 	// PV.Name of the appropriate PersistentVolume. Used to generate cloud
 	// volume name.
 	PVName string
+	// PVC is reference to the claim that lead to provisioning of a new PV.
+	// Provisioners *must* create a PV that would be matched by this PVC,
+	// i.e. with required capacity, accessMode, labels matching PVC.Selector and
+	// so on.
+	PVC *v1.PersistentVolumeClaim
 	// Volume provisioning parameters from StorageClass
 	Parameters map[string]string
-	// Volume selector from PersistentVolumeClaim
-	Selector *unversioned.LabelSelector
 }

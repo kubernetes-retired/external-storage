@@ -183,9 +183,9 @@ func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: options.PersistentVolumeReclaimPolicy,
-			AccessModes:                   options.AccessModes,
+			AccessModes:                   options.PVC.Spec.AccessModes,
 			Capacity: v1.ResourceList{
-				v1.ResourceName(v1.ResourceStorage): options.Capacity,
+				v1.ResourceName(v1.ResourceStorage): options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)],
 			},
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				NFS: &v1.NFSVolumeSource{
@@ -229,7 +229,7 @@ func (p *nfsProvisioner) createVolume(options controller.VolumeOptions) (string,
 		return "", "", 0, "", 0, "", 0, fmt.Errorf("error creating export for volume: %v", err)
 	}
 
-	projectBlock, projectId, err := p.createQuota(options.PVName, options.Capacity)
+	projectBlock, projectId, err := p.createQuota(options.PVName, options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)])
 	if err != nil {
 		os.RemoveAll(path)
 		return "", "", 0, "", 0, "", 0, fmt.Errorf("error creating quota for volume: %v", err)
@@ -258,7 +258,7 @@ func (p *nfsProvisioner) validateOptions(options controller.VolumeOptions) (stri
 	// TODO implement options.ProvisionerSelector parsing
 	// pv.Labels MUST be set to match claim.spec.selector
 	// gid selector? with or without pv annotation?
-	if options.Selector != nil {
+	if options.PVC.Spec.Selector != nil {
 		return "", fmt.Errorf("claim.Spec.Selector is not supported")
 	}
 
@@ -266,10 +266,11 @@ func (p *nfsProvisioner) validateOptions(options controller.VolumeOptions) (stri
 	if err := syscall.Statfs(p.exportDir, &stat); err != nil {
 		return "", fmt.Errorf("error calling statfs on %v: %v", p.exportDir, err)
 	}
-	capacity := options.Capacity.Value()
+	capacity := options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
+	requestBytes := capacity.Value()
 	available := int64(stat.Bavail) * int64(stat.Bsize)
-	if capacity > available {
-		return "", fmt.Errorf("insufficient available space %v bytes to satisfy claim for %v bytes", available, capacity)
+	if requestBytes > available {
+		return "", fmt.Errorf("insufficient available space %v bytes to satisfy claim for %v bytes", available, requestBytes)
 	}
 
 	return gid, nil
