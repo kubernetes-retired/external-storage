@@ -267,7 +267,7 @@ func (p *nfsProvisioner) validateOptions(options controller.VolumeOptions) (stri
 		return "", fmt.Errorf("error calling statfs on %v: %v", p.exportDir, err)
 	}
 	capacity := options.Capacity.Value()
-	available := int64(stat.Bavail) * stat.Bsize
+	available := int64(stat.Bavail) * int64(stat.Bsize)
 	if capacity > available {
 		return "", fmt.Errorf("insufficient available space %v bytes to satisfy claim for %v bytes", available, capacity)
 	}

@@ -28,7 +28,8 @@ else
 endif
 
 all build:
-	go build
+	GOOS=linux go install -v
+	GOOS=linux go build
 .PHONY: all build
 
 container: build quick-container
