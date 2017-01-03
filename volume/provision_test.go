@@ -55,10 +55,9 @@ func TestCreateVolume(t *testing.T) {
 		{
 			name: "succeed creating volume",
 			options: controller.VolumeOptions{
-				Capacity:                      resource.MustParse("1Ki"),
-				AccessModes:                   []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany},
 				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 				PVName:     "pvc-1",
+				PVC:        newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
 				Parameters: map[string]string{},
 			},
 			envKey:           podIPEnv,
@@ -72,10 +71,9 @@ func TestCreateVolume(t *testing.T) {
 		{
 			name: "succeed creating volume again",
 			options: controller.VolumeOptions{
-				Capacity:                      resource.MustParse("1Ki"),
-				AccessModes:                   []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany},
 				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 				PVName:     "pvc-2",
+				PVC:        newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
 				Parameters: map[string]string{},
 			},
 			envKey:           podIPEnv,
@@ -89,10 +87,9 @@ func TestCreateVolume(t *testing.T) {
 		{
 			name: "bad parameter",
 			options: controller.VolumeOptions{
-				Capacity:                      resource.MustParse("1Ki"),
-				AccessModes:                   []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany},
 				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 				PVName:     "pvc-3",
+				PVC:        newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
 				Parameters: map[string]string{"foo": "bar"},
 			},
 			envKey:           podIPEnv,
@@ -106,10 +103,9 @@ func TestCreateVolume(t *testing.T) {
 		{
 			name: "bad server",
 			options: controller.VolumeOptions{
-				Capacity:                      resource.MustParse("1Ki"),
-				AccessModes:                   []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany},
 				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 				PVName:     "pvc-4",
+				PVC:        newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
 				Parameters: map[string]string{},
 			},
 			envKey:           serviceEnv,
@@ -123,10 +119,9 @@ func TestCreateVolume(t *testing.T) {
 		{
 			name: "dir already exists",
 			options: controller.VolumeOptions{
-				Capacity:                      resource.MustParse("1Ki"),
-				AccessModes:                   []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany},
 				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 				PVName:     "pvc-1",
+				PVC:        newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
 				Parameters: map[string]string{},
 			},
 			envKey:           podIPEnv,
@@ -140,10 +135,9 @@ func TestCreateVolume(t *testing.T) {
 		{
 			name: "error exporting",
 			options: controller.VolumeOptions{
-				Capacity:                      resource.MustParse("1Ki"),
-				AccessModes:                   []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany},
 				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 				PVName:     "FAIL_TO_EXPORT_ME",
+				PVC:        newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
 				Parameters: map[string]string{},
 			},
 			envKey:           podIPEnv,
@@ -190,20 +184,29 @@ func TestValidateOptions(t *testing.T) {
 		expectError bool
 	}{
 		{
-			name:        "empty parameters",
-			options:     controller.VolumeOptions{Parameters: map[string]string{}, Capacity: resource.MustParse("1Ki")},
+			name: "empty parameters",
+			options: controller.VolumeOptions{
+				Parameters: map[string]string{},
+				PVC:        newClaim(resource.MustParse("1Ki"), nil, nil),
+			},
 			expectedGid: "none",
 			expectError: false,
 		},
 		{
-			name:        "gid parameter value 'none'",
-			options:     controller.VolumeOptions{Parameters: map[string]string{"gid": "none"}, Capacity: resource.MustParse("1Ki")},
+			name: "gid parameter value 'none'",
+			options: controller.VolumeOptions{
+				Parameters: map[string]string{"gid": "none"},
+				PVC:        newClaim(resource.MustParse("1Ki"), nil, nil),
+			},
 			expectedGid: "none",
 			expectError: false,
 		},
 		{
-			name:        "gid parameter value id",
-			options:     controller.VolumeOptions{Parameters: map[string]string{"gid": "1"}, Capacity: resource.MustParse("1Ki")},
+			name: "gid parameter value id",
+			options: controller.VolumeOptions{
+				Parameters: map[string]string{"gid": "1"},
+				PVC:        newClaim(resource.MustParse("1Ki"), nil, nil),
+			},
 			expectedGid: "1",
 			expectError: false,
 		},
@@ -233,14 +236,18 @@ func TestValidateOptions(t *testing.T) {
 		},
 		// TODO implement options.ProvisionerSelector parsing
 		{
-			name:        "non-nil selector",
-			options:     controller.VolumeOptions{Selector: &unversioned.LabelSelector{MatchLabels: nil}},
+			name: "non-nil selector",
+			options: controller.VolumeOptions{
+				PVC: newClaim(resource.MustParse("1Ki"), nil, &unversioned.LabelSelector{MatchLabels: nil}),
+			},
 			expectedGid: "",
 			expectError: true,
 		},
 		{
-			name:        "bad capacity",
-			options:     controller.VolumeOptions{Capacity: resource.MustParse("1Ei")},
+			name: "bad capacity",
+			options: controller.VolumeOptions{
+				PVC: newClaim(resource.MustParse("1Ei"), nil, nil),
+			},
 			expectedGid: "",
 			expectError: true,
 		},
@@ -557,6 +564,23 @@ func TestGetServer(t *testing.T) {
 		os.Unsetenv(namespaceEnv)
 		os.Unsetenv(nodeEnv)
 	}
+}
+
+func newClaim(capacity resource.Quantity, accessmodes []v1.PersistentVolumeAccessMode, selector *unversioned.LabelSelector) *v1.PersistentVolumeClaim {
+	claim := &v1.PersistentVolumeClaim{
+		ObjectMeta: v1.ObjectMeta{},
+		Spec: v1.PersistentVolumeClaimSpec{
+			AccessModes: accessmodes,
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): capacity,
+				},
+			},
+			Selector: selector,
+		},
+		Status: v1.PersistentVolumeClaimStatus{},
+	}
+	return claim
 }
 
 func newService(name, clusterIP string) *v1.Service {

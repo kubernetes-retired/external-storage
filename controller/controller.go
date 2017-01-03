@@ -481,11 +481,10 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 	}
 
 	options := VolumeOptions{
-		Capacity:    claim.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)],
-		AccessModes: claim.Spec.AccessModes,
 		// TODO SHOULD be set to `Delete` unless user manually congiures other reclaim policy.
 		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 		PVName:     pvName,
+		PVC:        claim,
 		Parameters: storageClass.Parameters,
 	}
 
