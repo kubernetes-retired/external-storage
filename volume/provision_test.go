@@ -156,7 +156,7 @@ func TestCreateVolume(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error creating file %s: %v", conf, err)
 	}
-	p := newNFSProvisionerInternal(tmpDir+"/", client, &testExporter{config: conf}, newDummyQuotaer())
+	p := newNFSProvisionerInternal(tmpDir+"/", client, false, &testExporter{config: conf}, newDummyQuotaer())
 
 	for _, test := range tests {
 		os.Setenv(test.envKey, "1.1.1.1")
@@ -254,7 +254,7 @@ func TestValidateOptions(t *testing.T) {
 	}
 
 	client := fake.NewSimpleClientset()
-	p := newNFSProvisionerInternal(tmpDir+"/", client, &testExporter{}, newDummyQuotaer())
+	p := newNFSProvisionerInternal(tmpDir+"/", client, false, &testExporter{}, newDummyQuotaer())
 
 	for _, test := range tests {
 		gid, err := p.validateOptions(test.options)
@@ -313,7 +313,7 @@ func TestCreateDirectory(t *testing.T) {
 	}
 
 	client := fake.NewSimpleClientset()
-	p := newNFSProvisionerInternal(tmpDir+"/", client, &testExporter{}, newDummyQuotaer())
+	p := newNFSProvisionerInternal(tmpDir+"/", client, false, &testExporter{}, newDummyQuotaer())
 
 	for _, test := range tests {
 		path := p.exportDir + test.directory
@@ -428,7 +428,8 @@ func TestGetServer(t *testing.T) {
 	tmpDir := utiltesting.MkTmpdirOrDie("nfsProvisionTest")
 	defer os.RemoveAll(tmpDir)
 
-	// service > node > podIP
+	// It should be node or service...but in case both exist, instead of failing
+	// just test for node > service > podIP (doesn't really matter after all)
 	tests := []struct {
 		name           string
 		objs           []runtime.Object
@@ -439,8 +440,45 @@ func TestGetServer(t *testing.T) {
 		expectedServer string
 		expectError    bool
 	}{
+
 		{
-			name: "valid service",
+			name:           "valid node only",
+			objs:           []runtime.Object{},
+			podIP:          "2.2.2.2",
+			service:        "",
+			namespace:      "",
+			node:           "127.0.0.1",
+			expectedServer: "127.0.0.1",
+			expectError:    false,
+		},
+		{
+			name: "valid node, valid service, should use node",
+			objs: []runtime.Object{
+				newService("foo", "1.1.1.1"),
+				newEndpoints("foo", []string{"2.2.2.2"}, []endpointPort{{2049, v1.ProtocolTCP}, {20048, v1.ProtocolTCP}, {111, v1.ProtocolUDP}, {111, v1.ProtocolTCP}}),
+			},
+			podIP:          "2.2.2.2",
+			service:        "foo",
+			namespace:      "default",
+			node:           "127.0.0.1",
+			expectedServer: "127.0.0.1",
+			expectError:    false,
+		},
+		{
+			name: "invalid service, valid node, should use node",
+			objs: []runtime.Object{
+				newService("foo", "1.1.1.1"),
+				newEndpoints("foo", []string{"3.3.3.3"}, []endpointPort{{2049, v1.ProtocolTCP}, {20048, v1.ProtocolTCP}, {111, v1.ProtocolUDP}, {111, v1.ProtocolTCP}}),
+			},
+			podIP:          "2.2.2.2",
+			service:        "foo",
+			namespace:      "default",
+			node:           "127.0.0.1",
+			expectedServer: "127.0.0.1",
+			expectError:    false,
+		},
+		{
+			name: "valid service only",
 			objs: []runtime.Object{
 				newService("foo", "1.1.1.1"),
 				newEndpoints("foo", []string{"2.2.2.2"}, []endpointPort{{2049, v1.ProtocolTCP}, {20048, v1.ProtocolTCP}, {111, v1.ProtocolUDP}, {111, v1.ProtocolTCP}}),
@@ -451,6 +489,19 @@ func TestGetServer(t *testing.T) {
 			node:           "",
 			expectedServer: "1.1.1.1",
 			expectError:    false,
+		},
+		{
+			name: "valid service but no namespace",
+			objs: []runtime.Object{
+				newService("foo", "1.1.1.1"),
+				newEndpoints("foo", []string{"2.2.2.2"}, []endpointPort{{2049, v1.ProtocolTCP}, {20048, v1.ProtocolTCP}, {111, v1.ProtocolUDP}, {111, v1.ProtocolTCP}}),
+			},
+			podIP:          "2.2.2.2",
+			service:        "foo",
+			namespace:      "",
+			node:           "",
+			expectedServer: "",
+			expectError:    true,
 		},
 		{
 			name: "invalid service, ports don't match exactly",
@@ -479,53 +530,17 @@ func TestGetServer(t *testing.T) {
 			expectError:    true,
 		},
 		{
-			name: "invalid service, should error even though valid node",
-			objs: []runtime.Object{
-				newService("foo", "1.1.1.1"),
-				newEndpoints("foo", []string{"3.3.3.3"}, []endpointPort{{2049, v1.ProtocolTCP}, {20048, v1.ProtocolTCP}, {111, v1.ProtocolUDP}, {111, v1.ProtocolTCP}}),
-			},
-			podIP:          "2.2.2.2",
-			service:        "foo",
-			namespace:      "default",
-			node:           "127.0.0.1",
-			expectedServer: "",
-			expectError:    true,
-		},
-		{
-			name: "valid service but no namespace",
+			name: "service but no pod IP to check if valid",
 			objs: []runtime.Object{
 				newService("foo", "1.1.1.1"),
 				newEndpoints("foo", []string{"2.2.2.2"}, []endpointPort{{2049, v1.ProtocolTCP}, {20048, v1.ProtocolTCP}, {111, v1.ProtocolUDP}, {111, v1.ProtocolTCP}}),
 			},
-			podIP:          "2.2.2.2",
+			podIP:          "",
 			service:        "foo",
 			namespace:      "",
 			node:           "",
 			expectedServer: "",
 			expectError:    true,
-		},
-		{
-			name: "valid service, valid node, should use service",
-			objs: []runtime.Object{
-				newService("foo", "1.1.1.1"),
-				newEndpoints("foo", []string{"2.2.2.2"}, []endpointPort{{2049, v1.ProtocolTCP}, {20048, v1.ProtocolTCP}, {111, v1.ProtocolUDP}, {111, v1.ProtocolTCP}}),
-			},
-			podIP:          "2.2.2.2",
-			service:        "foo",
-			namespace:      "default",
-			node:           "127.0.0.1",
-			expectedServer: "1.1.1.1",
-			expectError:    false,
-		},
-		{
-			name:           "no service, valid node, should use node",
-			objs:           []runtime.Object{},
-			podIP:          "2.2.2.2",
-			service:        "",
-			namespace:      "",
-			node:           "127.0.0.1",
-			expectedServer: "127.0.0.1",
-			expectError:    false,
 		},
 		{
 			name:           "no service, no node, should use podIP",
@@ -553,7 +568,7 @@ func TestGetServer(t *testing.T) {
 		}
 
 		client := fake.NewSimpleClientset(test.objs...)
-		p := newNFSProvisionerInternal(tmpDir+"/", client, &testExporter{}, newDummyQuotaer())
+		p := newNFSProvisionerInternal(tmpDir+"/", client, false, &testExporter{}, newDummyQuotaer())
 
 		server, err := p.getServer()
 
