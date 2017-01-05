@@ -1,0 +1,16 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  name: hostpath-provisioner
+spec:
+  containers:
+    - name: hostpath-provisioner
+      image: hostpath-provisioner:latest
+      imagePullPolicy: "IfNotPresent"
+      volumeMounts:
+        - name: pv-volume
+          mountPath: /tmp/hostpath-provisioner
+  volumes:
+    - name: pv-volume
+      hostPath:
+        path: /tmp/hostpath-provisioner
