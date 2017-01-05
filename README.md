@@ -1,7 +1,7 @@
 # nfs-provisioner
 [![Build Status](https://travis-ci.org/kubernetes-incubator/nfs-provisioner.svg?branch=master)](https://travis-ci.org/kubernetes-incubator/nfs-provisioner)
 
-nfs-provisioner is an out-of-tree dynamic provisioner for Kubernetes 1.4. You can use it to quickly & easily deploy shared storage that works almost anywhere. Or it can help you write your own out-of-tree dynamic provisioner by serving as an example implementation of the requirements detailed in [the proposal](https://github.com/kubernetes/kubernetes/pull/30285).
+nfs-provisioner is an out-of-tree dynamic provisioner for Kubernetes 1.4. You can use it to quickly & easily deploy shared storage that works almost anywhere. Or it can help you write your own out-of-tree dynamic provisioner by serving as an example implementation of the requirements detailed in [the proposal](https://github.com/kubernetes/kubernetes/pull/30285). Go [here](./demo) for a demo of how to use it and [here](./demo/hostpath-provisioner) for an example of how to write your own.
 
 It works just like in-tree dynamic provisioners: a `StorageClass` object can specify an instance of nfs-provisioner to be its `provisioner` like it specifies in-tree provisioners such as GCE or AWS. Then, the instance of nfs-provisioner will watch for `PersistentVolumeClaims` that ask for the `StorageClass` and automatically create NFS-backed `PersistentVolumes` for them. For more information on how dynamic provisioning works, see [the docs](http://kubernetes.io/docs/user-guide/persistent-volumes/) or [this blog post](http://blog.kubernetes.io/2016/10/dynamic-provisioning-and-storage-in-kubernetes.html).
 
@@ -58,16 +58,16 @@ Deleting the `PersistentVolumeClaim` will cause the provisioner to delete the `P
 Deleting the provisioner deployment will cause any outstanding `PersistentVolumes` to become unusable for as long as the provisioner is gone.
 
 ## Running
+Go [here](./demo) for a demo of how to run nfs-provisioner. You may also/instead want to read the (dryer but more detailed) following docs.
+
 To deploy nfs-provisioner on a Kubernetes cluster see [Deployment](docs/deployment.md).
 
 To use nfs-provisioner once it is deployed see [Usage](docs/usage.md).
 
 For information on running multiple instances of nfs-provisioner see [Running Multiple Provisioners](docs/multiple.md).
 
-## Implementation 
-The controller, the code for which is in the `controller/` directory, watches PVCs and PVs to determine when to provision or delete volumes. It expects to receive an implementation of the `Provisioner` interface which has two methods: `Provision` and `Delete`. This NFS provisioner's implementation of the interface can be found under the `volume/` directory.
-
-So to create your own provisioner, you need to write your own implementation of the interface and pass it to the controller. Ideally you should be able to import the package to create the controller, without modifying any controller code. The passing in of the provisioner to the controller, and initialization of other things they might need (like a client for the Kubernetes API server), is done here in `main.go`.
+## Writing your own
+Go [here](./demo/hostpath-provisioner) for an example of how to write your own out-of-tree dynamic provisioner.
 
 ## Roadmap
 This is still alpha/experimental and will change to reflect the [out-of-tree dynamic provisioner proposal](https://github.com/kubernetes/kubernetes/pull/30285)
