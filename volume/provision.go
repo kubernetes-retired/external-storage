@@ -71,7 +71,7 @@ const (
 	nodeEnv      = "NODE_NAME"
 )
 
-func NewNFSProvisioner(exportDir string, client kubernetes.Interface, useGanesha bool, ganeshaConfig string, rootSquash bool, enableXfsQuota bool) controller.Provisioner {
+func NewNFSProvisioner(exportDir string, client kubernetes.Interface, outOfCluster bool, useGanesha bool, ganeshaConfig string, rootSquash bool, enableXfsQuota bool) controller.Provisioner {
 	var exporter exporter
 	if useGanesha {
 		exporter = newGaneshaExporter(ganeshaConfig, rootSquash)
@@ -88,10 +88,10 @@ func NewNFSProvisioner(exportDir string, client kubernetes.Interface, useGanesha
 	} else {
 		quotaer = newDummyQuotaer()
 	}
-	return newNFSProvisionerInternal(exportDir, client, exporter, quotaer)
+	return newNFSProvisionerInternal(exportDir, client, outOfCluster, exporter, quotaer)
 }
 
-func newNFSProvisionerInternal(exportDir string, client kubernetes.Interface, exporter exporter, quotaer quotaer) *nfsProvisioner {
+func newNFSProvisionerInternal(exportDir string, client kubernetes.Interface, outOfCluster bool, exporter exporter, quotaer quotaer) *nfsProvisioner {
 	if _, err := os.Stat(exportDir); os.IsNotExist(err) {
 		glog.Fatalf("exportDir %s does not exist!", exportDir)
 	}
@@ -115,6 +115,7 @@ func newNFSProvisionerInternal(exportDir string, client kubernetes.Interface, ex
 	provisioner := &nfsProvisioner{
 		exportDir:    exportDir,
 		client:       client,
+		outOfCluster: outOfCluster,
 		exporter:     exporter,
 		quotaer:      quotaer,
 		identity:     identity,
@@ -134,6 +135,10 @@ type nfsProvisioner struct {
 	// Client, needed for getting a service cluster IP to put as the NFS server of
 	// provisioned PVs
 	client kubernetes.Interface
+
+	// Whether the provisioner is running out of cluster and so cannot rely on
+	// the existence of any of the pod, service, namespace, node env variables.
+	outOfCluster bool
 
 	// The exporter to use for exporting NFS shares
 	exporter exporter
@@ -278,35 +283,37 @@ func (p *nfsProvisioner) validateOptions(options controller.VolumeOptions) (stri
 
 // getServer gets the server IP to put in a provisioned PV's spec.
 func (p *nfsProvisioner) getServer() (string, error) {
-	// Use either `hostname -i` or podIPEnv as the fallback server
-	var fallbackServer string
-	podIP := os.Getenv(p.podIPEnv)
-	if podIP == "" {
+	if p.outOfCluster {
+		// TODO make this better
 		out, err := exec.Command("hostname", "-i").Output()
 		if err != nil {
 			return "", fmt.Errorf("hostname -i failed with error: %v, output: %s", err, out)
 		}
-		fallbackServer = string(out)
-	} else {
-		fallbackServer = podIP
+		addresses := strings.Fields(string(out))
+		if len(addresses) > 0 {
+			return addresses[0], nil
+		}
+		return "", fmt.Errorf("hostname -i had bad output %s, no address to use", string(out))
 	}
 
-	// Try to use the service's cluster IP as the server if serviceEnv is
-	// specified. If not, try to use nodeName if nodeEnv is specified (assume the
-	// pod is using hostPort). If not again, use fallback here.
-	serviceName := os.Getenv(p.serviceEnv)
-	if serviceName == "" {
-		nodeName := os.Getenv(p.nodeEnv)
-		if nodeName == "" {
-			glog.Infof("service env %s isn't set and neither is node env %s, using `hostname -i`/pod IP %s as NFS server IP", p.serviceEnv, p.nodeEnv, fallbackServer)
-			return fallbackServer, nil
-		}
-		glog.Infof("service env %s isn't set and node env %s is, using node name %s as NFS server IP", p.serviceEnv, p.nodeEnv, nodeName)
+	nodeName := os.Getenv(p.nodeEnv)
+	if nodeName != "" {
+		glog.Infof("using node name %s=%s as NFS server IP", p.nodeEnv, nodeName)
 		return nodeName, nil
 	}
 
-	// From this point forward, rather than fallback & provision non-persistent
-	// where persistent is expected, just return an error.
+	podIP := os.Getenv(p.podIPEnv)
+	if podIP == "" {
+		return "", fmt.Errorf("pod IP env %s must be set even if intent is to use service cluster IP as NFS server IP", p.podIPEnv)
+	}
+
+	serviceName := os.Getenv(p.serviceEnv)
+	if serviceName == "" {
+		glog.Infof("using potentially unstable pod IP %s=%s as NFS server IP (because neither service env %s nor node env %s are set)", p.podIPEnv, podIP, p.serviceEnv, p.nodeEnv)
+		return podIP, nil
+	}
+
+	// Service env was set, now find and validate it
 	namespace := os.Getenv(p.namespaceEnv)
 	if namespace == "" {
 		return "", fmt.Errorf("service env %s is set but namespace env %s isn't; no way to get the service cluster IP", p.serviceEnv, p.namespaceEnv)
@@ -333,7 +340,7 @@ func (p *nfsProvisioner) getServer() (string, error) {
 		if len(subset.Addresses) != 1 {
 			continue
 		}
-		if subset.Addresses[0].IP != fallbackServer {
+		if subset.Addresses[0].IP != podIP {
 			continue
 		}
 		actualPorts := make(map[endpointPort]bool)
@@ -347,12 +354,13 @@ func (p *nfsProvisioner) getServer() (string, error) {
 		break
 	}
 	if !valid {
-		return "", fmt.Errorf("service %s=%s is not valid; check that it has for ports %v one endpoint, this pod's IP %v", p.serviceEnv, serviceName, expectedPorts, fallbackServer)
+		return "", fmt.Errorf("service %s=%s is not valid; check that it has for ports %v one endpoint, this pod's IP %s=%s", p.serviceEnv, serviceName, expectedPorts, p.podIPEnv, podIP)
 	}
 	if service.Spec.ClusterIP == v1.ClusterIPNone {
 		return "", fmt.Errorf("service %s=%s is valid but it doesn't have a cluster IP", p.serviceEnv, serviceName)
 	}
 
+	glog.Infof("using service %s=%s cluster IP %s as NFS server IP", p.serviceEnv, serviceName, service.Spec.ClusterIP)
 	return service.Spec.ClusterIP, nil
 }
 
