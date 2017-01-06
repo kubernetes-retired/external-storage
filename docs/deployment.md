@@ -67,7 +67,7 @@ deployment "nfs-provisioner" created
 
 ### In Kubernetes - StatefulSet of 1 replica
 
-The procedure for running a stateful set is identical to [that for a deployment, above,](#in-kubernetes---deployment) so wherever you see `deployment` there, replace it with `statefulset`. The benefit is that you get a stable hostname. But note that stateful sets are in beta. Note that the service cannot be headless, unlike in most examples of stateful sets.
+The procedure for running a stateful set is identical to [that for a deployment, above,](#in-kubernetes---deployment-of-1-replica) so wherever you see `deployment` there, replace it with `statefulset`. The benefit is that you get a stable hostname. But note that stateful sets are in beta. Note that the service cannot be headless, unlike in most examples of stateful sets.
 
 
 ### In Kubernetes - DaemonSet
