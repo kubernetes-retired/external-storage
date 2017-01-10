@@ -121,7 +121,6 @@ type LeaderElector struct {
 func (le *LeaderElector) Run(task <-chan bool) {
 	defer func() {
 		runtime.HandleCrash()
-		le.config.Callbacks.OnStoppedLeading()
 	}()
 	over := le.acquire(task)
 	if over {
@@ -136,6 +135,7 @@ func (le *LeaderElector) Run(task <-chan bool) {
 	}()
 	le.renew(task, timeout)
 	close(stop)
+	le.config.Callbacks.OnStoppedLeading()
 }
 
 // GetLeader returns the identity of the last observed leader or returns the empty string if
