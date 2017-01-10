@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	rl "github.com/kubernetes-incubator/nfs-provisioner/controller/leaderelection/resourcelock"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	fakev1core "k8s.io/client-go/kubernetes/typed/core/v1/fake"
@@ -44,6 +45,7 @@ const (
 	resyncPeriod = 100 * time.Millisecond
 )
 
+// TODO clean this up, e.g. remove redundant params (provisionerName: "foo.bar/baz")
 func TestController(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -401,6 +403,51 @@ func TestShouldDelete(t *testing.T) {
 		if test.expectedShould != should {
 			t.Logf("test case: %s", test.name)
 			t.Errorf("expected should delete %v but got %v\n", test.expectedShould, should)
+		}
+	}
+}
+
+func TestIsOnlyRecordUpdate(t *testing.T) {
+	tests := []struct {
+		name       string
+		old        *v1.PersistentVolumeClaim
+		new        *v1.PersistentVolumeClaim
+		expectedIs bool
+	}{
+		{
+			name:       "is only record update",
+			old:        newClaim("claim-1", "1-1", "class-1", "", map[string]string{rl.LeaderElectionRecordAnnotationKey: "a"}),
+			new:        newClaim("claim-1", "1-1", "class-1", "", map[string]string{rl.LeaderElectionRecordAnnotationKey: "b"}),
+			expectedIs: true,
+		},
+		{
+			name:       "is seen as only record update, stayed exactly the same",
+			old:        newClaim("claim-1", "1-1", "class-1", "", map[string]string{rl.LeaderElectionRecordAnnotationKey: "a"}),
+			new:        newClaim("claim-1", "1-1", "class-1", "", map[string]string{rl.LeaderElectionRecordAnnotationKey: "a"}),
+			expectedIs: true,
+		},
+		{
+			name:       "isn't only record update, class changed as well",
+			old:        newClaim("claim-1", "1-1", "class-1", "", map[string]string{rl.LeaderElectionRecordAnnotationKey: "a"}),
+			new:        newClaim("claim-1", "1-1", "class-2", "", map[string]string{rl.LeaderElectionRecordAnnotationKey: "b"}),
+			expectedIs: false,
+		},
+		{
+			name:       "isn't only record update, only class changed",
+			old:        newClaim("claim-1", "1-1", "class-1", "", map[string]string{rl.LeaderElectionRecordAnnotationKey: "a"}),
+			new:        newClaim("claim-1", "1-1", "class-2", "", map[string]string{rl.LeaderElectionRecordAnnotationKey: "a"}),
+			expectedIs: false,
+		},
+	}
+	for _, test := range tests {
+		client := fake.NewSimpleClientset()
+		provisioner := newTestProvisioner()
+		ctrl := newTestProvisionController(client, resyncPeriod, "foo.bar/baz", provisioner, "v1.5.0", false)
+
+		is, _ := ctrl.isOnlyRecordUpdate(test.old, test.new)
+		if test.expectedIs != is {
+			t.Logf("test case: %s", test.name)
+			t.Errorf("expected is only record update %v but got %v\n", test.expectedIs, is)
 		}
 	}
 }
