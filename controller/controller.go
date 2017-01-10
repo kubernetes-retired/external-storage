@@ -19,6 +19,7 @@ package controller
 import (
 	"fmt"
 	"os/exec"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -278,7 +279,35 @@ func (ctrl *ProvisionController) addClaim(obj interface{}) {
 // On update claim, pass the new claim to addClaim. Updates occur at least every
 // resyncPeriod.
 func (ctrl *ProvisionController) updateClaim(oldObj, newObj interface{}) {
-	ctrl.addClaim(newObj)
+	// If they are exactly the same it must be a forced resync (every
+	// resyncPeriod).
+	if reflect.DeepEqual(oldObj, newObj) {
+		ctrl.addClaim(newObj)
+		return
+	}
+
+	// If not a forced resync, we filter out the frequent leader election record
+	// annotation changes by checking if the only update is in the annotation
+	oldClaim, ok := oldObj.(*v1.PersistentVolumeClaim)
+	if !ok {
+		glog.Errorf("Expected PersistentVolumeClaim but handler received %#v", oldObj)
+		return
+	}
+	newClaim, ok := newObj.(*v1.PersistentVolumeClaim)
+	if !ok {
+		glog.Errorf("Expected PersistentVolumeClaim but handler received %#v", newObj)
+		return
+	}
+
+	skipAddClaim, err := ctrl.isOnlyRecordUpdate(oldClaim, newClaim)
+	if err != nil {
+		glog.Errorf("Error checking if only record was updated in claim: %v")
+		return
+	}
+
+	if !skipAddClaim {
+		ctrl.addClaim(newObj)
+	}
 }
 
 // On update volume, check if the updated volume should be deleted and delete if
@@ -296,6 +325,42 @@ func (ctrl *ProvisionController) updateVolume(oldObj, newObj interface{}) {
 			return ctrl.deleteVolumeOperation(volume)
 		})
 	}
+}
+
+// isOnlyRecordUpdate checks if the only update between the old & new claim is
+// the leader election record annotation.
+func (ctrl *ProvisionController) isOnlyRecordUpdate(oldClaim, newClaim *v1.PersistentVolumeClaim) (bool, error) {
+	old, err := ctrl.removeRecord(oldClaim)
+	if err != nil {
+		return false, err
+	}
+	new, err := ctrl.removeRecord(newClaim)
+	if err != nil {
+		return false, err
+	}
+	return reflect.DeepEqual(old, new), nil
+}
+
+// removeRecord returns a claim with its leader election record annotation and
+// ResourceVersion set blank
+func (ctrl *ProvisionController) removeRecord(claim *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
+	clone, err := api.Scheme.DeepCopy(claim)
+	if err != nil {
+		return nil, fmt.Errorf("Error cloning claim: %v", err)
+	}
+	claimClone, ok := clone.(*v1.PersistentVolumeClaim)
+	if !ok {
+		return nil, fmt.Errorf("Unexpected claim cast error: %v", claimClone)
+	}
+
+	if claimClone.Annotations == nil {
+		claimClone.Annotations = make(map[string]string)
+	}
+	claimClone.Annotations[rl.LeaderElectionRecordAnnotationKey] = ""
+
+	claimClone.ResourceVersion = ""
+
+	return claimClone, nil
 }
 
 func (ctrl *ProvisionController) shouldProvision(claim *v1.PersistentVolumeClaim) bool {
