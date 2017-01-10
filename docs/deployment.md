@@ -14,7 +14,7 @@ Now build the project and the Docker image by checking out the latest release an
 
 ```
 $ cd $GOPATH/src/github.com/kubernetes-incubator/nfs-provisioner
-$ git checkout tags/v1.0.1
+$ git checkout tags/v1.0.2
 $ make container
 ```
 
@@ -23,7 +23,7 @@ $ make container
 If you are running in Kubernetes, it will pull the image from Quay for you. Or you can do it yourself.
 
 ```
-$ docker pull quay.io/kubernetes_incubator/nfs-provisioner:v1.0.1
+$ docker pull quay.io/kubernetes_incubator/nfs-provisioner:v1.0.2
 ```
 
 ## Deploying the provisioner
@@ -101,11 +101,11 @@ The container is going to need to run with one of `master` or `kubeconfig` set. 
 Run nfs-provisioner with `provisioner` equal to the name you decided on, and one of `master` or `kubeconfig` set. It needs to be run with capability `DAC_READ_SEARCH`.
 
 ```
-$ docker run --cap-add DAC_READ_SEARCH -v $HOME/.kube:/.kube:Z quay.io/kubernetes_incubator/nfs-provisioner:v1.0.1 -provisioner=example.com/nfs -kubeconfig=/.kube/config
+$ docker run --cap-add DAC_READ_SEARCH -v $HOME/.kube:/.kube:Z quay.io/kubernetes_incubator/nfs-provisioner:v1.0.2 -provisioner=example.com/nfs -kubeconfig=/.kube/config
 ```
 or
 ```
-$ docker run --cap-add DAC_READ_SEARCH quay.io/kubernetes_incubator/nfs-provisioner:v1.0.1 -provisioner=example.com/nfs -master=http://172.17.0.1:8080
+$ docker run --cap-add DAC_READ_SEARCH quay.io/kubernetes_incubator/nfs-provisioner:v1.0.2 -provisioner=example.com/nfs -master=http://172.17.0.1:8080
 ```
 
 You may want to create & mount a Docker volume at `/export` in the container. The `/export` directory is where the provisioner stores its provisioned `PersistentVolumes'` data, so by mounting a volume there, you specify it as the backing storage for provisioned PVs. The volume can then be reused by another container if the original container stops. Without Kubernetes you will have to manage the lifecycle yourself. You should give the container a stable IP somehow so that it can survive a restart to continue serving the shares in the volume.
@@ -115,7 +115,7 @@ You may also want to enable per-PV quota enforcement. It is based on xfs project
 With the two above options, the run command will look something like this.
 
 ```
-$ docker run --privileged -v $HOME/.kube:/.kube:Z -v /xfs:/export:Z quay.io/kubernetes_incubator/nfs-provisioner:v1.0.1 -provisioner=example.com/nfs -kubeconfig=/.kube/config -enable-xfs-quota=true
+$ docker run --privileged -v $HOME/.kube:/.kube:Z -v /xfs:/export:Z quay.io/kubernetes_incubator/nfs-provisioner:v1.0.2 -provisioner=example.com/nfs -kubeconfig=/.kube/config -enable-xfs-quota=true
 ```
 
 ### Outside of Kubernetes - binary
