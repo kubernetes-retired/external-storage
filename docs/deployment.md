@@ -98,14 +98,23 @@ daemonset "nfs-provisioner" created
 
 The container is going to need to run with one of `master` or `kubeconfig` set. For the `kubeconfig` argument to work, the config file, and any certificate files it references by path like `certificate-authority: /var/run/kubernetes/apiserver.crt`, need to be inside the container somehow. This can be done by creating Docker volumes, or copying the files into the folder where the Dockerfile is and adding lines like `COPY config /.kube/config` to the Dockerfile before building the image. 
 
-Run nfs-provisioner with `provisioner` equal to the name you decided on, and one of `master` or `kubeconfig` set. It needs to be run with capability `DAC_READ_SEARCH`.
+Run nfs-provisioner with `provisioner` equal to the name you decided on, and one of `master` or `kubeconfig` set. It needs to be run with capability `DAC_READ_SEARCH`. If you are using Docker 1.10 or newer, it also needs a more permissive seccomp profile: `unconfined` or `deploy/Docker/nfs-provisioner-seccomp.json`.
 
 ```
-$ docker run --cap-add DAC_READ_SEARCH -v $HOME/.kube:/.kube:Z quay.io/kubernetes_incubator/nfs-provisioner:v1.0.2 -provisioner=example.com/nfs -kubeconfig=/.kube/config
+$ docker run --cap-add DAC_READ_SEARCH \
+--security-opt seccomp:deploy/docker/nfs-provisioner-seccomp.json \
+-v $HOME/.kube:/.kube:Z \
+quay.io/kubernetes_incubator/nfs-provisioner:v1.0.2 \
+-provisioner=example.com/nfs \
+-kubeconfig=/.kube/config
 ```
 or
 ```
-$ docker run --cap-add DAC_READ_SEARCH quay.io/kubernetes_incubator/nfs-provisioner:v1.0.2 -provisioner=example.com/nfs -master=http://172.17.0.1:8080
+$ docker run --cap-add DAC_READ_SEARCH \
+--security-opt seccomp:deploy/docker/nfs-provisioner-seccomp.json \
+quay.io/kubernetes_incubator/nfs-provisioner:v1.0.2 \
+-provisioner=example.com/nfs \
+-master=http://172.17.0.1:8080
 ```
 
 You may want to create & mount a Docker volume at `/export` in the container. The `/export` directory is where the provisioner stores its provisioned `PersistentVolumes'` data, so by mounting a volume there, you specify it as the backing storage for provisioned PVs. The volume can then be reused by another container if the original container stops. Without Kubernetes you will have to manage the lifecycle yourself. You should give the container a stable IP somehow so that it can survive a restart to continue serving the shares in the volume.
@@ -115,7 +124,13 @@ You may also want to enable per-PV quota enforcement. It is based on xfs project
 With the two above options, the run command will look something like this.
 
 ```
-$ docker run --privileged -v $HOME/.kube:/.kube:Z -v /xfs:/export:Z quay.io/kubernetes_incubator/nfs-provisioner:v1.0.2 -provisioner=example.com/nfs -kubeconfig=/.kube/config -enable-xfs-quota=true
+$ docker run --privileged \
+-v $HOME/.kube:/.kube:Z \
+-v /xfs:/export:Z \
+quay.io/kubernetes_incubator/nfs-provisioner:v1.0.2 \
+-provisioner=example.com/nfs \
+-kubeconfig=/.kube/config \
+-enable-xfs-quota=true
 ```
 
 ### Outside of Kubernetes - binary
@@ -125,17 +140,27 @@ Running nfs-provisioner in this way allows it to manipulate exports directly on 
 Run nfs-provisioner with `provisioner` equal to the name you decided on, one of `master` or `kubeconfig` set, `run-server` set false, and `use-ganesha` set according to how the NFS server is running on the host. It probably needs to be run as root. 
 
 ```
-$ sudo ./nfs-provisioner -provisioner=example.com/nfs -kubeconfig=$HOME/.kube/config -run-server=false -use-ganesha=false
+$ sudo ./nfs-provisioner -provisioner=example.com/nfs \
+-kubeconfig=$HOME/.kube/config \
+-run-server=false \
+-use-ganesha=false
 ```
 or
 ```
-$ sudo ./nfs-provisioner -provisioner=example.com/nfs -master=http://0.0.0.0:8080 -run-server=false -use-ganesha=false
+$ sudo ./nfs-provisioner -provisioner=example.com/nfs \
+-master=http://0.0.0.0:8080 \
+-run-server=false \
+-use-ganesha=false
 ```
 
 You may want to enable per-PV quota enforcement. It is based on xfs project level quotas and so requires that the volume mounted at `/export` be xfs mounted with the prjquota/pquota option. Add the `-enable-xfs-quota=true` argument to enable it.
 
 ```
-$ sudo ./nfs-provisioner -provisioner=example.com/nfs -kubeconfig=$HOME/.kube/config -run-server=false -use-ganesha=false -enable-xfs-quota=true
+$ sudo ./nfs-provisioner -provisioner=example.com/nfs \
+-kubeconfig=$HOME/.kube/config \
+-run-server=false \
+-use-ganesha=false \
+-enable-xfs-quota=true
 ```
 
 ---
