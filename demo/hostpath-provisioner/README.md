@@ -113,10 +113,18 @@ Now all that's left is to connect our `Provisioner` with a `ProvisionController`
 
 We need to create a couple of things the controller expects as arguments, including our `hostPathProvisioner`, before we create and run it. First we create a client for communicating with Kubernetes from within a pod. We use it to determine the server version of Kubernetes. Then we create our `hostPathProvisioner`. We pass all of these things into `NewProvisionController`, plus some other arguments we'll explain now. 
 
-The second argument is the `resyncPeriod` of the controller which determines how often it relists PVCs and PVs to check if they should be provisioned for or deleted. The third is the `provisionerName` that storage classes will specify, "example.com/hostpath" here. The last is `exponentialBackOffOnError` which determines whether it should exponentially back off from calls to `Provision` or `Delete`, useful if either of those involves some API call. (There are many other possible parameters of the controller that could be exposed, please create an issue if you would like one to be.)
+The second argument is the `resyncPeriod` of the controller which determines how often it relists PVCs and PVs to check if they should be provisioned for or deleted. The third is the `provisionerName` that storage classes will specify, "example.com/hostpath" here. The second-to-last is `exponentialBackOffOnError` which determines whether it should exponentially back off from calls to `Provision` or `Delete`, useful if either of those involves some API call. And the last is `failedRetryThreshold`, the threshold for failed `Provision` attempts before giving up. (There are many other possible parameters of the controller that could be exposed, please create an issue if you would like one to be.)
 
 Finally, we create and `Run` the controller.
 
+```go
+const (
+	resyncPeriod              = 15 * time.Second
+	provisionerName           = "example.com/hostpath"
+	exponentialBackOffOnError = false
+	failedRetryThreshold      = 5
+)
+```
 ```go
 func main() {
 	flag.Parse()
@@ -144,7 +152,7 @@ func main() {
 
 	// Start the provision controller which will dynamically provision hostPath
 	// PVs
-	pc := controller.NewProvisionController(clientset, 15*time.Second, "example.com/hostpath", hostPathProvisioner, serverVersion.GitVersion, false)
+	pc := controller.NewProvisionController(clientset, resyncPeriod, "example.com/hostpath", hostPathProvisioner, serverVersion.GitVersion, exponentialBackOffOnError, failedRetryThreshold)
 	pc.Run(wait.NeverStop)
 }
 ```

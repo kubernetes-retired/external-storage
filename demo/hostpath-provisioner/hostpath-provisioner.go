@@ -18,7 +18,10 @@ import (
 )
 
 const (
-	failedRetryThreshold = 5
+	resyncPeriod              = 15 * time.Second
+	provisionerName           = "example.com/hostpath"
+	exponentialBackOffOnError = false
+	failedRetryThreshold      = 5
 )
 
 type hostPathProvisioner struct {
@@ -118,6 +121,6 @@ func main() {
 
 	// Start the provision controller which will dynamically provision hostPath
 	// PVs
-	pc := controller.NewProvisionController(clientset, 15*time.Second, "example.com/hostpath", hostPathProvisioner, serverVersion.GitVersion, false, failedRetryThreshold)
+	pc := controller.NewProvisionController(clientset, resyncPeriod, provisionerName, hostPathProvisioner, serverVersion.GitVersion, exponentialBackOffOnError, failedRetryThreshold)
 	pc.Run(wait.NeverStop)
 }
