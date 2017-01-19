@@ -51,7 +51,7 @@ Once you finished deploying the provisioner, go to [Usage](usage.md) for info on
 
 Edit the `provisioner` argument in the `args` field in `deploy/kube-config/deployment.yaml` to be the provisioner's name you decided on. 
 
-`deploy/kube-config/deployment.yaml` specifies a `hostPath` volume `/srv` mounted at `/export`. The `/export` directory is where the provisioner stores its state and provisioned `PersistentVolumes'` data, so by mounting a volume there, you specify it as the backing storage for provisioned PVs. You may edit the `hostPath` or even mount some other type of volume at `/export`, like a `PersistentVolumeClaim`.
+`deploy/kube-config/deployment.yaml` specifies a `hostPath` volume `/srv` mounted at `/export`. The `/export` directory is where the provisioner stores its state and provisioned `PersistentVolumes'` data, so by mounting a volume there, you specify it as the backing storage for provisioned PVs. You may edit the `hostPath` or even mount some other type of volume at `/export`, like a `PersistentVolumeClaim`. Note that the volume mounted there must have a [supported file system](https://github.com/nfs-ganesha/nfs-ganesha/wiki/Fsalsupport#vfs) on it: any local filesystem on Linux is supported & NFS is not supported.
 
 Note that if you continue with the `hostPath` volume, its path must exist on the node the provisioner is scheduled to, so you may want to use a `nodeSelector` to choose a particular node and ensure the directory exists there: `mkdir -p /srv`. If SELinux is enforcing on the node, you may need to make the container [privileged](http://kubernetes.io/docs/user-guide/security-context/) or change the security context of the directory on the node: `sudo chcon -Rt svirt_sandbox_file_t /srv`.
 
@@ -184,4 +184,4 @@ The pod requires authorization to `list` all `StorageClasses`, `PersistentVolume
 * `grace-period` - NFS Ganesha grace period to use in seconds, from 0-180. If the server is not expected to survive restarts, i.e. it is running as a pod & its export directory is not persisted, this can be set to 0. Can only be set if both run-server and use-ganesha are true. Default 90.
 * `root-squash` - If the provisioner will squash root users by adding the NFS Ganesha root_id_squash or kernel root_squash option to each export. Default false.
 * `enable-xfs-quota` - If the provisioner will set xfs quotas for each volume it provisions. Requires that the directory it creates volumes in ('/export') is xfs mounted with option prjquota/pquota, and that it has the privilege to run xfs_quota. Default false.
-* `failed-retry-threshold` - If the number of retries on provisioning failure need to be limited to a set number of attempts. Default 10 
+* `failed-retry-threshold` - If the number of retries on provisioning failure need to be limited to a set number of attempts. Default 10
