@@ -17,6 +17,10 @@ import (
 	"k8s.io/client-go/rest"
 )
 
+const (
+	failedRetryThreshold = 5
+)
+
 type hostPathProvisioner struct {
 	// The directory to create PV-backing directories in
 	pvDir string
@@ -114,6 +118,6 @@ func main() {
 
 	// Start the provision controller which will dynamically provision hostPath
 	// PVs
-	pc := controller.NewProvisionController(clientset, 15*time.Second, "example.com/hostpath", hostPathProvisioner, serverVersion.GitVersion, false)
+	pc := controller.NewProvisionController(clientset, 15*time.Second, "example.com/hostpath", hostPathProvisioner, serverVersion.GitVersion, false, failedRetryThreshold)
 	pc.Run(wait.NeverStop)
 }
