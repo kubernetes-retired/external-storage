@@ -1,5 +1,5 @@
-hash: bdb4509cbf99213fa41f24e4767c7d6bb98990b632c99fa3716053cffbc0b62d
-updated: 2017-01-04T11:11:32.024439243-05:00
+hash: 6fa2c84f1bd00d07bf4095b53a4d1c72f0d4afac54ea02fa7373a33bd5dcff8e
+updated: 2017-01-19T15:37:04.161550129-05:00
 imports:
 - name: cloud.google.com/go
   version: 3b1ae45394a234c385be014e9a488f2bb6eef821
@@ -66,7 +66,7 @@ imports:
 - name: github.com/jonboulle/clockwork
   version: 72f9bd7c4e0c2a40055ab3d0f09654f730cce982
 - name: github.com/kubernetes-incubator/nfs-provisioner
-  version: 74c608d2b9f3f6a51841fa848d5aa19971a9bfe8
+  version: 66e53b5a830820c304152761a3a019c2ffaefb22
   subpackages:
   - controller
   - controller/leaderelection
