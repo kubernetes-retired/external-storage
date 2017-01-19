@@ -14,7 +14,7 @@ Now build the project and the Docker image by checking out the latest release an
 
 ```
 $ cd $GOPATH/src/github.com/kubernetes-incubator/nfs-provisioner
-$ git checkout tags/v1.0.2
+$ git checkout tags/v1.0.3
 $ make container
 ```
 
@@ -23,7 +23,7 @@ $ make container
 If you are running in Kubernetes, it will pull the image from Quay for you. Or you can do it yourself.
 
 ```
-$ docker pull quay.io/kubernetes_incubator/nfs-provisioner:v1.0.2
+$ docker pull quay.io/kubernetes_incubator/nfs-provisioner:v1.0.3
 ```
 
 ## Deploying the provisioner
@@ -104,7 +104,7 @@ Run nfs-provisioner with `provisioner` equal to the name you decided on, and one
 $ docker run --cap-add DAC_READ_SEARCH \
 --security-opt seccomp:deploy/docker/nfs-provisioner-seccomp.json \
 -v $HOME/.kube:/.kube:Z \
-quay.io/kubernetes_incubator/nfs-provisioner:v1.0.2 \
+quay.io/kubernetes_incubator/nfs-provisioner:v1.0.3 \
 -provisioner=example.com/nfs \
 -kubeconfig=/.kube/config \
 -failed-retry-threshold=10
@@ -113,7 +113,7 @@ or
 ```
 $ docker run --cap-add DAC_READ_SEARCH \
 --security-opt seccomp:deploy/docker/nfs-provisioner-seccomp.json \
-quay.io/kubernetes_incubator/nfs-provisioner:v1.0.2 \
+quay.io/kubernetes_incubator/nfs-provisioner:v1.0.3 \
 -provisioner=example.com/nfs \
 -master=http://172.17.0.1:8080
 ```
@@ -128,7 +128,7 @@ With the two above options, the run command will look something like this.
 $ docker run --privileged \
 -v $HOME/.kube:/.kube:Z \
 -v /xfs:/export:Z \
-quay.io/kubernetes_incubator/nfs-provisioner:v1.0.2 \
+quay.io/kubernetes_incubator/nfs-provisioner:v1.0.3 \
 -provisioner=example.com/nfs \
 -kubeconfig=/.kube/config \
 -enable-xfs-quota=true\
