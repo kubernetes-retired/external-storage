@@ -125,6 +125,12 @@ type ProvisionController struct {
 	leaderElectors map[types.UID]*leaderelection.LeaderElector
 
 	mapMutex *sync.Mutex
+
+	// threshold for max number of retries on failure of provisioner
+	failedRetryThreshold int
+
+	// map of failed claims
+	failedClaimsStats map[types.UID]int
 }
 
 func NewProvisionController(
@@ -134,6 +140,7 @@ func NewProvisionController(
 	provisioner Provisioner,
 	serverGitVersion string,
 	exponentialBackOffOnError bool,
+	failedRetryThreshold int,
 ) *ProvisionController {
 	identity := uuid.NewUUID()
 
@@ -168,6 +175,8 @@ func NewProvisionController(
 		termLimit:                     leaderelection.DefaultTermLimit,
 		leaderElectors:                make(map[types.UID]*leaderelection.LeaderElector),
 		mapMutex:                      &sync.Mutex{},
+		failedClaimsStats:             make(map[types.UID]int),
+		failedRetryThreshold:          failedRetryThreshold,
 	}
 
 	controller.claimSource = &cache.ListWatch{
@@ -264,7 +273,9 @@ func (ctrl *ProvisionController) addClaim(obj interface{}) {
 		if ok && le.IsLeader() {
 			opName := fmt.Sprintf("provision-%s[%s]", claimToClaimKey(claim), string(claim.UID))
 			ctrl.scheduleOperation(opName, func() error {
-				return ctrl.provisionClaimOperation(claim)
+				err := ctrl.provisionClaimOperation(claim)
+				ctrl.updateStats(claim, err)
+				return err
 			})
 		} else {
 			opName := fmt.Sprintf("lock-provision-%s[%s]", claimToClaimKey(claim), string(claim.UID))
@@ -368,6 +379,13 @@ func (ctrl *ProvisionController) shouldProvision(claim *v1.PersistentVolumeClaim
 		return false
 	}
 
+	if failureCount, exists := ctrl.failedClaimsStats[claim.UID]; exists == true {
+		if failureCount >= ctrl.failedRetryThreshold {
+			glog.Errorf("Exceeded retry threshold: %d, for claim %q, provisioner will not attempt retries for this claim", ctrl.failedRetryThreshold, claimToClaimKey(claim))
+			return false
+		}
+	}
+
 	// Kubernetes 1.5 provisioning with annDynamicallyProvisioned
 	if provisioner, found := claim.Annotations[annDynamicallyProvisioned]; found {
 		if provisioner == ctrl.provisionerName {
@@ -439,7 +457,10 @@ func (ctrl *ProvisionController) lockProvisionClaimOperation(claim *v1.Persisten
 			OnStartedLeading: func(_ <-chan struct{}) {
 				opName := fmt.Sprintf("provision-%s[%s]", claimToClaimKey(claim), string(claim.UID))
 				ctrl.scheduleOperation(opName, func() error {
-					return ctrl.provisionClaimOperation(claim)
+					err := ctrl.provisionClaimOperation(claim)
+					ctrl.updateStats(claim, err)
+					return err
+
 				})
 			},
 			OnStoppedLeading: func() {
@@ -479,6 +500,20 @@ func (ctrl *ProvisionController) lockProvisionClaimOperation(claim *v1.Persisten
 	ctrl.mapMutex.Lock()
 	delete(ctrl.leaderElectors, claim.UID)
 	ctrl.mapMutex.Unlock()
+}
+
+func (ctrl *ProvisionController) updateStats(claim *v1.PersistentVolumeClaim, err error) {
+	if err != nil {
+		if failureRetryCount, exists := ctrl.failedClaimsStats[claim.UID]; exists == true {
+			failureRetryCount = failureRetryCount + 1
+			ctrl.failedClaimsStats[claim.UID] = failureRetryCount
+		} else {
+			ctrl.failedClaimsStats[claim.UID] = 1
+		}
+
+	} else {
+		delete(ctrl.failedClaimsStats, claim.UID)
+	}
 }
 
 // provisionClaimOperation attempts to provision a volume for the given claim.

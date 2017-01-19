@@ -42,7 +42,8 @@ import (
 )
 
 const (
-	resyncPeriod = 100 * time.Millisecond
+	resyncPeriod         = 100 * time.Millisecond
+	failedRetryThreshold = 5
 )
 
 // TODO clean this up, e.g. remove redundant params (provisionerName: "foo.bar/baz")
@@ -180,7 +181,7 @@ func TestController(t *testing.T) {
 				client.Fake.PrependReactor(v, "persistentvolumes", test.reaction)
 			}
 		}
-		ctrl := newTestProvisionController(client, resyncPeriod, test.provisionerName, test.provisioner, "v1.5.0", false)
+		ctrl := newTestProvisionController(client, resyncPeriod, test.provisionerName, test.provisioner, "v1.5.0", false, failedRetryThreshold)
 		stopCh := make(chan struct{})
 		go ctrl.Run(stopCh)
 
@@ -243,7 +244,7 @@ func TestMultipleControllers(t *testing.T) {
 		ctrls := make([]*ProvisionController, test.numControllers)
 		stopChs := make([]chan struct{}, test.numControllers)
 		for i := 0; i < test.numControllers; i++ {
-			ctrls[i] = NewProvisionController(client, 15*time.Second, test.provisionerName, provisioner, "v1.5.0", false)
+			ctrls[i] = NewProvisionController(client, 15*time.Second, test.provisionerName, provisioner, "v1.5.0", false, failedRetryThreshold)
 			ctrls[i].createProvisionedPVInterval = 10 * time.Millisecond
 			ctrls[i].claimSource = claimSource
 			ctrls[i].claims.Add(newClaim("claim-1", "uid-1-1", "class-1", "", nil))
@@ -327,7 +328,7 @@ func TestShouldProvision(t *testing.T) {
 	for _, test := range tests {
 		client := fake.NewSimpleClientset(test.claim)
 		provisioner := newTestProvisioner()
-		ctrl := newTestProvisionController(client, resyncPeriod, test.provisionerName, provisioner, "v1.5.0", false)
+		ctrl := newTestProvisionController(client, resyncPeriod, test.provisionerName, provisioner, "v1.5.0", false, failedRetryThreshold)
 
 		err := ctrl.classes.Add(test.class)
 		if err != nil {
@@ -397,7 +398,7 @@ func TestShouldDelete(t *testing.T) {
 	for _, test := range tests {
 		client := fake.NewSimpleClientset()
 		provisioner := newTestProvisioner()
-		ctrl := newTestProvisionController(client, resyncPeriod, test.provisionerName, provisioner, test.serverGitVersion, false)
+		ctrl := newTestProvisionController(client, resyncPeriod, test.provisionerName, provisioner, test.serverGitVersion, false, failedRetryThreshold)
 
 		should := ctrl.shouldDelete(test.volume)
 		if test.expectedShould != should {
@@ -442,7 +443,7 @@ func TestIsOnlyRecordUpdate(t *testing.T) {
 	for _, test := range tests {
 		client := fake.NewSimpleClientset()
 		provisioner := newTestProvisioner()
-		ctrl := newTestProvisionController(client, resyncPeriod, "foo.bar/baz", provisioner, "v1.5.0", false)
+		ctrl := newTestProvisionController(client, resyncPeriod, "foo.bar/baz", provisioner, "v1.5.0", false, failedRetryThreshold)
 
 		is, _ := ctrl.isOnlyRecordUpdate(test.old, test.new)
 		if test.expectedIs != is {
@@ -459,8 +460,9 @@ func newTestProvisionController(
 	provisioner Provisioner,
 	serverGitVersion string,
 	exponentialBackOffOnError bool,
+	failedRetryThreshold int,
 ) *ProvisionController {
-	ctrl := NewProvisionController(client, resyncPeriod, provisionerName, provisioner, serverGitVersion, exponentialBackOffOnError)
+	ctrl := NewProvisionController(client, resyncPeriod, provisionerName, provisioner, serverGitVersion, exponentialBackOffOnError, failedRetryThreshold)
 	ctrl.createProvisionedPVInterval = 10 * time.Millisecond
 	ctrl.leaseDuration = 2 * ctrl.resyncPeriod
 	ctrl.renewDeadline = ctrl.resyncPeriod
