@@ -106,7 +106,8 @@ $ docker run --cap-add DAC_READ_SEARCH \
 -v $HOME/.kube:/.kube:Z \
 quay.io/kubernetes_incubator/nfs-provisioner:v1.0.2 \
 -provisioner=example.com/nfs \
--kubeconfig=/.kube/config
+-kubeconfig=/.kube/config \
+-failed-retry-threshold=10
 ```
 or
 ```
@@ -130,7 +131,8 @@ $ docker run --privileged \
 quay.io/kubernetes_incubator/nfs-provisioner:v1.0.2 \
 -provisioner=example.com/nfs \
 -kubeconfig=/.kube/config \
--enable-xfs-quota=true
+-enable-xfs-quota=true\
+-failed-retry-threshold=10
 ```
 
 ### Outside of Kubernetes - binary
@@ -143,14 +145,16 @@ Run nfs-provisioner with `provisioner` equal to the name you decided on, one of 
 $ sudo ./nfs-provisioner -provisioner=example.com/nfs \
 -kubeconfig=$HOME/.kube/config \
 -run-server=false \
--use-ganesha=false
+-use-ganesha=false \
+-failed-retry-threshold=10
 ```
 or
 ```
 $ sudo ./nfs-provisioner -provisioner=example.com/nfs \
 -master=http://0.0.0.0:8080 \
 -run-server=false \
--use-ganesha=false
+-use-ganesha=false \
+-failed-retry-threshold=10
 ```
 
 You may want to enable per-PV quota enforcement. It is based on xfs project level quotas and so requires that the volume mounted at `/export` be xfs mounted with the prjquota/pquota option. Add the `-enable-xfs-quota=true` argument to enable it.
@@ -160,7 +164,8 @@ $ sudo ./nfs-provisioner -provisioner=example.com/nfs \
 -kubeconfig=$HOME/.kube/config \
 -run-server=false \
 -use-ganesha=false \
--enable-xfs-quota=true
+-enable-xfs-quota=true \
+-failed-retry-threshold=10
 ```
 
 ---
@@ -179,3 +184,4 @@ The pod requires authorization to `list` all `StorageClasses`, `PersistentVolume
 * `grace-period` - NFS Ganesha grace period to use in seconds, from 0-180. If the server is not expected to survive restarts, i.e. it is running as a pod & its export directory is not persisted, this can be set to 0. Can only be set if both run-server and use-ganesha are true. Default 90.
 * `root-squash` - If the provisioner will squash root users by adding the NFS Ganesha root_id_squash or kernel root_squash option to each export. Default false.
 * `enable-xfs-quota` - If the provisioner will set xfs quotas for each volume it provisions. Requires that the directory it creates volumes in ('/export') is xfs mounted with option prjquota/pquota, and that it has the privilege to run xfs_quota. Default false.
+* `failed-retry-threshold` - If the number of retries on provisioning failure need to be limited to a set number of attempts. Default 10 

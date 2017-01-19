@@ -42,7 +42,7 @@ var (
 	gracePeriod          = flag.Uint("grace-period", 90, "NFS Ganesha grace period to use in seconds, from 0-180. If the server is not expected to survive restarts, i.e. it is running as a pod & its export directory is not persisted, this can be set to 0. Can only be set if both run-server and use-ganesha are true. Default 90.")
 	rootSquash           = flag.Bool("root-squash", false, "If the provisioner will squash root users by adding the NFS Ganesha root_id_squash or kernel root_squash option to each export. Default false.")
 	enableXfsQuota       = flag.Bool("enable-xfs-quota", false, "If the provisioner will set xfs quotas for each volume it provisions. Requires that the directory it creates volumes in ('/export') is xfs mounted with option prjquota/pquota, and that it has the privilege to run xfs_quota. Default false.")
-	failedRetryThreshold = flag.Int("retries", 3, "number of retries on failure of provisioner. Default 3")
+	failedRetryThreshold = flag.Int("failed-retry-threshold", 10, "If the number of retries on provisioning failure need to be limited to a set number of attempts. Default 10")
 )
 
 const exportDir = "/export"
