@@ -60,6 +60,7 @@ EXPORT
 NFS_Core_Param
 {
 	MNT_Port = 20048;
+	fsid_device = true;
 }
 
 NFSV4
@@ -101,10 +102,52 @@ func Start(ganeshaConfig string, gracePeriod uint) error {
 	if err != nil {
 		return fmt.Errorf("error setting grace period to ganesha config: %v", err)
 	}
+	err = setFsidDevice(ganeshaConfig, true)
+	if err != nil {
+		return fmt.Errorf("error setting fsid device to ganesha config: %v", err)
+	}
 	// Start ganesha.nfsd
 	cmd = exec.Command("ganesha.nfsd", "-L", "/var/log/ganesha.log", "-f", ganeshaConfig)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("ganesha.nfsd failed with error: %v, output: %s", err, out)
+	}
+
+	return nil
+}
+
+func setFsidDevice(ganeshaConfig string, fsidDevice bool) error {
+	newLine := fmt.Sprintf("fsid_device = %t;", fsidDevice)
+
+	re := regexp.MustCompile("fsid_device = (true|false);")
+
+	read, err := ioutil.ReadFile(ganeshaConfig)
+	if err != nil {
+		return err
+	}
+
+	oldLine := re.Find(read)
+
+	if oldLine == nil {
+		// fsid_device line not there, append it after MNT_Port
+		re := regexp.MustCompile("MNT_Port = 20048;")
+
+		mntPort := re.Find(read)
+
+		block := "MNT_Port = 20048;\n" +
+			"\t" + newLine
+
+		replaced := strings.Replace(string(read), string(mntPort), block, -1)
+		err = ioutil.WriteFile(ganeshaConfig, []byte(replaced), 0)
+		if err != nil {
+			return err
+		}
+	} else {
+		// fsid_device there, just replace it
+		replaced := strings.Replace(string(read), string(oldLine), newLine, -1)
+		err = ioutil.WriteFile(ganeshaConfig, []byte(replaced), 0)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -124,9 +167,9 @@ func setGracePeriod(ganeshaConfig string, gracePeriod uint) error {
 		return err
 	}
 
-	old := re.Find(read)
+	oldLine := re.Find(read)
 
-	if old == nil {
+	if oldLine == nil {
 		// Grace_Period line not there, append the whole NFSV4 block.
 		file, err := os.OpenFile(ganeshaConfig, os.O_APPEND|os.O_WRONLY, 0600)
 		if err != nil {
@@ -144,7 +187,7 @@ func setGracePeriod(ganeshaConfig string, gracePeriod uint) error {
 		file.Sync()
 	} else {
 		// Grace_Period line there, just replace it
-		replaced := strings.Replace(string(read), string(old), newLine, -1)
+		replaced := strings.Replace(string(read), string(oldLine), newLine, -1)
 		err = ioutil.WriteFile(ganeshaConfig, []byte(replaced), 0)
 		if err != nil {
 			return err
