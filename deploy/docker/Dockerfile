@@ -22,7 +22,7 @@ RUN dnf install -y tar gcc cmake autoconf libtool bison flex make gcc-c++ krb5-d
 	&& cp src/scripts/ganeshactl/org.ganesha.nfsd.conf /etc/dbus-1/system.d/ \
 	&& dnf remove -y tar gcc cmake autoconf libtool bison flex make gcc-c++ krb5-devel dbus-devel jemalloc-devel libnfsidmap-devel patch && dnf clean all
 
-RUN dnf install -y dbus-x11 rpcbind hostname nfs-utils xfsprogs jemalloc libnfsidmap
+RUN dnf install -y dbus-x11 rpcbind-0.2.3-10.rc1.fc24.x86_64 hostname nfs-utils xfsprogs jemalloc libnfsidmap
 
 RUN mkdir -p /var/run/dbus
 RUN mkdir -p /export
