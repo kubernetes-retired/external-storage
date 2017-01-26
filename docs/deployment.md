@@ -255,7 +255,7 @@ Create the `ClusterRole`.
 $ oc create -f deploy/kube-config/openshift-clusterrole.yaml
 ```
 
-Add the `ClusterRole` to the `nfs-provisioner` service account to it. Change the service account name and namespace accordingly if you are not in the namespace `default` or named the service account something other than `nfs-provisioner`.
+Add the `ClusterRole` to the `nfs-provisioner` service account. Change the service account name and namespace accordingly if you are not in the namespace `default` or named the service account something other than `nfs-provisioner`.
 
 ```console
 $ oadm policy add-cluster-role-to-user nfs-provisioner-runner system:serviceaccount:default:nfs-provisioner
