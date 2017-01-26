@@ -177,6 +177,9 @@ If you chose to run the provisioner in Kubernetes you may need to grant it autho
 
 Find out what authorization plugin or policy implementation your cluster uses, if any, and follow one of the below sections.
 
+* [RBAC](#rbac)
+* [OpenShift](#openshift)
+
 ### RBAC
 
 [RBAC](https://kubernetes.io/docs/admin/authorization/) (Role-Based Access Control) is an alpha feature in Kubernetes 1.5 and beta in 1.6. If it is enabled on your cluster, you need to create a `ClusterRole` that lists all the permissions an nfs-provisioner pod needs plus a `ClusterRoleBinding` that grants the permissions to the [service account](https://kubernetes.io/docs/user-guide/service-accounts/) the nfs-provisioner pod will be assigned.
@@ -253,6 +256,7 @@ Create the `ClusterRole`.
 
 ```console
 $ oc create -f deploy/kube-config/openshift-clusterrole.yaml
+clusterrole "nfs-provisioner-runner" created
 ```
 
 Add the `ClusterRole` to the `nfs-provisioner` service account. Change the service account name and namespace accordingly if you are not in the namespace `default` or named the service account something other than `nfs-provisioner`.
