@@ -212,7 +212,56 @@ $ kubectl create -f deploy/kube-config/clusterrolebinding.yaml
 clusterrolebinding "run-nfs-provisioner" created
 ```
 
-Add a `spec.template.spec.serviceAccount` field to the deployment, stateful set, or daemon set yaml you chose earlier. Set it to the same service account we just referenced in our `ClusterRoleBinding`. Redeploy nfs-provisioner and it should have all the permissions it needs.
+Add a `spec.template.spec.serviceAccount` field to the deployment, stateful set, or daemon set yaml you chose earlier. If you already created it you may use `kubectl edit`. Set the field to the same service account we just referenced in our `ClusterRoleBinding`. Redeploy nfs-provisioner and it should have all the permissions it needs.
+
+### OpenShift
+
+OpenShift by default has both [authorization policies](https://docs.openshift.com/container-platform/latest/admin_guide/manage_authorization_policy.html) and [security context constraints](https://docs.openshift.com/container-platform/latest/admin_guide/manage_scc.html) that deny an nfs-provisioner pod its needed permissions, so you need to create a new `ClusterRole` and SCC for your pod to use.
+
+It's a good idea to create a service account just for nfs-provisioner. If you already deployed nfs-provisioner, you will soon have to redeploy it with the `serviceAccount` field of the pod template set to the name of this service account.
+
+Create the service account.
+```console
+$ cat > /tmp/serviceaccount.yaml <<EOF
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: nfs-provisioner
+EOF
+$ oc create -f /tmp/serviceaccount.yaml
+serviceaccount "nfs-provisioner" created
+```
+
+`deploy/kube-config/openshift-scc.yaml` defines an SCC for your nfs-provisioner pod to validate against.
+
+Create the SCC.
+
+```console
+$ oc create -f deploy/kube-config/openshift-scc.yaml
+securitycontextconstraints "nfs-provisioner" created
+```
+
+Add the `nfs-provisioner` service account to the SCC. Change the service account name and namespace accordingly if you are not in the namespace `default` or named the service account something other than `nfs-provisioner`.
+
+```console
+$ oadm policy add-scc-to-user nfs-provisioner system:serviceaccount:default:nfs-provisioner
+```
+
+`deploy/kube-config/openshift-clusterrole.yaml` lists all the permissions nfs-provisioner needs.
+
+Create the `ClusterRole`.
+
+```console
+$ oc create -f deploy/kube-config/openshift-clusterrole.yaml
+```
+
+Add the `ClusterRole` to the `nfs-provisioner` service account to it. Change the service account name and namespace accordingly if you are not in the namespace `default` or named the service account something other than `nfs-provisioner`.
+
+```console
+$ oadm policy add-cluster-role-to-user nfs-provisioner-runner system:serviceaccount:default:nfs-provisioner
+```
+
+Add a spec.template.spec.serviceAccount field to the deployment, stateful set, or daemon set yaml you chose earlier. If you already created it you may use `oc edit`. Set the field to the same service account we just referenced in our `oadm policy` commands. Redeploy nfs-provisioner and it should have all the permissions it needs.
 
 ---
 
