@@ -2,6 +2,8 @@
 
 One of the goals of the [nfs-provisioner](https://github.com/kubernetes-incubator/nfs-provisioner) project is to serve as an example implementation of an out-of-tree dynamic provisioner to help others write their own. nfs-provisioner creates NFS-backed PVs in its own opinionated way, and we'll show that it's easy to write your own provisioner that does it your way.
 
+Note you do **not** have to fork nfs-provisioner. As we will see here, you can treat the [`controller` directory](https://github.com/kubernetes-incubator/nfs-provisioner/tree/master/controller) of the nfs-provisioner repo as a library/dependency to import. This gives you the ability to control which version of it to use and you won't have to worry about rebasing your fork. You can rest assured that the controller has no NFS-specific functionality in it. There are plans to move this controller library into its own repository so stay tuned.
+
 ##The Provisioner Interface
 
 Ideally, all you should need to do to write your own provisioner is implement the `Provisioner` interface which has two methods: `Provision` and `Delete`. Then you can just pass it to the `ProvisionController`, which handles all the logic of calling the two methods. The signatures should be self-explanatory but we'll explain the methods in more detail anyhow. For this explanation we'll refer to the `ProvisionController` as the controller and the implementer of the `Provisioner` interface as the provisioner. The code can be found in the `controller` directory of the nfs-provisioner repo.
