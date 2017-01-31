@@ -23,8 +23,8 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/nfs-provisioner/controller"
-	"github.com/kubernetes-incubator/nfs-provisioner/server"
-	vol "github.com/kubernetes-incubator/nfs-provisioner/volume"
+	"github.com/kubernetes-incubator/nfs-provisioner/pkg/server"
+	vol "github.com/kubernetes-incubator/nfs-provisioner/pkg/volume"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/util/validation"
 	"k8s.io/client-go/pkg/util/validation/field"
