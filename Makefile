@@ -28,8 +28,8 @@ else
 endif
 
 all build:
-	GOOS=linux go install -v
-	GOOS=linux go build
+	GOOS=linux go install -v ./cmd/nfs-provisioner
+	GOOS=linux go build ./cmd/nfs-provisioner
 .PHONY: all build
 
 container: build quick-container
