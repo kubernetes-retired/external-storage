@@ -107,8 +107,7 @@ $ docker run --cap-add DAC_READ_SEARCH \
 -v $HOME/.kube:/.kube:Z \
 quay.io/kubernetes_incubator/nfs-provisioner:v1.0.3 \
 -provisioner=example.com/nfs \
--kubeconfig=/.kube/config \
--failed-retry-threshold=10
+-kubeconfig=/.kube/config
 ```
 or
 ```
@@ -132,8 +131,7 @@ $ docker run --privileged \
 quay.io/kubernetes_incubator/nfs-provisioner:v1.0.3 \
 -provisioner=example.com/nfs \
 -kubeconfig=/.kube/config \
--enable-xfs-quota=true \
--failed-retry-threshold=10
+-enable-xfs-quota=true
 ```
 
 ### Outside of Kubernetes - binary
@@ -146,16 +144,14 @@ Run nfs-provisioner with `provisioner` equal to the name you decided on, one of 
 $ sudo ./nfs-provisioner -provisioner=example.com/nfs \
 -kubeconfig=$HOME/.kube/config \
 -run-server=false \
--use-ganesha=false \
--failed-retry-threshold=10
+-use-ganesha=false
 ```
 or
 ```
 $ sudo ./nfs-provisioner -provisioner=example.com/nfs \
 -master=http://0.0.0.0:8080 \
 -run-server=false \
--use-ganesha=false \
--failed-retry-threshold=10
+-use-ganesha=false
 ```
 
 You may want to enable per-PV quota enforcement. It is based on xfs project level quotas and so requires that the volume mounted at `/export` be xfs mounted with the prjquota/pquota option. Add the `-enable-xfs-quota=true` argument to enable it.
@@ -165,8 +161,7 @@ $ sudo ./nfs-provisioner -provisioner=example.com/nfs \
 -kubeconfig=$HOME/.kube/config \
 -run-server=false \
 -use-ganesha=false \
--enable-xfs-quota=true \
--failed-retry-threshold=10
+-enable-xfs-quota=true
 ```
 
 ## Authorizing the provisioner
