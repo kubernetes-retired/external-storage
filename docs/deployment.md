@@ -132,7 +132,7 @@ $ docker run --privileged \
 quay.io/kubernetes_incubator/nfs-provisioner:v1.0.3 \
 -provisioner=example.com/nfs \
 -kubeconfig=/.kube/config \
--enable-xfs-quota=true\
+-enable-xfs-quota=true \
 -failed-retry-threshold=10
 ```
 
