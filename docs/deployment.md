@@ -202,7 +202,7 @@ $ kubectl create -f deploy/kube-config/clusterrole.yaml
 clusterrole "nfs-provisioner-runner" created
 ```
 
-`deploy/kube-config/clusterrolebinding.yaml` binds the `nfs-provisioner` service account in namespace `default` to your `ClusterRole`. Edit the service account name and namespace accordingly if you are not in the namespace `default` or named the service account something other than `nfs-provisioner`.
+`deploy/kube-config/clusterrolebinding.yaml` binds the "nfs-provisioner" service account in namespace `default` to your `ClusterRole`. Edit the service account name and namespace accordingly if you are not in the namespace `default` or named the service account something other than "nfs-provisioner".
 
 Create the `ClusterRoleBinding`.
 ```console
@@ -210,7 +210,22 @@ $ kubectl create -f deploy/kube-config/clusterrolebinding.yaml
 clusterrolebinding "run-nfs-provisioner" created
 ```
 
-Add a `spec.template.spec.serviceAccount` field to the deployment, stateful set, or daemon set yaml you chose earlier. If you already created it you may use `kubectl edit`. Set the field to the same service account we just referenced in our `ClusterRoleBinding`. Redeploy nfs-provisioner and it should have all the permissions it needs.
+Add a `spec.template.spec.serviceAccount` field set to the same service account we just referenced in our `ClusterRoleBinding` to the deployment, stateful set, or daemon set yaml you chose earlier. You can patch a deployment or use `deploy/kube-config/(statefulset|daemonset)-sa` which have the service account field set to "nfs-provisioner". 
+
+#### Deployment
+```console
+$ kubectl patch daemonset nfs-provisioner -p '{"spec":{"template":{"spec":{"serviceAccount":"nfs-provisioner"}}}}'
+```
+#### StatefulSet
+```console
+$ kubectl delete statefulset nfs-provisioner
+$ kubectl create -f deploy/kube-config/statefulset-sa.yaml 
+```
+#### DaemonSet
+```console
+$ kubectl delete daemonset nfs-provisioner
+$ kubectl create -f deploy/kube-config/daemonset-sa.yaml 
+```
 
 ### OpenShift
 
@@ -239,7 +254,7 @@ $ oc create -f deploy/kube-config/openshift-scc.yaml
 securitycontextconstraints "nfs-provisioner" created
 ```
 
-Add the `nfs-provisioner` service account to the SCC. Change the service account name and namespace accordingly if you are not in the namespace `default` or named the service account something other than `nfs-provisioner`.
+Add the `nfs-provisioner` service account to the SCC. Change the service account name and namespace accordingly if you are not in the namespace `default` or named the service account something other than "nfs-provisioner".
 
 ```console
 $ oadm policy add-scc-to-user nfs-provisioner system:serviceaccount:default:nfs-provisioner
@@ -254,14 +269,28 @@ $ oc create -f deploy/kube-config/openshift-clusterrole.yaml
 clusterrole "nfs-provisioner-runner" created
 ```
 
-Add the `ClusterRole` to the `nfs-provisioner` service account. Change the service account name and namespace accordingly if you are not in the namespace `default` or named the service account something other than `nfs-provisioner`.
+Add the `ClusterRole` to the `nfs-provisioner` service account. Change the service account name and namespace accordingly if you are not in the namespace `default` or named the service account something other than "nfs-provisioner".
 
 ```console
 $ oadm policy add-cluster-role-to-user nfs-provisioner-runner system:serviceaccount:default:nfs-provisioner
 ```
 
-Add a spec.template.spec.serviceAccount field to the deployment, stateful set, or daemon set yaml you chose earlier. If you already created it you may use `oc edit`. Set the field to the same service account we just referenced in our `oadm policy` commands. Redeploy nfs-provisioner and it should have all the permissions it needs.
+Add a `spec.template.spec.serviceAccount` field set to the same service account we just referenced in our `oadm policy` commands to the deployment, stateful set, or daemon set yaml you chose earlier. You can patch a deployment or use `deploy/kube-config/(statefulset|daemonset)-sa` which have the service account field set to "nfs-provisioner". 
 
+#### Deployment
+```console
+$ oc patch daemonset nfs-provisioner -p '{"spec":{"template":{"spec":{"serviceAccount":"nfs-provisioner"}}}}'
+```
+#### StatefulSet
+```console
+$ oc delete statefulset nfs-provisioner
+$ oc create -f deploy/kube-config/statefulset-sa.yaml 
+```
+#### DaemonSet
+```console
+$ oc delete daemonset nfs-provisioner
+$ oc create -f deploy/kube-config/daemonset-sa.yaml 
+```
 ---
 
 Now that you have finished deploying the provisioner, go to [Usage](usage.md) for info on how to use it.
