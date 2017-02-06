@@ -40,4 +40,4 @@ flycheck_*.el
 
 # nfs-provisioner binary
 /nfs-provisioner
-/deploy/docker/nfs-provisioner
+/docs/deploy/docker/nfs-provisioner
