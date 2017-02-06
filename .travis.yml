@@ -30,6 +30,8 @@ before_script:
   - $KUBECTL config use-context local
 
 script:
+# TODO
+  - cd nfs
   - make container
   - make test-integration
   - make test-e2e
