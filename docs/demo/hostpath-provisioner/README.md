@@ -2,7 +2,7 @@
 
 One of the goals of the [nfs-provisioner](https://github.com/kubernetes-incubator/nfs-provisioner) project is to serve as an example implementation of an out-of-tree dynamic provisioner to help others write their own. nfs-provisioner creates NFS-backed PVs in its own opinionated way, and we'll show that it's easy to write your own provisioner that does it your way.
 
-Note you do **not** have to fork nfs-provisioner. As we will see here, you can treat the [`controller` directory](https://github.com/kubernetes-incubator/nfs-provisioner/tree/master/controller) of the nfs-provisioner repo as a library/dependency to import. This gives you the ability to control which version of it to use and you won't have to worry about rebasing your fork. You can rest assured that the controller has no NFS-specific functionality in it. There are plans to move this controller library into its own repository so stay tuned.
+Note you do **not** have to fork nfs-provisioner. As we will see here, you can treat the [`lib` directory](https://github.com/kubernetes-incubator/nfs-provisioner/tree/master/lib) of the nfs-provisioner repo as a library/dependency to import. This gives you the ability to control which version of it to use and you won't have to worry about rebasing your fork. You can rest assured that the controller has no NFS-specific functionality in it. There are plans to move this controller library into its own repository so stay tuned.
 
 ##The Provisioner Interface
 
@@ -348,4 +348,4 @@ Note that the errors returned by Provision/Delete are sent as events on the PVC/
 
 If there is some behaviour of the controller you would like to change, feel free to open an issue. There are many parameters that could easily be made configurable but aren't because it would be too messy. The controller is written to follow the [proposal](https://github.com/kubernetes/kubernetes/pull/30285) and be like the upstream PV controller as much as possible, but there is always room for improvement.
 
-It's possible (but not pretty) to write e2e tests for your provisioner that look similar to kubernetes e2e tests by copying files from the e2e framework and fixing import statements. Like [here](https://github.com/kubernetes-incubator/nfs-provisioner/tree/master/e2e). Keep in mind the license, etc. In your case, unit & integration tests may be sufficient. 
+It's possible (but not pretty) to write e2e tests for your provisioner that look similar to kubernetes e2e tests by copying files from the e2e framework and fixing import statements. Like [here](https://github.com/kubernetes-incubator/nfs-provisioner/tree/master/nfs/test/e2e). Keep in mind the license, etc. In your case, unit & integration tests may be sufficient. 

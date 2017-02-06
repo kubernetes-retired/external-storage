@@ -4,7 +4,7 @@ The [beta dynamic provisioning feature](http://blog.kubernetes.io/2016/10/dynami
 
 nfs-provisioner creates NFS-backed PV's, leveraging the NFS volume plugin of Kubernetes, so given the ubiquity of NFS it will work almost anywhere. It's ideal for local clusters and dev work, any place a PV is wanted but not the manual work of creating one. We'll demonstrate how to get it quickly up and running, following a variation of the Kubernetes repo's [NFS example](https://github.com/kubernetes/kubernetes/tree/release-1.5/examples/volumes/nfs).
 
-The recommended way to run nfs-provisioner, which we'll demonstrate here, is as a [single-instance stateful app](http://kubernetes.io/docs/tutorials/stateful-application/run-stateful-application/), where we create a `Deployment` and back it with some persistent storage like a `hostPath` volume. We always create it in tandem with a matching service that has the necessary ports exposed. We'll see that when it's setup like so, the NFS server it runs to serve its PV's can maintain state and so survive pod restarts. The other ways to run are as a `DaemonSet`, standalone Docker container, or standalone binary, all documented [here](https://github.com/kubernetes-incubator/nfs-provisioner/blob/master/docs/deployment.md).
+The recommended way to run nfs-provisioner, which we'll demonstrate here, is as a [single-instance stateful app](http://kubernetes.io/docs/tutorials/stateful-application/run-stateful-application/), where we create a `Deployment` and back it with some persistent storage like a `hostPath` volume. We always create it in tandem with a matching service that has the necessary ports exposed. We'll see that when it's setup like so, the NFS server it runs to serve its PV's can maintain state and so survive pod restarts. The other ways to run are as a `DaemonSet`, standalone Docker container, or standalone binary, all documented [here](../deployment.md)
 
 There are two main things one can customize here before creating the deployment: the provisioner name and the backing volume.
 
@@ -39,7 +39,7 @@ $ sudo chcon -Rt svirt_sandbox_file_t /tmp/nfs-provisioner
 We create the deployment and its service.
 
 ```console
-$ kubectl create -f demo/deployment.yaml
+$ kubectl create -f deployment.yaml
 service "nfs-provisioner" created
 deployment "nfs-provisioner" created
 ```
@@ -49,14 +49,14 @@ Now, our instance of nfs-provisioner can be treated like any other provisioner: 
 We create a `StorageClass` that specifies our provisioner.
 
 ```console
-$ kubectl create -f demo/class.yaml
+$ kubectl create -f class.yaml
 storageclass "example-nfs" created
 ```
 
 We create a `PersistentVolumeClaim` asking for our `StorageClass`.
 
 ```console
-$ kubectl create -f demo/claim.yaml
+$ kubectl create -f claim.yaml
 persistentvolumeclaim "nfs" created
 ```
 
@@ -75,7 +75,7 @@ Now we have an NFS-backed PVC & PV pair that is exactly like what is expected by
 We setup the fake backend that updates `index.html` on the NFS server every 10 seconds. And check that our mounts are working.
 
 ```console
-$ kubectl create -f demo/nfs-busybox-rc.yaml
+$ kubectl create -f nfs-busybox-rc.yaml
 $ kubectl get pod -l name=nfs-busybox
 NAME                READY     STATUS    RESTARTS   AGE
 nfs-busybox-h782l   1/1       Running   0          13m
@@ -88,8 +88,8 @@ nfs-busybox-h782l
 We setup the web server that reads from the NFS share and runs a simple web server on it. And check that `nginx` is serving the data, the `index.html` from above, appropriately.
 
 ```console
-$ kubectl create -f demo/nfs-web-rc.yaml
-$ kubectl create -f demo/nfs-web-service.yaml
+$ kubectl create -f nfs-web-rc.yaml
+$ kubectl create -f nfs-web-service.yaml
 $ kubectl get pod -l name=nfs-busybox
 NAME                READY     STATUS    RESTARTS   AGE
 nfs-busybox-h782l   1/1       Running   0          13m
