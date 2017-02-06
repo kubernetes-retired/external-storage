@@ -1,5 +1,5 @@
 # package
-github.com/kubernetes-incubator/nfs-provisioner
+github.com/kubernetes-incubator/nfs-provisioner/nfs
 
 cloud.google.com/go	v0.4.0-54-g2c3878e
 github.com/PuerkitoBio/purell	v1.1.0
@@ -27,6 +27,7 @@ github.com/hashicorp/hcl	c3e054b
 github.com/howeyc/gopass	f5387c4
 github.com/imdario/mergo	0.2.2-6-g50d4dbd
 github.com/jonboulle/clockwork	v0.1.0-4-gbcac988
+github.com/kubernetes-incubator/nfs-provisioner #TODO!
 github.com/magiconair/properties	v1.7.0-5-g0723e35
 github.com/mailru/easyjson	159cdb8
 github.com/mitchellh/mapstructure	f3009df
