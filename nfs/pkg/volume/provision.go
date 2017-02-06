@@ -28,7 +28,7 @@ import (
 	"syscall"
 
 	"github.com/golang/glog"
-	"github.com/kubernetes-incubator/nfs-provisioner/controller"
+	"github.com/kubernetes-incubator/nfs-provisioner/lib/controller"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/resource"
 	"k8s.io/client-go/pkg/api/v1"

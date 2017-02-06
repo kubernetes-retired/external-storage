@@ -25,7 +25,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kubernetes-incubator/nfs-provisioner/e2e/framework"
+	"github.com/kubernetes-incubator/nfs-provisioner/nfs/test/e2e/framework"
 	"github.com/opencontainers/runc/libcontainer/selinux"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api"
