@@ -365,9 +365,10 @@ func startProvisionerPod(c clientset.Interface, ns string) *v1.Pod {
 
 func startProvisionerDeployment(c clientset.Interface, ns string) (*v1.Service, *extensions.Deployment) {
 	gopath := os.Getenv("GOPATH")
-	service := svcFromManifest(path.Join(gopath, "src/github.com/kubernetes-incubator/nfs-provisioner/deploy/kube-config/deployment.yaml"))
+	// TODO
+	service := svcFromManifest(path.Join(gopath, "src/github.com/kubernetes-incubator/nfs-provisioner/nfs/deploy/kube-config/deployment.yaml"))
 
-	deployment := deployFromManifest(path.Join(gopath, "src/github.com/kubernetes-incubator/nfs-provisioner/deploy/kube-config/deployment.yaml"))
+	deployment := deployFromManifest(path.Join(gopath, "src/github.com/kubernetes-incubator/nfs-provisioner/nfs/deploy/kube-config/deployment.yaml"))
 
 	tmpDir, err := ioutil.TempDir("", "nfs-provisioner-deployment")
 	Expect(err).NotTo(HaveOccurred())
