@@ -101,6 +101,8 @@ The container is going to need to run with one of `master` or `kubeconfig` set. 
 
 Run nfs-provisioner with `provisioner` equal to the name you decided on, and one of `master` or `kubeconfig` set. It needs to be run with capability `DAC_READ_SEARCH`. If you are using Docker 1.10 or newer, it also needs a more permissive seccomp profile: `unconfined` or `deploy/docker/nfs-provisioner-seccomp.json`.
 
+You may want to specify the hostname the NFS server exports from, i.e. the server IP to put on PVs, by setting the `server-hostname` flag.
+
 ```
 $ docker run --cap-add DAC_READ_SEARCH \
 --security-opt seccomp:deploy/docker/nfs-provisioner-seccomp.json \
@@ -139,6 +141,8 @@ quay.io/kubernetes_incubator/nfs-provisioner:v1.0.3 \
 Running nfs-provisioner in this way allows it to manipulate exports directly on the host machine. It will create & store all its data at `/export` so ensure the directory exists and is available for use. It runs assuming the host is already running either NFS Ganesha or a kernel NFS server, depending on how the `use-ganesha` flag is set. Use with caution.
 
 Run nfs-provisioner with `provisioner` equal to the name you decided on, one of `master` or `kubeconfig` set, `run-server` set false, and `use-ganesha` set according to how the NFS server is running on the host. It probably needs to be run as root. 
+
+You may want to specify the hostname the NFS server exports from, i.e. the server IP to put on PVs, by setting the `server-hostname` flag.
 
 ```
 $ sudo ./nfs-provisioner -provisioner=example.com/nfs \
