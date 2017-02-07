@@ -156,7 +156,7 @@ func TestCreateVolume(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error creating file %s: %v", conf, err)
 	}
-	p := newNFSProvisionerInternal(tmpDir+"/", client, false, &testExporter{config: conf}, newDummyQuotaer())
+	p := newNFSProvisionerInternal(tmpDir+"/", client, false, &testExporter{config: conf}, newDummyQuotaer(), "")
 
 	for _, test := range tests {
 		os.Setenv(test.envKey, "1.1.1.1")
@@ -254,7 +254,7 @@ func TestValidateOptions(t *testing.T) {
 	}
 
 	client := fake.NewSimpleClientset()
-	p := newNFSProvisionerInternal(tmpDir+"/", client, false, &testExporter{}, newDummyQuotaer())
+	p := newNFSProvisionerInternal(tmpDir+"/", client, false, &testExporter{}, newDummyQuotaer(), "")
 
 	for _, test := range tests {
 		gid, err := p.validateOptions(test.options)
@@ -313,7 +313,7 @@ func TestCreateDirectory(t *testing.T) {
 	}
 
 	client := fake.NewSimpleClientset()
-	p := newNFSProvisionerInternal(tmpDir+"/", client, false, &testExporter{}, newDummyQuotaer())
+	p := newNFSProvisionerInternal(tmpDir+"/", client, false, &testExporter{}, newDummyQuotaer(), "")
 
 	for _, test := range tests {
 		path := p.exportDir + test.directory
@@ -437,6 +437,8 @@ func TestGetServer(t *testing.T) {
 		service        string
 		namespace      string
 		node           string
+		serverHostname string
+		outOfCluster   bool
 		expectedServer string
 		expectError    bool
 	}{
@@ -552,6 +554,29 @@ func TestGetServer(t *testing.T) {
 			expectedServer: "2.2.2.2",
 			expectError:    false,
 		},
+		{
+			name:           "server-hostname is ignored, valid node",
+			objs:           []runtime.Object{},
+			podIP:          "2.2.2.2",
+			service:        "",
+			namespace:      "",
+			node:           "127.0.0.1",
+			serverHostname: "foo",
+			expectedServer: "127.0.0.1",
+			expectError:    false,
+		},
+		{
+			name:           "server-hostname takes precedence when out-of-cluster",
+			objs:           []runtime.Object{},
+			podIP:          "2.2.2.2",
+			service:        "",
+			namespace:      "",
+			node:           "127.0.0.1",
+			serverHostname: "foo",
+			outOfCluster:   true,
+			expectedServer: "foo",
+			expectError:    false,
+		},
 	}
 	for _, test := range tests {
 		if test.podIP != "" {
@@ -568,7 +593,7 @@ func TestGetServer(t *testing.T) {
 		}
 
 		client := fake.NewSimpleClientset(test.objs...)
-		p := newNFSProvisionerInternal(tmpDir+"/", client, false, &testExporter{}, newDummyQuotaer())
+		p := newNFSProvisionerInternal(tmpDir+"/", client, test.outOfCluster, &testExporter{}, newDummyQuotaer(), test.serverHostname)
 
 		server, err := p.getServer()
 

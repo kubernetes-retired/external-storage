@@ -71,7 +71,7 @@ const (
 	nodeEnv      = "NODE_NAME"
 )
 
-func NewNFSProvisioner(exportDir string, client kubernetes.Interface, outOfCluster bool, useGanesha bool, ganeshaConfig string, rootSquash bool, enableXfsQuota bool) controller.Provisioner {
+func NewNFSProvisioner(exportDir string, client kubernetes.Interface, outOfCluster bool, useGanesha bool, ganeshaConfig string, rootSquash bool, enableXfsQuota bool, serverHostname string) controller.Provisioner {
 	var exporter exporter
 	if useGanesha {
 		exporter = newGaneshaExporter(ganeshaConfig, rootSquash)
@@ -88,10 +88,10 @@ func NewNFSProvisioner(exportDir string, client kubernetes.Interface, outOfClust
 	} else {
 		quotaer = newDummyQuotaer()
 	}
-	return newNFSProvisionerInternal(exportDir, client, outOfCluster, exporter, quotaer)
+	return newNFSProvisionerInternal(exportDir, client, outOfCluster, exporter, quotaer, serverHostname)
 }
 
-func newNFSProvisionerInternal(exportDir string, client kubernetes.Interface, outOfCluster bool, exporter exporter, quotaer quotaer) *nfsProvisioner {
+func newNFSProvisionerInternal(exportDir string, client kubernetes.Interface, outOfCluster bool, exporter exporter, quotaer quotaer, serverHostname string) *nfsProvisioner {
 	if _, err := os.Stat(exportDir); os.IsNotExist(err) {
 		glog.Fatalf("exportDir %s does not exist!", exportDir)
 	}
@@ -113,16 +113,17 @@ func newNFSProvisionerInternal(exportDir string, client kubernetes.Interface, ou
 	}
 
 	provisioner := &nfsProvisioner{
-		exportDir:    exportDir,
-		client:       client,
-		outOfCluster: outOfCluster,
-		exporter:     exporter,
-		quotaer:      quotaer,
-		identity:     identity,
-		podIPEnv:     podIPEnv,
-		serviceEnv:   serviceEnv,
-		namespaceEnv: namespaceEnv,
-		nodeEnv:      nodeEnv,
+		exportDir:      exportDir,
+		client:         client,
+		outOfCluster:   outOfCluster,
+		exporter:       exporter,
+		quotaer:        quotaer,
+		serverHostname: serverHostname,
+		identity:       identity,
+		podIPEnv:       podIPEnv,
+		serviceEnv:     serviceEnv,
+		namespaceEnv:   namespaceEnv,
+		nodeEnv:        nodeEnv,
 	}
 
 	return provisioner
@@ -145,6 +146,10 @@ type nfsProvisioner struct {
 
 	// The quotaer to use for setting per-share/directory/project quotas
 	quotaer quotaer
+
+	// The hostname for the NFS server to export from. Only applicable when
+	// running as a Docker container
+	serverHostname string
 
 	// Identity of this nfsProvisioner, generated & persisted to exportDir or
 	// recovered from there. Used to mark provisioned PVs
@@ -284,6 +289,9 @@ func (p *nfsProvisioner) validateOptions(options controller.VolumeOptions) (stri
 // getServer gets the server IP to put in a provisioned PV's spec.
 func (p *nfsProvisioner) getServer() (string, error) {
 	if p.outOfCluster {
+		if p.serverHostname != "" {
+			return p.serverHostname, nil
+		}
 		// TODO make this better
 		out, err := exec.Command("hostname", "-i").Output()
 		if err != nil {
