@@ -43,6 +43,7 @@ var (
 	rootSquash           = flag.Bool("root-squash", false, "If the provisioner will squash root users by adding the NFS Ganesha root_id_squash or kernel root_squash option to each export. Default false.")
 	enableXfsQuota       = flag.Bool("enable-xfs-quota", false, "If the provisioner will set xfs quotas for each volume it provisions. Requires that the directory it creates volumes in ('/export') is xfs mounted with option prjquota/pquota, and that it has the privilege to run xfs_quota. Default false.")
 	failedRetryThreshold = flag.Int("failed-retry-threshold", 10, "If the number of retries on provisioning failure need to be limited to a set number of attempts. Default 10")
+	serverHostname       = flag.String("server-hostname", "", "The hostname for the NFS server to export from. Only applicable when running out-of-cluster i.e. it can only be set if either master or kubeconfig are set. If unset, the first IP output by `hostname -i` is used.")
 )
 
 const exportDir = "/export"
@@ -67,6 +68,13 @@ func main() {
 		glog.Fatalf("Invalid flags specified: custom grace period must be in the range 0-180")
 	}
 
+	// Create the client according to whether we are running in or out-of-cluster
+	outOfCluster := *master != "" || *kubeconfig != ""
+
+	if !outOfCluster && *serverHostname != "" {
+		glog.Fatalf("Invalid flags specified: if server-hostname is set, either master or kube-config must also be set.")
+	}
+
 	if *runServer {
 		glog.Infof("Starting NFS server!")
 		err := server.Start(ganeshaConfig, *gracePeriod)
@@ -75,8 +83,6 @@ func main() {
 		}
 	}
 
-	// Create the client according to whether we are running in or out-of-cluster
-	outOfCluster := *master != "" || *kubeconfig != ""
 	var config *rest.Config
 	var err error
 	if outOfCluster {
@@ -101,7 +107,7 @@ func main() {
 
 	// Create the provisioner: it implements the Provisioner interface expected by
 	// the controller
-	nfsProvisioner := vol.NewNFSProvisioner(exportDir, clientset, outOfCluster, *useGanesha, ganeshaConfig, *rootSquash, *enableXfsQuota)
+	nfsProvisioner := vol.NewNFSProvisioner(exportDir, clientset, outOfCluster, *useGanesha, ganeshaConfig, *rootSquash, *enableXfsQuota, *serverHostname)
 
 	// Start the provision controller which will dynamically provision NFS PVs
 	pc := controller.NewProvisionController(clientset, 15*time.Second, *provisioner, nfsProvisioner, serverVersion.GitVersion, false, *failedRetryThreshold)

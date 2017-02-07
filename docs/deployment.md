@@ -308,3 +308,4 @@ Now that you have finished deploying the provisioner, go to [Usage](usage.md) fo
 * `root-squash` - If the provisioner will squash root users by adding the NFS Ganesha root_id_squash or kernel root_squash option to each export. Default false.
 * `enable-xfs-quota` - If the provisioner will set xfs quotas for each volume it provisions. Requires that the directory it creates volumes in ('/export') is xfs mounted with option prjquota/pquota, and that it has the privilege to run xfs_quota. Default false.
 * `failed-retry-threshold` - If the number of retries on provisioning failure need to be limited to a set number of attempts. Default 10
+* `server-hostname` - The hostname for the NFS server to export from. Only applicable when running out-of-cluster i.e. it can only be set if either master or kubeconfig are set. If unset, the first IP output by `hostname -i` is used.
