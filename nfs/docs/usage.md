@@ -2,7 +2,7 @@
 
 The nfs-provisioner has been deployed and is now watching for claims it should provision volumes for. No such claims can exist until a properly configured `StorageClass` for claims to request is created.
 
-Edit the `provisioner` field in `deploy/kube-config/class.yaml` to be the provisioner's name. Configure the `parameters`.
+Edit the `provisioner` field in `deploy/kubernetes/class.yaml` to be the provisioner's name. Configure the `parameters`.
 
 ### Parameters
 * `gid`: `"none"` or a [supplemental group](http://kubernetes.io/docs/user-guide/security-context/) like `"1001"`. NFS shares will be created with permissions such that only pods running with the supplemental group can read & write to the share. Or if `"none"`, anybody can write to the share. This will only work in conjunction with the `root-squash` flag set true.  Default (if omitted) `"none"`.
@@ -10,16 +10,16 @@ Edit the `provisioner` field in `deploy/kube-config/class.yaml` to be the provis
 Name the `StorageClass` however you like; the name is how claims will request this class. Create the class.
  
 ```
-$ kubectl create -f deploy/kube-config/class.yaml
+$ kubectl create -f deploy/kubernetes/class.yaml
 storageclass "example-nfs" created
 ```
 
 Now if everything is working correctly, when you create a claim requesting the class you just created, the provisioner will automatically create a volume.
 
-Edit the `volume.beta.kubernetes.io/storage-class` annotation in `deploy/kube-config/claim.yaml` to be the name of the class. Create the claim.
+Edit the `volume.beta.kubernetes.io/storage-class` annotation in `deploy/kubernetes/claim.yaml` to be the name of the class. Create the claim.
 
 ```
-$ kubectl create -f deploy/kube-config/claim.yaml
+$ kubectl create -f deploy/kubernetes/claim.yaml
 persistentvolumeclaim "nfs" created
 ```
 
@@ -34,7 +34,7 @@ pvc-dce84888-7a9d-11e6-b1ee-5254001e0c1b   1Mi        RWX           Delete      
 A pod can consume the PVC and write to the backing NFS share. Create a pod to test this.
 
 ```
-$ kubectl create -f deploy/kube-config/write_pod.yaml 
+$ kubectl create -f deploy/kubernetes/write_pod.yaml
 pod "write-pod" created
 $ kubectl get pod --show-all
 nfs-provisioner   1/1       Running     0          31s

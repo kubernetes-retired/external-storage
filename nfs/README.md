@@ -6,7 +6,7 @@ nfs-provisioner is an out-of-tree dynamic provisioner for Kubernetes 1.4. You ca
 It works just like in-tree dynamic provisioners: a `StorageClass` object can specify an instance of nfs-provisioner to be its `provisioner` like it specifies in-tree provisioners such as GCE or AWS. Then, the instance of nfs-provisioner will watch for `PersistentVolumeClaims` that ask for the `StorageClass` and automatically create NFS-backed `PersistentVolumes` for them. For more information on how dynamic provisioning works, see [the docs](http://kubernetes.io/docs/user-guide/persistent-volumes/) or [this blog post](http://blog.kubernetes.io/2016/10/dynamic-provisioning-and-storage-in-kubernetes.html).
 
 ## Quickstart
-Choose some volume for your nfs-provisioner instance to store its state & data in and mount the volume at `/export` in `deploy/kube-config/deployment.yaml`. It doesn't have to be a `hostPath` volume, it can e.g. be a PVC. Note that the volume must have a [supported file system](https://github.com/nfs-ganesha/nfs-ganesha/wiki/Fsalsupport#vfs) on it: any local filesystem on Linux is supported & NFS is not supported.
+Choose some volume for your nfs-provisioner instance to store its state & data in and mount the volume at `/export` in `deploy/kubernetes/deployment.yaml`. It doesn't have to be a `hostPath` volume, it can e.g. be a PVC. Note that the volume must have a [supported file system](https://github.com/nfs-ganesha/nfs-ganesha/wiki/Fsalsupport#vfs) on it: any local filesystem on Linux is supported & NFS is not supported.
 ```yaml
 ...
   volumeMounts:
@@ -19,7 +19,7 @@ volumes:
 ...
 ```
 
-Choose a `provisioner` name for a `StorageClass` to specify and set it in `deploy/kube-config/deployment.yaml`
+Choose a `provisioner` name for a `StorageClass` to specify and set it in `deploy/kubernetes/deployment.yaml`
 ```yaml
 ...
 args:
@@ -29,20 +29,20 @@ args:
 
 Create the deployment.
 ```console
-$ kubectl create -f deploy/kube-config/deployment.yaml
+$ kubectl create -f deploy/kubernetes/deployment.yaml
 service "nfs-provisioner" created
 deployment "nfs-provisioner" created
 ```
 
 Create a `StorageClass` named "example-nfs" with `provisioner: example.com/nfs`.
 ```console
-$ kubectl create -f deploy/kube-config/class.yaml
+$ kubectl create -f deploy/kubernetes/class.yaml
 storageclass "example-nfs" created
 ```
 
 Create a `PersistentVolumeClaim` with annotation `volume.beta.kubernetes.io/storage-class: "example-nfs"`
 ```console
-$ kubectl create -f deploy/kube-config/claim.yaml
+$ kubectl create -f deploy/kubernetes/claim.yaml
 persistentvolumeclaim "nfs" created
 ```
 

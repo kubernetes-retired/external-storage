@@ -50,18 +50,18 @@ Decide how to run nfs-provisioner and follow one of the below sections. The reco
 
 ### In Kubernetes - Deployment of 1 replica
 
-Edit the `provisioner` argument in the `args` field in `deploy/kube-config/deployment.yaml` to be the provisioner's name you decided on. 
+Edit the `provisioner` argument in the `args` field in `deploy/kubernetes/deployment.yaml` to be the provisioner's name you decided on.
 
-`deploy/kube-config/deployment.yaml` specifies a `hostPath` volume `/srv` mounted at `/export`. The `/export` directory is where the provisioner stores its state and provisioned `PersistentVolumes'` data, so by mounting a volume there, you specify it as the backing storage for provisioned PVs. You may edit the `hostPath` or even mount some other type of volume at `/export`, like a `PersistentVolumeClaim`. Note that the volume mounted there must have a [supported file system](https://github.com/nfs-ganesha/nfs-ganesha/wiki/Fsalsupport#vfs) on it: any local filesystem on Linux is supported & NFS is not supported.
+`deploy/kubernetes/deployment.yaml` specifies a `hostPath` volume `/srv` mounted at `/export`. The `/export` directory is where the provisioner stores its state and provisioned `PersistentVolumes'` data, so by mounting a volume there, you specify it as the backing storage for provisioned PVs. You may edit the `hostPath` or even mount some other type of volume at `/export`, like a `PersistentVolumeClaim`. Note that the volume mounted there must have a [supported file system](https://github.com/nfs-ganesha/nfs-ganesha/wiki/Fsalsupport#vfs) on it: any local filesystem on Linux is supported & NFS is not supported.
 
 Note that if you continue with the `hostPath` volume, its path must exist on the node the provisioner is scheduled to, so you may want to use a `nodeSelector` to choose a particular node and ensure the directory exists there: `mkdir -p /srv`. If SELinux is enforcing on the node, you may need to make the container [privileged](http://kubernetes.io/docs/user-guide/security-context/) or change the security context of the directory on the node: `sudo chcon -Rt svirt_sandbox_file_t /srv`.
 
-`deploy/kube-config/deployment.yaml` also configures a service. The deployment's pod will use the service's cluster IP as the NFS server IP to put on its `PersistentVolumes`, instead of its own unstable pod IP, because the service's name is passed in via the `SERVICE_NAME` env variable.
+`deploy/kubernetes/deployment.yaml` also configures a service. The deployment's pod will use the service's cluster IP as the NFS server IP to put on its `PersistentVolumes`, instead of its own unstable pod IP, because the service's name is passed in via the `SERVICE_NAME` env variable.
 
 Create the deployment and its service.
 
 ```
-$ kubectl create -f deploy/kube-config/deployment.yaml 
+$ kubectl create -f deploy/kubernetes/deployment.yaml
 service "nfs-provisioner" created
 deployment "nfs-provisioner" created
 ```
@@ -73,13 +73,13 @@ The procedure for running a stateful set is identical to [that for a deployment,
 
 ### In Kubernetes - DaemonSet
 
-Edit the `provisioner` argument in the `args` field in `deploy/kube-config/daemonset.yaml` to be the provisioner's name you decided on. 
+Edit the `provisioner` argument in the `args` field in `deploy/kubernetes/daemonset.yaml` to be the provisioner's name you decided on.
 
-`deploy/kube-config/daemonset.yaml` specifies a `hostPath` volume `/srv` mounted at `/export`. The `/export` directory is where the provisioner stores its state and provisioned `PersistentVolumes'` data, so by mounting a volume there, you specify it as the backing storage for provisioned PVs. Each pod in the daemon set does this, effectively creating a "pool" of their nodes' local storage.
+`deploy/kubernetes/daemonset.yaml` specifies a `hostPath` volume `/srv` mounted at `/export`. The `/export` directory is where the provisioner stores its state and provisioned `PersistentVolumes'` data, so by mounting a volume there, you specify it as the backing storage for provisioned PVs. Each pod in the daemon set does this, effectively creating a "pool" of their nodes' local storage.
 
-`deploy/kube-config/daemonset.yaml` also specifies a `nodeSelector` to target nodes/hosts. Choose nodes to deploy nfs-provisioner on and be sure that the `hostPath` directory exists on each node: `mkdir -p /srv`. If SELinux is enforcing on the nodes, you may need to make the container [privileged](http://kubernetes.io/docs/user-guide/security-context/) or change the security context of the `hostPath` directory on the node: `sudo chcon -Rt svirt_sandbox_file_t /srv`.
+`deploy/kubernetes/daemonset.yaml` also specifies a `nodeSelector` to target nodes/hosts. Choose nodes to deploy nfs-provisioner on and be sure that the `hostPath` directory exists on each node: `mkdir -p /srv`. If SELinux is enforcing on the nodes, you may need to make the container [privileged](http://kubernetes.io/docs/user-guide/security-context/) or change the security context of the `hostPath` directory on the node: `sudo chcon -Rt svirt_sandbox_file_t /srv`.
 
-`deploy/kube-config/daemonset.yaml` specifies a `hostPort` for NFS, TCP 2049, to expose on the node, so be sure that this port is available on each node. The daemon set's pods will use their node's name as the NFS server IP to put on their `PersistentVolumes`.
+`deploy/kubernetes/daemonset.yaml` specifies a `hostPort` for NFS, TCP 2049, to expose on the node, so be sure that this port is available on each node. The daemon set's pods will use their node's name as the NFS server IP to put on their `PersistentVolumes`.
 
 Label the chosen nodes to match the `nodeSelector`.
 
@@ -91,7 +91,7 @@ node "127.0.0.1" labeled
 Create the daemon set.
 
 ```
-$ kubectl create -f deploy/kube-config/daemonset.yaml 
+$ kubectl create -f deploy/kubernetes/daemonset.yaml
 daemonset "nfs-provisioner" created
 ```
 
@@ -197,24 +197,24 @@ $ kubectl create -f /tmp/serviceaccount.yaml
 serviceaccounts/nfs-provisioner
 ```
 
-`deploy/kube-config/clusterrole.yaml` lists all the permissions nfs-provisioner needs.
+`deploy/kubernetes/clusterrole.yaml` lists all the permissions nfs-provisioner needs.
 
 Create the `ClusterRole`.
 
 ```console
-$ kubectl create -f deploy/kube-config/clusterrole.yaml
+$ kubectl create -f deploy/kubernetes/clusterrole.yaml
 clusterrole "nfs-provisioner-runner" created
 ```
 
-`deploy/kube-config/clusterrolebinding.yaml` binds the "nfs-provisioner" service account in namespace `default` to your `ClusterRole`. Edit the service account name and namespace accordingly if you are not in the namespace `default` or named the service account something other than "nfs-provisioner".
+`deploy/kubernetes/clusterrolebinding.yaml` binds the "nfs-provisioner" service account in namespace `default` to your `ClusterRole`. Edit the service account name and namespace accordingly if you are not in the namespace `default` or named the service account something other than "nfs-provisioner".
 
 Create the `ClusterRoleBinding`.
 ```console
-$ kubectl create -f deploy/kube-config/clusterrolebinding.yaml
+$ kubectl create -f deploy/kubernetes/clusterrolebinding.yaml
 clusterrolebinding "run-nfs-provisioner" created
 ```
 
-Add a `spec.template.spec.serviceAccount` field set to the same service account we just referenced in our `ClusterRoleBinding` to the deployment, stateful set, or daemon set yaml you chose earlier. You can patch a deployment or use `deploy/kube-config/(statefulset|daemonset)-sa` which have the service account field set to "nfs-provisioner". 
+Add a `spec.template.spec.serviceAccount` field set to the same service account we just referenced in our `ClusterRoleBinding` to the deployment, stateful set, or daemon set yaml you chose earlier. You can patch a deployment or use `deploy/kubernetes/(statefulset|daemonset)-sa` which have the service account field set to "nfs-provisioner".
 
 #### Deployment
 ```console
@@ -223,12 +223,12 @@ $ kubectl patch deployment nfs-provisioner -p '{"spec":{"template":{"spec":{"ser
 #### StatefulSet
 ```console
 $ kubectl delete statefulset nfs-provisioner
-$ kubectl create -f deploy/kube-config/statefulset-sa.yaml 
+$ kubectl create -f deploy/kubernetes/statefulset-sa.yaml
 ```
 #### DaemonSet
 ```console
 $ kubectl delete daemonset nfs-provisioner
-$ kubectl create -f deploy/kube-config/daemonset-sa.yaml 
+$ kubectl create -f deploy/kubernetes/daemonset-sa.yaml
 ```
 
 ### OpenShift
@@ -249,12 +249,12 @@ $ oc create -f /tmp/serviceaccount.yaml
 serviceaccount "nfs-provisioner" created
 ```
 
-`deploy/kube-config/openshift-scc.yaml` defines an SCC for your nfs-provisioner pod to validate against.
+`deploy/kubernetes/openshift-scc.yaml` defines an SCC for your nfs-provisioner pod to validate against.
 
 Create the SCC.
 
 ```console
-$ oc create -f deploy/kube-config/openshift-scc.yaml
+$ oc create -f deploy/kubernetes/openshift-scc.yaml
 securitycontextconstraints "nfs-provisioner" created
 ```
 
@@ -264,12 +264,12 @@ Add the `nfs-provisioner` service account to the SCC. Change the service account
 $ oadm policy add-scc-to-user nfs-provisioner system:serviceaccount:default:nfs-provisioner
 ```
 
-`deploy/kube-config/openshift-clusterrole.yaml` lists all the permissions nfs-provisioner needs.
+`deploy/kubernetes/openshift-clusterrole.yaml` lists all the permissions nfs-provisioner needs.
 
 Create the `ClusterRole`.
 
 ```console
-$ oc create -f deploy/kube-config/openshift-clusterrole.yaml
+$ oc create -f deploy/kubernetes/openshift-clusterrole.yaml
 clusterrole "nfs-provisioner-runner" created
 ```
 
@@ -279,7 +279,7 @@ Add the `ClusterRole` to the `nfs-provisioner` service account. Change the servi
 $ oadm policy add-cluster-role-to-user nfs-provisioner-runner system:serviceaccount:default:nfs-provisioner
 ```
 
-Add a `spec.template.spec.serviceAccount` field set to the same service account we just referenced in our `oadm policy` commands to the deployment, stateful set, or daemon set yaml you chose earlier. You can patch a deployment or use `deploy/kube-config/(statefulset|daemonset)-sa` which have the service account field set to "nfs-provisioner". 
+Add a `spec.template.spec.serviceAccount` field set to the same service account we just referenced in our `oadm policy` commands to the deployment, stateful set, or daemon set yaml you chose earlier. You can patch a deployment or use `deploy/kubernetes/(statefulset|daemonset)-sa` which have the service account field set to "nfs-provisioner".
 
 #### Deployment
 ```console
@@ -288,12 +288,12 @@ $ oc patch deployment nfs-provisioner -p '{"spec":{"template":{"spec":{"serviceA
 #### StatefulSet
 ```console
 $ oc delete statefulset nfs-provisioner
-$ oc create -f deploy/kube-config/statefulset-sa.yaml 
+$ oc create -f deploy/kubernetes/statefulset-sa.yaml
 ```
 #### DaemonSet
 ```console
 $ oc delete daemonset nfs-provisioner
-$ oc create -f deploy/kube-config/daemonset-sa.yaml 
+$ oc create -f deploy/kubernetes/daemonset-sa.yaml
 ```
 ---
 
