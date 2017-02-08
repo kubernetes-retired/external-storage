@@ -218,7 +218,7 @@ Add a `spec.template.spec.serviceAccount` field set to the same service account 
 
 #### Deployment
 ```console
-$ kubectl patch daemonset nfs-provisioner -p '{"spec":{"template":{"spec":{"serviceAccount":"nfs-provisioner"}}}}'
+$ kubectl patch deployment nfs-provisioner -p '{"spec":{"template":{"spec":{"serviceAccount":"nfs-provisioner"}}}}'
 ```
 #### StatefulSet
 ```console
@@ -283,7 +283,7 @@ Add a `spec.template.spec.serviceAccount` field set to the same service account 
 
 #### Deployment
 ```console
-$ oc patch daemonset nfs-provisioner -p '{"spec":{"template":{"spec":{"serviceAccount":"nfs-provisioner"}}}}'
+$ oc patch deployment nfs-provisioner -p '{"spec":{"template":{"spec":{"serviceAccount":"nfs-provisioner"}}}}'
 ```
 #### StatefulSet
 ```console
