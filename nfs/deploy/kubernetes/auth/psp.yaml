@@ -1,0 +1,22 @@
+apiVersion: extensions/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: nfs-provisioner
+spec:
+  fsGroup:
+    rule: RunAsAny
+  allowedCapabilities:
+  - DAC_READ_SEARCH
+  runAsUser:
+    rule: RunAsAny
+  seLinux:
+    rule: RunAsAny
+  supplementalGroups:
+    rule: RunAsAny
+  volumes:
+  - configMap
+  - downwardAPI
+  - emptyDir
+  - persistentVolumeClaim
+  - secret
+  - hostPath

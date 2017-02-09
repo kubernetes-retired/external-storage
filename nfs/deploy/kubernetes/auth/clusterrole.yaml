@@ -18,3 +18,7 @@ rules:
   - apiGroups: [""]
     resources: ["services", "endpoints"]
     verbs: ["get"]
+  - apiGroups: ["extensions"]
+    resources: ["podsecuritypolicies"]
+    resourceNames: ["nfs-provisioner"]
+    verbs: ["use"]

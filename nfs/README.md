@@ -60,6 +60,8 @@ Deleting the provisioner deployment will cause any outstanding `PersistentVolume
 ## Running
 Go [here](./docs/demo) for a demo of how to run nfs-provisioner. You may also/instead want to read the (dryer but more detailed) following docs.
 
+To authorize nfs-provisioner on a Kubernetes cluster (only if you have RBAC and/or PSP enabled or are running OpenShift) see [Authorization](docs/authorization.md).
+
 To deploy nfs-provisioner on a Kubernetes cluster see [Deployment](docs/deployment.md).
 
 To use nfs-provisioner once it is deployed see [Usage](docs/usage.md).

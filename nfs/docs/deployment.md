@@ -1,9 +1,5 @@
 # Deployment
 
-1. [Getting the provisioner image](#getting-the-provisioner-image)
-2. [Deploying the provisioner](#deploying-the-provisioner)
-3. [Authorizing the provisioner](#authorizing-the-provisioner)
-
 ## Getting the provisioner image
 To get the Docker image onto the machine where you want to run nfs-provisioner, you can either build it or pull the newest release from Quay. You may use the unstable `latest` tag if you wish, but all the example yamls reference the newest versioned release tag.
 
@@ -41,12 +37,13 @@ Decide on a unique name to give the provisioner that follows the naming scheme `
 
 Decide how to run nfs-provisioner and follow one of the below sections. The recommended way is running it as a [single-instance stateful app](http://kubernetes.io/docs/tutorials/stateful-application/run-stateful-application/), where you create a `Deployment`/`StatefulSet` and back it with some persistent storage like a `hostPath` volume. Running as a `DaemonSet` is for exposing & "pooling" multiple nodes' `hostPath` volumes. Running outside of Kubernetes as a standalone container or binary is for when you want greater control over the app's lifecycle and/or the ability to set per-PV quotas.
 
+**Note**: if you went through the [Authorization](authorization.md) guide, you should use the yaml specs in `deploy/kubernetes/auth` which have the spec.template.spec.serviceAccount set to "nfs-provisioner" for your convenience, instead of using the ones referred to here: e.g. `deploy/kubernetes/auth/deployment-sa.yaml` instead of `deploy/kubernetes/deployment.yaml`.
+
 * [In Kubernetes - Deployment](#in-kubernetes---deployment-of-1-replica)
 * [In Kubernetes - StatefulSet](#in-kubernetes---statefulset-of-1-replica)
 * [In Kubernetes - DaemonSet](#in-kubernetes---daemonset)
 * [Outside of Kubernetes - container](#outside-of-kubernetes---container)
 * [Outside of Kubernetes - binary](#outside-of-kubernetes---binary)
-
 
 ### In Kubernetes - Deployment of 1 replica
 
@@ -168,133 +165,6 @@ $ sudo ./nfs-provisioner -provisioner=example.com/nfs \
 -enable-xfs-quota=true
 ```
 
-## Authorizing the provisioner
-
-If you chose to run the provisioner in Kubernetes you may need to grant it authorization to make the API requests it needs to. Creating `PersistentVolumes` is normally an administrator's responsibility and the authorization policies of Kubernetes & OpenShift will by default deny a pod the authorization to make such API requests. A Kubernetes RBAC request denial looks like this:
-
->E0124 20:10:01.475115       1 reflector.go:199] github.com/kubernetes-incubator/nfs-provisioner/vendor/k8s.io/client-go/tools/cache/reflector.go:94: Failed to list *v1beta1.StorageClass: the server does not allow access to the requested resource (get storageclasses.storage.k8s.io)
-
-Find out what authorization plugin or policy implementation your cluster uses, if any, and follow one of the below sections.
-
-* [RBAC](#rbac)
-* [OpenShift](#openshift)
-
-### RBAC
-
-[RBAC](https://kubernetes.io/docs/admin/authorization/) (Role-Based Access Control) is an alpha feature in Kubernetes 1.5 and beta in 1.6. If it is enabled on your cluster, you need to create a `ClusterRole` that lists all the permissions an nfs-provisioner pod needs plus a `ClusterRoleBinding` that grants the permissions to the [service account](https://kubernetes.io/docs/user-guide/service-accounts/) the nfs-provisioner pod will be assigned.
-
-It's a good idea to create a service account just for nfs-provisioner. If you already deployed nfs-provisioner, you will soon have to redeploy it with the `serviceAccount` field of the pod template set to the name of this service account.
-
-Create the service account.
-```console
-$ cat > /tmp/serviceaccount.yaml <<EOF
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: nfs-provisioner
-EOF
-$ kubectl create -f /tmp/serviceaccount.yaml
-serviceaccounts/nfs-provisioner
-```
-
-`deploy/kubernetes/clusterrole.yaml` lists all the permissions nfs-provisioner needs.
-
-Create the `ClusterRole`.
-
-```console
-$ kubectl create -f deploy/kubernetes/clusterrole.yaml
-clusterrole "nfs-provisioner-runner" created
-```
-
-`deploy/kubernetes/clusterrolebinding.yaml` binds the "nfs-provisioner" service account in namespace `default` to your `ClusterRole`. Edit the service account name and namespace accordingly if you are not in the namespace `default` or named the service account something other than "nfs-provisioner".
-
-Create the `ClusterRoleBinding`.
-```console
-$ kubectl create -f deploy/kubernetes/clusterrolebinding.yaml
-clusterrolebinding "run-nfs-provisioner" created
-```
-
-Add a `spec.template.spec.serviceAccount` field set to the same service account we just referenced in our `ClusterRoleBinding` to the deployment, stateful set, or daemon set yaml you chose earlier. You can patch a deployment or use `deploy/kubernetes/(statefulset|daemonset)-sa` which have the service account field set to "nfs-provisioner".
-
-#### Deployment
-```console
-$ kubectl patch deployment nfs-provisioner -p '{"spec":{"template":{"spec":{"serviceAccount":"nfs-provisioner"}}}}'
-```
-#### StatefulSet
-```console
-$ kubectl delete statefulset nfs-provisioner
-$ kubectl create -f deploy/kubernetes/statefulset-sa.yaml
-```
-#### DaemonSet
-```console
-$ kubectl delete daemonset nfs-provisioner
-$ kubectl create -f deploy/kubernetes/daemonset-sa.yaml
-```
-
-### OpenShift
-
-OpenShift by default has both [authorization policies](https://docs.openshift.com/container-platform/latest/admin_guide/manage_authorization_policy.html) and [security context constraints](https://docs.openshift.com/container-platform/latest/admin_guide/manage_scc.html) that deny an nfs-provisioner pod its needed permissions, so you need to create a new `ClusterRole` and SCC for your pod to use.
-
-It's a good idea to create a service account just for nfs-provisioner. If you already deployed nfs-provisioner, you will soon have to redeploy it with the `serviceAccount` field of the pod template set to the name of this service account.
-
-Create the service account.
-```console
-$ cat > /tmp/serviceaccount.yaml <<EOF
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: nfs-provisioner
-EOF
-$ oc create -f /tmp/serviceaccount.yaml
-serviceaccount "nfs-provisioner" created
-```
-
-`deploy/kubernetes/openshift-scc.yaml` defines an SCC for your nfs-provisioner pod to validate against.
-
-Create the SCC.
-
-```console
-$ oc create -f deploy/kubernetes/openshift-scc.yaml
-securitycontextconstraints "nfs-provisioner" created
-```
-
-Add the `nfs-provisioner` service account to the SCC. Change the service account name and namespace accordingly if you are not in the namespace `default` or named the service account something other than "nfs-provisioner".
-
-```console
-$ oadm policy add-scc-to-user nfs-provisioner system:serviceaccount:default:nfs-provisioner
-```
-
-`deploy/kubernetes/openshift-clusterrole.yaml` lists all the permissions nfs-provisioner needs.
-
-Create the `ClusterRole`.
-
-```console
-$ oc create -f deploy/kubernetes/openshift-clusterrole.yaml
-clusterrole "nfs-provisioner-runner" created
-```
-
-Add the `ClusterRole` to the `nfs-provisioner` service account. Change the service account name and namespace accordingly if you are not in the namespace `default` or named the service account something other than "nfs-provisioner".
-
-```console
-$ oadm policy add-cluster-role-to-user nfs-provisioner-runner system:serviceaccount:default:nfs-provisioner
-```
-
-Add a `spec.template.spec.serviceAccount` field set to the same service account we just referenced in our `oadm policy` commands to the deployment, stateful set, or daemon set yaml you chose earlier. You can patch a deployment or use `deploy/kubernetes/(statefulset|daemonset)-sa` which have the service account field set to "nfs-provisioner".
-
-#### Deployment
-```console
-$ oc patch deployment nfs-provisioner -p '{"spec":{"template":{"spec":{"serviceAccount":"nfs-provisioner"}}}}'
-```
-#### StatefulSet
-```console
-$ oc delete statefulset nfs-provisioner
-$ oc create -f deploy/kubernetes/statefulset-sa.yaml
-```
-#### DaemonSet
-```console
-$ oc delete daemonset nfs-provisioner
-$ oc create -f deploy/kubernetes/daemonset-sa.yaml
-```
 ---
 
 Now that you have finished deploying the provisioner, go to [Usage](usage.md) for info on how to use it.
