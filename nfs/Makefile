@@ -44,17 +44,25 @@ push: container
 	docker push $(IMAGE):$(VERSION)
 .PHONY: push
 
-test-integration: verify-gofmt
-	go test `go list ./... | grep -v 'vendor\|e2e\|demo'`
+test-integration: verify
+	go test `go list ./... | grep -v 'vendor\|test\|demo'`
 .PHONY: test-integration
 
-test-e2e: verify-gofmt
+test-e2e: verify
 	go test ./test/e2e -v --kubeconfig=$(HOME)/.kube/config
 .PHONY: test-e2e
 
-verify-gofmt:
+verify:
+	@tput bold; echo Running gofmt:; tput sgr0
 	(gofmt -s -w -l `find . -type f -name "*.go" | grep -v vendor`) || exit 1
-.PHONY: verify-gofmt
+	@tput bold; echo Running golint and go vet:; tput sgr0
+	for i in $$(find . -type f -name "*.go" | grep -v vendor); do \
+		golint --set_exit_status $$i; \
+		go vet $$i; \
+	done
+	@tput bold; echo Running verify-boilerplate; tput sgr0
+	../repo-infra/verify/verify-boilerplate.sh
+.PHONY: verify
 
 clean:
 	rm -f nfs-provisioner
