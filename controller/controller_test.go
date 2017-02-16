@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kubernetes-incubator/nfs-provisioner/controller/leaderelection"
 	rl "github.com/kubernetes-incubator/nfs-provisioner/controller/leaderelection/resourcelock"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
@@ -244,7 +245,7 @@ func TestMultipleControllers(t *testing.T) {
 		ctrls := make([]*ProvisionController, test.numControllers)
 		stopChs := make([]chan struct{}, test.numControllers)
 		for i := 0; i < test.numControllers; i++ {
-			ctrls[i] = NewProvisionController(client, 15*time.Second, test.provisionerName, provisioner, "v1.5.0", false, failedRetryThreshold)
+			ctrls[i] = NewProvisionController(client, 15*time.Second, test.provisionerName, provisioner, "v1.5.0", false, failedRetryThreshold, leaderelection.DefaultLeaseDuration, leaderelection.DefaultRenewDeadline, leaderelection.DefaultRetryPeriod, leaderelection.DefaultTermLimit)
 			ctrls[i].createProvisionedPVInterval = 10 * time.Millisecond
 			ctrls[i].claimSource = claimSource
 			ctrls[i].claims.Add(newClaim("claim-1", "uid-1-1", "class-1", "", nil))
@@ -462,12 +463,8 @@ func newTestProvisionController(
 	exponentialBackOffOnError bool,
 	failedRetryThreshold int,
 ) *ProvisionController {
-	ctrl := NewProvisionController(client, resyncPeriod, provisionerName, provisioner, serverGitVersion, exponentialBackOffOnError, failedRetryThreshold)
+	ctrl := NewProvisionController(client, resyncPeriod, provisionerName, provisioner, serverGitVersion, exponentialBackOffOnError, failedRetryThreshold, 2*resyncPeriod, resyncPeriod, resyncPeriod/2, 2*resyncPeriod)
 	ctrl.createProvisionedPVInterval = 10 * time.Millisecond
-	ctrl.leaseDuration = 2 * ctrl.resyncPeriod
-	ctrl.renewDeadline = ctrl.resyncPeriod
-	ctrl.retryPeriod = ctrl.resyncPeriod / 2
-	ctrl.termLimit = 2 * ctrl.resyncPeriod
 	return ctrl
 }
 

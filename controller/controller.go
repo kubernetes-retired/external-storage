@@ -143,6 +143,10 @@ func NewProvisionController(
 	serverGitVersion string,
 	exponentialBackOffOnError bool,
 	failedRetryThreshold int,
+	leaseDuration time.Duration,
+	renewDeadline time.Duration,
+	retryPeriod time.Duration,
+	termLimit time.Duration,
 ) *ProvisionController {
 	identity := uuid.NewUUID()
 
@@ -171,10 +175,10 @@ func NewProvisionController(
 		createProvisionedPVRetryCount: createProvisionedPVRetryCount,
 		createProvisionedPVInterval:   createProvisionedPVInterval,
 		identity:                      identity,
-		leaseDuration:                 leaderelection.DefaultLeaseDuration,
-		renewDeadline:                 leaderelection.DefaultRenewDeadline,
-		retryPeriod:                   leaderelection.DefaultRetryPeriod,
-		termLimit:                     leaderelection.DefaultTermLimit,
+		leaseDuration:                 leaseDuration,
+		renewDeadline:                 renewDeadline,
+		retryPeriod:                   retryPeriod,
+		termLimit:                     termLimit,
 		leaderElectors:                make(map[types.UID]*leaderelection.LeaderElector),
 		mapMutex:                      &sync.Mutex{},
 		failedClaimsStats:             make(map[types.UID]int),

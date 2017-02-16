@@ -23,6 +23,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/nfs-provisioner/controller"
+	"github.com/kubernetes-incubator/nfs-provisioner/controller/leaderelection"
 	"github.com/kubernetes-incubator/nfs-provisioner/pkg/server"
 	vol "github.com/kubernetes-incubator/nfs-provisioner/pkg/volume"
 	"k8s.io/client-go/kubernetes"
@@ -46,8 +47,14 @@ var (
 	serverHostname       = flag.String("server-hostname", "", "The hostname for the NFS server to export from. Only applicable when running out-of-cluster i.e. it can only be set if either master or kubeconfig are set. If unset, the first IP output by `hostname -i` is used.")
 )
 
-const exportDir = "/export"
-const ganeshaConfig = "/export/vfs.conf"
+const (
+	exportDir     = "/export"
+	ganeshaConfig = "/export/vfs.conf"
+	leasePeriod   = leaderelection.DefaultLeaseDuration
+	retryPeriod   = leaderelection.DefaultRetryPeriod
+	renewDeadline = leaderelection.DefaultRenewDeadline
+	termLimit     = leaderelection.DefaultTermLimit
+)
 
 func main() {
 	flag.Set("logtostderr", "true")
@@ -110,7 +117,7 @@ func main() {
 	nfsProvisioner := vol.NewNFSProvisioner(exportDir, clientset, outOfCluster, *useGanesha, ganeshaConfig, *rootSquash, *enableXfsQuota, *serverHostname)
 
 	// Start the provision controller which will dynamically provision NFS PVs
-	pc := controller.NewProvisionController(clientset, 15*time.Second, *provisioner, nfsProvisioner, serverVersion.GitVersion, false, *failedRetryThreshold)
+	pc := controller.NewProvisionController(clientset, 15*time.Second, *provisioner, nfsProvisioner, serverVersion.GitVersion, false, *failedRetryThreshold, leasePeriod, renewDeadline, retryPeriod, termLimit)
 	pc.Run(wait.NeverStop)
 }
 
