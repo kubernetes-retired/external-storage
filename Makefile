@@ -45,7 +45,7 @@ push: container
 .PHONY: push
 
 test-integration: verify-gofmt
-	go test `go list ./... | grep -v 'vendor\|e2e'`
+	go test `go list ./... | grep -v 'vendor\|e2e\|demo'`
 .PHONY: test-integration
 
 test-e2e: verify-gofmt
