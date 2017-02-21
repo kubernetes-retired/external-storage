@@ -27,8 +27,8 @@ import (
 	"sync"
 )
 
-// generateId generates a unique exportId to assign an export
-func generateId(mutex *sync.Mutex, ids map[uint16]bool) uint16 {
+// generateID generates a unique exportID to assign an export
+func generateID(mutex *sync.Mutex, ids map[uint16]bool) uint16 {
 	mutex.Lock()
 	id := uint16(1)
 	for ; id <= math.MaxUint16; id++ {
@@ -41,15 +41,15 @@ func generateId(mutex *sync.Mutex, ids map[uint16]bool) uint16 {
 	return id
 }
 
-func deleteId(mutex *sync.Mutex, ids map[uint16]bool, id uint16) {
+func deleteID(mutex *sync.Mutex, ids map[uint16]bool, id uint16) {
 	mutex.Lock()
 	delete(ids, id)
 	mutex.Unlock()
 }
 
-// getExistingIds populates a map with existing ids found in the given config
+// getExistingIDs populates a map with existing ids found in the given config
 // file using the given regexp. Regexp must have a "digits" submatch.
-func getExistingIds(config string, re *regexp.Regexp) (map[uint16]bool, error) {
+func getExistingIDs(config string, re *regexp.Regexp) (map[uint16]bool, error) {
 	ids := map[uint16]bool{}
 
 	digitsRe := "([0-9]+)"

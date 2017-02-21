@@ -37,8 +37,8 @@ func (p *nfsProvisioner) Delete(volume *v1.PersistentVolume) error {
 		return fmt.Errorf("error determining if this provisioner was the one to provision volume %q: %v", volume.Name, err)
 	}
 	if !provisioned {
-		strerr := fmt.Sprintf("this provisioner id %s didn't provision volume %q and so can't delete it; id %s did & can", p.identity, volume.Name, volume.Annotations[annProvisionerId])
-		return &controller.IgnoredError{strerr}
+		strerr := fmt.Sprintf("this provisioner id %s didn't provision volume %q and so can't delete it; id %s did & can", p.identity, volume.Name, volume.Annotations[annProvisionerID])
+		return &controller.IgnoredError{Reason: strerr}
 	}
 
 	err = p.deleteDirectory(volume)
@@ -60,12 +60,12 @@ func (p *nfsProvisioner) Delete(volume *v1.PersistentVolume) error {
 }
 
 func (p *nfsProvisioner) provisioned(volume *v1.PersistentVolume) (bool, error) {
-	provisionerId, ok := volume.Annotations[annProvisionerId]
+	provisionerID, ok := volume.Annotations[annProvisionerID]
 	if !ok {
-		return false, fmt.Errorf("PV doesn't have an annotation %s", annProvisionerId)
+		return false, fmt.Errorf("PV doesn't have an annotation %s", annProvisionerID)
 	}
 
-	return provisionerId == string(p.identity), nil
+	return provisionerID == string(p.identity), nil
 }
 
 func (p *nfsProvisioner) deleteDirectory(volume *v1.PersistentVolume) error {
@@ -81,12 +81,12 @@ func (p *nfsProvisioner) deleteDirectory(volume *v1.PersistentVolume) error {
 }
 
 func (p *nfsProvisioner) deleteExport(volume *v1.PersistentVolume) error {
-	block, exportId, err := getBlockAndId(volume, annExportBlock, annExportId)
+	block, exportID, err := getBlockAndID(volume, annExportBlock, annExportID)
 	if err != nil {
 		return fmt.Errorf("error getting block &/or id from annotations: %v", err)
 	}
 
-	if err := p.exporter.RemoveExportBlock(block, uint16(exportId)); err != nil {
+	if err := p.exporter.RemoveExportBlock(block, uint16(exportID)); err != nil {
 		return fmt.Errorf("error removing the export from the config file: %v", err)
 	}
 
@@ -98,12 +98,12 @@ func (p *nfsProvisioner) deleteExport(volume *v1.PersistentVolume) error {
 }
 
 func (p *nfsProvisioner) deleteQuota(volume *v1.PersistentVolume) error {
-	block, projectId, err := getBlockAndId(volume, annProjectBlock, annProjectId)
+	block, projectID, err := getBlockAndID(volume, annProjectBlock, annProjectID)
 	if err != nil {
 		return fmt.Errorf("error getting block &/or id from annotations: %v", err)
 	}
 
-	if err := p.quotaer.RemoveProject(block, uint16(projectId)); err != nil {
+	if err := p.quotaer.RemoveProject(block, uint16(projectID)); err != nil {
 		return fmt.Errorf("error removing the quota project from the projects file: %v", err)
 	}
 
@@ -114,15 +114,15 @@ func (p *nfsProvisioner) deleteQuota(volume *v1.PersistentVolume) error {
 	return nil
 }
 
-func getBlockAndId(volume *v1.PersistentVolume, annBlock, annId string) (string, uint16, error) {
+func getBlockAndID(volume *v1.PersistentVolume, annBlock, annID string) (string, uint16, error) {
 	block, ok := volume.Annotations[annBlock]
 	if !ok {
 		return "", 0, fmt.Errorf("PV doesn't have an annotation with key %s", annBlock)
 	}
 
-	idStr, ok := volume.Annotations[annId]
+	idStr, ok := volume.Annotations[annID]
 	if !ok {
-		return "", 0, fmt.Errorf("PV doesn't have an annotation %s", annId)
+		return "", 0, fmt.Errorf("PV doesn't have an annotation %s", annID)
 	}
 	id, _ := strconv.ParseUint(idStr, 10, 16)
 

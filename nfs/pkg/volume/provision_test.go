@@ -49,7 +49,7 @@ func TestCreateVolume(t *testing.T) {
 		expectedPath     string
 		expectedGroup    uint64
 		expectedBlock    string
-		expectedExportId uint16
+		expectedExportID uint16
 		expectError      bool
 	}{
 		{
@@ -65,7 +65,7 @@ func TestCreateVolume(t *testing.T) {
 			expectedPath:     tmpDir + "/pvc-1",
 			expectedGroup:    0,
 			expectedBlock:    "\nExport_Id = 0;\n",
-			expectedExportId: 0,
+			expectedExportID: 0,
 			expectError:      false,
 		},
 		{
@@ -81,7 +81,7 @@ func TestCreateVolume(t *testing.T) {
 			expectedPath:     tmpDir + "/pvc-2",
 			expectedGroup:    0,
 			expectedBlock:    "\nExport_Id = 0;\n",
-			expectedExportId: 0,
+			expectedExportID: 0,
 			expectError:      false,
 		},
 		{
@@ -97,7 +97,7 @@ func TestCreateVolume(t *testing.T) {
 			expectedPath:     "",
 			expectedGroup:    0,
 			expectedBlock:    "",
-			expectedExportId: 0,
+			expectedExportID: 0,
 			expectError:      true,
 		},
 		{
@@ -113,7 +113,7 @@ func TestCreateVolume(t *testing.T) {
 			expectedPath:     "",
 			expectedGroup:    0,
 			expectedBlock:    "",
-			expectedExportId: 0,
+			expectedExportID: 0,
 			expectError:      true,
 		},
 		{
@@ -129,7 +129,7 @@ func TestCreateVolume(t *testing.T) {
 			expectedPath:     "",
 			expectedGroup:    0,
 			expectedBlock:    "",
-			expectedExportId: 0,
+			expectedExportID: 0,
 			expectError:      true,
 		},
 		{
@@ -145,7 +145,7 @@ func TestCreateVolume(t *testing.T) {
 			expectedPath:     "",
 			expectedGroup:    0,
 			expectedBlock:    "",
-			expectedExportId: 0,
+			expectedExportID: 0,
 			expectError:      true,
 		},
 	}
@@ -161,13 +161,13 @@ func TestCreateVolume(t *testing.T) {
 	for _, test := range tests {
 		os.Setenv(test.envKey, "1.1.1.1")
 
-		server, path, supGroup, block, exportId, _, _, err := p.createVolume(test.options)
+		server, path, supGroup, block, exportID, _, _, err := p.createVolume(test.options)
 
 		evaluate(t, test.name, test.expectError, err, test.expectedServer, server, "server")
 		evaluate(t, test.name, test.expectError, err, test.expectedPath, path, "path")
 		evaluate(t, test.name, test.expectError, err, test.expectedGroup, supGroup, "group")
 		evaluate(t, test.name, test.expectError, err, test.expectedBlock, block, "block")
-		evaluate(t, test.name, test.expectError, err, test.expectedExportId, exportId, "export id")
+		evaluate(t, test.name, test.expectError, err, test.expectedExportID, exportID, "export id")
 
 		os.Unsetenv(test.envKey)
 	}
@@ -366,7 +366,7 @@ func TestAddToRemoveFromFile(t *testing.T) {
 	}
 }
 
-func TestGetConfigExportIds(t *testing.T) {
+func TestGetExistingIDs(t *testing.T) {
 	tmpDir := utiltesting.MkTmpdirOrDie("nfsProvisionTest")
 	defer os.RemoveAll(tmpDir)
 
@@ -375,7 +375,7 @@ func TestGetConfigExportIds(t *testing.T) {
 		useGanesha        bool
 		configContents    string
 		re                *regexp.Regexp
-		expectedExportIds map[uint16]bool
+		expectedExportIDs map[uint16]bool
 		expectError       bool
 	}{
 		{
@@ -389,7 +389,7 @@ func TestGetConfigExportIds(t *testing.T) {
 				"\tFilesystem_id = 1.1;\n" +
 				"\tFSAL {\n\t\tName = VFS;\n\t}\n}\n",
 			re:                regexp.MustCompile("Export_Id = ([0-9]+);"),
-			expectedExportIds: map[uint16]bool{1: true, 3: true},
+			expectedExportIDs: map[uint16]bool{1: true, 3: true},
 			expectError:       false,
 		},
 		{
@@ -397,7 +397,7 @@ func TestGetConfigExportIds(t *testing.T) {
 			configContents: "\n foo *(rw,insecure,root_squash,fsid=1)\n" +
 				"\n bar *(rw,insecure,root_squash,fsid=3)\n",
 			re:                regexp.MustCompile("fsid=([0-9]+)"),
-			expectedExportIds: map[uint16]bool{1: true, 3: true},
+			expectedExportIDs: map[uint16]bool{1: true, 3: true},
 			expectError:       false,
 		},
 		{
@@ -407,7 +407,7 @@ func TestGetConfigExportIds(t *testing.T) {
 				"\tFilesystem_id = 1.1;\n" +
 				"\tFSAL {\n\t\tName = VFS;\n\t}\n}\n",
 			re:                regexp.MustCompile("Export_Id = [0-9]+;"),
-			expectedExportIds: map[uint16]bool{},
+			expectedExportIDs: map[uint16]bool{},
 			expectError:       true,
 		},
 	}
@@ -418,9 +418,9 @@ func TestGetConfigExportIds(t *testing.T) {
 			t.Errorf("Error writing file %s: %v", conf, err)
 		}
 
-		exportIds, err := getExistingIds(conf, test.re)
+		exportIDs, err := getExistingIDs(conf, test.re)
 
-		evaluate(t, test.name, test.expectError, err, test.expectedExportIds, exportIds, "export ids")
+		evaluate(t, test.name, test.expectError, err, test.expectedExportIDs, exportIDs, "export ids")
 	}
 }
 
@@ -674,7 +674,7 @@ func (e *testExporter) AddExportBlock(path string) (string, uint16, error) {
 	return "\nExport_Id = 0;\n", 0, nil
 }
 
-func (e *testExporter) RemoveExportBlock(block string, exportId uint16) error {
+func (e *testExporter) RemoveExportBlock(block string, exportID uint16) error {
 	return nil
 }
 

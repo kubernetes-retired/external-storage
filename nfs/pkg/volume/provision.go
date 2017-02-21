@@ -47,23 +47,23 @@ const (
 	// A PV annotation for the entire ganesha EXPORT block or /etc/exports
 	// block, needed for deletion.
 	annExportBlock = "EXPORT_block"
-	// A PV annotation for the exportId of this PV's backing ganesha/kernel export
-	// , needed for ganesha deletion and used for deleting the entry in exportIds
+	// A PV annotation for the exportID of this PV's backing ganesha/kernel export
+	// , needed for ganesha deletion and used for deleting the entry in exportIDs
 	// map so the id can be reassigned.
-	annExportId = "Export_Id"
+	annExportID = "Export_Id"
 
 	// A PV annotation for the project quota info block, needed for quota
 	// deletion.
 	annProjectBlock = "Project_block"
 	// A PV annotation for the project quota id, needed for quota deletion
-	annProjectId = "Project_Id"
+	annProjectID = "Project_Id"
 
 	// VolumeGidAnnotationKey is the key of the annotation on the PersistentVolume
 	// object that specifies a supplemental GID.
 	VolumeGidAnnotationKey = "pv.beta.kubernetes.io/gid"
 
 	// A PV annotation for the identity of the nfsProvisioner that provisioned it
-	annProvisionerId = "Provisioner_Id"
+	annProvisionerID = "Provisioner_Id"
 
 	podIPEnv     = "POD_IP"
 	serviceEnv   = "SERVICE_NAME"
@@ -71,6 +71,8 @@ const (
 	nodeEnv      = "NODE_NAME"
 )
 
+// NewNFSProvisioner creates a Provisioner that provisions NFS PVs backed by
+// the given directory.
 func NewNFSProvisioner(exportDir string, client kubernetes.Interface, outOfCluster bool, useGanesha bool, ganeshaConfig string, rootSquash bool, enableXfsQuota bool, serverHostname string) controller.Provisioner {
 	var exporter exporter
 	if useGanesha {
@@ -169,7 +171,7 @@ var _ controller.Provisioner = &nfsProvisioner{}
 // Provision creates a volume i.e. the storage asset and returns a PV object for
 // the volume.
 func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.PersistentVolume, error) {
-	server, path, supGroup, exportBlock, exportId, projectBlock, projectId, err := p.createVolume(options)
+	server, path, supGroup, exportBlock, exportID, projectBlock, projectID, err := p.createVolume(options)
 	if err != nil {
 		return nil, err
 	}
@@ -177,13 +179,13 @@ func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 	annotations := make(map[string]string)
 	annotations[annCreatedBy] = createdBy
 	annotations[annExportBlock] = exportBlock
-	annotations[annExportId] = strconv.FormatUint(uint64(exportId), 10)
+	annotations[annExportID] = strconv.FormatUint(uint64(exportID), 10)
 	annotations[annProjectBlock] = projectBlock
-	annotations[annProjectId] = strconv.FormatUint(uint64(projectId), 10)
+	annotations[annProjectID] = strconv.FormatUint(uint64(projectID), 10)
 	if supGroup != 0 {
 		annotations[VolumeGidAnnotationKey] = strconv.FormatUint(supGroup, 10)
 	}
-	annotations[annProvisionerId] = string(p.identity)
+	annotations[annProvisionerID] = string(p.identity)
 
 	pv := &v1.PersistentVolume{
 		ObjectMeta: v1.ObjectMeta{
@@ -213,7 +215,7 @@ func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 // createVolume creates a volume i.e. the storage asset. It creates a unique
 // directory under /export and exports it. Returns the server IP, the path, a
 // zero/non-zero supplemental group, the block it added to either the ganesha
-// config or /etc/exports, and the exportId
+// config or /etc/exports, and the exportID
 // TODO return values
 func (p *nfsProvisioner) createVolume(options controller.VolumeOptions) (string, string, uint64, string, uint16, string, uint16, error) {
 	gid, err := p.validateOptions(options)
@@ -233,19 +235,19 @@ func (p *nfsProvisioner) createVolume(options controller.VolumeOptions) (string,
 		return "", "", 0, "", 0, "", 0, fmt.Errorf("error creating directory for volume: %v", err)
 	}
 
-	exportBlock, exportId, err := p.createExport(options.PVName)
+	exportBlock, exportID, err := p.createExport(options.PVName)
 	if err != nil {
 		os.RemoveAll(path)
 		return "", "", 0, "", 0, "", 0, fmt.Errorf("error creating export for volume: %v", err)
 	}
 
-	projectBlock, projectId, err := p.createQuota(options.PVName, options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)])
+	projectBlock, projectID, err := p.createQuota(options.PVName, options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)])
 	if err != nil {
 		os.RemoveAll(path)
 		return "", "", 0, "", 0, "", 0, fmt.Errorf("error creating quota for volume: %v", err)
 	}
 
-	return server, path, 0, exportBlock, exportId, projectBlock, projectId, nil
+	return server, path, 0, exportBlock, exportID, projectBlock, projectID, nil
 }
 
 func (p *nfsProvisioner) validateOptions(options controller.VolumeOptions) (string, error) {
@@ -398,8 +400,8 @@ func (p *nfsProvisioner) createDirectory(directory, gid string) error {
 	}
 
 	if gid != "none" {
-		groupId, _ := strconv.ParseUint(gid, 10, 64)
-		cmd = exec.Command("chgrp", strconv.FormatUint(groupId, 10), path)
+		groupID, _ := strconv.ParseUint(gid, 10, 64)
+		cmd = exec.Command("chgrp", strconv.FormatUint(groupID, 10), path)
 		out, err = cmd.CombinedOutput()
 		if err != nil {
 			os.RemoveAll(path)
@@ -415,18 +417,18 @@ func (p *nfsProvisioner) createDirectory(directory, gid string) error {
 func (p *nfsProvisioner) createExport(directory string) (string, uint16, error) {
 	path := path.Join(p.exportDir, directory)
 
-	block, exportId, err := p.exporter.AddExportBlock(path)
+	block, exportID, err := p.exporter.AddExportBlock(path)
 	if err != nil {
 		return "", 0, fmt.Errorf("error adding export block for path %s: %v", path, err)
 	}
 
 	err = p.exporter.Export(path)
 	if err != nil {
-		p.exporter.RemoveExportBlock(block, exportId)
+		p.exporter.RemoveExportBlock(block, exportID)
 		return "", 0, fmt.Errorf("error exporting export block %s: %v", block, err)
 	}
 
-	return block, exportId, nil
+	return block, exportID, nil
 }
 
 // createQuota creates a quota for the directory by adding a project to
@@ -436,16 +438,16 @@ func (p *nfsProvisioner) createQuota(directory string, capacity resource.Quantit
 
 	limit := strconv.FormatInt(capacity.Value(), 10)
 
-	block, projectId, err := p.quotaer.AddProject(path, limit)
+	block, projectID, err := p.quotaer.AddProject(path, limit)
 	if err != nil {
 		return "", 0, fmt.Errorf("error adding project for path %s: %v", path, err)
 	}
 
-	err = p.quotaer.SetQuota(projectId, path, limit)
+	err = p.quotaer.SetQuota(projectID, path, limit)
 	if err != nil {
-		p.quotaer.RemoveProject(block, projectId)
+		p.quotaer.RemoveProject(block, projectID)
 		return "", 0, fmt.Errorf("error setting quota for path %s: %v", path, err)
 	}
 
-	return block, projectId, nil
+	return block, projectID, nil
 }

@@ -44,10 +44,10 @@ type genericExporter struct {
 	ebc    exportBlockCreator
 	config string
 
-	// Map to track used exportIds. Each ganesha export needs a unique fsid and
-	// Export_Id, each kernel a unique fsid. Assign each export an exportId and
+	// Map to track used exportIDs. Each ganesha export needs a unique fsid and
+	// Export_Id, each kernel a unique fsid. Assign each export an exportID and
 	// use it as both fsid and Export_Id.
-	exportIds map[uint16]bool
+	exportIDs map[uint16]bool
 
 	mapMutex  *sync.Mutex
 	fileMutex *sync.Mutex
@@ -58,35 +58,35 @@ func newGenericExporter(ebc exportBlockCreator, config string, re *regexp.Regexp
 		glog.Fatalf("config %s does not exist!", config)
 	}
 
-	exportIds, err := getExistingIds(config, re)
+	exportIDs, err := getExistingIDs(config, re)
 	if err != nil {
-		glog.Errorf("error while populating exportIds map, there may be errors exporting later if exportIds are reused: %v", err)
+		glog.Errorf("error while populating exportIDs map, there may be errors exporting later if exportIDs are reused: %v", err)
 	}
 	return &genericExporter{
 		ebc:       ebc,
 		config:    config,
-		exportIds: exportIds,
+		exportIDs: exportIDs,
 		mapMutex:  &sync.Mutex{},
 		fileMutex: &sync.Mutex{},
 	}
 }
 
 func (e *genericExporter) AddExportBlock(path string) (string, uint16, error) {
-	exportId := generateId(e.mapMutex, e.exportIds)
-	exportIdStr := strconv.FormatUint(uint64(exportId), 10)
+	exportID := generateID(e.mapMutex, e.exportIDs)
+	exportIDStr := strconv.FormatUint(uint64(exportID), 10)
 
-	block := e.ebc.CreateExportBlock(exportIdStr, path)
+	block := e.ebc.CreateExportBlock(exportIDStr, path)
 
 	// Add the export block to the config file
 	if err := addToFile(e.fileMutex, e.config, block); err != nil {
-		deleteId(e.mapMutex, e.exportIds, exportId)
+		deleteID(e.mapMutex, e.exportIDs, exportID)
 		return "", 0, fmt.Errorf("error adding export block %s to config %s: %v", block, e.config, err)
 	}
-	return block, exportId, nil
+	return block, exportID, nil
 }
 
-func (e *genericExporter) RemoveExportBlock(block string, exportId uint16) error {
-	deleteId(e.mapMutex, e.exportIds, exportId)
+func (e *genericExporter) RemoveExportBlock(block string, exportID uint16) error {
+	deleteID(e.mapMutex, e.exportIDs, exportID)
 	return removeFromFile(e.fileMutex, e.config, block)
 }
 
@@ -120,11 +120,11 @@ func (e *ganeshaExporter) Export(path string) error {
 }
 
 func (e *ganeshaExporter) Unexport(volume *v1.PersistentVolume) error {
-	ann, ok := volume.Annotations[annExportId]
+	ann, ok := volume.Annotations[annExportID]
 	if !ok {
-		return fmt.Errorf("PV doesn't have an annotation %s, can't remove the export from the server", annExportId)
+		return fmt.Errorf("PV doesn't have an annotation %s, can't remove the export from the server", annExportID)
 	}
-	exportId, _ := strconv.ParseUint(ann, 10, 16)
+	exportID, _ := strconv.ParseUint(ann, 10, 16)
 
 	// Call RemoveExport using dbus
 	conn, err := dbus.SystemBus()
@@ -132,7 +132,7 @@ func (e *ganeshaExporter) Unexport(volume *v1.PersistentVolume) error {
 		return fmt.Errorf("error getting dbus session bus: %v", err)
 	}
 	obj := conn.Object("org.ganesha.nfsd", "/org/ganesha/nfsd/ExportMgr")
-	call := obj.Call("org.ganesha.nfsd.exportmgr.RemoveExport", 0, uint16(exportId))
+	call := obj.Call("org.ganesha.nfsd.exportmgr.RemoveExport", 0, uint16(exportID))
 	if call.Err != nil {
 		return fmt.Errorf("error calling org.ganesha.nfsd.exportmgr.RemoveExport: %v", call.Err)
 	}
@@ -148,19 +148,19 @@ type ganeshaExportBlockCreator struct {
 var _ exportBlockCreator = &ganeshaExportBlockCreator{}
 
 // CreateBlock creates the text block to add to the ganesha config file.
-func (e *ganeshaExportBlockCreator) CreateExportBlock(exportId, path string) string {
+func (e *ganeshaExportBlockCreator) CreateExportBlock(exportID, path string) string {
 	squash := "no_root_squash"
 	if e.rootSquash {
 		squash = "root_id_squash"
 	}
 	return "\nEXPORT\n{\n" +
-		"\tExport_Id = " + exportId + ";\n" +
+		"\tExport_Id = " + exportID + ";\n" +
 		"\tPath = " + path + ";\n" +
 		"\tPseudo = " + path + ";\n" +
 		"\tAccess_Type = RW;\n" +
 		"\tSquash = " + squash + ";\n" +
 		"\tSecType = sys;\n" +
-		"\tFilesystem_id = " + exportId + "." + exportId + ";\n" +
+		"\tFilesystem_id = " + exportID + "." + exportID + ";\n" +
 		"\tFSAL {\n\t\tName = VFS;\n\t}\n}\n"
 }
 
@@ -207,10 +207,10 @@ type kernelExportBlockCreator struct {
 var _ exportBlockCreator = &kernelExportBlockCreator{}
 
 // CreateBlock creates the text block to add to the /etc/exports file.
-func (e *kernelExportBlockCreator) CreateExportBlock(exportId, path string) string {
+func (e *kernelExportBlockCreator) CreateExportBlock(exportID, path string) string {
 	squash := "no_root_squash"
 	if e.rootSquash {
 		squash = "root_squash"
 	}
-	return "\n" + path + " *(rw,insecure," + squash + ",fsid=" + exportId + ")\n"
+	return "\n" + path + " *(rw,insecure," + squash + ",fsid=" + exportID + ")\n"
 }

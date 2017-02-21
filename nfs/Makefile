@@ -56,7 +56,7 @@ verify:
 	@tput bold; echo Running gofmt:; tput sgr0
 	(gofmt -s -w -l `find . -type f -name "*.go" | grep -v vendor`) || exit 1
 	@tput bold; echo Running golint and go vet:; tput sgr0
-	for i in $$(find . -type f -name "*.go" | grep -v vendor); do \
+	for i in $$(find . -type f -name "*.go" | grep -v 'vendor\|framework'); do \
 		golint --set_exit_status $$i; \
 		go vet $$i; \
 	done

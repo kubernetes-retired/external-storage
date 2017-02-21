@@ -46,7 +46,7 @@ type xfsQuotaer struct {
 	// Similar to http://man7.org/linux/man-pages/man5/projects.5.html
 	projectsFile string
 
-	projectIds map[uint16]bool
+	projectIDs map[uint16]bool
 
 	mapMutex  *sync.Mutex
 	fileMutex *sync.Mutex
@@ -56,7 +56,7 @@ var _ quotaer = &xfsQuotaer{}
 
 func newXfsQuotaer(xfsPath string) (*xfsQuotaer, error) {
 	if _, err := os.Stat(xfsPath); os.IsNotExist(err) {
-		return nil, fmt.Errorf("xfs path %s does not exist!", xfsPath)
+		return nil, fmt.Errorf("xfs path %s does not exist", xfsPath)
 	}
 
 	isXfs, err := isXfs(xfsPath)
@@ -80,7 +80,7 @@ func newXfsQuotaer(xfsPath string) (*xfsQuotaer, error) {
 	}
 
 	projectsFile := path.Join(xfsPath, "projects")
-	projectIds := map[uint16]bool{}
+	projectIDs := map[uint16]bool{}
 	if _, err := os.Stat(projectsFile); os.IsNotExist(err) {
 		file, err := os.Create(projectsFile)
 		if err != nil {
@@ -89,16 +89,16 @@ func newXfsQuotaer(xfsPath string) (*xfsQuotaer, error) {
 		file.Close()
 	} else {
 		re := regexp.MustCompile("(?m:^([0-9]+):/.+$)")
-		projectIds, err = getExistingIds(projectsFile, re)
+		projectIDs, err = getExistingIDs(projectsFile, re)
 		if err != nil {
-			glog.Errorf("error while populating projectIds map, there may be errors setting quotas later if projectIds are reused: %v", err)
+			glog.Errorf("error while populating projectIDs map, there may be errors setting quotas later if projectIDs are reused: %v", err)
 		}
 	}
 
 	xfsQuotaer := &xfsQuotaer{
 		xfsPath:      xfsPath,
 		projectsFile: projectsFile,
-		projectIds:   projectIds,
+		projectIDs:   projectIDs,
 		mapMutex:     &sync.Mutex{},
 		fileMutex:    &sync.Mutex{},
 	}
@@ -146,18 +146,18 @@ func (q *xfsQuotaer) restoreQuotas() error {
 
 	matches := re.FindAllSubmatch(read, -1)
 	for _, match := range matches {
-		projectId, _ := strconv.ParseUint(string(match[1]), 10, 16)
+		projectID, _ := strconv.ParseUint(string(match[1]), 10, 16)
 		directory := string(match[2])
 		bhard := string(match[3])
 
 		// If directory referenced by projects file no longer exists, don't set a
 		// quota for it: will fail
 		if _, err := os.Stat(directory); os.IsNotExist(err) {
-			q.RemoveProject(string(match[0]), uint16(projectId))
+			q.RemoveProject(string(match[0]), uint16(projectID))
 			continue
 		}
 
-		if err := q.SetQuota(uint16(projectId), directory, bhard); err != nil {
+		if err := q.SetQuota(uint16(projectID), directory, bhard); err != nil {
 			return fmt.Errorf("error restoring quota for directory %s: %v", directory, err)
 		}
 	}
@@ -166,42 +166,42 @@ func (q *xfsQuotaer) restoreQuotas() error {
 }
 
 func (q *xfsQuotaer) AddProject(directory, bhard string) (string, uint16, error) {
-	projectId := generateId(q.mapMutex, q.projectIds)
-	projectIdStr := strconv.FormatUint(uint64(projectId), 10)
+	projectID := generateID(q.mapMutex, q.projectIDs)
+	projectIDStr := strconv.FormatUint(uint64(projectID), 10)
 
 	// Store project:directory mapping and also project's quota info
-	block := "\n" + projectIdStr + ":" + directory + ":" + bhard + "\n"
+	block := "\n" + projectIDStr + ":" + directory + ":" + bhard + "\n"
 
 	// Add the project block to the projects file
 	if err := addToFile(q.fileMutex, q.projectsFile, block); err != nil {
-		deleteId(q.mapMutex, q.projectIds, projectId)
+		deleteID(q.mapMutex, q.projectIDs, projectID)
 		return "", 0, fmt.Errorf("error adding project block %s to projects file %s: %v", block, q.projectsFile, err)
 	}
 
 	// Specify the new project
-	cmd := exec.Command("xfs_quota", "-x", "-c", fmt.Sprintf("project -s -p %s %s", directory, projectIdStr), q.xfsPath)
+	cmd := exec.Command("xfs_quota", "-x", "-c", fmt.Sprintf("project -s -p %s %s", directory, projectIDStr), q.xfsPath)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		deleteId(q.mapMutex, q.projectIds, projectId)
+		deleteID(q.mapMutex, q.projectIDs, projectID)
 		removeFromFile(q.fileMutex, q.projectsFile, block)
 		return "", 0, fmt.Errorf("xfs_quota failed with error: %v, output: %s", err, out)
 	}
 
-	return block, projectId, nil
+	return block, projectID, nil
 }
 
-func (q *xfsQuotaer) RemoveProject(block string, projectId uint16) error {
-	deleteId(q.mapMutex, q.projectIds, projectId)
+func (q *xfsQuotaer) RemoveProject(block string, projectID uint16) error {
+	deleteID(q.mapMutex, q.projectIDs, projectID)
 	return removeFromFile(q.fileMutex, q.projectsFile, block)
 }
 
-func (q *xfsQuotaer) SetQuota(projectId uint16, directory, bhard string) error {
-	if !q.projectIds[projectId] {
-		return fmt.Errorf("project with id %v has not been added", projectId)
+func (q *xfsQuotaer) SetQuota(projectID uint16, directory, bhard string) error {
+	if !q.projectIDs[projectID] {
+		return fmt.Errorf("project with id %v has not been added", projectID)
 	}
-	projectIdStr := strconv.FormatUint(uint64(projectId), 10)
+	projectIDStr := strconv.FormatUint(uint64(projectID), 10)
 
-	cmd := exec.Command("xfs_quota", "-x", "-c", fmt.Sprintf("limit -p bhard=%s %s", bhard, projectIdStr), q.xfsPath)
+	cmd := exec.Command("xfs_quota", "-x", "-c", fmt.Sprintf("limit -p bhard=%s %s", bhard, projectIDStr), q.xfsPath)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("xfs_quota failed with error: %v, output: %s", err, out)
