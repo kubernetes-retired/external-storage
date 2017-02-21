@@ -1,5 +1,5 @@
-hash: 6fa2c84f1bd00d07bf4095b53a4d1c72f0d4afac54ea02fa7373a33bd5dcff8e
-updated: 2017-01-19T15:37:04.161550129-05:00
+hash: 5ed4a0454b399910b913d69173efe5e891ce62274216b56dfad3183e0d7d3536
+updated: 2017-02-21T15:30:07.826602914-05:00
 imports:
 - name: cloud.google.com/go
   version: 3b1ae45394a234c385be014e9a488f2bb6eef821
@@ -65,12 +65,13 @@ imports:
   version: bbcb9da2d746f8bdbd6a936686a0a6067ada0ec5
 - name: github.com/jonboulle/clockwork
   version: 72f9bd7c4e0c2a40055ab3d0f09654f730cce982
-- name: github.com/kubernetes-incubator/nfs-provisioner
-  version: 66e53b5a830820c304152761a3a019c2ffaefb22
+- name: github.com/kubernetes-incubator/external-storage
+  version: 2517d1fa42c9908654e64fe4ade039a45e269da7
   subpackages:
   - controller
-  - controller/leaderelection
-  - controller/leaderelection/resourcelock
+  - lib/controller
+  - lib/leaderelection
+  - lib/leaderelection/resourcelock
 - name: github.com/mailru/easyjson
   version: d5b7844b561a7bc640052f1b935f7b800330d7e0
   subpackages:

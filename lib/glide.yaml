@@ -21,7 +21,6 @@ import:
   - pkg/watch
   - tools/cache
   - tools/record
-# TODO
 - package: k8s.io/kubernetes
   subpackages:
   - pkg/util/goroutinemap

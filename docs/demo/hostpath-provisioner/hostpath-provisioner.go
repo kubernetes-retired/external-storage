@@ -24,7 +24,8 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/kubernetes-incubator/nfs-provisioner/controller"
+	"github.com/kubernetes-incubator/external-storage/lib/controller"
+	"github.com/kubernetes-incubator/external-storage/lib/leaderelection"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/types"
@@ -38,6 +39,10 @@ const (
 	provisionerName           = "example.com/hostpath"
 	exponentialBackOffOnError = false
 	failedRetryThreshold      = 5
+	leasePeriod               = leaderelection.DefaultLeaseDuration
+	retryPeriod               = leaderelection.DefaultRetryPeriod
+	renewDeadline             = leaderelection.DefaultRenewDeadline
+	termLimit                 = leaderelection.DefaultTermLimit
 )
 
 type hostPathProvisioner struct {
@@ -137,6 +142,6 @@ func main() {
 
 	// Start the provision controller which will dynamically provision hostPath
 	// PVs
-	pc := controller.NewProvisionController(clientset, resyncPeriod, provisionerName, hostPathProvisioner, serverVersion.GitVersion, exponentialBackOffOnError, failedRetryThreshold)
+	pc := controller.NewProvisionController(clientset, resyncPeriod, provisionerName, hostPathProvisioner, serverVersion.GitVersion, exponentialBackOffOnError, failedRetryThreshold, leasePeriod, renewDeadline, retryPeriod, termLimit)
 	pc.Run(wait.NeverStop)
 }

@@ -1,12 +1,10 @@
-#Writing an Out-of-tree Dynamic Provisioner Using nfs-provisioner
+#Writing an Out-of-tree Dynamic Provisioner
 
-One of the goals of the [nfs-provisioner](https://github.com/kubernetes-incubator/nfs-provisioner) project is to serve as an example implementation of an out-of-tree dynamic provisioner to help others write their own. nfs-provisioner creates NFS-backed PVs in its own opinionated way, and we'll show that it's easy to write your own provisioner that does it your way.
-
-Note you do **not** have to fork nfs-provisioner. As we will see here, you can treat the [`lib` directory](https://github.com/kubernetes-incubator/nfs-provisioner/tree/master/lib) of the nfs-provisioner repo as a library/dependency to import. This gives you the ability to control which version of it to use and you won't have to worry about rebasing your fork. You can rest assured that the controller has no NFS-specific functionality in it. There are plans to move this controller library into its own repository so stay tuned.
+In this guide we'll demonstrate how to write an out-of-tree dynamic provisioner using [the helper library](https://github.com/kubernetes-incubator/external-storage/tree/master/lib)
 
 ##The Provisioner Interface
 
-Ideally, all you should need to do to write your own provisioner is implement the `Provisioner` interface which has two methods: `Provision` and `Delete`. Then you can just pass it to the `ProvisionController`, which handles all the logic of calling the two methods. The signatures should be self-explanatory but we'll explain the methods in more detail anyhow. For this explanation we'll refer to the `ProvisionController` as the controller and the implementer of the `Provisioner` interface as the provisioner. The code can be found in the `controller` directory of the nfs-provisioner repo.
+Ideally, all you should need to do to write your own provisioner is implement the `Provisioner` interface which has two methods: `Provision` and `Delete`. Then you can just pass it to the `ProvisionController`, which handles all the logic of calling the two methods. The signatures should be self-explanatory but we'll explain the methods in more detail anyhow. For this explanation we'll refer to the `ProvisionController` as the controller and the implementer of the `Provisioner` interface as the provisioner. The code can be found in the [`controller` directory](https://github.com/kubernetes-incubator/external-storage/tree/master/lib/controller)
 
 ```go
 Provision(VolumeOptions) (*v1.PersistentVolume, error)
@@ -115,7 +113,13 @@ Now all that's left is to connect our `Provisioner` with a `ProvisionController`
 
 We need to create a couple of things the controller expects as arguments, including our `hostPathProvisioner`, before we create and run it. First we create a client for communicating with Kubernetes from within a pod. We use it to determine the server version of Kubernetes. Then we create our `hostPathProvisioner`. We pass all of these things into `NewProvisionController`, plus some other arguments we'll explain now. 
 
-The second argument is the `resyncPeriod` of the controller which determines how often it relists PVCs and PVs to check if they should be provisioned for or deleted. The third is the `provisionerName` that storage classes will specify, "example.com/hostpath" here. The second-to-last is `exponentialBackOffOnError` which determines whether it should exponentially back off from calls to `Provision` or `Delete`, useful if either of those involves some API call. And the last is `failedRetryThreshold`, the threshold for failed `Provision` attempts before giving up. (There are many other possible parameters of the controller that could be exposed, please create an issue if you would like one to be.)
+* `resyncPeriod` determines how often the controller relists PVCs and PVs to check if they should be provisioned for or deleted.
+* `provisionerName` is the `provisioner` that storage classes will specify, "example.com/hostpath" here.
+* `exponentialBackOffOnError` determines whether it should exponentially back off from calls to `Provision` or `Delete`, useful if either of those involves some API call.
+* `failedRetryThreshold` is the threshold for failed `Provision` attempts before giving up trying to provisionf or a claim.
+* The last four arguments configure leader election wherein mutliple controllers trying to provision for the same class of claims race to lock/lead claims in order to be the one to provision for them. The meaning of these parameters is documented in the [leaderelection package](https://github.com/kubernetes-incubator/external-storage/tree/master/lib/leaderelection). If you don't intend for users to run more than one instance of your provisioner for the same class of claims, you may ignore these and simply use the default as we do here.
+
+(There are many other possible parameters of the controller that could be exposed, please create an issue if you would like one to be.)
 
 Finally, we create and `Run` the controller.
 
@@ -125,6 +129,10 @@ const (
 	provisionerName           = "example.com/hostpath"
 	exponentialBackOffOnError = false
 	failedRetryThreshold      = 5
+	leasePeriod               = leaderelection.DefaultLeaseDuration
+	retryPeriod               = leaderelection.DefaultRetryPeriod
+	renewDeadline             = leaderelection.DefaultRenewDeadline
+	termLimit                 = leaderelection.DefaultTermLimit
 )
 ```
 ```go
@@ -154,18 +162,20 @@ func main() {
 
 	// Start the provision controller which will dynamically provision hostPath
 	// PVs
-	pc := controller.NewProvisionController(clientset, resyncPeriod, "example.com/hostpath", hostPathProvisioner, serverVersion.GitVersion, exponentialBackOffOnError, failedRetryThreshold)
+	pc := controller.NewProvisionController(clientset, resyncPeriod, "example.com/hostpath", hostPathProvisioner, serverVersion.GitVersion, exponentialBackOffOnError, failedRetryThreshold, leasePeriod, renewDeadline, retryPeriod, termLimit)
 	pc.Run(wait.NeverStop)
 }
 ```
 
 We're now done writing code. The code we wrote can be found [here](./hostpath-provisioner.go). The other files we'll use in the remainder of the walkthrough can be found in the same directory.
 
+Notice we just import "github.com/kubernetes-incubator/external-storage/lib/controller" to get access to the required interface and function.
+
 ##Building and Running our `hostPath` Dynamic Provisioner
 
 Before we can run our provisioner in a pod we need to build a Docker image for the pod to specify. Our hostpath-provisioner Go package has many dependencies so it's a good idea to use a tool to manage them. It's especially important to do so when depending on a package like [client-go](https://github.com/kubernetes/client-go#how-to-get-it) that has an unstable master branch. We'll use [glide](https://github.com/Masterminds/glide).
 
-Our [glide.yaml](./glide.yaml) was created by manually setting the latest version of nfs-provisioner & setting the version of client-go to the same one that nfs-provisioner uses. We use it to populate a vendor directory containing dependencies.
+Our [glide.yaml](./glide.yaml) was created by manually setting the latest version of external-storage/lib & setting the version of client-go to the same one that external-storage/lib uses. We use it to populate a vendor directory containing dependencies.
 
 ```
 $ glide install -v
@@ -348,4 +358,4 @@ Note that the errors returned by Provision/Delete are sent as events on the PVC/
 
 If there is some behaviour of the controller you would like to change, feel free to open an issue. There are many parameters that could easily be made configurable but aren't because it would be too messy. The controller is written to follow the [proposal](https://github.com/kubernetes/kubernetes/pull/30285) and be like the upstream PV controller as much as possible, but there is always room for improvement.
 
-It's possible (but not pretty) to write e2e tests for your provisioner that look similar to kubernetes e2e tests by copying files from the e2e framework and fixing import statements. Like [here](https://github.com/kubernetes-incubator/nfs-provisioner/tree/master/nfs/test/e2e). Keep in mind the license, etc. In your case, unit & integration tests may be sufficient. 
+It's possible (but not pretty) to write e2e tests for your provisioner that look similar to kubernetes e2e tests by copying files from the e2e framework and fixing import statements. Like [here](https://github.com/kubernetes-incubator/external-storage/tree/master/nfs/test/e2e). Keep in mind the license, etc. In your case, unit & integration tests may be sufficient. 

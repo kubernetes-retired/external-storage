@@ -7,14 +7,13 @@ To get the Docker image onto the machine where you want to run nfs-provisioner, 
 Building the project will only work if the project is in your `GOPATH`. Download the project into your `GOPATH` directory by using `go get` or cloning it manually.
 
 ```
-$ go get github.com/kubernetes-incubator/nfs-provisioner
+$ go get github.com/kubernetes-incubator/external-storage
 ```
 
 Now build the project and the Docker image by checking out the latest release and running `make container` in the project directory.
 
 ```
-$ cd $GOPATH/src/github.com/kubernetes-incubator/nfs-provisioner
-$ git checkout tags/v1.0.3
+$ cd $GOPATH/src/github.com/kubernetes-incubator/external-storage/nfs
 $ make container
 ```
 
