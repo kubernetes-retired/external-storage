@@ -19,6 +19,7 @@ github.com/go-openapi/spec	3a04341
 github.com/go-openapi/swag	3b6d86c
 github.com/gogo/protobuf	v0.3-127-g8d70fb3
 github.com/golang/glog	23def4e
+github.com/golang/groupcache	a6b377e
 github.com/golang/protobuf	8ee7999
 github.com/google/gofuzz	fd52762
 github.com/guelfey/go.dbus	f6a3a23
@@ -26,7 +27,7 @@ github.com/hashicorp/hcl	c3e054b
 github.com/howeyc/gopass	f5387c4
 github.com/imdario/mergo	0.2.2-6-g50d4dbd
 github.com/jonboulle/clockwork	v0.1.0-4-gbcac988
-github.com/kubernetes-incubator/external-storage	2517d1f
+github.com/kubernetes-incubator/nfs-provisioner #TODO!
 github.com/magiconair/properties	v1.7.0-5-g0723e35
 github.com/mailru/easyjson	159cdb8
 github.com/mitchellh/mapstructure	f3009df
