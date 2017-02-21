@@ -34,13 +34,15 @@ type Provisioner interface {
 	// given PV. Does not delete the PV object itself.
 	//
 	// May return IgnoredError to indicate that the call has been ignored and no
-	// action taken. In case multiple provisioners are serving the same storage
-	// class, provisioners may ignore PVs they are not responsible for (e.g. ones
-	// they didn't create). The controller will act accordingly, i.e. it won't
-	// emit a misleading VolumeFailedDelete event.
+	// action taken.
 	Delete(*v1.PersistentVolume) error
 }
 
+// IgnoredError is the value for Delete to return to indicate that the call has
+// been ignored and no action taken. In case multiple provisioners are serving
+// the same storage class, provisioners may ignore PVs they are not responsible
+// for (e.g. ones they didn't create). The controller will act accordingly,
+// i.e. it won't emit a misleading VolumeFailedDelete event.
 type IgnoredError struct {
 	Reason string
 }

@@ -668,9 +668,8 @@ func (r *claimReactor) React(action testclient.Action) (handled bool, ret runtim
 				return true, nil, fmt.Errorf("Error casting clone of claim %s: %v", name, claimClone)
 			}
 			return true, claimClone, nil
-		} else {
-			return true, nil, fmt.Errorf("Cannot find claim %s", name)
 		}
+		return true, nil, fmt.Errorf("Cannot find claim %s", name)
 	}
 
 	return false, nil, nil

@@ -25,6 +25,7 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 )
 
+// ProvisionPVCLock is a lock on an existing PVC to provision a PV for
 type ProvisionPVCLock struct {
 	// PVCMeta should contain a Name and a Namespace of a PVC
 	// object that the LeaderElector will attempt to lead.
@@ -34,6 +35,7 @@ type ProvisionPVCLock struct {
 	p          *v1.PersistentVolumeClaim
 }
 
+// Get returns the LeaderElectionRecord
 func (pl *ProvisionPVCLock) Get() (*LeaderElectionRecord, error) {
 	var record LeaderElectionRecord
 	var err error
@@ -53,9 +55,9 @@ func (pl *ProvisionPVCLock) Get() (*LeaderElectionRecord, error) {
 	return &record, nil
 }
 
-// Create attempts to create a LeaderElectionRecord annotation
+// Create is not allowed, the PVC should already exist
 func (pl *ProvisionPVCLock) Create(ler LeaderElectionRecord) error {
-	return errors.New("create not allowed, PVC should already exist!")
+	return errors.New("create not allowed, PVC should already exist")
 }
 
 // Update will update and existing annotation on a given resource.
@@ -84,7 +86,7 @@ func (pl *ProvisionPVCLock) Describe() string {
 	return fmt.Sprintf("to provision for pvc %v/%v", pl.PVCMeta.Namespace, pl.PVCMeta.Name)
 }
 
-// returns the Identity of the lock
+// Identity returns the Identity of the lock
 func (pl *ProvisionPVCLock) Identity() string {
 	return pl.LockConfig.Identity
 }

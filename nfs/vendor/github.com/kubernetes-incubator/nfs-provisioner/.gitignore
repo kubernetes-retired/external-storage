@@ -39,5 +39,6 @@ flycheck_*.el
 .projectile
 
 # nfs-provisioner binary
-/nfs-provisioner
-/docs/deploy/docker/nfs-provisioner
+/nfs/nfs-provisioner
+/nfs/deploy/docker/nfs-provisioner
+*.pyc

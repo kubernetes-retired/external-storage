@@ -10,6 +10,8 @@ env:
 before_install:
   - sudo apt-get -qq update
   - sudo apt-get install -y nfs-common
+  - curl https://glide.sh/get | sh
+  - go get -u github.com/golang/lint/golint
 
 install:
   - pushd $HOME
@@ -31,7 +33,11 @@ before_script:
 
 script:
 # TODO
-  - cd nfs
+  - cd ./lib
+  - glide install -v
+  - ./verify.sh
+  - go test ./controller
+  - cd ../nfs
   - make container
   - make test-integration
   - make test-e2e

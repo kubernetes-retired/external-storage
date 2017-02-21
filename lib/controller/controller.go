@@ -135,6 +135,7 @@ type ProvisionController struct {
 	failedClaimsStatsMutex *sync.Mutex
 }
 
+// NewProvisionController creates a new provision controller
 func NewProvisionController(
 	client kubernetes.Interface,
 	resyncPeriod time.Duration,
@@ -256,6 +257,7 @@ func NewProvisionController(
 	return controller
 }
 
+// Run starts all of this controller's control loops
 func (ctrl *ProvisionController) Run(stopCh <-chan struct{}) {
 	glog.Infof("Starting provisioner controller %s!", string(ctrl.identity))
 	go ctrl.claimController.Run(stopCh)
@@ -319,7 +321,7 @@ func (ctrl *ProvisionController) updateClaim(oldObj, newObj interface{}) {
 
 	skipAddClaim, err := ctrl.isOnlyRecordUpdate(oldClaim, newClaim)
 	if err != nil {
-		glog.Errorf("Error checking if only record was updated in claim: %v")
+		glog.Errorf("Error checking if only record was updated in claim: %v", oldClaim)
 		return
 	}
 
@@ -810,12 +812,11 @@ func (ctrl *ProvisionController) deleteVolumeOperation(volume *v1.PersistentVolu
 			// Delete ignored, do nothing and hope another provisioner will delete it.
 			glog.Infof("deletion of volume %q ignored: %v", volume.Name, ierr)
 			return nil
-		} else {
-			// Delete failed, emit an event.
-			glog.Errorf("Deletion of volume %q failed: %v", volume.Name, err)
-			ctrl.eventRecorder.Event(volume, v1.EventTypeWarning, "VolumeFailedDelete", err.Error())
-			return err
 		}
+		// Delete failed, emit an event.
+		glog.Errorf("Deletion of volume %q failed: %v", volume.Name, err)
+		ctrl.eventRecorder.Event(volume, v1.EventTypeWarning, "VolumeFailedDelete", err.Error())
+		return err
 	}
 
 	glog.Infof("volume %q deleted", volume.Name)
