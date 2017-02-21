@@ -25,8 +25,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kubernetes-incubator/nfs-provisioner/lib/leaderelection"
-	rl "github.com/kubernetes-incubator/nfs-provisioner/lib/leaderelection/resourcelock"
+	"github.com/kubernetes-incubator/external-storage/lib/leaderelection"
+	rl "github.com/kubernetes-incubator/external-storage/lib/leaderelection/resourcelock"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	fakev1core "k8s.io/client-go/kubernetes/typed/core/v1/fake"

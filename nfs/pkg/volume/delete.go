@@ -22,7 +22,7 @@ import (
 	"path"
 	"strconv"
 
-	"github.com/kubernetes-incubator/nfs-provisioner/lib/controller"
+	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	"k8s.io/client-go/pkg/api/v1"
 )
 

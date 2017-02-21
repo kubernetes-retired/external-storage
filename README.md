@@ -10,7 +10,7 @@ External provisioners work just like in-tree dynamic PV provisioners. A `Storage
 ### How to use the library
 ```go
 import (
-  "github.com/kubernetes-incubator/nfs-provisioner/lib/controller"
+  "github.com/kubernetes-incubator/external-storage/lib/controller"
 )
 ```
 You need to implement the `Provisioner` interface then pass your implementation to a `ProvisionController` and run the controller. The controller takes care of deciding when to call your implementation's `Provision` or `Delete`. The interface and controller are defined in the above package.

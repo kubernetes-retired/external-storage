@@ -25,7 +25,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kubernetes-incubator/nfs-provisioner/nfs/test/e2e/framework"
+	"github.com/kubernetes-incubator/external-storage/nfs/test/e2e/framework"
 	"github.com/opencontainers/runc/libcontainer/selinux"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api"
@@ -366,9 +366,9 @@ func startProvisionerPod(c clientset.Interface, ns string) *v1.Pod {
 func startProvisionerDeployment(c clientset.Interface, ns string) (*v1.Service, *extensions.Deployment) {
 	gopath := os.Getenv("GOPATH")
 	// TODO
-	service := svcFromManifest(path.Join(gopath, "src/github.com/kubernetes-incubator/nfs-provisioner/nfs/deploy/kubernetes/deployment.yaml"))
+	service := svcFromManifest(path.Join(gopath, "src/github.com/kubernetes-incubator/external-storage/nfs/deploy/kubernetes/deployment.yaml"))
 
-	deployment := deployFromManifest(path.Join(gopath, "src/github.com/kubernetes-incubator/nfs-provisioner/nfs/deploy/kubernetes/deployment.yaml"))
+	deployment := deployFromManifest(path.Join(gopath, "src/github.com/kubernetes-incubator/external-storage/nfs/deploy/kubernetes/deployment.yaml"))
 
 	tmpDir, err := ioutil.TempDir("", "nfs-provisioner-deployment")
 	Expect(err).NotTo(HaveOccurred())

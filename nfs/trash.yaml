@@ -1,5 +1,5 @@
 # package
-github.com/kubernetes-incubator/nfs-provisioner/nfs
+github.com/kubernetes-incubator/external-storage/nfs
 
 cloud.google.com/go	v0.4.0-54-g2c3878e
 github.com/PuerkitoBio/purell	v1.1.0
