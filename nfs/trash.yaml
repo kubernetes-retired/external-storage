@@ -19,6 +19,7 @@ github.com/go-openapi/spec	3a04341
 github.com/go-openapi/swag	3b6d86c
 github.com/gogo/protobuf	v0.3-127-g8d70fb3
 github.com/golang/glog	23def4e
+github.com/golang/groupcache	a6b377e
 github.com/golang/protobuf	8ee7999
 github.com/google/gofuzz	fd52762
 github.com/guelfey/go.dbus	f6a3a23
