@@ -1,5 +1,4 @@
 # nfs-provisioner
-[![Build Status](https://travis-ci.org/kubernetes-incubator/nfs-provisioner.svg?branch=master)](https://travis-ci.org/kubernetes-incubator/nfs-provisioner)
 
 nfs-provisioner is an out-of-tree dynamic provisioner for Kubernetes 1.4. You can use it to quickly & easily deploy shared storage that works almost anywhere. Or it can help you write your own out-of-tree dynamic provisioner by serving as an example implementation of the requirements detailed in [the proposal](https://github.com/kubernetes/kubernetes/pull/30285). Go [here](./docs/demo) for a demo of how to use it and [here](../docs/demo/hostpath-provisioner) for an example of how to write your own.
 
@@ -74,15 +73,8 @@ Go [here](../docs/demo/hostpath-provisioner) for an example of how to write your
 ## Roadmap
 This is still alpha/experimental and will change to reflect the [out-of-tree dynamic provisioner proposal](https://github.com/kubernetes/kubernetes/pull/30285)
 
-November
-* Create a process for releasing (to Docker Hub, etc.)
-* Release 0.1 for kubernetes 1.5
-* Support using the controller as a library
-* Support running the provisioner as a StatefulSet
-
-December
-* Prevent multiple provisioners from racing to provision where possible (in a StatefulSet or DaemonSet)
-* Add configurable retries for failed provisioning and deleting
+February
+* Release v1.0.4
 
 ## Community, discussion, contribution, and support
 

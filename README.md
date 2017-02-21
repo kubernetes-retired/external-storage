@@ -1,4 +1,5 @@
 # External Storage
+[![Build Status](https://travis-ci.org/kubernetes-incubator/external-storage.svg?branch=master)](https://travis-ci.org/kubernetes-incubator/external-storage)
 ## External Provisioners
 This repository houses community-maintained external provisioners plus a helper library for building them. Each provisioner is contained in its own directory so for information on how to use one, enter its directory and read its documentation. The library is contained in the `lib` directory.
 
@@ -20,3 +21,28 @@ Note that because your provisioner needs to depend also on [client-go](https://g
 For a full guide on how to write an external provisioner using the library that demonstrates the above, see [here](docs/demo/hostpath-provisioner/).
 
 If you want your provisioner to be compatible with users' RBAC/PSP/OpenShift authorization policies also consider reading [this](docs/authorization.md).
+
+## Roadmap
+
+February
+* Finalize repo structure, release process, etc.
+
+## Community, discussion, contribution, and support
+
+Learn how to engage with the Kubernetes community on the [community page](http://kubernetes.io/community/).
+
+You can reach the maintainers of this project at:
+
+- Slack: #sig-storage
+
+## Kubernetes Incubator
+
+This is a [Kubernetes Incubator project](https://github.com/kubernetes/community/blob/master/incubator.md). The project was established 2016-11-15 (as nfs-provisioner). The incubator team for the project is:
+
+- Sponsor: Clayton (@smarterclayton)
+- Champion: Brad (@childsb)
+- SIG: sig-storage
+
+### Code of conduct
+
+Participation in the Kubernetes community is governed by the [Kubernetes Code of Conduct](code-of-conduct.md).
