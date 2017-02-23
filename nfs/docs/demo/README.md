@@ -4,6 +4,8 @@ The [beta dynamic provisioning feature](http://blog.kubernetes.io/2016/10/dynami
 
 nfs-provisioner creates NFS-backed PV's, leveraging the NFS volume plugin of Kubernetes, so given the ubiquity of NFS it will work almost anywhere. It's ideal for local clusters and dev work, any place a PV is wanted but not the manual work of creating one. We'll demonstrate how to get it quickly up and running, following a variation of the Kubernetes repo's [NFS example](https://github.com/kubernetes/kubernetes/tree/release-1.5/examples/volumes/nfs).
 
+If the cluster you intend to follow this demo with has RBAC and/or PSP enabled or it's an OpenShift cluster, you must first complete the [authorization guide](../authorization.md).
+
 The recommended way to run nfs-provisioner, which we'll demonstrate here, is as a [single-instance stateful app](http://kubernetes.io/docs/tutorials/stateful-application/run-stateful-application/), where we create a `Deployment` and back it with some persistent storage like a `hostPath` volume. We always create it in tandem with a matching service that has the necessary ports exposed. We'll see that when it's setup like so, the NFS server it runs to serve its PV's can maintain state and so survive pod restarts. The other ways to run are as a `DaemonSet`, standalone Docker container, or standalone binary, all documented [here](../deployment.md)
 
 There are two main things one can customize here before creating the deployment: the provisioner name and the backing volume.
@@ -34,6 +36,15 @@ volumes:
 ```console
 $ mkdir -p /tmp/nfs-provisioner
 $ sudo chcon -Rt svirt_sandbox_file_t /tmp/nfs-provisioner
+```
+
+If you completed the [authorization guide](../authorization.md) (because your cluster has RBAC and/or PSP enabled or it's an OpenShift cluster) and it told you to remember to ensure the pod template of the deployment specifies the service account you created, do that now as well by adding a `serviceAccount` line.
+```yaml
+...
+    spec:
+      serviceAccount: nfs-provisioner
+      containers:
+...
 ```
 
 We create the deployment and its service.
