@@ -116,7 +116,7 @@ We need to create a couple of things the controller expects as arguments, includ
 * `resyncPeriod` determines how often the controller relists PVCs and PVs to check if they should be provisioned for or deleted.
 * `provisionerName` is the `provisioner` that storage classes will specify, "example.com/hostpath" here.
 * `exponentialBackOffOnError` determines whether it should exponentially back off from calls to `Provision` or `Delete`, useful if either of those involves some API call.
-* `failedRetryThreshold` is the threshold for failed `Provision` attempts before giving up trying to provisionf or a claim.
+* `failedRetryThreshold` is the threshold for failed `Provision` attempts before giving up trying to provision for a claim.
 * The last four arguments configure leader election wherein mutliple controllers trying to provision for the same class of claims race to lock/lead claims in order to be the one to provision for them. The meaning of these parameters is documented in the [leaderelection package](https://github.com/kubernetes-incubator/external-storage/tree/master/lib/leaderelection). If you don't intend for users to run more than one instance of your provisioner for the same class of claims, you may ignore these and simply use the default as we do here.
 
 (There are many other possible parameters of the controller that could be exposed, please create an issue if you would like one to be.)
@@ -242,7 +242,7 @@ pod "hostpath-provisioner" created
 Before proceeding, we check that it doesn't immediately crash due to one of the fatal conditions we wrote.
 
 ```console
-$ kc get pod
+$ kubectl get pod
 NAME                   READY     STATUS    RESTARTS   AGE
 hostpath-provisioner   1/1       Running   0          5s
 ```
