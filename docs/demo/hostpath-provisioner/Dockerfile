@@ -12,4 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM golang:1.7.4-onbuild
+FROM golang:1.7.4
+COPY . /go/src/app
+WORKDIR /go/src/app
+RUN go get github.com/Masterminds/glide
+RUN glide install
+RUN go-wrapper install
