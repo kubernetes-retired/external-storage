@@ -18,3 +18,4 @@ WORKDIR /go/src/app
 RUN go get github.com/Masterminds/glide
 RUN glide install -v
 RUN go-wrapper install
+CMD /go/bin/app

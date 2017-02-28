@@ -191,6 +191,7 @@ WORKDIR /go/src/app
 RUN go get github.com/Masterminds/glide
 RUN glide install -v
 RUN go-wrapper install
+CMD /go/bin/app
 ```
 
 We build our Docker image. Note that the Docker image needs to be on the node we'll run the pod on. So you may need to tag your image and push it to Docker Hub so that it can be pulled later by the node, or just work on the node and build the image there.
