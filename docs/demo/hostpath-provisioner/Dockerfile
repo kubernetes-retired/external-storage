@@ -16,5 +16,5 @@ FROM golang:1.7.4
 COPY . /go/src/app
 WORKDIR /go/src/app
 RUN go get github.com/Masterminds/glide
-RUN glide install
+RUN glide install -v
 RUN go-wrapper install

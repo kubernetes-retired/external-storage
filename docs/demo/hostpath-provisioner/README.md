@@ -185,7 +185,12 @@ $ glide install -v
 Now we can use the [Go Docker image](https://hub.docker.com/_/golang/) to build & run our hostpath-provisioner.
 
 ```dockerfile
-FROM golang:1.7.4-onbuild
+FROM golang:1.7.4
+COPY . /go/src/app
+WORKDIR /go/src/app
+RUN go get github.com/Masterminds/glide
+RUN glide install -v
+RUN go-wrapper install
 ```
 
 We build our Docker image. Note that the Docker image needs to be on the node we'll run the pod on. So you may need to tag your image and push it to Docker Hub so that it can be pulled later by the node, or just work on the node and build the image there.
