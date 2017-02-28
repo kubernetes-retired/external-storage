@@ -33,11 +33,16 @@ before_script:
 
 script:
 # TODO
-  - cd ./lib
+  - pushd ./lib
   - glide install -v
   - ./verify.sh
   - go test ./controller
-  - cd ../nfs
+  - popd
+  - pushd ./docs/demo/hostpath-provisioner
+  - glide install -v
+  - docker build -t hostpath-provisioner:latest .
+  - popd
+  - pushd ./nfs
   - make container
   - make test-integration
   - make test-e2e
