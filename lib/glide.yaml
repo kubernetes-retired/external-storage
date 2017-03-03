@@ -2,7 +2,7 @@ package: github.com/kubernetes-incubator/external-storage/lib
 import:
 - package: github.com/golang/glog
 - package: k8s.io/client-go
-  version: v2.0.0
+  version: ^v2.0.0
   subpackages:
   - kubernetes
   - kubernetes/typed/core/v1
@@ -22,5 +22,6 @@ import:
   - tools/cache
   - tools/record
 - package: k8s.io/kubernetes
+  version: ~1.5.0
   subpackages:
   - pkg/util/goroutinemap
