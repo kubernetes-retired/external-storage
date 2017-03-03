@@ -25,4 +25,5 @@ hostpath-provisioner: $(shell find . -name "*.go")
 
 .PHONY: clean
 clean:
+	rm -rf vendor
 	rm hostpath-provisioner

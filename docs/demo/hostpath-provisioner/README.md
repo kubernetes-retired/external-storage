@@ -177,12 +177,7 @@ Before we can run our provisioner in a pod we need to build a Docker image for t
 
 Our [glide.yaml](./glide.yaml) was created by manually setting the latest version of external-storage/lib & setting the version of client-go to the same one that external-storage/lib uses. We use it to populate a vendor directory containing dependencies.
 
-```
-$ glide install -v
-...
-```
-
-Now we can use the [Go Docker image](https://hub.docker.com/_/golang/) to build & run our hostpath-provisioner.
+Now we can use the [Go Docker image](https://hub.docker.com/_/golang/) to build & run our hostpath-provisioner. The following Dockerfile will build the hostpath-provisioner binary inside the container. Note the `glide install -v` command that gets the dependencies listed in our glide.yaml.
 
 ```dockerfile
 FROM golang:1.7.4
@@ -201,6 +196,8 @@ $ docker build -t hostpath-provisioner:latest .
 ...
 Successfully built 9bb0954337a0
 ```
+
+>Note that the above build process is not the only one available to you. We include here an example of an alternative static build process that results in a much smaller image: see the Makefile and Dockerfile.scratch if you're interested. Regardless of which method you choose, you should end up with a container tagged hostpath-provisioner:latest.
 
 Now we can specify our image in a pod. Recall that we set `pvDir` to `/tmp/hostpath-provisioner`. Since we are running our provisioner in a container as a pod, we should mount a corresponding `hostPath` volume there to serve as the parent of all provisioned PVs' `hostPath` volumes.
 
