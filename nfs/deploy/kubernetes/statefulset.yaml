@@ -35,7 +35,7 @@ spec:
       terminationGracePeriodSeconds: 0
       containers:
         - name: nfs-provisioner
-          image: quay.io/kubernetes_incubator/nfs-provisioner:v1.0.3
+          image: quay.io/kubernetes_incubator/nfs-provisioner:v1.0.4
           ports:
             - name: nfs
               containerPort: 2049
