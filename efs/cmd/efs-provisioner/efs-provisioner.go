@@ -43,7 +43,7 @@ import (
 
 const (
 	provisionerNameKey = "PROVISIONER_NAME"
-	fileSystemIdKey    = "FILE_SYSTEM_ID"
+	fileSystemIDKey    = "FILE_SYSTEM_ID"
 	awsRegionKey       = "AWS_REGION"
 
 	resyncPeriod              = 15 * time.Second
@@ -63,18 +63,19 @@ type efsProvisioner struct {
 	allocator  gidallocator.Allocator
 }
 
+// NewEFSProvisioner creates an AWS EFS volume provisioner
 func NewEFSProvisioner(client kubernetes.Interface) controller.Provisioner {
-	fileSystemId := os.Getenv(fileSystemIdKey)
-	if fileSystemId == "" {
-		glog.Fatal("environment variable %s is not set! Please set it.", fileSystemIdKey)
+	fileSystemID := os.Getenv(fileSystemIDKey)
+	if fileSystemID == "" {
+		glog.Fatalf("environment variable %s is not set! Please set it.", fileSystemIDKey)
 	}
 
 	awsRegion := os.Getenv(awsRegionKey)
 	if awsRegion == "" {
-		glog.Fatal("environment variable %s is not set! Please set it.", awsRegionKey)
+		glog.Fatalf("environment variable %s is not set! Please set it.", awsRegionKey)
 	}
 
-	dnsName := getDNSName(fileSystemId, awsRegion)
+	dnsName := getDNSName(fileSystemID, awsRegion)
 
 	mountpoint, source, err := getMount(dnsName)
 	if err != nil {
@@ -88,7 +89,7 @@ func NewEFSProvisioner(client kubernetes.Interface) controller.Provisioner {
 
 	svc := efs.New(sess, &aws.Config{Region: aws.String(awsRegion)})
 	params := &efs.DescribeFileSystemsInput{
-		FileSystemId: aws.String(fileSystemId),
+		FileSystemId: aws.String(fileSystemID),
 	}
 
 	_, err = svc.DescribeFileSystems(params)
@@ -105,8 +106,8 @@ func NewEFSProvisioner(client kubernetes.Interface) controller.Provisioner {
 	}
 }
 
-func getDNSName(fileSystemId, awsRegion string) string {
-	return fileSystemId + ".efs." + awsRegion + ".amazonaws.com"
+func getDNSName(fileSystemID, awsRegion string) string {
+	return fileSystemID + ".efs." + awsRegion + ".amazonaws.com"
 }
 
 func getMount(dnsName string) (string, string, error) {
@@ -269,7 +270,7 @@ func main() {
 
 	provisionerName := os.Getenv(provisionerNameKey)
 	if provisionerName == "" {
-		glog.Fatal("environment variable %s is not set! Please set it.", provisionerNameKey)
+		glog.Fatalf("environment variable %s is not set! Please set it.", provisionerNameKey)
 	}
 
 	// Start the provision controller which will dynamically provision efs NFS

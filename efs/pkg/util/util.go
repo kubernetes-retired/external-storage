@@ -67,6 +67,7 @@ func GetClaimStorageClass(claim *v1.PersistentVolumeClaim) string {
 	return ""
 }
 
+// GetClassForVolume gets the volume's Storage Class
 func GetClassForVolume(kubeClient kubernetes.Interface, pv *v1.PersistentVolume) (*v1beta1.StorageClass, error) {
 	if kubeClient == nil {
 		return nil, fmt.Errorf("Cannot get kube client")

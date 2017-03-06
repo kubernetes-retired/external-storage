@@ -42,12 +42,15 @@ const (
 	absoluteGidMax = math.MaxInt32
 )
 
+// Allocator allocates GIDs to PVs. It allocates from per-SC ranges and ensures
+// that no two PVs of the same SC get the same GID.
 type Allocator struct {
 	client       kubernetes.Interface
 	gidTable     map[string]*allocator.MinMaxAllocator
 	gidTableLock sync.Mutex
 }
 
+// New creates a new GID Allocator
 func New(client kubernetes.Interface) Allocator {
 	return Allocator{
 		client:   client,
@@ -55,6 +58,8 @@ func New(client kubernetes.Interface) Allocator {
 	}
 }
 
+// AllocateNext allocates the next available GID for the given VolumeOptions
+// (claim's options for a volume it wants) from the appropriate GID table.
 func (a *Allocator) AllocateNext(options controller.VolumeOptions) (int, error) {
 	class := util.GetClaimStorageClass(options.PVC)
 	gidMin, gidMax, err := parseClassParameters(options.Parameters)
@@ -75,6 +80,8 @@ func (a *Allocator) AllocateNext(options controller.VolumeOptions) (int, error) 
 	return gid, nil
 }
 
+// Release releases the given volume's allocated GID from the appropriate GID
+// table.
 func (a *Allocator) Release(volume *v1.PersistentVolume) error {
 	class, err := util.GetClassForVolume(a.client, volume)
 	if err != nil {
