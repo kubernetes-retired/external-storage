@@ -49,6 +49,11 @@ script:
   - make image
   - make clean
   - popd
+  - pushd ./efs
+  - make container
+  - make test
+  - make clean
+  - popd
     # Test building and running nfs-provisioner
   - pushd ./nfs
   - make container
