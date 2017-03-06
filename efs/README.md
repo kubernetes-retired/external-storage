@@ -1,5 +1,10 @@
 # efs-provisioner
 
+## Prerequisites
+* An IAM user assigned the AmazonElasticFileSystemReadOnlyAccess policy (or better)
+* An EFS file system in your cluster's region
+* [Mount targets](http://docs.aws.amazon.com/efs/latest/ug/accessing-fs.html) and [security groups](http://docs.aws.amazon.com/efs/latest/ug/accessing-fs-create-security-groups.html) such that any node (in any zone in the cluster's region) can mount the EFS file system by its [File system DNS name](http://docs.aws.amazon.com/efs/latest/ug/mounting-fs-mount-cmd-dns-name.html)
+
 ## Deployment
 
 Create a configmap containing the [**File system ID**](http://docs.aws.amazon.com/efs/latest/ug/gs-step-two-create-efs-resources.html) and Amazon EC2 region of the EFS file system you wish to provision NFS PVs from, plus the name of the provisioner, which administrators will specify in the `provisioner` field of their `StorageClass(es)`, e.g. `provisioner: example.com/aws-efs`.
@@ -11,7 +16,7 @@ $ kubectl create configmap efs-provisioner \
 --from-literal=provisioner.name=example.com/aws-efs
 ```
 
-Create a secret containing AWS credentials for the provisioner to use. The credentials will be used only once at startup to check that the EFS file system you specified in the configmap actually exists.
+Create a secret containing the AWS credentials of a user assigned the AmazonElasticFileSystemReadOnlyAccess policy. The credentials will be used by the provisioner only once at startup to check that the EFS file system you specified in the configmap actually exists.
 
 ```console
 $ kubectl create secret generic aws-credentials \
