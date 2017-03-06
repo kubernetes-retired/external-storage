@@ -1,5 +1,5 @@
-hash: 5ed4a0454b399910b913d69173efe5e891ce62274216b56dfad3183e0d7d3536
-updated: 2017-02-21T15:30:07.826602914-05:00
+hash: 0123cc12df692481ba34f0a7f71b51a2420b5652c3ef310c8dbc6fb4cffb759b
+updated: 2017-03-03T16:31:50.886913856-05:00
 imports:
 - name: cloud.google.com/go
   version: 3b1ae45394a234c385be014e9a488f2bb6eef821
@@ -65,8 +65,10 @@ imports:
   version: bbcb9da2d746f8bdbd6a936686a0a6067ada0ec5
 - name: github.com/jonboulle/clockwork
   version: 72f9bd7c4e0c2a40055ab3d0f09654f730cce982
+- name: github.com/juju/ratelimit
+  version: 77ed1c8a01217656d2080ad51981f6e99adaa177
 - name: github.com/kubernetes-incubator/external-storage
-  version: 2517d1fa42c9908654e64fe4ade039a45e269da7
+  version: 7ed750505f701c978a79ebf001cc37fc529d73d0
   subpackages:
   - controller
   - lib/controller
@@ -136,7 +138,7 @@ imports:
 - name: gopkg.in/yaml.v2
   version: 53feefa2559fb8dfa8d81baad31be332c97d6c77
 - name: k8s.io/client-go
-  version: 89c60099837a47cfce19bd14e2d1f16c4670fd58
+  version: e121606b0d09b2e1c467183ee46217fa85a6b672
   subpackages:
   - discovery
   - kubernetes
@@ -228,7 +230,6 @@ imports:
   - pkg/util/net
   - pkg/util/parsers
   - pkg/util/rand
-  - pkg/util/ratelimit
   - pkg/util/runtime
   - pkg/util/sets
   - pkg/util/strategicpatch
@@ -250,7 +251,7 @@ imports:
   - tools/record
   - transport
 - name: k8s.io/kubernetes
-  version: ee03b9b206ece1500b65140f26acc2ebe40b630b
+  version: e9eeec655e7fdee50d4e19200f9707d1cd4a3371
   subpackages:
   - pkg/util/goroutinemap
   - pkg/util/goroutinemap/exponentialbackoff
