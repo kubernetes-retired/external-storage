@@ -42,7 +42,7 @@ You can reach the maintainers of this project at:
 This is a [Kubernetes Incubator project](https://github.com/kubernetes/community/blob/master/incubator.md). The project was established 2016-11-15 (as nfs-provisioner). The incubator team for the project is:
 
 - Sponsor: Clayton (@smarterclayton)
-- Champion: Brad (@childsb)
+- Champion: Jan (@jsafrane)
 - SIG: sig-storage
 
 ### Code of conduct
