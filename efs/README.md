@@ -1,5 +1,10 @@
 # efs-provisioner
 
+[![Docker Repository on Quay](https://quay.io/repository/external_storage/efs-provisioner/status "Docker Repository on Quay")](https://quay.io/repository/external_storage/efs-provisioner)
+```
+quay.io/external_storage/efs-provisioner:latest
+```
+
 ## Prerequisites
 * An IAM user assigned the AmazonElasticFileSystemReadOnlyAccess policy (or better)
 * An EFS file system in your cluster's region
