@@ -1,5 +1,10 @@
 # nfs-provisioner
 
+[![Docker Repository on Quay](https://quay.io/repository/kubernetes_incubator/nfs-provisioner/status "Docker Repository on Quay")](https://quay.io/repository/kubernetes_incubator/nfs-provisioner)
+```
+quay.io/kubernetes_incubator/nfs-provisioner:v1.0.4
+```
+
 nfs-provisioner is an out-of-tree dynamic provisioner for Kubernetes 1.4. You can use it to quickly & easily deploy shared storage that works almost anywhere. Or it can help you write your own out-of-tree dynamic provisioner by serving as an example implementation of the requirements detailed in [the proposal](https://github.com/kubernetes/kubernetes/pull/30285). Go [here](./docs/demo) for a demo of how to use it and [here](../docs/demo/hostpath-provisioner) for an example of how to write your own.
 
 It works just like in-tree dynamic provisioners: a `StorageClass` object can specify an instance of nfs-provisioner to be its `provisioner` like it specifies in-tree provisioners such as GCE or AWS. Then, the instance of nfs-provisioner will watch for `PersistentVolumeClaims` that ask for the `StorageClass` and automatically create NFS-backed `PersistentVolumes` for them. For more information on how dynamic provisioning works, see [the docs](http://kubernetes.io/docs/user-guide/persistent-volumes/) or [this blog post](http://blog.kubernetes.io/2016/10/dynamic-provisioning-and-storage-in-kubernetes.html).
@@ -67,14 +72,14 @@ To use nfs-provisioner once it is deployed see [Usage](docs/usage.md).
 
 For information on running multiple instances of nfs-provisioner see [Running Multiple Provisioners](docs/multiple.md).
 
+## [Changelog](CHANGELOG.md)
+Releases done here in external-storage will not have corresponding git tags (external-storage's git tags are reserved for versioning the library), so to keep track of releases check this README, the [changelog](CHANGELOG.md), or [Quay](https://quay.io/repository/kubernetes_incubator/nfs-provisioner)
+
 ## Writing your own
 Go [here](../docs/demo/hostpath-provisioner) for an example of how to write your own out-of-tree dynamic provisioner.
 
 ## Roadmap
 This is still alpha/experimental and will change to reflect the [out-of-tree dynamic provisioner proposal](https://github.com/kubernetes/kubernetes/pull/30285)
-
-February
-* Release v1.0.4
 
 ## Community, discussion, contribution, and support
 
