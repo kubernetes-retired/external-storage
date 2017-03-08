@@ -19,12 +19,12 @@ package main
 import (
 	"errors"
 	"flag"
+	"fmt"
 	"os"
 	exec "os/exec"
-	"time"
-	"fmt"
-	dstrings "strings"
 	"strconv"
+	dstrings "strings"
+	"time"
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
@@ -36,7 +36,6 @@ import (
 	"k8s.io/client-go/pkg/util/wait"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	//storage "k8s.io/client-go/pkg/apis/storage/v1beta1"
 )
 
@@ -45,12 +44,12 @@ const (
 	provisionerName           = "gluster.org/glusterblock"
 	exponentialBackOffOnError = false
 	failedRetryThreshold      = 5
-	defaultExecPath	  	  = "./createiscsi"
-	secretKeyName 		  = "key"
-	leasePeriod   		  = leaderelection.DefaultLeaseDuration
-	retryPeriod   		  = leaderelection.DefaultRetryPeriod
-	renewDeadline 		  = leaderelection.DefaultRenewDeadline
-	termLimit 		  = leaderelection.DefaultTermLimit
+	defaultExecPath           = "./createiscsi"
+	secretKeyName             = "key"
+	leasePeriod               = leaderelection.DefaultLeaseDuration
+	retryPeriod               = leaderelection.DefaultRetryPeriod
+	renewDeadline             = leaderelection.DefaultRenewDeadline
+	termLimit                 = leaderelection.DefaultTermLimit
 )
 
 type glusterBlockProvisioner struct {
@@ -81,7 +80,7 @@ type provisionerConfig struct {
 	secretValue     string
 
 	// Optinal:  ClusterID from which the provisioner create the block volume
-	clusterId       string
+	clusterId string
 
 	// Optional: high availability count in case of multipathing
 	haCount int
@@ -95,7 +94,7 @@ type provisionerConfig struct {
 
 func NewglusterBlockProvisioner(client kubernetes.Interface) controller.Provisioner {
 	return &glusterBlockProvisioner{
-		client: client,
+		client:   client,
 		identity: uuid.NewUUID(),
 	}
 }
@@ -110,7 +109,7 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 		return nil, fmt.Errorf("claim Selector is not supported")
 	}
 
-    	glog.V(4).Infof("glusterblock: VolumeOptions %v", options)
+	glog.V(4).Infof("glusterblock: VolumeOptions %v", options)
 
 	// If we want to retrieve storage class name.
 	// scName := storageutil.GetClaimStorageClass(r.options.PVC)
@@ -189,7 +188,6 @@ func (p *glusterBlockProvisioner) Delete(volume *v1.PersistentVolume) error {
 
 	return nil
 }
-
 
 func parseClassParameters(params map[string]string, kubeclient kubernetes.Interface) (*provisionerConfig, error) {
 	var cfg provisionerConfig
@@ -272,7 +270,6 @@ func parseClassParameters(params map[string]string, kubeclient kubernetes.Interf
 	return &cfg, nil
 }
 
-
 // parseSecret finds a given Secret instance and reads user password from it.
 func parseSecret(namespace, secretName string, kubeClient kubernetes.Interface) (string, error) {
 
@@ -295,25 +292,24 @@ func parseSecret(namespace, secretName string, kubeClient kubernetes.Interface) 
 	return secret, nil
 }
 
-
 // GetSecretForPV locates secret by name and namespace, verifies the secret type, and returns secret map
 
 func GetSecretForPV(secretNamespace, secretName, volumePluginName string, kubeClient kubernetes.Interface) (map[string]string, error) {
-        secret := make(map[string]string)
-        if kubeClient == nil {
-                return secret, fmt.Errorf("Cannot get kube client")
-        }
-        secrets, err := kubeClient.Core().Secrets(secretNamespace).Get(secretName, metav1.GetOptions{})
-        if err != nil {
-                return secret, err
-        }
-        if secrets.Type != v1.SecretType(volumePluginName) {
-                return secret, fmt.Errorf("Cannot get secret of type %s", volumePluginName)
-        }
-        for name, data := range secrets.Data {
-                secret[name] = string(data)
-        }
-        return secret, nil
+	secret := make(map[string]string)
+	if kubeClient == nil {
+		return secret, fmt.Errorf("Cannot get kube client")
+	}
+	secrets, err := kubeClient.Core().Secrets(secretNamespace).Get(secretName)
+	if err != nil {
+		return secret, err
+	}
+	if secrets.Type != v1.SecretType(volumePluginName) {
+		return secret, fmt.Errorf("Cannot get secret of type %s", volumePluginName)
+	}
+	for name, data := range secrets.Data {
+		secret[name] = string(data)
+	}
+	return secret, nil
 }
 
 var (
