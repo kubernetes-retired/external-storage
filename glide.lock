@@ -1,5 +1,5 @@
-hash: fde7a81a5b404ab281c4b6116a584066aff0d5a2d9b0b0890a5b8c20b2cf885e
-updated: 2017-03-08T23:01:49.42502054+05:30
+hash: 3defe504a0923ef7bdaf66a372b1acfb64710c06195137c419682141d3caefc7
+updated: 2017-03-08T13:17:00.753696101-05:00
 imports:
 - name: cloud.google.com/go
   version: 3b1ae45394a234c385be014e9a488f2bb6eef821
@@ -252,29 +252,6 @@ imports:
   version: 3887ee99ecf07df5b447e9b00d9c0b2adaa9f3e4
 - name: gopkg.in/yaml.v2
   version: 53feefa2559fb8dfa8d81baad31be332c97d6c77
-- name: k8s.io/apimachinery
-  version: c810e4931f2cf80a6f0a007f8ba9c05ef0165cee
-  subpackages:
-  - pkg/api/resource
-  - pkg/apis/meta/v1
-  - pkg/conversion
-  - pkg/conversion/queryparams
-  - pkg/fields
-  - pkg/labels
-  - pkg/openapi
-  - pkg/runtime
-  - pkg/runtime/schema
-  - pkg/selection
-  - pkg/types
-  - pkg/util/errors
-  - pkg/util/intstr
-  - pkg/util/net
-  - pkg/util/runtime
-  - pkg/util/sets
-  - pkg/util/validation
-  - pkg/util/wait
-  - pkg/watch
-  - third_party/forked/golang/reflect
 - name: k8s.io/client-go
   version: e121606b0d09b2e1c467183ee46217fa85a6b672
   subpackages:

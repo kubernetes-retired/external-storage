@@ -57,8 +57,6 @@ import:
   subpackages:
   - pkg/cloudprovider
   - pkg/util/goroutinemap
-- package: k8s.io/apimachinery
-  version: c810e49
 testImport:
 - package: github.com/opencontainers/runc
   subpackages:
