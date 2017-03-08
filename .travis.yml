@@ -48,10 +48,16 @@ script:
   - make image
   - make clean
   - popd
+  - pushd ./cephfs
+  - go build cephfs-provisioner.go
+  - popd
   - pushd ./efs
   - make container
   - make test
   - make clean
+  - popd
+  - pushd ./glusterblock
+  - go build glusterblock-provisioner.go
   - popd
     # Test building and running nfs-provisioner
   - pushd ./nfs
