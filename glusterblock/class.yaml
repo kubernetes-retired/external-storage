@@ -6,5 +6,5 @@ provisioner: gluster.org/glusterblock
 parameters:
     opmode: "executable"
     execpath: "/tmp/iscsicreate"
-    hacount: 3
+    hacount: "3"
 
