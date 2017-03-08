@@ -1,0 +1,10 @@
+kind: StorageClass
+apiVersion: storage.k8s.io/v1beta1
+metadata:
+  name: glusterblock
+provisioner: gluster.org/glusterblock
+parameters:
+    opmode: "executable"
+    execpath: "/tmp/iscsicreate"
+    hacount: 3
+
