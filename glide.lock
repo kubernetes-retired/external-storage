@@ -1,5 +1,5 @@
-hash: 3defe504a0923ef7bdaf66a372b1acfb64710c06195137c419682141d3caefc7
-updated: 2017-03-06T13:14:40.479255257-05:00
+hash: fde7a81a5b404ab281c4b6116a584066aff0d5a2d9b0b0890a5b8c20b2cf885e
+updated: 2017-03-08T23:01:49.42502054+05:30
 imports:
 - name: cloud.google.com/go
   version: 3b1ae45394a234c385be014e9a488f2bb6eef821
@@ -7,7 +7,7 @@ imports:
   - compute/metadata
   - internal
 - name: github.com/aws/aws-sdk-go
-  version: 6669bce73b4e3bc922ff5ea3a3983ede26e02b39
+  version: fa1a4bc634fffa6ac468d8fb217e05475e063440
   subpackages:
   - aws
   - aws/awserr
@@ -61,7 +61,7 @@ imports:
   - digest
   - reference
 - name: github.com/docker/docker
-  version: 9369acc776be47eb4163ee97153aefa0a4e647a0
+  version: 71f249967e7a82574d89d23172f7c38a5e3be31f
   subpackages:
   - pkg/mount
 - name: github.com/emicklei/go-restful
@@ -74,7 +74,7 @@ imports:
 - name: github.com/ghodss/yaml
   version: 73d445a93680fa1a78ae23a5839bad48f32ba1ee
 - name: github.com/go-ini/ini
-  version: 2e44421e256d82ebbf3d4d4fcabe8930b905eff3
+  version: c437d20015c2ab6454b7a66a13109ff0fb99e17a
 - name: github.com/go-openapi/jsonpointer
   version: 46af16f9f7b149af66e5d1bd010e3574dc06de98
 - name: github.com/go-openapi/jsonreference
@@ -252,6 +252,29 @@ imports:
   version: 3887ee99ecf07df5b447e9b00d9c0b2adaa9f3e4
 - name: gopkg.in/yaml.v2
   version: 53feefa2559fb8dfa8d81baad31be332c97d6c77
+- name: k8s.io/apimachinery
+  version: c810e4931f2cf80a6f0a007f8ba9c05ef0165cee
+  subpackages:
+  - pkg/api/resource
+  - pkg/apis/meta/v1
+  - pkg/conversion
+  - pkg/conversion/queryparams
+  - pkg/fields
+  - pkg/labels
+  - pkg/openapi
+  - pkg/runtime
+  - pkg/runtime/schema
+  - pkg/selection
+  - pkg/types
+  - pkg/util/errors
+  - pkg/util/intstr
+  - pkg/util/net
+  - pkg/util/runtime
+  - pkg/util/sets
+  - pkg/util/validation
+  - pkg/util/wait
+  - pkg/watch
+  - third_party/forked/golang/reflect
 - name: k8s.io/client-go
   version: e121606b0d09b2e1c467183ee46217fa85a6b672
   subpackages:
@@ -406,7 +429,7 @@ imports:
   - tools/record
   - transport
 - name: k8s.io/kubernetes
-  version: e9eeec655e7fdee50d4e19200f9707d1cd4a3371
+  version: 00a1fb254bd8e5235575fba1398b958943e39078
   subpackages:
   - pkg/api
   - pkg/api/meta
