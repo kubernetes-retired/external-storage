@@ -4,6 +4,7 @@ metadata:
   name: glusterblock
 provisioner: gluster.org/glusterblock
 parameters:
+    resturl: "http://127.0.0.1:8081"
     opmode: "executable"
     execpath: "/tmp/iscsicreate"
     hacount: "3"
