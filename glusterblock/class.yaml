@@ -4,6 +4,10 @@ metadata:
   name: glusterblock
 provisioner: gluster.org/glusterblock
 parameters:
+    resturl: "http://127.0.0.1:8081"
+    restuser: "admin"
+    secretnamespace: "default"
+    secretname: "heketi-secret"
     opmode: "executable"
     execpath: "/tmp/iscsicreate"
     hacount: "3"
