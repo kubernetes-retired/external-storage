@@ -56,7 +56,7 @@ script:
   - make test
   - make clean
   - popd
-  - pushd ./glusterblock
+  - pushd ./gluster/block
   - go build glusterblock-provisioner.go
   - popd
     # Test building and running nfs-provisioner
