@@ -1,8 +1,8 @@
-#Writing an Out-of-tree Dynamic Provisioner
+# Writing an Out-of-tree Dynamic Provisioner
 
 In this guide we'll demonstrate how to write an out-of-tree dynamic provisioner using [the helper library](https://github.com/kubernetes-incubator/external-storage/tree/master/lib)
 
-##The Provisioner Interface
+## The Provisioner Interface
 
 Ideally, all you should need to do to write your own provisioner is implement the `Provisioner` interface which has two methods: `Provision` and `Delete`. Then you can just pass it to the `ProvisionController`, which handles all the logic of calling the two methods. The signatures should be self-explanatory but we'll explain the methods in more detail anyhow. For this explanation we'll refer to the `ProvisionController` as the controller and the implementer of the `Provisioner` interface as the provisioner. The code can be found in the [`controller` directory](https://github.com/kubernetes-incubator/external-storage/tree/master/lib/controller)
 
@@ -26,7 +26,7 @@ Special consideration must be given to the case where multiple controllers that 
 
 `Delete` is not responsible for actually deleting the PV, i.e. removing it from the Kubernetes API, it just deletes the storage asset backing the PV and the controller handles deleting the API object.
 
-##Writing a `hostPath` Dynamic Provisioner
+## Writing a `hostPath` Dynamic Provisioner
 
 Now that we understand the interface expected by the controller, let's implement it and create our own out-of-tree `hostPath` dynamic provisioner. This is for single node testing and demonstration purposes only - local storage is not supported in any way and will not work on multi-node clusters. This simple program has the power to delete and create local data on your node, so if you intend to actually follow along and run it, be careful!
 
@@ -114,7 +114,7 @@ Now all that's left is to connect our `Provisioner` with a `ProvisionController`
 We need to create a couple of things the controller expects as arguments, including our `hostPathProvisioner`, before we create and run it. First we create a client for communicating with Kubernetes from within a pod. We use it to determine the server version of Kubernetes. Then we create our `hostPathProvisioner`. We pass all of these things into `NewProvisionController`, plus some other arguments we'll explain now. 
 
 * `resyncPeriod` determines how often the controller relists PVCs and PVs to check if they should be provisioned for or deleted.
-* `provisionerName` is the `provisioner` that storage classes will specify, "example.com/hostpath" here.
+* `provisionerName` is the `provisioner` that storage classes will specify, "example.com/hostpath" here.  It must follow the <vendor name>/<provisioner name> naming scheme and <vendor name> cannot be "kubernetes.io"
 * `exponentialBackOffOnError` determines whether it should exponentially back off from calls to `Provision` or `Delete`, useful if either of those involves some API call.
 * `failedRetryThreshold` is the threshold for failed `Provision` attempts before giving up trying to provision for a claim.
 * The last four arguments configure leader election wherein mutliple controllers trying to provision for the same class of claims race to lock/lead claims in order to be the one to provision for them. The meaning of these parameters is documented in the [leaderelection package](https://github.com/kubernetes-incubator/external-storage/tree/master/lib/leaderelection). If you don't intend for users to run more than one instance of your provisioner for the same class of claims, you may ignore these and simply use the default as we do here.
@@ -171,7 +171,7 @@ We're now done writing code. The code we wrote can be found [here](./hostpath-pr
 
 Notice we just import "github.com/kubernetes-incubator/external-storage/lib/controller" to get access to the required interface and function.
 
-##Building and Running our `hostPath` Dynamic Provisioner
+## Building and Running our `hostPath` Dynamic Provisioner
 
 Before we can run our provisioner in a pod we need to build a Docker image for the pod to specify. Our hostpath-provisioner Go package has many dependencies so it's a good idea to use a tool to manage them. It's especially important to do so when depending on a package like [client-go](https://github.com/kubernetes/client-go#how-to-get-it) that has an unstable master branch. We'll use [glide](https://github.com/Masterminds/glide).
 
@@ -227,7 +227,7 @@ $ mkdir -p /tmp/hostpath-provisioner
 $ sudo chcon -Rt svirt_sandbox_file_t /tmp/hostpath-provisioner
 ```
 
-##Using our `hostPath` Dynamic Provisioner
+## Using our `hostPath` Dynamic Provisioner
 
 As said before, this dynamic provisioner is for single node testing purposes only. It has been tested to work with [hack/local-up-cluster.sh](https://github.com/kubernetes/kubernetes/blob/release-1.5/hack/local-up-cluster.sh) started like so.
 
