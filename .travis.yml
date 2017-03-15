@@ -51,7 +51,7 @@ script:
   - pushd ./cephfs
   - go build cephfs-provisioner.go
   - popd
-  - pushd ./efs
+  - pushd ./aws/efs
   - make container
   - make test
   - make clean
