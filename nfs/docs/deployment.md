@@ -32,7 +32,7 @@ Now the Docker image is on your machine. Bring up a 1.4+ cluster if you don't ha
 $ ALLOW_SECURITY_CONTEXT=true API_HOST_IP=0.0.0.0 $GOPATH/src/k8s.io/kubernetes/hack/local-up-cluster.sh
 ```
 
-Decide on a unique name to give the provisioner that follows the naming scheme `<vendor name>/<provisioner name>`. The provisioner will only provision volumes for claims that request a `StorageClass` with a `provisioner` field set equal to this name. For example, the names of the in-tree GCE and AWS provisioners are `kubernetes.io/gce-pd` and `kubernetes.io/aws-ebs`.
+Decide on a unique name to give the provisioner that follows the naming scheme `<vendor name>/<provisioner name>` where `<vendor name>` cannot be "kubernetes.io." The provisioner will only provision volumes for claims that request a `StorageClass` with a `provisioner` field set equal to this name. For example, the names of the in-tree GCE and AWS provisioners are `kubernetes.io/gce-pd` and `kubernetes.io/aws-ebs`.
 
 Decide how to run nfs-provisioner and follow one of the below sections. The recommended way is running it as a [single-instance stateful app](http://kubernetes.io/docs/tutorials/stateful-application/run-stateful-application/), where you create a `Deployment`/`StatefulSet` and back it with some persistent storage like a `hostPath` volume. Running as a `DaemonSet` is for exposing & "pooling" multiple nodes' `hostPath` volumes. Running outside of Kubernetes as a standalone container or binary is for when you want greater control over the app's lifecycle and/or the ability to set per-PV quotas.
 
