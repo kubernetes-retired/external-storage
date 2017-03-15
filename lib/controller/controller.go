@@ -572,6 +572,8 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 		Parameters: storageClass.Parameters,
 	}
 
+	ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, "Provisioning", fmt.Sprintf("External provisioner is provisioning volume for claim %q", claimToClaimKey(claim)))
+
 	volume, err = ctrl.provisioner.Provision(options)
 	if err != nil {
 		strerr := fmt.Sprintf("Failed to provision volume with StorageClass %q: %v", storageClass.Name, err)
