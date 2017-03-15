@@ -59,7 +59,7 @@ verify:
 		go vet $$i; \
 	done
 	@tput bold; echo Running verify-boilerplate; tput sgr0
-	../repo-infra/verify/verify-boilerplate.sh
+	../../repo-infra/verify/verify-boilerplate.sh
 .PHONY: verify
 
 clean:
