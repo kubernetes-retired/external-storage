@@ -17,20 +17,20 @@ IMAGE = quay.io/external_storage/efs-provisioner
 VERSION = latest
 
 all build:
-	@mkdir -p .go/src/github.com/kubernetes-incubator/external-storage/efs/vendor
+	@mkdir -p .go/src/github.com/kubernetes-incubator/external-storage/aws/efs/vendor
 	@mkdir -p .go/bin
 	@mkdir -p .go/stdlib
-	@docker run \
+	docker run \
 		--rm  \
 		-e "CGO_ENABLED=0" \
 		-u $$(id -u):$$(id -g) \
 		-v $$(pwd)/.go:/go \
-		-v $$(pwd):/go/src/github.com/kubernetes-incubator/external-storage/efs \
-		-v "$$(dirname $$(pwd))/vendor":/go/src/github.com/kubernetes-incubator/external-storage/vendor \
-		-v "$$(dirname $$(pwd))/lib":/go/src/github.com/kubernetes-incubator/external-storage/lib \
+		-v $$(pwd):/go/src/github.com/kubernetes-incubator/external-storage/aws/efs \
+		-v "$${PWD%/*/*}/vendor":/go/src/github.com/kubernetes-incubator/external-storage/vendor \
+		-v "$${PWD%/*/*}/lib":/go/src/github.com/kubernetes-incubator/external-storage/lib \
 		-v $$(pwd):/go/bin \
 		-v $$(pwd)/.go/stdlib:/usr/local/go/pkg/linux_amd64_asdf \
-		-w /go/src/github.com/kubernetes-incubator/external-storage/efs \
+		-w /go/src/github.com/kubernetes-incubator/external-storage/aws/efs \
 		golang:1.7.4-alpine \
 		go install -installsuffix "asdf" ./cmd/efs-provisioner
 .PHONY: all build
