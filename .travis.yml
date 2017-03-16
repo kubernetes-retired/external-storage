@@ -48,7 +48,7 @@ script:
   - make image
   - make clean
   - popd
-  - pushd ./cephfs
+  - pushd ./ceph/cephfs
   - go build cephfs-provisioner.go
   - popd
   - pushd ./aws/efs
