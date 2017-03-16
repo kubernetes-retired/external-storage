@@ -30,6 +30,8 @@ docker run -ti -v /root/.kube:/kube --privileged --net=host  cephfs-provisioner 
 
 * Create a CephFS Storage Class
 
+Replace Ceph monitor's IP in [class.yaml](class.yaml) with your own and create storage class:
+
 ```bash
 kubectl create -f class.yaml
 ```
@@ -52,3 +54,6 @@ kubectl create -f test-pod.yaml
 * Kernel CephFS doesn't work with SELinux, setting SELinux label in Pod's securityContext will not work.
 * Kernel CephFS doesn't support quota or capacity, capacity requested by PVC is not enforced or validated.
 * Currently each Ceph user created by the provisioner has `allow r` MDS cap to permit CephFS mount.
+
+# Acknowledgement
+Inspired by CephFS Manila provisioner and conversation with John Spray
