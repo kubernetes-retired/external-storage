@@ -383,26 +383,24 @@ func (p *nfsProvisioner) createDirectory(directory, gid string) error {
 		return fmt.Errorf("the path already exists")
 	}
 
-	perm := os.FileMode(0777)
+	perm := os.FileMode(0777 | os.ModeSetgid)
 	if gid != "none" {
 		// Execute permission is required for stat, which kubelet uses during unmount.
-		perm = os.FileMode(0071)
+		perm = os.FileMode(0071 | os.ModeSetgid)
 	}
 	if err := os.MkdirAll(path, perm); err != nil {
 		return err
 	}
 	// Due to umask, need to chmod
-	cmd := exec.Command("chmod", strconv.FormatInt(int64(perm), 8), path)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
+	if err := os.Chmod(path, perm); err != nil {
 		os.RemoveAll(path)
-		return fmt.Errorf("chmod failed with error: %v, output: %s", err, out)
+		return err
 	}
 
 	if gid != "none" {
 		groupID, _ := strconv.ParseUint(gid, 10, 64)
-		cmd = exec.Command("chgrp", strconv.FormatUint(groupID, 10), path)
-		out, err = cmd.CombinedOutput()
+		cmd := exec.Command("chgrp", strconv.FormatUint(groupID, 10), path)
+		out, err := cmd.CombinedOutput()
 		if err != nil {
 			os.RemoveAll(path)
 			return fmt.Errorf("chgrp failed with error: %v, output: %s", err, out)
