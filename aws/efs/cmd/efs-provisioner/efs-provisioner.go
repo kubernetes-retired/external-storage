@@ -169,22 +169,20 @@ func (p *efsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 }
 
 func (p *efsProvisioner) createVolume(path string, gid int) error {
-	perm := os.FileMode(0071)
+	perm := os.FileMode(0071 | os.ModeSetgid)
 
 	if err := os.MkdirAll(path, perm); err != nil {
 		return err
 	}
 
 	// Due to umask, need to chmod
-	cmd := exec.Command("chmod", strconv.FormatInt(int64(perm), 8), path)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
+	if err := os.Chmod(path, perm); err != nil {
 		os.RemoveAll(path)
-		return fmt.Errorf("chmod failed with error: %v, output: %s", err, out)
+		return err
 	}
 
-	cmd = exec.Command("chgrp", strconv.Itoa(gid), path)
-	out, err = cmd.CombinedOutput()
+	cmd := exec.Command("chgrp", strconv.Itoa(gid), path)
+	out, err := cmd.CombinedOutput()
 	if err != nil {
 		os.RemoveAll(path)
 		return fmt.Errorf("chgrp failed with error: %v, output: %s", err, out)
