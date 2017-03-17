@@ -4,13 +4,16 @@ go:
 services: docker
 
 env:
-  - ETCD_VER=v3.0.14 KUBE_VERSION=1.5.3
+  - ETCD_VER=v3.0.14 KUBE_VERSION=1.5.4
+  - ETCD_VER=v3.0.17 KUBE_VERSION=1.6.0-beta.3
 
 before_install:
   - sudo apt-get -qq update
   - sudo apt-get install -y nfs-common
   - curl https://glide.sh/get | sh
   - go get -u github.com/golang/lint/golint
+  - export PATH=$PATH:$GOPATH/bin
+  - go get -u github.com/cloudflare/cfssl/cmd/...
 
 install:
   - pushd $HOME
@@ -25,13 +28,17 @@ install:
 before_script:
   - sudo "PATH=$PATH" KUBECTL=$HOME/kubernetes/server/bin/kubectl ALLOW_SECURITY_CONTEXT=true API_HOST_IP=0.0.0.0 $HOME/kubernetes-${KUBE_VERSION}/hack/local-up-cluster.sh -o $HOME/kubernetes/server/bin &
   - KUBECTL=$HOME/kubernetes/server/bin/kubectl
-  - $KUBECTL config set-cluster local --server=https://localhost:6443 --certificate-authority=/var/run/kubernetes/apiserver.crt
-  - $KUBECTL config set-credentials myself --username=admin --password=admin
+  - if [ "$KUBE_VERSION" = "1.5.4" ]; then
+      $KUBECTL config set-cluster local --server=https://localhost:6443 --certificate-authority=/var/run/kubernetes/apiserver.crt;
+      $KUBECTL config set-credentials myself --username=admin --password=admin;
+    else
+      $KUBECTL config set-cluster local --server=https://localhost:6443 --certificate-authority=/var/run/kubernetes/server-ca.crt;
+      $KUBECTL config set-credentials myself --client-key=/var/run/kubernetes/client-admin.key --client-certificate=/var/run/kubernetes/client-admin.crt;
+    fi
   - $KUBECTL config set-context local --cluster=local --user=myself
   - $KUBECTL config use-context local
 
 script:
-# TODO
     # Test building library using its dependencies (they ought to be the same as
     # the shared ones)
   - pushd ./lib
@@ -63,4 +70,7 @@ script:
   - pushd ./nfs
   - make container
   - make test-integration
+  - if [ "$KUBE_VERSION" != "1.5.4" ]; then
+      sudo chown -R $(logname) /var/run/kubernetes;
+    fi
   - make test-e2e
