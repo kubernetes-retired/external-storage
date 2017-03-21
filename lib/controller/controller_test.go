@@ -27,17 +27,18 @@ import (
 
 	"github.com/kubernetes-incubator/external-storage/lib/leaderelection"
 	rl "github.com/kubernetes-incubator/external-storage/lib/leaderelection/resourcelock"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	fakev1core "k8s.io/client-go/kubernetes/typed/core/v1/fake"
-	"k8s.io/client-go/pkg/api/resource"
-	"k8s.io/client-go/pkg/api/testapi"
+	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/apis/storage/v1beta1"
-	"k8s.io/client-go/pkg/conversion"
-	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/types"
-	"k8s.io/client-go/pkg/watch"
+	storagev1 "k8s.io/client-go/pkg/apis/storage/v1"
 	testclient "k8s.io/client-go/testing"
 	fcache "k8s.io/client-go/tools/cache/testing"
 )
@@ -189,7 +190,7 @@ func TestController(t *testing.T) {
 		time.Sleep(2 * resyncPeriod)
 		ctrl.runningOperations.Wait()
 
-		pvList, _ := client.Core().PersistentVolumes().List(v1.ListOptions{})
+		pvList, _ := client.Core().PersistentVolumes().List(metav1.ListOptions{})
 		if !reflect.DeepEqual(test.expectedVolumes, pvList.Items) {
 			t.Logf("test case: %s", test.name)
 			t.Errorf("expected PVs:\n %v\n but got:\n %v\n", test.expectedVolumes, pvList.Items)
@@ -275,7 +276,7 @@ func TestShouldProvision(t *testing.T) {
 	tests := []struct {
 		name            string
 		provisionerName string
-		class           *v1beta1.StorageClass
+		class           *storagev1.StorageClass
 		claim           *v1.PersistentVolumeClaim
 		expectedShould  bool
 	}{
@@ -468,9 +469,9 @@ func newTestProvisionController(
 	return ctrl
 }
 
-func newStorageClass(name, provisioner string) *v1beta1.StorageClass {
-	return &v1beta1.StorageClass{
-		ObjectMeta: v1.ObjectMeta{
+func newStorageClass(name, provisioner string) *storagev1.StorageClass {
+	return &storagev1.StorageClass{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		Provisioner: provisioner,
@@ -479,13 +480,13 @@ func newStorageClass(name, provisioner string) *v1beta1.StorageClass {
 
 func newClaim(name, claimUID, provisioner, volumeName string, annotations map[string]string) *v1.PersistentVolumeClaim {
 	claim := &v1.PersistentVolumeClaim{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:            name,
 			Namespace:       v1.NamespaceDefault,
 			UID:             types.UID(claimUID),
 			ResourceVersion: "0",
 			Annotations:     map[string]string{annClass: provisioner},
-			SelfLink:        testapi.Default.SelfLink("pvc", ""),
+			SelfLink:        "/api/v1/namespaces/" + v1.NamespaceDefault + "/persistentvolumeclaims/" + name,
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany},
@@ -508,9 +509,10 @@ func newClaim(name, claimUID, provisioner, volumeName string, annotations map[st
 
 func newVolume(name string, phase v1.PersistentVolumePhase, policy v1.PersistentVolumeReclaimPolicy, annotations map[string]string) *v1.PersistentVolume {
 	pv := &v1.PersistentVolume{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
 			Annotations: annotations,
+			SelfLink:    "/api/v1/persistentvolumes/" + name,
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: policy,
@@ -536,7 +538,7 @@ func newVolume(name string, phase v1.PersistentVolumePhase, policy v1.Persistent
 
 // newProvisionedVolume returns the volume the test controller should provision for the
 // given claim with the given class
-func newProvisionedVolume(storageClass *v1beta1.StorageClass, claim *v1.PersistentVolumeClaim) *v1.PersistentVolume {
+func newProvisionedVolume(storageClass *storagev1.StorageClass, claim *v1.PersistentVolumeClaim) *v1.PersistentVolume {
 	// pv.Spec MUST be set to match requirements in claim.Spec, especially access mode and PV size. The provisioned volume size MUST NOT be smaller than size requested in the claim, however it MAY be larger.
 	options := VolumeOptions{
 		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
@@ -547,7 +549,7 @@ func newProvisionedVolume(storageClass *v1beta1.StorageClass, claim *v1.Persiste
 	volume, _ := newTestProvisioner().Provision(options)
 
 	// pv.Spec.ClaimRef MUST point to the claim that led to its creation (including the claim UID).
-	volume.Spec.ClaimRef, _ = v1.GetReference(claim)
+	volume.Spec.ClaimRef, _ = v1.GetReference(api.Scheme, claim)
 
 	// pv.Annotations["pv.kubernetes.io/provisioned-by"] MUST be set to name of the external provisioner. This provisioner will be used to delete the volume.
 	// pv.Annotations["volume.beta.kubernetes.io/storage-class"] MUST be set to name of the storage class requested by the claim.
@@ -580,7 +582,7 @@ func (p *testProvisioner) Provision(options VolumeOptions) (*v1.PersistentVolume
 	time.Sleep(50 * time.Millisecond)
 
 	pv := &v1.PersistentVolume{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: options.PVName,
 		},
 		Spec: v1.PersistentVolumeSpec{

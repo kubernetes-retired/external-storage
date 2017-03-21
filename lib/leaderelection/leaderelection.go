@@ -28,11 +28,12 @@ import (
 	"reflect"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/errors"
+
 	rl "github.com/kubernetes-incubator/external-storage/lib/leaderelection/resourcelock"
-	"k8s.io/client-go/pkg/api/errors"
-	"k8s.io/client-go/pkg/api/unversioned"
-	"k8s.io/client-go/pkg/util/runtime"
-	"k8s.io/client-go/pkg/util/wait"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/golang/glog"
 )
@@ -176,7 +177,7 @@ func (le *LeaderElector) acquire(task <-chan bool) bool {
 			return
 		}
 		le.config.Lock.RecordEvent("became leader")
-		glog.Infof("sucessfully acquired lease %v", desc)
+		glog.Infof("successfully acquired lease %v", desc)
 		close(stop)
 	}, le.config.RetryPeriod, JitterFactor, true, stop)
 
@@ -184,7 +185,7 @@ func (le *LeaderElector) acquire(task <-chan bool) bool {
 }
 
 // renew loops calling tryAcquireOrRenew and returns immediately when tryAcquireOrRenew fails
-// or the task has either succeeded or failed in which case leadership must be given up
+// or the task has either succeeded or failed in which case leadership must be given up.
 func (le *LeaderElector) renew(task <-chan bool, timeout <-chan bool) {
 	stop := make(chan struct{})
 	wait.Until(func() {
@@ -226,7 +227,7 @@ func (le *LeaderElector) renew(task <-chan bool, timeout <-chan bool) {
 // else it tries to renew the lease if it has already been acquired. Returns true
 // on success else returns false.
 func (le *LeaderElector) tryAcquireOrRenew() bool {
-	now := unversioned.Now()
+	now := metav1.Now()
 	leaderElectionRecord := rl.LeaderElectionRecord{
 		HolderIdentity:       le.config.Lock.Identity(),
 		LeaseDurationSeconds: int(le.config.LeaseDuration / time.Second),

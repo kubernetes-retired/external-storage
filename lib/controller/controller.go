@@ -27,20 +27,20 @@ import (
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/leaderelection"
 	rl "github.com/kubernetes-incubator/external-storage/lib/leaderelection/resourcelock"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
-	core_v1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/apis/storage/v1beta1"
-	"k8s.io/client-go/pkg/fields"
-	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/types"
-	"k8s.io/client-go/pkg/util/uuid"
-	"k8s.io/client-go/pkg/version"
-	"k8s.io/client-go/pkg/watch"
+	storagev1 "k8s.io/client-go/pkg/apis/storage/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
+	utilversion "k8s.io/kubernetes/pkg/util/version"
 )
 
 // annClass annotation represents the storage class associated with a resource:
@@ -93,9 +93,9 @@ type ProvisionController struct {
 	is1dot4 bool
 
 	claimSource      cache.ListerWatcher
-	claimController  *cache.Controller
+	claimController  cache.Controller
 	volumeSource     cache.ListerWatcher
-	volumeController *cache.Controller
+	volumeController cache.Controller
 	classSource      cache.ListerWatcher
 	classReflector   *cache.Reflector
 
@@ -152,18 +152,18 @@ func NewProvisionController(
 	identity := uuid.NewUUID()
 
 	broadcaster := record.NewBroadcaster()
-	broadcaster.StartRecordingToSink(&core_v1.EventSinkImpl{Interface: client.Core().Events(v1.NamespaceAll)})
+	broadcaster.StartRecordingToSink(&corev1.EventSinkImpl{Interface: client.Core().Events(v1.NamespaceAll)})
 	var eventRecorder record.EventRecorder
 	out, err := exec.Command("hostname").Output()
 	if err != nil {
-		eventRecorder = broadcaster.NewRecorder(v1.EventSource{Component: fmt.Sprintf("%s %s", provisionerName, string(identity))})
+		eventRecorder = broadcaster.NewRecorder(api.Scheme, v1.EventSource{Component: fmt.Sprintf("%s %s", provisionerName, string(identity))})
 	} else {
-		eventRecorder = broadcaster.NewRecorder(v1.EventSource{Component: fmt.Sprintf("%s %s %s", provisionerName, strings.TrimSpace(string(out)), string(identity))})
+		eventRecorder = broadcaster.NewRecorder(api.Scheme, v1.EventSource{Component: fmt.Sprintf("%s %s %s", provisionerName, strings.TrimSpace(string(out)), string(identity))})
 	}
 
-	gitVersion := version.MustParse(serverGitVersion)
-	gitVersion1dot5 := version.MustParse("1.5.0")
-	is1dot4 := gitVersion.LT(gitVersion1dot5)
+	gitVersion := utilversion.MustParseSemantic(serverGitVersion)
+	gitVersion1dot5 := utilversion.MustParseSemantic("v1.5.0")
+	is1dot4 := gitVersion.LessThan(gitVersion1dot5)
 
 	controller := &ProvisionController{
 		client:                        client,
@@ -188,15 +188,11 @@ func NewProvisionController(
 	}
 
 	controller.claimSource = &cache.ListWatch{
-		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-			var out v1.ListOptions
-			v1.Convert_api_ListOptions_To_v1_ListOptions(&options, &out, nil)
-			return client.Core().PersistentVolumeClaims(v1.NamespaceAll).List(out)
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			return client.Core().PersistentVolumeClaims(v1.NamespaceAll).List(options)
 		},
-		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-			var out v1.ListOptions
-			v1.Convert_api_ListOptions_To_v1_ListOptions(&options, &out, nil)
-			return client.Core().PersistentVolumeClaims(v1.NamespaceAll).Watch(out)
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			return client.Core().PersistentVolumeClaims(v1.NamespaceAll).Watch(options)
 		},
 	}
 	controller.claims, controller.claimController = cache.NewInformer(
@@ -211,16 +207,11 @@ func NewProvisionController(
 	)
 
 	controller.volumeSource = &cache.ListWatch{
-		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-			var out v1.ListOptions
-			v1.Convert_api_ListOptions_To_v1_ListOptions(&options, &out, nil)
-			return client.Core().PersistentVolumes().List(out)
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			return client.Core().PersistentVolumes().List(options)
 		},
-		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-			var out v1.ListOptions
-			v1.Convert_api_ListOptions_To_v1_ListOptions(&options, &out, nil)
-
-			return client.Core().PersistentVolumes().Watch(out)
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			return client.Core().PersistentVolumes().Watch(options)
 		},
 	}
 	controller.volumes, controller.volumeController = cache.NewInformer(
@@ -235,21 +226,17 @@ func NewProvisionController(
 	)
 
 	controller.classSource = &cache.ListWatch{
-		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-			var out v1.ListOptions
-			v1.Convert_api_ListOptions_To_v1_ListOptions(&options, &out, nil)
-			return client.Storage().StorageClasses().List(out)
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			return client.Storage().StorageClasses().List(options)
 		},
-		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-			var out v1.ListOptions
-			v1.Convert_api_ListOptions_To_v1_ListOptions(&options, &out, nil)
-			return client.Storage().StorageClasses().Watch(out)
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			return client.Storage().StorageClasses().Watch(options)
 		},
 	}
 	controller.classes = cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc)
 	controller.classReflector = cache.NewReflector(
 		controller.classSource,
-		&v1beta1.StorageClass{},
+		&storagev1.StorageClass{},
 		controller.classes,
 		resyncPeriod,
 	)
@@ -543,7 +530,7 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 	//  the locks. Check that PV (with deterministic name) hasn't been provisioned
 	//  yet.
 	pvName := ctrl.getProvisionedVolumeNameForClaim(claim)
-	volume, err := ctrl.client.Core().PersistentVolumes().Get(pvName)
+	volume, err := ctrl.client.Core().PersistentVolumes().Get(pvName, metav1.GetOptions{})
 	if err == nil && volume != nil {
 		// Volume has been already provisioned, nothing to do.
 		glog.V(4).Infof("provisionClaimOperation [%s]: volume already exists, skipping", claimToClaimKey(claim))
@@ -552,7 +539,7 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 
 	// Prepare a claimRef to the claim early (to fail before a volume is
 	// provisioned)
-	claimRef, err := v1.GetReference(claim)
+	claimRef, err := v1.GetReference(api.Scheme, claim)
 	if err != nil {
 		glog.Errorf("Unexpected error getting claim reference to claim %q: %v", claimToClaimKey(claim), err)
 		return nil
@@ -705,9 +692,8 @@ func (ctrl *ProvisionController) watchProvisioning(claim *v1.PersistentVolumeCla
 // watchPVC returns a watch on the given PVC and ProvisioningFailed &
 // ProvisioningSucceeded events involving it
 func (ctrl *ProvisionController) watchPVC(claim *v1.PersistentVolumeClaim, stopChannel chan struct{}) (<-chan watch.Event, error) {
-	pvcSelector, _ := fields.ParseSelector("metadata.name=" + claim.Name)
-	options := api.ListOptions{
-		FieldSelector:   pvcSelector,
+	options := metav1.ListOptions{
+		FieldSelector:   "metadata.name=" + claim.Name,
 		Watch:           true,
 		ResourceVersion: claim.ResourceVersion,
 	}
@@ -774,7 +760,7 @@ func (ctrl *ProvisionController) getPVCEventWatch(claim *v1.PersistentVolumeClai
 	claimUID := string(claim.UID)
 	fieldSelector := ctrl.client.Core().Events(claim.Namespace).GetFieldSelector(&claim.Name, &claim.Namespace, &claimKind, &claimUID).String() + ",type=" + eventType + ",reason=" + reason
 
-	list, err := ctrl.client.Core().Events(claim.Namespace).List(v1.ListOptions{
+	list, err := ctrl.client.Core().Events(claim.Namespace).List(metav1.ListOptions{
 		FieldSelector: fieldSelector,
 	})
 	if err != nil {
@@ -786,7 +772,7 @@ func (ctrl *ProvisionController) getPVCEventWatch(claim *v1.PersistentVolumeClai
 		resourceVersion = list.Items[len(list.Items)-1].ResourceVersion
 	}
 
-	return ctrl.client.Core().Events(claim.Namespace).Watch(v1.ListOptions{
+	return ctrl.client.Core().Events(claim.Namespace).Watch(metav1.ListOptions{
 		FieldSelector:   fieldSelector,
 		Watch:           true,
 		ResourceVersion: resourceVersion,
@@ -800,7 +786,7 @@ func (ctrl *ProvisionController) deleteVolumeOperation(volume *v1.PersistentVolu
 	// Our check does not have to be as sophisticated as PV controller's, we can
 	// trust that the PV controller has set the PV to Released/Failed and it's
 	// ours to delete
-	newVolume, err := ctrl.client.Core().PersistentVolumes().Get(volume.Name)
+	newVolume, err := ctrl.client.Core().PersistentVolumes().Get(volume.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil
 	}
@@ -857,7 +843,7 @@ func (ctrl *ProvisionController) scheduleOperation(operationName string, operati
 	}
 }
 
-func (ctrl *ProvisionController) getStorageClass(name string) (*v1beta1.StorageClass, error) {
+func (ctrl *ProvisionController) getStorageClass(name string) (*storagev1.StorageClass, error) {
 	classObj, found, err := ctrl.classes.GetByKey(name)
 	if err != nil {
 		return nil, fmt.Errorf("Error getting StorageClass %q: %v", name, err)
@@ -869,7 +855,7 @@ func (ctrl *ProvisionController) getStorageClass(name string) (*v1beta1.StorageC
 		//    found, it SHOULD report an error (by sending an event to the claim) and it
 		//    SHOULD retry periodically with step i.
 	}
-	storageClass, ok := classObj.(*v1beta1.StorageClass)
+	storageClass, ok := classObj.(*storagev1.StorageClass)
 	if !ok {
 		return nil, fmt.Errorf("Cannot convert object to StorageClass: %+v", classObj)
 	}
@@ -882,12 +868,12 @@ func (ctrl *ProvisionController) getStorageClass(name string) (*v1beta1.StorageC
 	return storageClass, nil
 }
 
-func hasAnnotation(obj v1.ObjectMeta, ann string) bool {
+func hasAnnotation(obj metav1.ObjectMeta, ann string) bool {
 	_, found := obj.Annotations[ann]
 	return found
 }
 
-func setAnnotation(obj *v1.ObjectMeta, ann string, value string) {
+func setAnnotation(obj *metav1.ObjectMeta, ann string, value string) {
 	if obj.Annotations == nil {
 		obj.Annotations = make(map[string]string)
 	}
