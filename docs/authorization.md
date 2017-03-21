@@ -3,7 +3,7 @@ The controller requires authorization to perform the following API calls:
 * `get`, `list`, `watch`, `create`, `delete` "persistentvolumes"
 * `get`, `list`, `watch`, `update` "persistentvolumeclaims"
 * `get`, `list`, `watch` "storageclasses"
-* `watch`, `create`, `update`, `patch` "events"
+* `list`, `watch`, `create`, `update`, `patch` "events"
 
 As of Kubernetes 1.6 these needed permissions are enumerated in an RBAC bootstrap `ClusterRole` named ["system:persistent-volume-provisioner"](https://github.com/kubernetes/kubernetes/blob/4e01d1d1412950250148d25ca607fb9585f4c86b/plugin/pkg/auth/authorizer/rbac/bootstrappolicy/testdata/cluster-roles.yaml#L693). In OpenShift this bootstrap `ClusterRole` doesn't yet exist but it would look exactly the same except for the `apiVersion` field.
 
