@@ -29,12 +29,12 @@ import (
 	"testing"
 
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/client-go/pkg/api/resource"
-	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/runtime"
-	utiltesting "k8s.io/client-go/pkg/util/testing"
+	utiltesting "k8s.io/client-go/util/testing"
 )
 
 func TestCreateVolume(t *testing.T) {
@@ -238,7 +238,7 @@ func TestValidateOptions(t *testing.T) {
 		{
 			name: "non-nil selector",
 			options: controller.VolumeOptions{
-				PVC: newClaim(resource.MustParse("1Ki"), nil, &unversioned.LabelSelector{MatchLabels: nil}),
+				PVC: newClaim(resource.MustParse("1Ki"), nil, &metav1.LabelSelector{MatchLabels: nil}),
 			},
 			expectedGid: "",
 			expectError: true,
@@ -606,7 +606,7 @@ func TestGetServer(t *testing.T) {
 	}
 }
 
-func newClaim(capacity resource.Quantity, accessmodes []v1.PersistentVolumeAccessMode, selector *unversioned.LabelSelector) *v1.PersistentVolumeClaim {
+func newClaim(capacity resource.Quantity, accessmodes []v1.PersistentVolumeAccessMode, selector *metav1.LabelSelector) *v1.PersistentVolumeClaim {
 	claim := &v1.PersistentVolumeClaim{
 		ObjectMeta: v1.ObjectMeta{},
 		Spec: v1.PersistentVolumeClaimSpec{

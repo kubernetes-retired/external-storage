@@ -23,9 +23,7 @@ import (
 
 	"github.com/onsi/ginkgo/config"
 	"github.com/spf13/viper"
-	"k8s.io/client-go/pkg/apis/componentconfig"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
 type TestContextType struct {
@@ -110,7 +108,7 @@ type NodeTestContextType struct {
 	// PrepullImages indicates whether node e2e framework should prepull images.
 	PrepullImages bool
 	// KubeletConfig is the kubelet configuration the test is running against.
-	KubeletConfig componentconfig.KubeletConfiguration
+	// KubeletConfig componentconfig.KubeletConfiguration
 }
 
 type CloudConfig struct {
@@ -123,7 +121,7 @@ type CloudConfig struct {
 	ClusterTag        string
 	Network           string
 
-	Provider cloudprovider.Interface
+	//Provider cloudprovider.Interface
 }
 
 var TestContext TestContextType

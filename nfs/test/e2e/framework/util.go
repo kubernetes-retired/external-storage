@@ -23,22 +23,23 @@ import (
 	"time"
 
 	"github.com/blang/semver"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api"
-	apierrs "k8s.io/client-go/pkg/api/errors"
-	"k8s.io/client-go/pkg/api/unversioned"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/fields"
-	"k8s.io/client-go/pkg/labels"
-	"k8s.io/client-go/pkg/master/ports"
-	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/util/sets"
-	"k8s.io/client-go/pkg/util/uuid"
-	"k8s.io/client-go/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/kubernetes/pkg/master/ports"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/pkg/version"
-	"k8s.io/client-go/pkg/watch"
+	"k8s.io/apimachinery/pkg/watch"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -411,7 +412,7 @@ func hasRemainingContent(c clientset.Interface, clientPool dynamic.ClientPool, n
 			continue
 		}
 		// get the api resource
-		apiResource := unversioned.APIResource{Name: gvr.Resource, Namespaced: true}
+		apiResource := metav1.APIResource{Name: gvr.Resource, Namespaced: true}
 		// TODO: temporary hack for https://github.com/kubernetes/kubernetes/issues/31798
 		if ignoredResources.Has(apiResource.Name) {
 			Logf("namespace: %s, resource: %s, ignored listing per whitelist", namespace, apiResource.Name)
@@ -475,7 +476,7 @@ var ErrPodCompleted = fmt.Errorf("pod ran to completion")
 func PodRunning(event watch.Event) (bool, error) {
 	switch event.Type {
 	case watch.Deleted:
-		return false, apierrs.NewNotFound(unversioned.GroupResource{Resource: "pods"}, "")
+		return false, apierrs.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
 	}
 	switch t := event.Object.(type) {
 	case *v1.Pod:

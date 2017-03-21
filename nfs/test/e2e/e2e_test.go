@@ -27,15 +27,15 @@ import (
 
 	"github.com/kubernetes-incubator/external-storage/nfs/test/e2e/framework"
 	"github.com/opencontainers/runc/libcontainer/selinux"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/api/resource"
-	"k8s.io/client-go/pkg/api/unversioned"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/client-go/pkg/api/v1"
 	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	"k8s.io/client-go/pkg/apis/storage/v1beta1"
-	"k8s.io/client-go/pkg/runtime"
-	utilyaml "k8s.io/client-go/pkg/util/yaml"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -229,7 +229,7 @@ func newClaim(ns string) *v1.PersistentVolumeClaim {
 // runInPodWithVolume runs a command in a pod with given claim mounted to /mnt directory.
 func runInPodWithVolume(c clientset.Interface, ns, claimName, command string) {
 	pod := &v1.Pod{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
@@ -275,7 +275,7 @@ func runInPodWithVolume(c clientset.Interface, ns, claimName, command string) {
 
 func newStorageClass() *v1beta1.StorageClass {
 	return &v1beta1.StorageClass{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
 		ObjectMeta: v1.ObjectMeta{
@@ -289,7 +289,7 @@ func startProvisionerPod(c clientset.Interface, ns string) *v1.Pod {
 	podClient := c.Core().Pods(ns)
 
 	provisionerPod := &v1.Pod{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},

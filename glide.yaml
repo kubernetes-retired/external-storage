@@ -19,25 +19,17 @@ import:
   - config
 - package: github.com/onsi/gomega
 - package: github.com/spf13/viper
-- package: k8s.io/client-go
-  version: ^2.0.0
+- package: k8s.io/apimachinery
+  version: 9c2186c
   subpackages:
-  - discovery
-  - dynamic
-  - kubernetes
-  - kubernetes/typed/core/v1
-  - pkg/api
   - pkg/api/errors
   - pkg/api/resource
-  - pkg/api/unversioned
-  - pkg/api/v1
   - pkg/apimachinery/registered
-  - pkg/apis/componentconfig
-  - pkg/apis/storage/v1beta1
+  - pkg/apis/meta/v1
   - pkg/fields
   - pkg/labels
-  - pkg/master/ports
   - pkg/runtime
+  - pkg/runtime/schema
   - pkg/types
   - pkg/util/runtime
   - pkg/util/sets
@@ -45,18 +37,30 @@ import:
   - pkg/util/validation
   - pkg/util/validation/field
   - pkg/util/wait
-  - pkg/version
   - pkg/watch
+- package: k8s.io/client-go
+  version: 2cb68a1
+  subpackages:
+  - discovery
+  - dynamic
+  - kubernetes
+  - kubernetes/typed/core/v1
+  - pkg/api
+  - pkg/api/v1
+  - pkg/apis/storage/v1
+  - pkg/apis/storage/v1beta1
+  - pkg/version
   - rest
   - tools/cache
   - tools/clientcmd
   - tools/clientcmd/api
   - tools/record
 - package: k8s.io/kubernetes
-  version: ~1.5.0
+  version: v1.6.0-beta.4
   subpackages:
-  - pkg/cloudprovider
+  - pkg/master/ports
   - pkg/util/goroutinemap
+  - pkg/util/version
 testImport:
 - package: github.com/opencontainers/runc
   subpackages:
