@@ -399,8 +399,8 @@ func (ctrl *ProvisionController) shouldProvision(claim *v1.PersistentVolumeClaim
 	}
 	ctrl.failedClaimsStatsMutex.Unlock()
 
-	// Kubernetes 1.5 provisioning with annDynamicallyProvisioned
-	if provisioner, found := claim.Annotations[annDynamicallyProvisioned]; found {
+	// Kubernetes 1.5 provisioning with annStorageProvisioner
+	if provisioner, found := claim.Annotations[annStorageProvisioner]; found {
 		if provisioner == ctrl.provisionerName {
 			return true
 		}

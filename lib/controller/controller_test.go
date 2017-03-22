@@ -307,14 +307,14 @@ func TestShouldProvision(t *testing.T) {
 			claim:           newClaim("claim-1", "1-1", "class-1", "", nil),
 			expectedShould:  false,
 		},
-		// Kubernetes 1.5 provisioning - annDynamicallyProvisioned is set
+		// Kubernetes 1.5 provisioning - annStorageProvisioner is set
 		// and only this annotation is evaluated
 		{
 			name:            "should provision 1.5",
 			provisionerName: "foo.bar/baz",
 			class:           newStorageClass("class-2", "abc.def/ghi"),
 			claim: newClaim("claim-1", "1-1", "class-1", "",
-				map[string]string{annDynamicallyProvisioned: "foo.bar/baz"}),
+				map[string]string{annStorageProvisioner: "foo.bar/baz"}),
 			expectedShould: true,
 		},
 		{
@@ -322,7 +322,7 @@ func TestShouldProvision(t *testing.T) {
 			provisionerName: "foo.bar/baz",
 			class:           newStorageClass("class-1", "foo.bar/baz"),
 			claim: newClaim("claim-1", "1-1", "class-1", "",
-				map[string]string{annDynamicallyProvisioned: "abc.def/ghi"}),
+				map[string]string{annStorageProvisioner: "abc.def/ghi"}),
 			expectedShould: false,
 		},
 	}
