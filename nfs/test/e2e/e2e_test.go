@@ -25,17 +25,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kubernetes-incubator/external-storage/nfs/test/e2e/framework"
 	"github.com/opencontainers/runc/libcontainer/selinux"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/client-go/pkg/api/v1"
-	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
-	"k8s.io/client-go/pkg/apis/storage/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
+	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	"k8s.io/kubernetes/pkg/apis/storage/v1beta1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -74,11 +74,11 @@ func testCreate(client clientset.Interface, claim *v1.PersistentVolumeClaim) *v1
 
 	By("checking the claim")
 	// Get new copy of the claim
-	claim, err = client.Core().PersistentVolumeClaims(claim.Namespace).Get(claim.Name)
+	claim, err = client.Core().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 
 	// Get the bound PV
-	pv, err := client.Core().PersistentVolumes().Get(claim.Spec.VolumeName)
+	pv, err := client.Core().PersistentVolumes().Get(claim.Spec.VolumeName, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 
 	// Check sizes
@@ -203,7 +203,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 
 func newClaim(ns string) *v1.PersistentVolumeClaim {
 	claim := v1.PersistentVolumeClaim{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "pvc-",
 			Namespace:    ns,
 		},
@@ -233,7 +233,7 @@ func runInPodWithVolume(c clientset.Interface, ns, claimName, command string) {
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "pvc-volume-tester-",
 		},
 		Spec: v1.PodSpec{
@@ -278,7 +278,7 @@ func newStorageClass() *v1beta1.StorageClass {
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "fast",
 		},
 		Provisioner: pluginName,
@@ -293,7 +293,7 @@ func startProvisionerPod(c clientset.Interface, ns string) *v1.Pod {
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "nfs-provisioner",
 			Labels: map[string]string{
 				"role": "nfs-provisioner",
@@ -355,7 +355,7 @@ func startProvisionerPod(c clientset.Interface, ns string) *v1.Pod {
 	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, provisionerPod))
 
 	By("locating the provisioner pod")
-	pod, err := podClient.Get(provisionerPod.Name)
+	pod, err := podClient.Get(provisionerPod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "Cannot locate the provisioner pod %v: %v", provisionerPod.Name, err)
 
 	By("sleeping a bit to give the provisioner time to start")
@@ -393,7 +393,7 @@ func startProvisionerDeployment(c clientset.Interface, ns string) (*v1.Service, 
 	deployment, err = c.Extensions().Deployments(ns).Create(deployment)
 	framework.ExpectNoError(err, "Failed to create %s deployment: %v", deployment.Name, err)
 
-	framework.ExpectNoError(framework.WaitForDeploymentPodsRunning(c, ns, deployment.Name))
+	framework.ExpectNoError(framework.WaitForDeploymentStatus(c, deployment))
 
 	By("sleeping a bit to give the provisioner time to start")
 	time.Sleep(5 * time.Second)
@@ -454,12 +454,12 @@ func deployFromManifest(fileName string) *extensions.Deployment {
 }
 
 func scaleDeployment(c clientset.Interface, ns, name string, newSize int32) {
-	deployment, err := c.Extensions().Deployments(ns).Get(name)
+	deployment, err := c.Extensions().Deployments(ns).Get(name, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 	deployment.Spec.Replicas = &newSize
 	updatedDeployment, err := c.Extensions().Deployments(ns).Update(deployment)
 	Expect(err).NotTo(HaveOccurred())
-	framework.ExpectNoError(framework.WaitForDeploymentPodsRunning(c, ns, updatedDeployment.Name))
+	framework.ExpectNoError(framework.WaitForDeploymentStatus(c, updatedDeployment))
 	// Above is not enough. Just sleep to prevent conflict when doing Update.
 	// kubectl Scaler would be ideal. or WaitForDeploymentStatus
 	time.Sleep(5 * time.Second)

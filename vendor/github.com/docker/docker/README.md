@@ -1,30 +1,30 @@
-Docker: the container engine [![Release](https://img.shields.io/github/release/docker/docker.svg)](https://github.com/docker/docker/releases/latest)
-============================
+Docker: the Linux container engine
+==================================
 
 Docker is an open source project to pack, ship and run any application
 as a lightweight container.
 
 Docker containers are both *hardware-agnostic* and *platform-agnostic*.
 This means they can run anywhere, from your laptop to the largest
-cloud compute instance and everything in between - and they don't require
+EC2 compute instance and everything in between - and they don't require
 you to use a particular language, framework or packaging system. That
 makes them great building blocks for deploying and scaling web apps,
 databases, and backend services without depending on a particular stack
 or provider.
 
 Docker began as an open-source implementation of the deployment engine which
-powered [dotCloud](http://web.archive.org/web/20130530031104/https://www.dotcloud.com/),
-a popular Platform-as-a-Service. It benefits directly from the experience
-accumulated over several years of large-scale operation and support of hundreds
-of thousands of applications and databases.
+powers [dotCloud](https://dotcloud.com), a popular Platform-as-a-Service.
+It benefits directly from the experience accumulated over several years
+of large-scale operation and support of hundreds of thousands of
+applications and databases.
 
-![Docker logo](docs/static_files/docker-logo-compressed.png "Docker")
+![Docker L](docs/static_files/docker-logo-compressed.png "Docker")
 
 ## Security Disclosure
 
-Security is very important to us. If you have any issue regarding security,
-please disclose the information responsibly by sending an email to
-security@docker.com and not by creating a GitHub issue.
+Security is very important to us. If you have any issue regarding security, 
+please disclose the information responsibly by sending an email to 
+security@docker.com and not by creating a github issue.
 
 ## Better than VMs
 
@@ -143,10 +143,14 @@ as they can be built by running a Unix command in a container.
 Getting started
 ===============
 
-Docker can be installed either on your computer for building applications or
-on servers for running them. To get started, [check out the installation
-instructions in the
-documentation](https://docs.docker.com/engine/installation/).
+Docker can be installed on your local machine as well as servers - both
+bare metal and virtualized.  It is available as a binary on most modern
+Linux systems, or as a VM on Windows, Mac and other systems.
+
+We also offer an [interactive tutorial](https://www.docker.com/tryit/)
+for quickly learning the basics of using Docker.
+
+For up-to-date install instructions, see the [Docs](https://docs.docker.com).
 
 Usage examples
 ==============
@@ -155,7 +159,7 @@ Docker can be used to run short-lived commands, long-running daemons
 (app servers, databases, etc.), interactive shell sessions, etc.
 
 You can find a [list of real-world
-examples](https://docs.docker.com/engine/examples/) in the
+examples](https://docs.docker.com/examples/) in the
 documentation.
 
 Under the hood
@@ -164,23 +168,22 @@ Under the hood
 Under the hood, Docker is built on the following components:
 
 * The
-  [cgroups](https://www.kernel.org/doc/Documentation/cgroup-v1/cgroups.txt)
+  [cgroups](https://www.kernel.org/doc/Documentation/cgroups/cgroups.txt)
   and
   [namespaces](http://man7.org/linux/man-pages/man7/namespaces.7.html)
   capabilities of the Linux kernel
 * The [Go](https://golang.org) programming language
 * The [Docker Image Specification](https://github.com/docker/docker/blob/master/image/spec/v1.md)
-* The [Libcontainer Specification](https://github.com/opencontainers/runc/blob/master/libcontainer/SPEC.md)
+* The [Libcontainer Specification](https://github.com/docker/libcontainer/blob/master/SPEC.md)
 
-Contributing to Docker [![GoDoc](https://godoc.org/github.com/docker/docker?status.svg)](https://godoc.org/github.com/docker/docker)
+Contributing to Docker
 ======================
 
-| **Master** (Linux) | **Experimental** (Linux) | **Windows** | **FreeBSD** |
-|------------------|----------------------|---------|---------|
-| [![Jenkins Build Status](https://jenkins.dockerproject.org/view/Docker/job/Docker%20Master/badge/icon)](https://jenkins.dockerproject.org/view/Docker/job/Docker%20Master/) | [![Jenkins Build Status](https://jenkins.dockerproject.org/view/Docker/job/Docker%20Master%20%28experimental%29/badge/icon)](https://jenkins.dockerproject.org/view/Docker/job/Docker%20Master%20%28experimental%29/) | [![Build Status](http://jenkins.dockerproject.org/job/Docker%20Master%20(windows)/badge/icon)](http://jenkins.dockerproject.org/job/Docker%20Master%20(windows)/) | [![Build Status](http://jenkins.dockerproject.org/job/Docker%20Master%20(freebsd)/badge/icon)](http://jenkins.dockerproject.org/job/Docker%20Master%20(freebsd)/) |
+[![GoDoc](https://godoc.org/github.com/docker/docker?status.svg)](https://godoc.org/github.com/docker/docker)
+[![Jenkins Build Status](https://jenkins.dockerproject.org/job/Docker%20Master/badge/icon)](https://jenkins.dockerproject.org/job/Docker%20Master/)
 
 Want to hack on Docker? Awesome! We have [instructions to help you get
-started contributing code or documentation](https://docs.docker.com/opensource/project/who-written-for/).
+started contributing code or documentation](https://docs.docker.com/project/who-written-for/).
 
 These instructions are probably not perfect, please let us know if anything
 feels wrong or incomplete. Better yet, submit a PR and improve them yourself.
@@ -188,8 +191,8 @@ feels wrong or incomplete. Better yet, submit a PR and improve them yourself.
 Getting the development builds
 ==============================
 
-Want to run Docker from a master build? You can download
-master builds at [master.dockerproject.org](https://master.dockerproject.org).
+Want to run Docker from a master build? You can download 
+master builds at [master.dockerproject.org](https://master.dockerproject.org). 
 They are updated with each commit merged into the master branch.
 
 Don't know how to use that super cool new feature in the master build? Check
@@ -213,32 +216,24 @@ We are always open to suggestions on process improvements, and are always lookin
     <td>Internet&nbsp;Relay&nbsp;Chat&nbsp;(IRC)</td>
     <td>
       <p>
-        IRC is a direct line to our most knowledgeable Docker users; we have
+        IRC a direct line to our most knowledgeable Docker users; we have
         both the  <code>#docker</code> and <code>#docker-dev</code> group on
         <strong>irc.freenode.net</strong>.
         IRC is a rich chat protocol but it can overwhelm new users. You can search
         <a href="https://botbot.me/freenode/docker/#" target="_blank">our chat archives</a>.
       </p>
-      Read our <a href="https://docs.docker.com/opensource/get-help/#/irc-quickstart" target="_blank">IRC quickstart guide</a> for an easy way to get started.
-    </td>
-  </tr>
-  <tr>
-    <td>Docker Community Forums</td>
-    <td>
-      The <a href="https://forums.docker.com/c/open-source-projects/de" target="_blank">Docker Engine</a>
-      group is for users of the Docker Engine project.
+      Read our <a href="https://docs.docker.com/project/get-help/#irc-quickstart" target="_blank">IRC quickstart guide</a> for an easy way to get started.
     </td>
   </tr>
   <tr>
     <td>Google Groups</td>
     <td>
-      The <a href="https://groups.google.com/forum/#!forum/docker-dev"
-      target="_blank">docker-dev</a> group is for contributors and other people
-      contributing to the Docker project.  You can join this group without a
-      Google account by sending an email to <a
-      href="mailto:docker-dev+subscribe@googlegroups.com">docker-dev+subscribe@googlegroups.com</a>.
-      You'll receive a join-request message; simply reply to the message to
-      confirm your subscription.
+      There are two groups.
+      <a href="https://groups.google.com/forum/#!forum/docker-user" target="_blank">Docker-user</a>
+      is for people using Docker containers.
+      The <a href="https://groups.google.com/forum/#!forum/docker-dev" target="_blank">docker-dev</a>
+      group is for contributors and other people contributing to the Docker
+      project.
     </td>
   </tr>
   <tr>
@@ -252,7 +247,7 @@ We are always open to suggestions on process improvements, and are always lookin
   <tr>
     <td>Stack Overflow</td>
     <td>
-      Stack Overflow has over 7000 Docker questions listed. We regularly
+      Stack Overflow has over 7000K Docker questions listed. We regularly
       monitor <a href="https://stackoverflow.com/search?tab=newest&q=docker" target="_blank">Docker questions</a>
       and so do many other knowledgeable Docker users.
     </td>
@@ -285,20 +280,16 @@ There are a number of projects under development that are based on Docker's
 core technology. These projects expand the tooling built around the
 Docker platform to broaden its application and utility.
 
-* [Docker Registry](https://github.com/docker/distribution): Registry
+* [Docker Registry](https://github.com/docker/distribution): Registry 
 server for Docker (hosting/delivery of repositories and images)
-* [Docker Machine](https://github.com/docker/machine): Machine management
+* [Docker Machine](https://github.com/docker/machine): Machine management 
 for a container-centric world
-* [Docker Swarm](https://github.com/docker/swarm): A Docker-native clustering
+* [Docker Swarm](https://github.com/docker/swarm): A Docker-native clustering 
 system
-* [Docker Compose](https://github.com/docker/compose) (formerly Fig):
+* [Docker Compose](https://github.com/docker/compose) (formerly Fig): 
 Define and run multi-container apps
-* [Kitematic](https://github.com/docker/kitematic): The easiest way to use
+* [Kitematic](https://github.com/kitematic/kitematic): The easiest way to use 
 Docker on Mac and Windows
 
-If you know of another project underway that should be listed here, please help
+If you know of another project underway that should be listed here, please help 
 us keep this list up-to-date by submitting a PR.
-
-Awesome-Docker
-==============
-You can find more projects, tools and articles related to Docker on the [awesome-docker list](https://github.com/veggiemonk/awesome-docker). Add your project there.

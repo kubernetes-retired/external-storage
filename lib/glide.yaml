@@ -2,7 +2,7 @@ package: github.com/kubernetes-incubator/external-storage/lib
 import:
 - package: github.com/golang/glog
 - package: k8s.io/apimachinery
-  version: 9c2186c
+  version: c1c4a7f
   subpackages:
   - pkg/api/errors
   - pkg/apis/meta/v1
@@ -13,7 +13,7 @@ import:
   - pkg/util/wait
   - pkg/watch
 - package: k8s.io/client-go
-  version: 2cb68a1
+  version: 7615377
   subpackages:
   - kubernetes
   - kubernetes/typed/core/v1
