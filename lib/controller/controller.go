@@ -395,7 +395,7 @@ func (ctrl *ProvisionController) shouldProvision(claim *v1.PersistentVolumeClaim
 	}
 
 	// Kubernetes 1.4 provisioning, evaluating class.Provisioner
-	claimClass := getClaimClass(claim)
+	claimClass := v1.GetPersistentVolumeClaimClass(claim)
 	_, err := ctrl.getStorageClass(claimClass)
 	if err != nil {
 		glog.Errorf("Claim %q: %v", claimToClaimKey(claim), err)
@@ -523,7 +523,7 @@ func (ctrl *ProvisionController) updateStats(claim *v1.PersistentVolumeClaim, er
 // the operation is deleted, else the operation may be retried with expbackoff.
 func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVolumeClaim) error {
 	// Most code here is identical to that found in controller.go of kube's PV controller...
-	claimClass := getClaimClass(claim)
+	claimClass := v1.GetPersistentVolumeClaimClass(claim)
 	glog.V(4).Infof("provisionClaimOperation [%s] started, class: %q", claimToClaimKey(claim), claimClass)
 
 	//  A previous doProvisionClaim may just have finished while we were waiting for
@@ -878,19 +878,6 @@ func setAnnotation(obj *metav1.ObjectMeta, ann string, value string) {
 		obj.Annotations = make(map[string]string)
 	}
 	obj.Annotations[ann] = value
-}
-
-// getClaimClass returns name of class that is requested by given claim.
-// Request for `nil` class is interpreted as request for class "",
-// i.e. for a classless PV.
-func getClaimClass(claim *v1.PersistentVolumeClaim) string {
-	// TODO: change to PersistentVolumeClaim.Spec.Class value when this
-	// attribute is introduced.
-	if class, found := claim.Annotations[annClass]; found {
-		return class
-	}
-
-	return ""
 }
 
 func claimToClaimKey(claim *v1.PersistentVolumeClaim) string {

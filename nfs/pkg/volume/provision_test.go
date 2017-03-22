@@ -608,7 +608,7 @@ func TestGetServer(t *testing.T) {
 
 func newClaim(capacity resource.Quantity, accessmodes []v1.PersistentVolumeAccessMode, selector *metav1.LabelSelector) *v1.PersistentVolumeClaim {
 	claim := &v1.PersistentVolumeClaim{
-		ObjectMeta: v1.ObjectMeta{},
+		ObjectMeta: metav1.ObjectMeta{},
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes: accessmodes,
 			Resources: v1.ResourceRequirements{
@@ -625,7 +625,7 @@ func newClaim(capacity resource.Quantity, accessmodes []v1.PersistentVolumeAcces
 
 func newService(name, clusterIP string) *v1.Service {
 	return &v1.Service{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: "default",
 		},
@@ -650,7 +650,7 @@ func newEndpoints(name string, ips []string, ports []endpointPort) *v1.Endpoints
 		epPorts = append(epPorts, v1.EndpointPort{Name: strconv.Itoa(i), Port: port.port, Protocol: port.protocol})
 	}
 	return &v1.Endpoints{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: "default",
 		},

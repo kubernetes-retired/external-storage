@@ -32,12 +32,12 @@ import (
 	"github.com/docker/docker/pkg/mount"
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/aws/efs/pkg/gidallocator"
-	"github.com/kubernetes-incubator/external-storage/aws/efs/pkg/util"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	"github.com/kubernetes-incubator/external-storage/lib/leaderelection"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
 )
 
@@ -143,10 +143,10 @@ func (p *efsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 	}
 
 	pv := &v1.PersistentVolume{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: options.PVName,
 			Annotations: map[string]string{
-				util.VolumeGidAnnotationKey: strconv.FormatInt(int64(gid), 10),
+				gidallocator.VolumeGidAnnotationKey: strconv.FormatInt(int64(gid), 10),
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{

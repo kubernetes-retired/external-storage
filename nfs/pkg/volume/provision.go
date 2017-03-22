@@ -29,11 +29,12 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/client-go/pkg/api/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/pkg/api/v1"
 )
 
 const (
@@ -188,7 +189,7 @@ func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 	annotations[annProvisionerID] = string(p.identity)
 
 	pv := &v1.PersistentVolume{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:        options.PVName,
 			Labels:      map[string]string{},
 			Annotations: annotations,
@@ -328,7 +329,7 @@ func (p *nfsProvisioner) getServer() (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("service env %s is set but namespace env %s isn't; no way to get the service cluster IP", p.serviceEnv, p.namespaceEnv)
 	}
-	service, err := p.client.Core().Services(namespace).Get(serviceName)
+	service, err := p.client.Core().Services(namespace).Get(serviceName, metav1.GetOptions{})
 	if err != nil {
 		return "", fmt.Errorf("error getting service %s=%s in namespace %s=%s", p.serviceEnv, serviceName, p.namespaceEnv, namespace)
 	}
@@ -345,7 +346,7 @@ func (p *nfsProvisioner) getServer() (string, error) {
 		endpointPort{111, v1.ProtocolUDP}:   true,
 		endpointPort{111, v1.ProtocolTCP}:   true,
 	}
-	endpoints, err := p.client.Core().Endpoints(namespace).Get(serviceName)
+	endpoints, err := p.client.Core().Endpoints(namespace).Get(serviceName, metav1.GetOptions{})
 	for _, subset := range endpoints.Subsets {
 		if len(subset.Addresses) != 1 {
 			continue

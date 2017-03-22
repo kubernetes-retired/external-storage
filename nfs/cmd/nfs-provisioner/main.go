@@ -26,10 +26,10 @@ import (
 	"github.com/kubernetes-incubator/external-storage/lib/leaderelection"
 	"github.com/kubernetes-incubator/external-storage/nfs/pkg/server"
 	vol "github.com/kubernetes-incubator/external-storage/nfs/pkg/volume"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
