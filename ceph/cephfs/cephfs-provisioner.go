@@ -27,12 +27,12 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
-	storage "k8s.io/client-go/pkg/apis/storage/v1beta1"
-	"k8s.io/client-go/pkg/types"
-	"k8s.io/client-go/pkg/util/uuid"
-	"k8s.io/client-go/pkg/util/wait"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -108,7 +108,7 @@ func (p *cephFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 	nameSpace := options.PVC.Namespace
 	secretName := "ceph-" + user + "-secret"
 	secret := &v1.Secret{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: nameSpace,
 			Name:      secretName,
 		},
@@ -129,7 +129,7 @@ func (p *cephFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 	}
 
 	pv := &v1.PersistentVolume{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: options.PVName,
 			Annotations: map[string]string{
 				provisionerIDAnn: string(p.identity),
@@ -179,7 +179,7 @@ func (p *cephFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 		return errors.New("ceph share annotation not found on PV")
 	}
 	// delete CephFS
-	class, err := p.getClassForVolume(volume)
+	class, err := p.client.Storage().StorageClasses().Get(v1.GetPersistentVolumeClass(volume), metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -253,7 +253,7 @@ func (p *cephFSProvisioner) parsePVSecret(namespace, secretName string) (string,
 	if p.client == nil {
 		return "", fmt.Errorf("Cannot get kube client")
 	}
-	secrets, err := p.client.Core().Secrets(namespace).Get(secretName)
+	secrets, err := p.client.Core().Secrets(namespace).Get(secretName, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -263,19 +263,6 @@ func (p *cephFSProvisioner) parsePVSecret(namespace, secretName string) (string,
 
 	// If not found, the last secret in the map wins as done before
 	return "", fmt.Errorf("no secret found")
-}
-
-func (p *cephFSProvisioner) getClassForVolume(pv *v1.PersistentVolume) (*storage.StorageClass, error) {
-	className, found := pv.Annotations["volume.beta.kubernetes.io/storage-class"]
-	if !found {
-		return nil, fmt.Errorf("Volume has no class annotation")
-	}
-
-	class, err := p.client.Storage().StorageClasses().Get(className)
-	if err != nil {
-		return nil, err
-	}
-	return class, nil
 }
 
 var (

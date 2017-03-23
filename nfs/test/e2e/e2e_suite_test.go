@@ -17,7 +17,7 @@ limitations under the License.
 package e2e
 
 import (
-	"github.com/kubernetes-incubator/external-storage/nfs/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

@@ -49,6 +49,7 @@ test-integration: verify
 .PHONY: test-integration
 
 test-e2e: verify
+	cd ./test/e2e; glide install -v
 	go test ./test/e2e -v --kubeconfig=$(HOME)/.kube/config
 .PHONY: test-e2e
 

@@ -1,7 +1,2 @@
 bundles
 .gopath
-vendor/pkg
-.go-pkg-cache
-.git
-hack/integration-cli-on-swarm/integration-cli-on-swarm
-

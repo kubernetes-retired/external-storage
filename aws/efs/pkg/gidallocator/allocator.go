@@ -25,13 +25,17 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/aws/efs/pkg/allocator"
-	"github.com/kubernetes-incubator/external-storage/aws/efs/pkg/util"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
 )
 
 const (
+	// VolumeGidAnnotationKey is the key of the annotation on the PersistentVolume
+	// object that specifies a supplemental GID.
+	VolumeGidAnnotationKey = "pv.beta.kubernetes.io/gid"
+
 	defaultGidMin = 2000
 	defaultGidMax = math.MaxInt32
 	// absoluteGidMin/Max are currently the same as the
@@ -61,7 +65,7 @@ func New(client kubernetes.Interface) Allocator {
 // AllocateNext allocates the next available GID for the given VolumeOptions
 // (claim's options for a volume it wants) from the appropriate GID table.
 func (a *Allocator) AllocateNext(options controller.VolumeOptions) (int, error) {
-	class := util.GetClaimStorageClass(options.PVC)
+	class := v1.GetPersistentVolumeClaimClass(options.PVC)
 	gidMin, gidMax, err := parseClassParameters(options.Parameters)
 	if err != nil {
 		return 0, err
@@ -83,10 +87,7 @@ func (a *Allocator) AllocateNext(options controller.VolumeOptions) (int, error) 
 // Release releases the given volume's allocated GID from the appropriate GID
 // table.
 func (a *Allocator) Release(volume *v1.PersistentVolume) error {
-	class, err := util.GetClassForVolume(a.client, volume)
-	if err != nil {
-		return err
-	}
+	class, err := a.client.Storage().StorageClasses().Get(v1.GetPersistentVolumeClass(volume), metav1.GetOptions{})
 	gidMin, gidMax, err := parseClassParameters(class.Parameters)
 	if err != nil {
 		return err
@@ -173,20 +174,20 @@ func (a *Allocator) getGidTable(className string, min int, max int) (*allocator.
 // in a given storage class, and mark them in the table.
 //
 func (a *Allocator) collectGids(className string, gidTable *allocator.MinMaxAllocator) error {
-	pvList, err := a.client.Core().PersistentVolumes().List(v1.ListOptions{})
+	pvList, err := a.client.Core().PersistentVolumes().List(metav1.ListOptions{})
 	if err != nil {
 		glog.Errorf("failed to get existing persistent volumes")
 		return err
 	}
 
 	for _, pv := range pvList.Items {
-		if util.GetVolumeStorageClass(&pv) != className {
+		if v1.GetPersistentVolumeClass(&pv) != className {
 			continue
 		}
 
 		pvName := pv.ObjectMeta.Name
 
-		gidStr, ok := pv.Annotations[util.VolumeGidAnnotationKey]
+		gidStr, ok := pv.Annotations[VolumeGidAnnotationKey]
 
 		if !ok {
 			glog.Warningf("no gid found in pv '%v'", pvName)
@@ -252,7 +253,7 @@ func parseClassParameters(params map[string]string) (int, int, error) {
 }
 
 func getGid(volume *v1.PersistentVolume) (int, bool, error) {
-	gidStr, ok := volume.Annotations[util.VolumeGidAnnotationKey]
+	gidStr, ok := volume.Annotations[VolumeGidAnnotationKey]
 
 	if !ok {
 		return 0, false, nil
