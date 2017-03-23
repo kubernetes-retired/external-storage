@@ -38,7 +38,7 @@ import (
 	fakev1core "k8s.io/client-go/kubernetes/typed/core/v1/fake"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
-	storagev1 "k8s.io/client-go/pkg/apis/storage/v1"
+	storagebeta "k8s.io/client-go/pkg/apis/storage/v1beta1"
 	testclient "k8s.io/client-go/testing"
 	fcache "k8s.io/client-go/tools/cache/testing"
 )
@@ -276,7 +276,7 @@ func TestShouldProvision(t *testing.T) {
 	tests := []struct {
 		name            string
 		provisionerName string
-		class           *storagev1.StorageClass
+		class           *storagebeta.StorageClass
 		claim           *v1.PersistentVolumeClaim
 		expectedShould  bool
 	}{
@@ -469,8 +469,8 @@ func newTestProvisionController(
 	return ctrl
 }
 
-func newStorageClass(name, provisioner string) *storagev1.StorageClass {
-	return &storagev1.StorageClass{
+func newStorageClass(name, provisioner string) *storagebeta.StorageClass {
+	return &storagebeta.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
@@ -538,7 +538,7 @@ func newVolume(name string, phase v1.PersistentVolumePhase, policy v1.Persistent
 
 // newProvisionedVolume returns the volume the test controller should provision for the
 // given claim with the given class
-func newProvisionedVolume(storageClass *storagev1.StorageClass, claim *v1.PersistentVolumeClaim) *v1.PersistentVolume {
+func newProvisionedVolume(storageClass *storagebeta.StorageClass, claim *v1.PersistentVolumeClaim) *v1.PersistentVolume {
 	// pv.Spec MUST be set to match requirements in claim.Spec, especially access mode and PV size. The provisioned volume size MUST NOT be smaller than size requested in the claim, however it MAY be larger.
 	options := VolumeOptions{
 		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,

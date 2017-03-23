@@ -36,7 +36,8 @@ import (
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
-	storagev1 "k8s.io/client-go/pkg/apis/storage/v1"
+	storage "k8s.io/client-go/pkg/apis/storage/v1"
+	storagebeta "k8s.io/client-go/pkg/apis/storage/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
@@ -88,9 +89,13 @@ type ProvisionController struct {
 	// volumes.
 	provisioner Provisioner
 
-	// Whether we are running in a 1.4 cluster before out-of-tree dynamic
-	// provisioning is officially supported
-	is1dot4 bool
+	// Kubernetes cluster server version:
+	// * 1.4: storage classes introduced as beta. Technically out-of-tree dynamic
+	// provisioning is not officially supported, though it works
+	// * 1.5: storage classes stay in beta. Out-of-tree dynamic provisioning is
+	// officially supported
+	// * 1.6: storage classes enter GA
+	kubeVersion *utilversion.Version
 
 	claimSource      cache.ListerWatcher
 	claimController  cache.Controller
@@ -161,16 +166,12 @@ func NewProvisionController(
 		eventRecorder = broadcaster.NewRecorder(api.Scheme, v1.EventSource{Component: fmt.Sprintf("%s %s %s", provisionerName, strings.TrimSpace(string(out)), string(identity))})
 	}
 
-	gitVersion := utilversion.MustParseSemantic(serverGitVersion)
-	gitVersion1dot5 := utilversion.MustParseSemantic("v1.5.0")
-	is1dot4 := gitVersion.LessThan(gitVersion1dot5)
-
 	controller := &ProvisionController{
 		client:                        client,
 		resyncPeriod:                  resyncPeriod,
 		provisionerName:               provisionerName,
 		provisioner:                   provisioner,
-		is1dot4:                       is1dot4,
+		kubeVersion:                   utilversion.MustParseSemantic(serverGitVersion),
 		eventRecorder:                 eventRecorder,
 		runningOperations:             goroutinemap.NewGoRoutineMap(exponentialBackOffOnError),
 		createProvisionedPVRetryCount: createProvisionedPVRetryCount,
@@ -225,21 +226,38 @@ func NewProvisionController(
 		},
 	)
 
-	controller.classSource = &cache.ListWatch{
-		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			return client.Storage().StorageClasses().List(options)
-		},
-		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			return client.Storage().StorageClasses().Watch(options)
-		},
-	}
 	controller.classes = cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc)
-	controller.classReflector = cache.NewReflector(
-		controller.classSource,
-		&storagev1.StorageClass{},
-		controller.classes,
-		resyncPeriod,
-	)
+	if controller.kubeVersion.AtLeast(utilversion.MustParseSemantic("v1.6.0")) {
+		controller.classSource = &cache.ListWatch{
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return client.StorageV1().StorageClasses().List(options)
+			},
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return client.StorageV1().StorageClasses().Watch(options)
+			},
+		}
+		controller.classReflector = cache.NewReflector(
+			controller.classSource,
+			&storage.StorageClass{},
+			controller.classes,
+			resyncPeriod,
+		)
+	} else {
+		controller.classSource = &cache.ListWatch{
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return client.StorageV1beta1().StorageClasses().List(options)
+			},
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return client.StorageV1beta1().StorageClasses().Watch(options)
+			},
+		}
+		controller.classReflector = cache.NewReflector(
+			controller.classSource,
+			&storagebeta.StorageClass{},
+			controller.classes,
+			resyncPeriod,
+		)
+	}
 
 	return controller
 }
@@ -396,18 +414,22 @@ func (ctrl *ProvisionController) shouldProvision(claim *v1.PersistentVolumeClaim
 
 	// Kubernetes 1.4 provisioning, evaluating class.Provisioner
 	claimClass := v1.GetPersistentVolumeClaimClass(claim)
-	_, err := ctrl.getStorageClass(claimClass)
+	provisioner, _, err := ctrl.getStorageClassFields(claimClass)
 	if err != nil {
-		glog.Errorf("Claim %q: %v", claimToClaimKey(claim), err)
+		glog.Errorf("Error getting claim %q's StorageClass's fields: %v", claimToClaimKey(claim), err)
 		return false
 	}
+	if provisioner != ctrl.provisionerName {
+		return false
+	}
+
 	return true
 }
 
 func (ctrl *ProvisionController) shouldDelete(volume *v1.PersistentVolume) bool {
 	// In 1.5+ we delete only if the volume is in state Released. In 1.4 we must
 	// delete if the volume is in state Failed too.
-	if !ctrl.is1dot4 {
+	if ctrl.kubeVersion.AtLeast(utilversion.MustParseSemantic("v1.5.0")) {
 		if volume.Status.Phase != v1.VolumeReleased {
 			return false
 		}
@@ -421,7 +443,7 @@ func (ctrl *ProvisionController) shouldDelete(volume *v1.PersistentVolume) bool 
 		return false
 	}
 
-	if !hasAnnotation(volume.ObjectMeta, annDynamicallyProvisioned) {
+	if !metav1.HasAnnotation(volume.ObjectMeta, annDynamicallyProvisioned) {
 		return false
 	}
 
@@ -545,9 +567,16 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 		return nil
 	}
 
-	storageClass, err := ctrl.getStorageClass(claimClass)
+	provisioner, parameters, err := ctrl.getStorageClassFields(claimClass)
 	if err != nil {
-		glog.Errorf("claim %v: %v", claimToClaimKey(claim), err)
+		glog.Errorf("Error getting claim %q's StorageClass's fields: %v", claimToClaimKey(claim), err)
+		return nil
+	}
+	if provisioner != ctrl.provisionerName {
+		// class.Provisioner has either changed since shouldProvision() or
+		// annDynamicallyProvisioned contains different provisioner than
+		// class.Provisioner.
+		glog.Errorf("Unknown provisioner %q requested in claim %q's StorageClass %q", provisioner, claimToClaimKey(claim), claimClass)
 		return nil
 	}
 
@@ -556,15 +585,15 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 		PVName:     pvName,
 		PVC:        claim,
-		Parameters: storageClass.Parameters,
+		Parameters: parameters,
 	}
 
 	ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, "Provisioning", fmt.Sprintf("External provisioner is provisioning volume for claim %q", claimToClaimKey(claim)))
 
 	volume, err = ctrl.provisioner.Provision(options)
 	if err != nil {
-		strerr := fmt.Sprintf("Failed to provision volume with StorageClass %q: %v", storageClass.Name, err)
-		glog.Errorf("Failed to provision volume for claim %q with StorageClass %q: %v", claimToClaimKey(claim), storageClass.Name, err)
+		strerr := fmt.Sprintf("Failed to provision volume with StorageClass %q: %v", claimClass, err)
+		glog.Errorf("Failed to provision volume for claim %q with StorageClass %q: %v", claimToClaimKey(claim), claimClass, err)
 		ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, "ProvisioningFailed", strerr)
 		return err
 	}
@@ -574,8 +603,12 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 	// Set ClaimRef and the PV controller will bind and set annBoundByController for us
 	volume.Spec.ClaimRef = claimRef
 
-	setAnnotation(&volume.ObjectMeta, annDynamicallyProvisioned, ctrl.provisionerName)
-	setAnnotation(&volume.ObjectMeta, annClass, claimClass)
+	metav1.SetMetaDataAnnotation(&volume.ObjectMeta, annDynamicallyProvisioned, ctrl.provisionerName)
+	if ctrl.kubeVersion.AtLeast(utilversion.MustParseSemantic("v1.6.0")) {
+		volume.Spec.StorageClassName = claimClass
+	} else {
+		metav1.SetMetaDataAnnotation(&volume.ObjectMeta, annClass, claimClass)
+	}
 
 	// Try to create the PV object several times
 	for i := 0; i < ctrl.createProvisionedPVRetryCount; i++ {
@@ -843,41 +876,25 @@ func (ctrl *ProvisionController) scheduleOperation(operationName string, operati
 	}
 }
 
-func (ctrl *ProvisionController) getStorageClass(name string) (*storagev1.StorageClass, error) {
+func (ctrl *ProvisionController) getStorageClassFields(name string) (string, map[string]string, error) {
 	classObj, found, err := ctrl.classes.GetByKey(name)
 	if err != nil {
-		return nil, fmt.Errorf("Error getting StorageClass %q: %v", name, err)
+		return "", nil, err
 	}
 	if !found {
-		return nil, fmt.Errorf("StorageClass %q not found", name)
+		return "", nil, fmt.Errorf("StorageClass %q not found", name)
 		// 3. It tries to find a StorageClass instance referenced by annotation
 		//    `claim.Annotations["volume.beta.kubernetes.io/storage-class"]`. If not
 		//    found, it SHOULD report an error (by sending an event to the claim) and it
 		//    SHOULD retry periodically with step i.
 	}
-	storageClass, ok := classObj.(*storagev1.StorageClass)
-	if !ok {
-		return nil, fmt.Errorf("Cannot convert object to StorageClass: %+v", classObj)
+	switch class := classObj.(type) {
+	case *storage.StorageClass:
+		return class.Provisioner, class.Parameters, nil
+	case *storagebeta.StorageClass:
+		return class.Provisioner, class.Parameters, nil
 	}
-	if storageClass.Provisioner != ctrl.provisionerName {
-		// class.Provisioner has either changed since shouldProvision() or
-		// annDynamicallyProvisioned contains different provisioner than
-		// class.Provisioner.
-		return nil, fmt.Errorf("Unknown provisioner %q requested in storage class %q", storageClass.Provisioner, name)
-	}
-	return storageClass, nil
-}
-
-func hasAnnotation(obj metav1.ObjectMeta, ann string) bool {
-	_, found := obj.Annotations[ann]
-	return found
-}
-
-func setAnnotation(obj *metav1.ObjectMeta, ann string, value string) {
-	if obj.Annotations == nil {
-		obj.Annotations = make(map[string]string)
-	}
-	obj.Annotations[ann] = value
+	return "", nil, fmt.Errorf("Cannot convert object to StorageClass: %+v", classObj)
 }
 
 func claimToClaimKey(claim *v1.PersistentVolumeClaim) string {
