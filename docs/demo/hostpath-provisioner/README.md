@@ -181,27 +181,31 @@ Before we can run our provisioner in a pod we need to build a Docker image for t
 
 Our [glide.yaml](./glide.yaml) was created by manually setting the latest version of external-storage/lib & setting the version of client-go to the same one that external-storage/lib uses. We use it to populate a vendor directory containing dependencies.
 
-Now we can use the [Go Docker image](https://hub.docker.com/_/golang/) to build & run our hostpath-provisioner. The following Dockerfile will build the hostpath-provisioner binary inside the container. Note the `glide install -v` command that gets the dependencies listed in our glide.yaml.
+Now we can use build & run our hostpath-provisioner using a simple Makefile where we first we run `glide install -v` to get the dependencies listed in our glide.yaml, then do a static go build of our program that can run in our "FROM scratch" Dockerfile.
 
-```dockerfile
-FROM golang:1.7.4
-COPY . /go/src/app
-WORKDIR /go/src/app
-RUN go get github.com/Masterminds/glide
-RUN glide install -v
-RUN go-wrapper install
-CMD /go/bin/app
+```make
+...
+image: hostpath-provisioner
+	docker build -t $(IMAGE) -f Dockerfile.scratch .
+
+hostpath-provisioner: $(shell find . -name "*.go")
+	glide install -v --strip-vcs
+	CGO_ENABLED=0 go build -a -ldflags '-extldflags "-static"' -o hostpath-provisioner .
+...
+```
+```Dockerfile
+FROM scratch
+COPY hostpath-provisioner /
+CMD ["/hostpath-provisioner"]
 ```
 
-We build our Docker image. Note that the Docker image needs to be on the node we'll run the pod on. So you may need to tag your image and push it to Docker Hub so that it can be pulled later by the node, or just work on the node and build the image there.
+We run make. Note that the Docker image needs to be on the node we'll run the pod on. So you may need to tag your image and push it to Docker Hub so that it can be pulled later by the node, or just work on the node and build the image there.
 
 ```console
-$ docker build -t hostpath-provisioner:latest .
+$ make
 ...
-Successfully built 9bb0954337a0
+Successfully built c3cd467b5fbe
 ```
-
->Note that the above build process is not the only one available to you. We include here an example of an alternative static build process that results in a much smaller image: see the Makefile and Dockerfile.scratch if you're interested. Regardless of which method you choose, you should end up with a container tagged hostpath-provisioner:latest.
 
 Now we can specify our image in a pod. Recall that we set `pvDir` to `/tmp/hostpath-provisioner`. Since we are running our provisioner in a container as a pod, we should mount a corresponding `hostPath` volume there to serve as the parent of all provisioned PVs' `hostPath` volumes.
 

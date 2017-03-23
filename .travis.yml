@@ -49,9 +49,8 @@ script:
   - rm -rf ./vendor
   - go test ./controller
   - popd
-    # Test building hostpath-provisioner demo (both methods)
+    # Test building hostpath-provisioner demo
   - pushd ./docs/demo/hostpath-provisioner
-  - docker build -t hostpath-provisioner:latest .
   - make image
   - make clean
   - popd
