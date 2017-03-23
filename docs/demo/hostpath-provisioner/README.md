@@ -22,7 +22,7 @@ Delete(*v1.PersistentVolume) error
 
 `Delete` removes the storage asset that was created by `Provision` to back the given PV. The given PV will still have any useful annotations that were set earlier in `Provision`.
 
-Special consideration must be given to the case where multiple controllers that serve the same storage class (that have the same `provisioner` name) are running: how do you know that *this* provisioner was the one to provision the given PV? This is why it's recommended to store a provisioner's identity on its PVs in `Provision`, so that each can remember if it was the one to provision a PV when it comes time to delete it, and if not, ignore it by returning `IgnoredError`.
+Special consideration must be given to the case where multiple controllers that serve the same storage class (that have the same `provisioner` name) are running: how do you know that *this* provisioner was the one to provision the given PV? This is why it's recommended to store a provisioner's identity on its PVs in `Provision`, so that each can remember if it was the one to provision a PV when it comes time to delete it, and if not, ignore it by returning `IgnoredError`. If you are confused by any of this, please continue through the `hostPath` example to see a practical implementation and if that isn't enough, please read [this section](#running-multiple-provisioners-and-giving-provisioners-identities) after the example.
 
 `Delete` is not responsible for actually deleting the PV, i.e. removing it from the Kubernetes API, it just deletes the storage asset backing the PV and the controller handles deleting the API object.
 
@@ -30,22 +30,26 @@ Special consideration must be given to the case where multiple controllers that 
 
 Now that we understand the interface expected by the controller, let's implement it and create our own out-of-tree `hostPath` dynamic provisioner. This is for single node testing and demonstration purposes only - local storage is not supported in any way and will not work on multi-node clusters. This simple program has the power to delete and create local data on your node, so if you intend to actually follow along and run it, be careful!
 
-We define a `hostPathProvisioner` struct. It will back every `hostPath` PV it provisions with a new child directory in `pvDir`, hard-coded here to `/tmp/hostpath-provisioner`. It will also give itself a unique `identity`.
+We define a `hostPathProvisioner` struct. It will back every `hostPath` PV it provisions with a new child directory in `pvDir`, hard-coded here to `/tmp/hostpath-provisioner`. It will also give itself a unique `identity`, set to the name of the node/host it runs on, which is passed in via an env variable.
 
 ```go
 type hostPathProvisioner struct {
 	// The directory to create PV-backing directories in
 	pvDir string
 
-	// Identity of this hostPathProvisioner, generated. Used to identify "this"
-	// provisioner's PVs.
-	identity types.UID
+	// Identity of this hostPathProvisioner, set to node's name. Used to identify
+	// "this" provisioner's PVs.
+	identity string
 }
 
 func NewHostPathProvisioner() controller.Provisioner {
+	nodeName := os.Getenv("NODE_NAME")
+	if nodeName == "" {
+		glog.Fatal("env variable NODE_NAME must be set so that this provisioner can identify itself")
+	}
 	return &hostPathProvisioner{
 		pvDir:    "/tmp/hostpath-provisioner",
-		identity: uuid.NewUUID(),
+		identity: nodeName,
 	}
 }
 ```
@@ -62,10 +66,10 @@ func (p *hostPathProvisioner) Provision(options controller.VolumeOptions) (*v1.P
 	}
 
 	pv := &v1.PersistentVolume{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: options.PVName,
 			Annotations: map[string]string{
-				"hostPathProvisionerIdentity": string(p.identity),
+				"hostPathProvisionerIdentity": p.identity,
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{
@@ -86,7 +90,7 @@ func (p *hostPathProvisioner) Provision(options controller.VolumeOptions) (*v1.P
 }
 ```
 
-We implement `Delete`. First it checks if this provisioner was the one that created the directory backing the given PV by looking at the identity annotation. If not, it returns an `IgnoredError`. Otherwise, it can safely delete it.
+We implement `Delete`. First it checks if this provisioner was the one that created the directory backing the given PV by looking at the identity annotation. If not, it returns an `IgnoredError`: the safest assumption is that some other `hostPath` provisioner that is/was running on a different node was the one that created the directory on that different node, so it would be a dangerous idea for *this* provisioner to attempt to delete the directory here on *this* node! Otherwise, if the identity annotation matches this provisioner's, it can safely delete the directory.
 
 ```go
 // Delete removes the storage asset that was created by Provision represented
@@ -96,7 +100,7 @@ func (p *hostPathProvisioner) Delete(volume *v1.PersistentVolume) error {
 	if !ok {
 		return errors.New("identity annotation not found on PV")
 	}
-	if ann != string(p.identity) {
+	if ann != p.identity {
 		return &controller.IgnoredError{"identity annotation on PV does not match ours"}
 	}
 
@@ -117,7 +121,7 @@ We need to create a couple of things the controller expects as arguments, includ
 * `provisionerName` is the `provisioner` that storage classes will specify, "example.com/hostpath" here.  It must follow the `<vendor name>/<provisioner name>` naming scheme and `<vendor name>` cannot be "kubernetes.io"
 * `exponentialBackOffOnError` determines whether it should exponentially back off from calls to `Provision` or `Delete`, useful if either of those involves some API call.
 * `failedRetryThreshold` is the threshold for failed `Provision` attempts before giving up trying to provision for a claim.
-* The last four arguments configure leader election wherein mutliple controllers trying to provision for the same class of claims race to lock/lead claims in order to be the one to provision for them. The meaning of these parameters is documented in the [leaderelection package](https://github.com/kubernetes-incubator/external-storage/tree/master/lib/leaderelection). If you don't intend for users to run more than one instance of your provisioner for the same class of claims, you may ignore these and simply use the default as we do here.
+* The last four arguments configure leader election wherein mutliple controllers trying to provision for the same class of claims race to lock/lead claims in order to be the one to provision for them. The meaning of these parameters is documented in the [leaderelection package](https://github.com/kubernetes-incubator/external-storage/tree/master/lib/leaderelection). If you don't intend for users to run more than one instance of your provisioner for the same class of claims, you may ignore these and simply use the default as we do here. See [this section](#running-multiple-provisioners-and-giving-provisioners-identities) after this example for more info on running multiple provisioners.
 
 (There are many other possible parameters of the controller that could be exposed, please create an issue if you would like one to be.)
 
@@ -235,8 +239,31 @@ As said before, this dynamic provisioner is for single node testing purposes onl
 $ API_HOST_IP=0.0.0.0 $GOPATH/src/k8s.io/kubernetes/hack/local-up-cluster.sh
 ```
 
-Once our cluster is running, we create the hostpath-provisioner pod.
+Once our cluster is running, we create the hostpath-provisioner pod. Note how we populate the "NODE_NAME" variable.
 
+```yaml
+kind: Pod
+apiVersion: v1
+metadata:
+  name: hostpath-provisioner
+spec:
+  containers:
+    - name: hostpath-provisioner
+      image: hostpath-provisioner:latest
+      imagePullPolicy: "IfNotPresent"
+      env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+      volumeMounts:
+        - name: pv-volume
+          mountPath: /tmp/hostpath-provisioner
+  volumes:
+    - name: pv-volume
+      hostPath:
+        path: /tmp/hostpath-provisioner
+```
 ```console
 $ kubectl create -f pod.yaml
 pod "hostpath-provisioner" created
@@ -349,6 +376,18 @@ Finally, we delete the provisioner pod when it has deleted all its PVs and it's 
 $ kubectl delete pod hostpath-provisioner
 pod "hostpath-provisioner" deleted
 ```
+
+## Running multiple provisioners and giving provisioners identities
+
+You must determine whether you want to support the use-case of running multiple provisioner-controller instances in a cluster. Further, you must determine whether you want to implement this identity idea to address that use-case.
+
+The library supports running multiple instances out of the box via its basic leader election implementation wherein multiple controllers trying to provision for the same class of claims race to lock/lead claims in order to be the one to provision for them. This prevents multiple provisioners from needlessly calling `Provision`, which is undesirable because only one will succeed in creating a PV and the rest will have wasted API calls and/or resources creating useless storage assets. As described above in the `hostPath` example, configuration of all this is done via controller parameters.
+
+There is no such race to lock implementation for deleting PVs: all provisioners will call `Delete`, repeatedly until the storage asset backing the PV and the PV are deleted. This is why it's desirable to implement the identity idea, so that only the provisioner who is *responsible* for deleting a PV actually attempts to delete the PV's backing storage asset. The rest should return the special `IgnoredError` which indicates to the controller that they ignored the PV, as opposed to trying and failing (which would result in a misleading error message) or succeeding (obviously a bad idea to lie about that).
+
+In some cases, the provisioner who is *responsible* for deleting a PV is also the only one *capable* of deleting a PV, in which case it's not only desirable to implement the identity idea, but necessary. This is the case with the `hostPath` provisioner example above: obviously only the provisioner running on a certain host can delete the backing storage asset because the backing storage asset is local to the host.
+
+Now, actually giving provisioners identities and effectively making them pets may be the hard part. In the `hostPath` example, the sensible thing to do was tie a provisioner's identity to the node/host it runs on. In your case, maybe it makes sense to tie each provisioner to e.g. a certain member in a storage pool. And should a certain provisioner die, when it comes back it should retain its identity lest the cluster be left with dangling volumes that no running provisioner can delete.
 
 ## Extras
 So as we can see, it can be easy to write a simple but useful dynamic provisioner. For something more complicated here are some various other things to consider...

@@ -26,11 +26,10 @@ import (
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	"github.com/kubernetes-incubator/external-storage/lib/leaderelection"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/types"
-	"k8s.io/client-go/pkg/util/uuid"
-	"k8s.io/client-go/pkg/util/wait"
 	"k8s.io/client-go/rest"
 )
 
@@ -49,15 +48,19 @@ type hostPathProvisioner struct {
 	// The directory to create PV-backing directories in
 	pvDir string
 
-	// Identity of this hostPathProvisioner, generated. Used to identify "this"
-	// provisioner's PVs.
-	identity types.UID
+	// Identity of this hostPathProvisioner, set to node's name. Used to identify
+	// "this" provisioner's PVs.
+	identity string
 }
 
 func NewHostPathProvisioner() controller.Provisioner {
+	nodeName := os.Getenv("NODE_NAME")
+	if nodeName == "" {
+		glog.Fatal("env variable NODE_NAME must be set so that this provisioner can identify itself")
+	}
 	return &hostPathProvisioner{
 		pvDir:    "/tmp/hostpath-provisioner",
-		identity: uuid.NewUUID(),
+		identity: nodeName,
 	}
 }
 
@@ -72,10 +75,10 @@ func (p *hostPathProvisioner) Provision(options controller.VolumeOptions) (*v1.P
 	}
 
 	pv := &v1.PersistentVolume{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: options.PVName,
 			Annotations: map[string]string{
-				"hostPathProvisionerIdentity": string(p.identity),
+				"hostPathProvisionerIdentity": p.identity,
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{
@@ -102,7 +105,7 @@ func (p *hostPathProvisioner) Delete(volume *v1.PersistentVolume) error {
 	if !ok {
 		return errors.New("identity annotation not found on PV")
 	}
-	if ann != string(p.identity) {
+	if ann != p.identity {
 		return &controller.IgnoredError{"identity annotation on PV does not match ours"}
 	}
 
