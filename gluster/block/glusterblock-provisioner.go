@@ -28,7 +28,6 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
-	"github.com/kubernetes-incubator/external-storage/lib/leaderelection"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -47,10 +46,10 @@ const (
 	failedRetryThreshold      = 5
 	defaultExecPath           = "./createiscsi"
 	secretKeyName             = "key"
-	leasePeriod               = leaderelection.DefaultLeaseDuration
-	retryPeriod               = leaderelection.DefaultRetryPeriod
-	renewDeadline             = leaderelection.DefaultRenewDeadline
-	termLimit                 = leaderelection.DefaultTermLimit
+	leasePeriod               = controller.DefaultLeaseDuration
+	retryPeriod               = controller.DefaultRetryPeriod
+	renewDeadline             = controller.DefaultRenewDeadline
+	termLimit                 = controller.DefaultTermLimit
 )
 
 type glusterBlockProvisioner struct {

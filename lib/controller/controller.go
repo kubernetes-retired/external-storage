@@ -68,6 +68,27 @@ const createProvisionedPVRetryCount = 5
 // Interval between retries when we create a PV object for a provisioned volume.
 const createProvisionedPVInterval = 10 * time.Second
 
+const (
+	// DefaultLeaseDuration is a suggested controller LeaseDuration:
+	// LeaseDuration is the duration that non-leader candidates will
+	// wait to force acquire leadership. This is measured against time of
+	// last observed ack.
+	DefaultLeaseDuration = 15 * time.Second
+	// DefaultRenewDeadline is a suggested controller RenewDeadline:
+	// RenewDeadline is the duration that the acting master will retry
+	// refreshing leadership before giving up.
+	DefaultRenewDeadline = 10 * time.Second
+	// DefaultRetryPeriod is a suggested controller RetryPeriod:
+	// RetryPeriod is the duration the LeaderElector clients should wait
+	// between tries of actions.
+	DefaultRetryPeriod = 2 * time.Second
+	// DefaultTermLimit is a suggested controller TermLimit:
+	// TermLimit is the maximum duration that a leader may remain the leader
+	// to complete the task before it must give up its leadership. 0 for forever
+	// or indefinite.
+	DefaultTermLimit = 30 * time.Second
+)
+
 // ProvisionController is a controller that provisions PersistentVolumes for
 // PersistentVolumeClaims.
 type ProvisionController struct {
@@ -119,24 +140,29 @@ type ProvisionController struct {
 	// Interval between retries when we create a PV object for a provisioned volume.
 	createProvisionedPVInterval time.Duration
 
-	// Identity of this controller, generated at creation time.
+	// Identity of this controller, generated at creation time and not persisted
+	// across restarts. Useful only for debugging, for seeing the source of
+	// events. controller.provisioner may have its own, different notion of
+	// identity which may/may not persist across restarts
 	identity types.UID
 
-	// Parameters of LeaderElectionConfig: set to defaults except in tests
+	// Parameters of leaderelection.LeaderElectionConfig. Leader election is for
+	// when multiple controllers are running: they race to lock (lead) every PVC
+	// so that only one calls Provision for it (saving API calls, CPU cycles...)
+	// Descriptions of each can be found in the leaderelection package and
+	// reproduced above (DefaultLeaseDuration...)
 	leaseDuration, renewDeadline, retryPeriod, termLimit time.Duration
 
 	// Map of claim UID to LeaderElector: for checking if this controller
 	// is the leader of a given claim
 	leaderElectors map[types.UID]*leaderelection.LeaderElector
+	mapMutex       *sync.Mutex
 
-	mapMutex *sync.Mutex
-
-	// threshold for max number of retries on failure of provisioner
+	// Threshold for max number of retries on failure of provisioner
 	failedRetryThreshold int
 
-	// map of failed claims
-	failedClaimsStats map[types.UID]int
-
+	// Map of failed claims
+	failedClaimsStats      map[types.UID]int
 	failedClaimsStatsMutex *sync.Mutex
 }
 

@@ -23,7 +23,6 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
-	"github.com/kubernetes-incubator/external-storage/lib/leaderelection"
 	"github.com/kubernetes-incubator/external-storage/nfs/pkg/server"
 	vol "github.com/kubernetes-incubator/external-storage/nfs/pkg/volume"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -50,10 +49,10 @@ var (
 const (
 	exportDir     = "/export"
 	ganeshaConfig = "/export/vfs.conf"
-	leasePeriod   = leaderelection.DefaultLeaseDuration
-	retryPeriod   = leaderelection.DefaultRetryPeriod
-	renewDeadline = leaderelection.DefaultRenewDeadline
-	termLimit     = leaderelection.DefaultTermLimit
+	leasePeriod   = controller.DefaultLeaseDuration
+	retryPeriod   = controller.DefaultRetryPeriod
+	renewDeadline = controller.DefaultRenewDeadline
+	termLimit     = controller.DefaultTermLimit
 )
 
 func main() {
