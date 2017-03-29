@@ -1,0 +1,14 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  name: flex-provisioner
+spec:
+  containers:
+    - name: flex-provisioner
+      image: childsb/flex-provisioner
+      securityContext:
+      args:
+        - "-provisioner=external/flex-simple"
+        - "-execCommand=/opt/go/src/kubernetes-incubator/external-storage/flex/flex-script/flex"
+      imagePullPolicy: "IfNotPresent"
+

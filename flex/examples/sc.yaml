@@ -1,0 +1,6 @@
+apiVersion: storage.k8s.io/v1beta1
+kind: StorageClass
+metadata:
+  name: default-shared 
+provisioner: external/flex-simple 
+parameters:
