@@ -1,8 +1,8 @@
-hash: 8c8c6d4fce6e3030c3723e0ec90ca20bb60955697634fe2bf67c3ad0771d0f2f
-updated: 2017-03-22T14:28:25.876572174-04:00
+hash: 953b6877593080ed4c55f894a86257de431de42ba46b31f58fa37e0afe8ff937
+updated: 2017-03-29T16:41:33.450818905-04:00
 imports:
 - name: github.com/aws/aws-sdk-go
-  version: 695fe24acaf9afe80b0ce261d4637f42ba0b4c7d
+  version: 6669bce73b4e3bc922ff5ea3a3983ede26e02b39
   subpackages:
   - aws
   - aws/awserr
@@ -40,7 +40,7 @@ imports:
   - digest
   - reference
 - name: github.com/docker/docker
-  version: 0f5c9d301b9b1cca66b3ea0f9dec3b5317d3686d
+  version: 092cba3727bb9b4a2f0e922cd6c0f93ea270e363
   subpackages:
   - pkg/mount
 - name: github.com/emicklei/go-restful
@@ -290,7 +290,7 @@ imports:
   - util/integer
   - util/testing
 - name: k8s.io/kubernetes
-  version: b202120be3a97e5f8a5e20da51d0b6f5a1eebd31
+  version: fff5156092b56e6bd60fff75aad4dc9de6b6ef37
   subpackages:
   - pkg/util/goroutinemap
   - pkg/util/goroutinemap/exponentialbackoff

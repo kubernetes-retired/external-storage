@@ -1,9 +1,9 @@
-# This file describes the standard way to build Docker, using docker
+# This file describes the standard way to build Docker on ppc64le, using docker
 #
 # Usage:
 #
 # # Assemble the full dev environment. This is slow the first time.
-# docker build -t docker .
+# docker build -t docker -f Dockerfile.ppc64le .
 #
 # # Mount your source in an interactive container for quick testing:
 # docker run -v `pwd`:/go/src/github.com/docker/docker --privileged -i -t docker bash
@@ -11,81 +11,62 @@
 # # Run the test suite:
 # docker run --privileged docker hack/make.sh test-unit test-integration-cli test-docker-py
 #
-# # Publish a release:
-# docker run --privileged \
-#  -e AWS_S3_BUCKET=baz \
-#  -e AWS_ACCESS_KEY=foo \
-#  -e AWS_SECRET_KEY=bar \
-#  -e GPG_PASSPHRASE=gloubiboulga \
-#  docker hack/release.sh
-#
 # Note: AppArmor used to mess with privileged mode, but this is no longer
 # the case. Therefore, you don't have to disable it anymore.
 #
 
-FROM debian:jessie
+FROM ppc64le/debian:jessie
 
 # allow replacing httpredir or deb mirror
 ARG APT_MIRROR=deb.debian.org
 RUN sed -ri "s/(httpredir|deb).debian.org/$APT_MIRROR/g" /etc/apt/sources.list
 
-# Add zfs ppa
-RUN apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys E871F18B51E0147C77796AC81196BA81F6B0FC61 \
-	|| apt-key adv --keyserver hkp://pgp.mit.edu:80 --recv-keys E871F18B51E0147C77796AC81196BA81F6B0FC61
-RUN echo deb http://ppa.launchpad.net/zfs-native/stable/ubuntu trusty main > /etc/apt/sources.list.d/zfs.list
-
 # Packaged dependencies
 RUN apt-get update && apt-get install -y \
 	apparmor \
-	apt-utils \
 	aufs-tools \
 	automake \
 	bash-completion \
-	binutils-mingw-w64 \
-	bsdmainutils \
 	btrfs-tools \
 	build-essential \
-	clang \
 	cmake \
 	createrepo \
 	curl \
 	dpkg-sig \
-	gcc-mingw-w64 \
 	git \
 	iptables \
 	jq \
+	net-tools \
 	libapparmor-dev \
 	libcap-dev \
 	libltdl-dev \
-	libnl-3-dev \
-	libprotobuf-c0-dev \
-	libprotobuf-dev \
 	libsqlite3-dev \
 	libsystemd-journal-dev \
 	libtool \
 	mercurial \
-	net-tools \
 	pkg-config \
-	protobuf-compiler \
-	protobuf-c-compiler \
 	python-dev \
 	python-mock \
 	python-pip \
 	python-websocket \
-	ubuntu-zfs \
 	xfsprogs \
-	vim-common \
-	libzfs-dev \
 	tar \
-	zip \
-	--no-install-recommends \
-	&& pip install awscli==1.10.15
+	vim-common \
+	--no-install-recommends
+
 # Get lvm2 source for compiling statically
 ENV LVM2_VERSION 2.02.103
 RUN mkdir -p /usr/local/lvm2 \
 	&& curl -fsSL "https://mirrors.kernel.org/sourceware/lvm2/LVM2.${LVM2_VERSION}.tgz" \
 		| tar -xzC /usr/local/lvm2 --strip-components=1
 # See https://git.fedorahosted.org/cgit/lvm2.git/refs/tags for release tags
+
+# Fix platform enablement in lvm2 to support ppc64le properly
+RUN set -e \
+	&& for f in config.guess config.sub; do \
+		curl -fsSL -o "/usr/local/lvm2/autoconf/$f" "http://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=$f;hb=HEAD"; \
+	done
+# "arch.c:78:2: error: #error the arch code needs to know about your machine type"
 
 # Compile and install lvm2
 RUN cd /usr/local/lvm2 \
@@ -96,50 +77,30 @@ RUN cd /usr/local/lvm2 \
 	&& make install_device-mapper
 # See https://git.fedorahosted.org/cgit/lvm2.git/tree/INSTALL
 
-# Configure the container for OSX cross compilation
-ENV OSX_SDK MacOSX10.11.sdk
-ENV OSX_CROSS_COMMIT a9317c18a3a457ca0a657f08cc4d0d43c6cf8953
-RUN set -x \
-	&& export OSXCROSS_PATH="/osxcross" \
-	&& git clone https://github.com/tpoechtrager/osxcross.git $OSXCROSS_PATH \
-	&& ( cd $OSXCROSS_PATH && git checkout -q $OSX_CROSS_COMMIT) \
-	&& curl -sSL https://s3.dockerproject.org/darwin/v2/${OSX_SDK}.tar.xz -o "${OSXCROSS_PATH}/tarballs/${OSX_SDK}.tar.xz" \
-	&& UNATTENDED=yes OSX_VERSION_MIN=10.6 ${OSXCROSS_PATH}/build.sh
-ENV PATH /osxcross/target/bin:$PATH
-
-# Install seccomp: the version shipped in trusty is too old
+# Install seccomp: the version shipped in jessie is too old
 ENV SECCOMP_VERSION 2.3.1
 RUN set -x \
-	&& export SECCOMP_PATH="$(mktemp -d)" \
-	&& curl -fsSL "https://github.com/seccomp/libseccomp/releases/download/v${SECCOMP_VERSION}/libseccomp-${SECCOMP_VERSION}.tar.gz" \
-		| tar -xzC "$SECCOMP_PATH" --strip-components=1 \
-	&& ( \
-		cd "$SECCOMP_PATH" \
-		&& ./configure --prefix=/usr/local \
-		&& make \
-		&& make install \
-		&& ldconfig \
-	) \
-	&& rm -rf "$SECCOMP_PATH"
+        && export SECCOMP_PATH="$(mktemp -d)" \
+        && curl -fsSL "https://github.com/seccomp/libseccomp/releases/download/v${SECCOMP_VERSION}/libseccomp-${SECCOMP_VERSION}.tar.gz" \
+                | tar -xzC "$SECCOMP_PATH" --strip-components=1 \
+        && ( \
+                cd "$SECCOMP_PATH" \
+                && ./configure --prefix=/usr/local \
+                && make \
+                && make install \
+                && ldconfig \
+        ) \
+        && rm -rf "$SECCOMP_PATH"
+
 
 # Install Go
-# IMPORTANT: If the version of Go is updated, the Windows to Linux CI machines
-#            will need updating, to avoid errors. Ping #docker-maintainers on IRC
-#            with a heads-up.
+# NOTE: official ppc64le go binaries weren't available until go 1.6.4 and 1.7.4
 ENV GO_VERSION 1.7.5
-RUN curl -fsSL "https://golang.org/dl/go${GO_VERSION}.linux-amd64.tar.gz" \
+RUN curl -fsSL "https://golang.org/dl/go${GO_VERSION}.linux-ppc64le.tar.gz" \
 	| tar -xzC /usr/local
 
 ENV PATH /go/bin:/usr/local/go/bin:$PATH
 ENV GOPATH /go
-
-# Compile Go for cross compilation
-ENV DOCKER_CROSSPLATFORMS \
-	linux/386 linux/arm \
-	darwin/amd64 \
-	freebsd/amd64 freebsd/386 freebsd/arm \
-	windows/amd64 windows/386 \
-	solaris/amd64
 
 # Dependency for golint
 ENV GO_TOOLS_COMMIT 823804e1ae08dbb14eb807afc7db9993bc9e3cc3
@@ -151,14 +112,6 @@ ENV GO_LINT_COMMIT 32a87160691b3c96046c0c678fe57c5bef761456
 RUN git clone https://github.com/golang/lint.git /go/src/github.com/golang/lint \
 	&& (cd /go/src/github.com/golang/lint && git checkout -q $GO_LINT_COMMIT) \
 	&& go install -v github.com/golang/lint/golint
-
-# Install CRIU for checkpoint/restore support
-ENV CRIU_VERSION 2.2
-RUN mkdir -p /usr/src/criu \
-	&& curl -sSL https://github.com/xemul/criu/archive/v${CRIU_VERSION}.tar.gz | tar -v -C /usr/src/criu/ -xz --strip-components=1 \
-	&& cd /usr/src/criu \
-	&& make \
-	&& make install-criu
 
 # Install two versions of the registry. The first is an older version that
 # only supports schema1 manifests. The second is a newer version that supports
@@ -183,9 +136,9 @@ RUN set -x \
 	&& export GOPATH="$(mktemp -d)" \
 	&& git clone https://github.com/docker/notary.git "$GOPATH/src/github.com/docker/notary" \
 	&& (cd "$GOPATH/src/github.com/docker/notary" && git checkout -q "$NOTARY_VERSION") \
-	&& GOPATH="$GOPATH/src/github.com/docker/notary/vendor:$GOPATH" \
+	&& GOPATH="$GOPATH/src/github.com/docker/notary/Godeps/_workspace:$GOPATH" \
 		go build -o /usr/local/bin/notary-server github.com/docker/notary/cmd/notary-server \
-	&& GOPATH="$GOPATH/src/github.com/docker/notary/vendor:$GOPATH" \
+	&& GOPATH="$GOPATH/src/github.com/docker/notary/Godeps/_workspace:$GOPATH" \
 		go build -o /usr/local/bin/notary github.com/docker/notary/cmd/notary \
 	&& rm -rf "$GOPATH"
 
@@ -195,15 +148,6 @@ RUN git clone https://github.com/docker/docker-py.git /docker-py \
 	&& cd /docker-py \
 	&& git checkout -q $DOCKER_PY_COMMIT \
 	&& pip install -r test-requirements.txt
-
-# Install yamllint for validating swagger.yaml
-RUN pip install yamllint==1.5.0
-
-# Install go-swagger for validating swagger.yaml
-ENV GO_SWAGGER_COMMIT c28258affb0b6251755d92489ef685af8d4ff3eb
-RUN git clone https://github.com/go-swagger/go-swagger.git /go/src/github.com/go-swagger/go-swagger \
-	&& (cd /go/src/github.com/go-swagger/go-swagger && git checkout -q $GO_SWAGGER_COMMIT) \
-	&& go install -v github.com/go-swagger/go-swagger/cmd/swagger
 
 # Set user.email so crosbymichael's in-container merge commits go smoothly
 RUN git config --global user.email 'docker-dummy@example.com'
@@ -218,8 +162,6 @@ ENV DOCKER_BUILDTAGS apparmor pkcs11 seccomp selinux
 
 # Let us use a .bashrc file
 RUN ln -sfv $PWD/.bashrc ~/.bashrc
-# Add integration helps to bashrc
-RUN echo "source $PWD/hack/make/.integration-test-helpers" >> /etc/bash.bashrc
 
 # Register Docker's bash completion.
 RUN ln -sv $PWD/contrib/completion/bash/docker /etc/bash_completion.d/docker
@@ -227,17 +169,17 @@ RUN ln -sv $PWD/contrib/completion/bash/docker /etc/bash_completion.d/docker
 # Get useful and necessary Hub images so we can "docker load" locally instead of pulling
 COPY contrib/download-frozen-image-v2.sh /go/src/github.com/docker/docker/contrib/
 RUN ./contrib/download-frozen-image-v2.sh /docker-frozen-images \
-	buildpack-deps:jessie@sha256:25785f89240fbcdd8a74bdaf30dd5599a9523882c6dfc567f2e9ef7cf6f79db6 \
-	busybox:latest@sha256:e4f93f6ed15a0cdd342f5aae387886fba0ab98af0a102da6276eaf24d6e6ade0 \
-	debian:jessie@sha256:f968f10b4b523737e253a97eac59b0d1420b5c19b69928d35801a6373ffe330e \
-	hello-world:latest@sha256:8be990ef2aeb16dbcb9271ddfe2610fa6658d13f6dfb8bc72074cc1ca36966a7
+	ppc64le/buildpack-deps:jessie@sha256:902bfe4ef1389f94d143d64516dd50a2de75bca2e66d4a44b1d73f63ddf05dda \
+	ppc64le/busybox:latest@sha256:38bb82085248d5a3c24bd7a5dc146f2f2c191e189da0441f1c2ca560e3fc6f1b \
+	ppc64le/debian:jessie@sha256:412845f51b6ab662afba71bc7a716e20fdb9b84f185d180d4c7504f8a75c4f91 \
+	ppc64le/hello-world:latest@sha256:186a40a9a02ca26df0b6c8acdfb8ac2f3ae6678996a838f977e57fac9d963974
 # See also "hack/make/.ensure-frozen-images" (which needs to be updated any time this list is)
 
 # Install tomlv, vndr, runc, containerd, tini, docker-proxy
 # Please edit hack/dockerfile/install-binaries.sh to update them.
 COPY hack/dockerfile/binaries-commits /tmp/binaries-commits
 COPY hack/dockerfile/install-binaries.sh /tmp/install-binaries.sh
-RUN /tmp/install-binaries.sh tomlv vndr runc containerd tini proxy bindata
+RUN /tmp/install-binaries.sh tomlv vndr runc containerd tini proxy
 
 # Wrap all commands in the "docker-in-docker" script to allow nested containers
 ENTRYPOINT ["hack/dind"]

@@ -1,4 +1,4 @@
-// +build linux
+// +build solaris
 
 package mount
 
@@ -51,19 +51,8 @@ func MakeRUnbindable(mountPoint string) error {
 }
 
 func ensureMountedAs(mountPoint, options string) error {
-	mounted, err := Mounted(mountPoint)
-	if err != nil {
-		return err
-	}
-
-	if !mounted {
-		if err := Mount(mountPoint, mountPoint, "none", "bind,rw"); err != nil {
-			return err
-		}
-	}
-	if _, err = Mounted(mountPoint); err != nil {
-		return err
-	}
-
-	return ForceMount("", mountPoint, "none", options)
+	// TODO: Solaris does not support bind mounts.
+	// Evaluate lofs and also look at the relevant
+	// mount flags to be supported.
+	return nil
 }
