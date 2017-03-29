@@ -25,7 +25,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kubernetes-incubator/external-storage/lib/leaderelection"
 	rl "github.com/kubernetes-incubator/external-storage/lib/leaderelection/resourcelock"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -246,7 +245,7 @@ func TestMultipleControllers(t *testing.T) {
 		ctrls := make([]*ProvisionController, test.numControllers)
 		stopChs := make([]chan struct{}, test.numControllers)
 		for i := 0; i < test.numControllers; i++ {
-			ctrls[i] = NewProvisionController(client, 15*time.Second, test.provisionerName, provisioner, "v1.5.0", false, failedRetryThreshold, leaderelection.DefaultLeaseDuration, leaderelection.DefaultRenewDeadline, leaderelection.DefaultRetryPeriod, leaderelection.DefaultTermLimit)
+			ctrls[i] = NewProvisionController(client, 15*time.Second, test.provisionerName, provisioner, "v1.5.0", false, failedRetryThreshold, DefaultLeaseDuration, DefaultRenewDeadline, DefaultRetryPeriod, DefaultTermLimit)
 			ctrls[i].createProvisionedPVInterval = 10 * time.Millisecond
 			ctrls[i].claimSource = claimSource
 			ctrls[i].claims.Add(newClaim("claim-1", "uid-1-1", "class-1", "", nil))

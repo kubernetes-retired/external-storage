@@ -33,7 +33,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/aws/efs/pkg/gidallocator"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
-	"github.com/kubernetes-incubator/external-storage/lib/leaderelection"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
@@ -49,10 +48,10 @@ const (
 	resyncPeriod              = 15 * time.Second
 	exponentialBackOffOnError = true
 	failedRetryThreshold      = 5
-	leasePeriod               = leaderelection.DefaultLeaseDuration
-	retryPeriod               = leaderelection.DefaultRetryPeriod
-	renewDeadline             = leaderelection.DefaultRenewDeadline
-	termLimit                 = leaderelection.DefaultTermLimit
+	leasePeriod               = controller.DefaultLeaseDuration
+	retryPeriod               = controller.DefaultRetryPeriod
+	renewDeadline             = controller.DefaultRenewDeadline
+	termLimit                 = controller.DefaultTermLimit
 )
 
 type efsProvisioner struct {

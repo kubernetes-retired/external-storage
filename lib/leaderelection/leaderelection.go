@@ -39,11 +39,7 @@ import (
 )
 
 const (
-	JitterFactor         = 1.2
-	DefaultLeaseDuration = 15 * time.Second
-	DefaultRenewDeadline = 10 * time.Second
-	DefaultRetryPeriod   = 2 * time.Second
-	DefaultTermLimit     = 30 * time.Second
+	JitterFactor = 1.2
 )
 
 // NewLeaderElector creates a LeaderElector from a LeaderElecitionConfig
