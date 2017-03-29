@@ -9,6 +9,6 @@ spec:
       securityContext:
       args:
         - "-provisioner=external/flex-simple"
-        - "-execCommand=/opt/go/src/kubernetes-incubator/external-storage/flex/flex-script/flex"
+        - "-execCommand=/opt/storage/flex-provision.sh"
       imagePullPolicy: "IfNotPresent"
 
