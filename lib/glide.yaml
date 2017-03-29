@@ -23,7 +23,7 @@ import:
   - tools/cache
   - tools/record
 - package: k8s.io/kubernetes
-  version: v1.6.0-beta.4
+  version: v1.6.0
   subpackages:
   - pkg/util/goroutinemap
   - pkg/util/version

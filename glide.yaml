@@ -1,12 +1,13 @@
 package: github.com/kubernetes-incubator/external-storage
 import:
 - package: github.com/aws/aws-sdk-go
-  version: ^1.7.3
+  version: v1.7.3
   subpackages:
   - aws
   - aws/session
   - service/efs
 - package: github.com/docker/docker
+  version: v1.13.1
   subpackages:
   - pkg/mount
 - package: github.com/golang/glog
@@ -35,12 +36,13 @@ import:
   - pkg/api
   - pkg/api/v1
   - pkg/apis/storage/v1
+  - pkg/apis/storage/v1beta1
   - rest
   - tools/cache
   - tools/clientcmd
   - tools/record
 - package: k8s.io/kubernetes
-  version: v1.6.0-beta.4
+  version: v1.6.0
   subpackages:
   - pkg/util/goroutinemap
   - pkg/util/version
