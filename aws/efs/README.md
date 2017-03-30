@@ -65,7 +65,8 @@ $ oc create -f deploy/auth/serviceaccount.yaml
 serviceaccount "efs-provisioner" created
 $ oc create -f deploy/auth/openshift-clusterrole.yaml
 clusterrole "efs-provisioner-runner" created
-$ oadm policy add-cluster-role-to-user efs-provisioner-runner system:serviceaccount:default:efs-provisioner created
+$ oadm policy add-scc-to-user hostmount-anyuid system:serviceaccount:default:efs-provisioner
+$ oadm policy add-cluster-role-to-user efs-provisioner-runner system:serviceaccount:default:efs-provisioner
 $ oc patch deployment efs-provisioner -p '{"spec":{"template":{"spec":{"serviceAccount":"efs-provisioner"}}}}'
 ```
 ### SELinux
