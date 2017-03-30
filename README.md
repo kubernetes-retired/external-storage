@@ -20,9 +20,7 @@ You will want to import a specific version of the library to ensure compatibilit
 
 Note that because your provisioner needs to depend also on [client-go](https://github.com/kubernetes/client-go) and the library itself depends on a specific version of client-go, to avoid a dependency conflict you must ensure you use the exact same version of client-go as the library. You can check what version of client-go the library depends on by looking at its [glide.yaml](lib/glide.yaml).
 
-For a full guide on how to write an external provisioner using the library that demonstrates the above, see [here](docs/demo/hostpath-provisioner/).
-
-If you want your provisioner to be compatible with users' RBAC/PSP/OpenShift authorization policies also consider reading [this](docs/authorization.md).
+[For all documentation, including a full guide on how to write an external provisioner using the library that demonstrates the above, see here](./docs).
 
 ## Roadmap
 
