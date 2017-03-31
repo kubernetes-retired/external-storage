@@ -29,3 +29,9 @@ spec:
             fieldRef:
               fieldPath: status.podIP
       imagePullPolicy: "IfNotPresent"
+      volumeMounts:
+        - name: export-volume
+          mountPath: /export
+  volumes:
+    - name: export-volume
+      emptyDir: {}
