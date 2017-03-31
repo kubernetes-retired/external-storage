@@ -43,6 +43,7 @@ Decide on & set aside a directory within the EFS file system for the provisioner
 $ kubectl create -f deploy/deployment.yaml
 deployment "efs-provisioner" created
 ```
+You will need to create this directory on your EFS file system first or the efs-provisioner pod will fail to start.
 
 ### Authorization
 
