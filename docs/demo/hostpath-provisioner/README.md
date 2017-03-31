@@ -22,7 +22,7 @@ Delete(*v1.PersistentVolume) error
 
 `Delete` removes the storage asset that was created by `Provision` to back the given PV. The given PV will still have any useful annotations that were set earlier in `Provision`.
 
-Special consideration must be given to the case where multiple controllers that serve the same storage class (that have the same `provisioner` name) are running: how do you know that *this* provisioner was the one to provision the given PV? This is why it's recommended to store a provisioner's identity on its PVs in `Provision`, so that each can remember if it was the one to provision a PV when it comes time to delete it, and if not, ignore it by returning `IgnoredError`. If you are confused by any of this, please continue through the `hostPath` example to see a practical implementation and if that isn't enough, please read [this section](#running-multiple-provisioners-and-giving-provisioners-identities) after the example.
+Special consideration must be given to the case where multiple controllers that serve the same storage class (that have the same `provisioner` name) are running: how do you know that *this* provisioner was the one to provision the given PV? This is why it's recommended to store a provisioner's identity on its PVs in `Provision`, so that each can remember if it was the one to provision a PV when it comes time to delete it, and if not, ignore it by returning `IgnoredError`. If you are confused by any of this, please continue through the `hostPath` example to see a practical implementation and if that isn't enough, please read [this doc](../../README.md#running-multiple-provisioners-and-giving-provisioners-identities) after the example.
 
 `Delete` is not responsible for actually deleting the PV, i.e. removing it from the Kubernetes API, it just deletes the storage asset backing the PV and the controller handles deleting the API object.
 
@@ -121,7 +121,7 @@ We need to create a couple of things the controller expects as arguments, includ
 * `provisionerName` is the `provisioner` that storage classes will specify, "example.com/hostpath" here.  It must follow the `<vendor name>/<provisioner name>` naming scheme and `<vendor name>` cannot be "kubernetes.io"
 * `exponentialBackOffOnError` determines whether it should exponentially back off from calls to `Provision` or `Delete`, useful if either of those involves some API call.
 * `failedRetryThreshold` is the threshold for failed `Provision` attempts before giving up trying to provision for a claim.
-* The last four arguments configure leader election wherein mutliple controllers trying to provision for the same class of claims race to lock/lead claims in order to be the one to provision for them. The meaning of these parameters is documented in the [leaderelection package](https://github.com/kubernetes-incubator/external-storage/tree/master/lib/leaderelection). If you don't intend for users to run more than one instance of your provisioner for the same class of claims, you may ignore these and simply use the default as we do here. See [this section](#running-multiple-provisioners-and-giving-provisioners-identities) after this example for more info on running multiple provisioners.
+* The last four arguments configure leader election wherein mutliple controllers trying to provision for the same class of claims race to lock/lead claims in order to be the one to provision for them. The meaning of these parameters is documented in the [leaderelection package](https://github.com/kubernetes-incubator/external-storage/tree/master/lib/leaderelection). If you don't intend for users to run more than one instance of your provisioner for the same class of claims, you may ignore these and simply use the default as we do here. See [this doc](../../README.md#running-multiple-provisioners-and-giving-provisioners-identities) for more info on running multiple provisioners.
 
 (There are many other possible parameters of the controller that could be exposed, please create an issue if you would like one to be.)
 
@@ -179,7 +179,7 @@ Notice we just import "github.com/kubernetes-incubator/external-storage/lib/cont
 
 Before we can run our provisioner in a pod we need to build a Docker image for the pod to specify. Our hostpath-provisioner Go package has many dependencies so it's a good idea to use a tool to manage them. It's especially important to do so when depending on a package like [client-go](https://github.com/kubernetes/client-go#how-to-get-it) that has an unstable master branch. We'll use [glide](https://github.com/Masterminds/glide).
 
-Our [glide.yaml](./glide.yaml) was created by manually setting the latest version of external-storage/lib & setting the version of client-go to the same one that external-storage/lib uses. We use it to populate a vendor directory containing dependencies.
+Our [glide.yaml](./glide.yaml) was created by manually setting the latest version of external-storage/lib & setting the version of client-go to the same one that external-storage/lib uses. We use it to populate a vendor directory containing dependencies. For more information on how to get this build working, see [this doc](../../README.md#building-provisioner-programs-and-managing-dependencies).
 
 Now we can use build & run our hostpath-provisioner using a simple Makefile where we first we run `glide install -v` to get the dependencies listed in our glide.yaml, then do a static go build of our program that can run in our "FROM scratch" Dockerfile.
 
@@ -237,7 +237,7 @@ $ sudo chcon -Rt svirt_sandbox_file_t /tmp/hostpath-provisioner
 
 ## Using our `hostPath` Dynamic Provisioner
 
-As said before, this dynamic provisioner is for single node testing purposes only. It has been tested to work with [hack/local-up-cluster.sh](https://github.com/kubernetes/kubernetes/blob/release-1.5/hack/local-up-cluster.sh) started like so.
+As said before, this dynamic provisioner is for single node testing purposes only. It has been tested to work with [hack/local-up-cluster.sh](https://github.com/kubernetes/kubernetes/blob/release-1.5/hack/local-up-cluster.sh) started like so. If you want to run your provisioner on a cluster with RBAC enabled or an OpenShift cluster, please see [this doc](../../README.md#authorizing-provisioners-for-rbac-or-openshift).
 
 ```console
 $ API_HOST_IP=0.0.0.0 $GOPATH/src/k8s.io/kubernetes/hack/local-up-cluster.sh
@@ -381,17 +381,6 @@ $ kubectl delete pod hostpath-provisioner
 pod "hostpath-provisioner" deleted
 ```
 
-## Running multiple provisioners and giving provisioners identities
-
-You must determine whether you want to support the use-case of running multiple provisioner-controller instances in a cluster. Further, you must determine whether you want to implement this identity idea to address that use-case.
-
-The library supports running multiple instances out of the box via its basic leader election implementation wherein multiple controllers trying to provision for the same class of claims race to lock/lead claims in order to be the one to provision for them. This prevents multiple provisioners from needlessly calling `Provision`, which is undesirable because only one will succeed in creating a PV and the rest will have wasted API calls and/or resources creating useless storage assets. As described above in the `hostPath` example, configuration of all this is done via controller parameters.
-
-There is no such race to lock implementation for deleting PVs: all provisioners will call `Delete`, repeatedly until the storage asset backing the PV and the PV are deleted. This is why it's desirable to implement the identity idea, so that only the provisioner who is *responsible* for deleting a PV actually attempts to delete the PV's backing storage asset. The rest should return the special `IgnoredError` which indicates to the controller that they ignored the PV, as opposed to trying and failing (which would result in a misleading error message) or succeeding (obviously a bad idea to lie about that).
-
-In some cases, the provisioner who is *responsible* for deleting a PV is also the only one *capable* of deleting a PV, in which case it's not only desirable to implement the identity idea, but necessary. This is the case with the `hostPath` provisioner example above: obviously only the provisioner running on a certain host can delete the backing storage asset because the backing storage asset is local to the host.
-
-Now, actually giving provisioners identities and effectively making them pets may be the hard part. In the `hostPath` example, the sensible thing to do was tie a provisioner's identity to the node/host it runs on. In your case, maybe it makes sense to tie each provisioner to e.g. a certain member in a storage pool. And should a certain provisioner die, when it comes back it should retain its identity lest the cluster be left with dangling volumes that no running provisioner can delete.
 
 ## Extras
 So as we can see, it can be easy to write a simple but useful dynamic provisioner. For something more complicated here are some various other things to consider...
