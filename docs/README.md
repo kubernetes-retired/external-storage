@@ -84,6 +84,8 @@ As the author of your external provisioner you will need to instruct users on ho
 In Kubernetes you grant the needed permissions by creating a `ClusterRoleBinding` that refers to "system:persistent-volume-provisioner".
 In OpenShift you do so by running something like: `oadm policy add-cluster-role-to-user system:persistent-volume-provisioner system:serviceaccount:default:my-provisioner`
 
+For an example of what all this looks like, see the [EFS provisioner documentation](https://github.com/kubernetes-incubator/external-storage/tree/master/aws/efs#authorization) and its associated [yamls](https://github.com/kubernetes-incubator/external-storage/tree/master/aws/efs/deploy/auth).
+
 ## Running multiple provisioners and giving provisioners identities
 
 You must determine whether you want to support the use-case of running multiple provisioner-controller instances in a cluster. Further, you must determine whether you want to implement this identity idea to address that use-case.
