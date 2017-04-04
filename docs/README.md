@@ -67,7 +67,10 @@ At this point, if you run `glide install -v` glide *should* be smart enough to d
 
 After you have edited your glide.yaml to your satisfaction, run `glide install -v` to get a vendor directory full of your dependencies which you can build your provisioner with.
 
-Assuming you're in your `GOPATH` you can run `go build .` to get a binary (which can then be e.g. used to make a Docker image).
+Finally you'll want to build your program. You can write some sort of containerized build or stick to a `go build` invocation. In order for a `go build .` or variation thereof to work, you must
+* be working in your `GOPATH`, your code has to be somewhere under "$GOPATH/src". This is a requirement (even) when using vendored dependencies
+* have go version 1.7 or greater installed
+The binary produced can then be e.g. used to make a Docker image.
 
 ## Authorizing provisioners for RBAC or OpenShift
 
