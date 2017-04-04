@@ -179,6 +179,11 @@ Notice we just import "github.com/kubernetes-incubator/external-storage/lib/cont
 
 Before we can run our provisioner in a pod we need to build a Docker image for the pod to specify. Our hostpath-provisioner Go package has many dependencies so it's a good idea to use a tool to manage them. It's especially important to do so when depending on a package like [client-go](https://github.com/kubernetes/client-go#how-to-get-it) that has an unstable master branch. We'll use [glide](https://github.com/Masterminds/glide).
 
+In order for the build method described below to work, you must
+* be working in your `GOPATH`, your code has to be somewhere under "$GOPATH/src". This is a requirement (even) when using vendored dependencies
+* have go version 1.7 or greater installed
+* have Docker installed
+
 Our [glide.yaml](./glide.yaml) was created by manually setting the latest version of external-storage/lib & setting the version of client-go to the same one that external-storage/lib uses. We use it to populate a vendor directory containing dependencies. For more information on how to get this build working, see [this doc](../../README.md#building-provisioner-programs-and-managing-dependencies).
 
 Now we can use build & run our hostpath-provisioner using a simple Makefile where we first we run `glide install -v` to get the dependencies listed in our glide.yaml, then do a static go build of our program that can run in our "FROM scratch" Dockerfile.
