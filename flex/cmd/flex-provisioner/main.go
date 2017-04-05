@@ -18,35 +18,33 @@ package main
 
 import (
 	"flag"
-	"strings"
-	"time"
 	"github.com/golang/glog"
+	vol "github.com/kubernetes-incubator/external-storage/flex/pkg/volume"
+	"github.com/kubernetes-incubator/external-storage/lib/controller"
+	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/util/validation"
-	"k8s.io/client-go/pkg/util/validation/field"
-	"k8s.io/client-go/pkg/util/wait"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"github.com/kubernetes-incubator/external-storage/lib/controller"
-	 vol "github.com/kubernetes-incubator/external-storage/flex/pkg/volume"
-	"github.com/kubernetes-incubator/external-storage/lib/leaderelection"
+	"strings"
+	"time"
 )
 
 var (
-	provisioner    = flag.String("provisioner", "k8s.io/default", "Name of the provisioner. The provisioner will only provision volumes for claims that request a StorageClass with a provisioner field set equal to this name.")
-	master         = flag.String("master", "", "Master URL to build a client config from. Either this or kubeconfig needs to be set if the provisioner is being run out of cluster.")
-	kubeconfig     = flag.String("kubeconfig", "", "Absolute path to the kubeconfig file. Either this or master needs to be set if the provisioner is being run out of cluster.")
-	execCommand    = flag.String("execCommand", "/opt/storage/flex-provision.sh", "The provisioner executable.")
+	provisioner          = flag.String("provisioner", "k8s.io/default", "Name of the provisioner. The provisioner will only provision volumes for claims that request a StorageClass with a provisioner field set equal to this name.")
+	master               = flag.String("master", "", "Master URL to build a client config from. Either this or kubeconfig needs to be set if the provisioner is being run out of cluster.")
+	kubeconfig           = flag.String("kubeconfig", "", "Absolute path to the kubeconfig file. Either this or master needs to be set if the provisioner is being run out of cluster.")
+	execCommand          = flag.String("execCommand", "/opt/storage/flex-provision.sh", "The provisioner executable.")
 	failedRetryThreshold = flag.Int("failed-retry-threshold", 10, "If the number of retries on provisioning failure need to be limited to a set number of attempts. Default 10")
 )
 
 const (
-	leasePeriod   = leaderelection.DefaultLeaseDuration
-	retryPeriod   = leaderelection.DefaultRetryPeriod
-	renewDeadline = leaderelection.DefaultRenewDeadline
-	termLimit     = leaderelection.DefaultTermLimit
+	leasePeriod   = controller.DefaultLeaseDuration
+	retryPeriod   = controller.DefaultRetryPeriod
+	renewDeadline = controller.DefaultRenewDeadline
+	termLimit     = controller.DefaultTermLimit
 )
-
 
 func main() {
 	flag.Set("logtostderr", "true")
@@ -57,7 +55,7 @@ func main() {
 	}
 	glog.Infof("Provisioner %s specified", *provisioner)
 
-	if execCommand==nil {
+	if execCommand == nil {
 		glog.Fatalf("Invalid flags specified: must provide provisioner exec command")
 	}
 
@@ -92,7 +90,6 @@ func main() {
 
 	// Start the provision controller which will dynamically provision NFS PVs
 	pc := controller.NewProvisionController(clientset, 15*time.Second, *provisioner, flexProvisioner, serverVersion.GitVersion, false, *failedRetryThreshold, leasePeriod, renewDeadline, retryPeriod, termLimit)
-
 
 	pc.Run(wait.NeverStop)
 }
