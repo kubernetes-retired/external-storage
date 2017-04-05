@@ -2,7 +2,7 @@ kind: StorageClass
 apiVersion: storage.k8s.io/v1beta1
 metadata:
   name: cephfs
-provisioner: ceph/cephfs
+provisioner: ceph.com/cephfs
 parameters:
     monitors: 172.24.0.4:6789
     adminId: admin

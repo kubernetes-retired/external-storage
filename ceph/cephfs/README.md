@@ -16,16 +16,16 @@ docker build -t cephfs-provisioner .
 * Create a Ceph admin secret
 
 ```bash
-ceph auth get client.admin 2>&1 |grep "key = " |a^C '{print  $3'} |xargs echo -n > /tmp/secret
+ceph auth get client.admin 2>&1 |grep "key = " |awk '{print  $3'} |xargs echo -n > /tmp/secret
 kubectl create secret generic ceph-secret-admin --from-file=/tmp/secret --namespace=kube-system
 ```
 
 * Start CephFS provisioner
 
-Assume kubeconfig is at `/root/.kube`:
+The following example uses `cephfs-provisioner-1` as the identity for the instance and assumes kubeconfig is at `/root/.kube`. The identity should remain the same if the provisioner restarts. If there are multiple provisioners, each should have a different identity.
 
 ```bash
-docker run -ti -v /root/.kube:/kube --privileged --net=host  cephfs-provisioner /usr/local/bin/cephfs-provisioner -master=http://127.0.0.1:8080 -kubeconfig=/kube/config
+docker run -ti -v /root/.kube:/kube --privileged --net=host  cephfs-provisioner /usr/local/bin/cephfs-provisioner -master=http://127.0.0.1:8080 -kubeconfig=/kube/config -id=cephfs-provisioner-1
 ```
 
 * Create a CephFS Storage Class
