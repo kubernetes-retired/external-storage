@@ -28,7 +28,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
@@ -39,7 +38,7 @@ import (
 
 const (
 	resyncPeriod              = 15 * time.Second
-	provisionerName           = "ceph/cephfs"
+	provisionerName           = "ceph.com/cephfs"
 	exponentialBackOffOnError = false
 	failedRetryThreshold      = 5
 	provisionCmd              = "/usr/local/bin/cephfs_provisioner"
@@ -58,13 +57,13 @@ type cephFSProvisioner struct {
 	client kubernetes.Interface
 	// Identity of this cephFSProvisioner, generated. Used to identify "this"
 	// provisioner's PVs.
-	identity types.UID
+	identity string
 }
 
-func newCephFSProvisioner(client kubernetes.Interface) controller.Provisioner {
+func newCephFSProvisioner(client kubernetes.Interface, id string) controller.Provisioner {
 	return &cephFSProvisioner{
 		client:   client,
-		identity: uuid.NewUUID(),
+		identity: id,
 	}
 }
 
@@ -132,17 +131,13 @@ func (p *cephFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 		ObjectMeta: metav1.ObjectMeta{
 			Name: options.PVName,
 			Annotations: map[string]string{
-				provisionerIDAnn: string(p.identity),
+				provisionerIDAnn: p.identity,
 				cephShareAnn:     share,
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: options.PersistentVolumeReclaimPolicy,
-			AccessModes: []v1.PersistentVolumeAccessMode{
-				v1.ReadWriteOnce,
-				v1.ReadOnlyMany,
-				v1.ReadWriteMany,
-			},
+			AccessModes:                   options.PVC.Spec.AccessModes,
 			Capacity: v1.ResourceList{ //FIXME: kernel cephfs doesn't enforce quota, capacity is not meaningless here.
 				v1.ResourceName(v1.ResourceStorage): options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)],
 			},
@@ -171,7 +166,7 @@ func (p *cephFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 	if !ok {
 		return errors.New("identity annotation not found on PV")
 	}
-	if ann != string(p.identity) {
+	if ann != p.identity {
 		return &controller.IgnoredError{"identity annotation on PV does not match ours"}
 	}
 	share, ok := volume.Annotations[cephShareAnn]
@@ -268,6 +263,7 @@ func (p *cephFSProvisioner) parsePVSecret(namespace, secretName string) (string,
 var (
 	master     = flag.String("master", "", "Master URL")
 	kubeconfig = flag.String("kubeconfig", "", "Absolute path to the kubeconfig")
+	id         = flag.String("id", "", "Unique provisioner identity")
 )
 
 func main() {
@@ -281,7 +277,10 @@ func main() {
 	} else {
 		config, err = rest.InClusterConfig()
 	}
-
+	prId := string(uuid.NewUUID())
+	if *id != "" {
+		prId = *id
+	}
 	if err != nil {
 		glog.Fatalf("Failed to create config: %v", err)
 	}
@@ -299,7 +298,7 @@ func main() {
 
 	// Create the provisioner: it implements the Provisioner interface expected by
 	// the controller
-	cephFSProvisioner := newCephFSProvisioner(clientset)
+	cephFSProvisioner := newCephFSProvisioner(clientset, prId)
 
 	// Start the provision controller which will dynamically provision cephFS
 	// PVs
