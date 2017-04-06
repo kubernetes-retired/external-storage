@@ -14,10 +14,10 @@ docker build -t glusterblock-provisioner .
 
 * Start glusterblock provisioner
 
-Assume kubeconfig is at `/root/.kube`:
+The following example uses `glusterblock-provisioner-1` as the identity for the instance and assumes kubeconfig is at `/root/.kube`. The identity should remain the same if the provisioner restarts. If there are multiple provisioners, each should have a different identity.
 
 ```bash
-docker run -ti -v /root/.kube:/kube --privileged --net=host  glusterblock-provisioner /usr/local/bin/glusterblock-provisioner -master=http://127.0.0.1:8080 -kubeconfig=/kube/config
+docker run -ti -v /root/.kube:/kube --privileged --net=host  glusterblock-provisioner /usr/local/bin/glusterblock-provisioner -master=http://127.0.0.1:8080 -kubeconfig=/kube/config -id=glusterblock-provisioner-1
 ```
 
 * Create a glusterblock Storage Class

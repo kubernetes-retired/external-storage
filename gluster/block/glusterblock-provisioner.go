@@ -29,7 +29,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
@@ -58,7 +57,7 @@ type glusterBlockProvisioner struct {
 
 	// Identity of this glusterBlockProvisioner, generated. Used to identify "this"
 	// provisioner's PVs.
-	identity types.UID
+	identity string
 
 	// Configuration of gluster block provisioner
 	provConfig provisionerConfig
@@ -92,10 +91,10 @@ type provisionerConfig struct {
 	execPath string
 }
 
-func NewglusterBlockProvisioner(client kubernetes.Interface) controller.Provisioner {
+func NewglusterBlockProvisioner(client kubernetes.Interface, id string) controller.Provisioner {
 	return &glusterBlockProvisioner{
 		client:   client,
-		identity: uuid.NewUUID(),
+		identity: id,
 	}
 }
 
@@ -132,7 +131,7 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 		ObjectMeta: metav1.ObjectMeta{
 			Name: options.PVName,
 			Annotations: map[string]string{
-				"glusterBlockProvisionerIdentity": string(p.identity),
+				"glusterBlockProvisionerIdentity": p.identity,
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{
@@ -179,7 +178,7 @@ func (p *glusterBlockProvisioner) Delete(volume *v1.PersistentVolume) error {
 	if !ok {
 		return errors.New("identity annotation not found on PV")
 	}
-	if ann != string(p.identity) {
+	if ann != p.identity {
 		return &controller.IgnoredError{"identity annotation on PV does not match ours"}
 	}
 	// Unset the variables.
@@ -315,6 +314,7 @@ func GetSecretForPV(secretNamespace, secretName, volumePluginName string, kubeCl
 var (
 	master     = flag.String("master", "", "Master URL")
 	kubeconfig = flag.String("kubeconfig", "", "Absolute path to the kubeconfig")
+	id         = flag.String("id", "", "Unique provisioner identity")
 )
 
 func main() {
@@ -330,6 +330,12 @@ func main() {
 		config, err = clientcmd.BuildConfigFromFlags(*master, *kubeconfig)
 	} else {
 		config, err = rest.InClusterConfig()
+	}
+
+	prId := string(uuid.NewUUID())
+
+	if *id != "" {
+		prId = *id
 	}
 
 	if err != nil {
@@ -349,7 +355,7 @@ func main() {
 
 	// Create the provisioner: it implements the Provisioner interface expected by
 	// the controller
-	glusterBlockProvisioner := NewglusterBlockProvisioner(clientset)
+	glusterBlockProvisioner := NewglusterBlockProvisioner(clientset, prId)
 
 	// Start the provision controller which will dynamically provision glusterblock
 	// PVs
