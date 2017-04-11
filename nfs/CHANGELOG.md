@@ -1,3 +1,6 @@
+# v1.0.6
+- Reduce image size by a lot
+
 # v1.0.5
 - Add compatibility with kubernetes v1.6.x (using lib v2.0.x)
 
