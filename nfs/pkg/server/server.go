@@ -23,6 +23,9 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
+	"syscall"
+
+	"github.com/golang/glog"
 )
 
 var defaultGaneshaConfigContents = []byte(`
@@ -91,6 +94,11 @@ func Start(ganeshaConfig string, gracePeriod uint) error {
 		return fmt.Errorf("dbus-daemon failed with error: %v, output: %s", err, out)
 	}
 
+	err := setRlimitNOFILE()
+	if err != nil {
+		glog.Warningf("Error setting RLIMIT_NOFILE, there may be 'Too many open files' errors later: %v", err)
+	}
+
 	// Use defaultGaneshaConfigContents if the ganeshaConfig doesn't exist yet
 	if _, err := os.Stat(ganeshaConfig); os.IsNotExist(err) {
 		err = ioutil.WriteFile(ganeshaConfig, defaultGaneshaConfigContents, 0600)
@@ -98,7 +106,7 @@ func Start(ganeshaConfig string, gracePeriod uint) error {
 			return fmt.Errorf("error writing ganesha config %s: %v", ganeshaConfig, err)
 		}
 	}
-	err := setGracePeriod(ganeshaConfig, gracePeriod)
+	err = setGracePeriod(ganeshaConfig, gracePeriod)
 	if err != nil {
 		return fmt.Errorf("error setting grace period to ganesha config: %v", err)
 	}
@@ -112,6 +120,27 @@ func Start(ganeshaConfig string, gracePeriod uint) error {
 		return fmt.Errorf("ganesha.nfsd failed with error: %v, output: %s", err, out)
 	}
 
+	return nil
+}
+
+func setRlimitNOFILE() error {
+	var rlimit syscall.Rlimit
+	err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &rlimit)
+	if err != nil {
+		return fmt.Errorf("error getting RLIMIT_NOFILE: %v", err)
+	}
+	glog.Infof("starting RLIMIT_NOFILE rlimit.Cur %d, rlimit.Max %d", rlimit.Cur, rlimit.Max)
+	rlimit.Max = 1024 * 1024
+	rlimit.Cur = 1024 * 1024
+	err = syscall.Setrlimit(syscall.RLIMIT_NOFILE, &rlimit)
+	if err != nil {
+		return err
+	}
+	err = syscall.Getrlimit(syscall.RLIMIT_NOFILE, &rlimit)
+	if err != nil {
+		return fmt.Errorf("error getting RLIMIT_NOFILE: %v", err)
+	}
+	glog.Infof("ending RLIMIT_NOFILE rlimit.Cur %d, rlimit.Max %d", rlimit.Cur, rlimit.Max)
 	return nil
 }
 
