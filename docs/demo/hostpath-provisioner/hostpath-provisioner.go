@@ -30,6 +30,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
+	"syscall"
 )
 
 const (
@@ -117,6 +118,8 @@ func (p *hostPathProvisioner) Delete(volume *v1.PersistentVolume) error {
 }
 
 func main() {
+	syscall.Umask(0)
+
 	flag.Parse()
 	flag.Set("logtostderr", "true")
 
