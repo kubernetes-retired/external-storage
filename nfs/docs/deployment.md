@@ -95,12 +95,12 @@ daemonset "nfs-provisioner" created
 
 The container is going to need to run with one of `master` or `kubeconfig` set. For the `kubeconfig` argument to work, the config file, and any certificate files it references by path like `certificate-authority: /var/run/kubernetes/apiserver.crt`, need to be inside the container somehow. This can be done by creating Docker volumes, or copying the files into the folder where the Dockerfile is and adding lines like `COPY config /.kube/config` to the Dockerfile before building the image. 
 
-Run nfs-provisioner with `provisioner` equal to the name you decided on, and one of `master` or `kubeconfig` set. It needs to be run with capability `DAC_READ_SEARCH`. If you are using Docker 1.10 or newer, it also needs a more permissive seccomp profile: `unconfined` or `deploy/docker/nfs-provisioner-seccomp.json`.
+Run nfs-provisioner with `provisioner` equal to the name you decided on, and one of `master` or `kubeconfig` set. It needs to be run with capability `DAC_READ_SEARCH` in order for Ganesha to work. Optionally, it should be run also with capability `SYS_RESOURCE` so that it can set a higher limit for the number of opened files Ganesha may have. If you are using Docker 1.10 or newer, it also needs a more permissive seccomp profile: `unconfined` or `deploy/docker/nfs-provisioner-seccomp.json`.
 
 You may want to specify the hostname the NFS server exports from, i.e. the server IP to put on PVs, by setting the `server-hostname` flag.
 
 ```
-$ docker run --cap-add DAC_READ_SEARCH \
+$ docker run --cap-add DAC_READ_SEARCH --cap-add SYS_RESOURCE \
 --security-opt seccomp:deploy/docker/nfs-provisioner-seccomp.json \
 -v $HOME/.kube:/.kube:Z \
 quay.io/kubernetes_incubator/nfs-provisioner:v1.0.6 \
@@ -109,7 +109,7 @@ quay.io/kubernetes_incubator/nfs-provisioner:v1.0.6 \
 ```
 or
 ```
-$ docker run --cap-add DAC_READ_SEARCH \
+$ docker run --cap-add DAC_READ_SEARCH --cap-add SYS_RESOURCE \
 --security-opt seccomp:deploy/docker/nfs-provisioner-seccomp.json \
 quay.io/kubernetes_incubator/nfs-provisioner:v1.0.6 \
 -provisioner=example.com/nfs \

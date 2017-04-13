@@ -6,6 +6,7 @@ allowHostPorts: false
 allowPrivilegedContainer: false
 allowedCapabilities:
 - DAC_READ_SEARCH
+- SYS_RESOURCE
 apiVersion: v1
 defaultAddCapabilities: null
 fsGroup:

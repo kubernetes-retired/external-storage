@@ -7,6 +7,7 @@ spec:
     rule: RunAsAny
   allowedCapabilities:
   - DAC_READ_SEARCH
+  - SYS_RESOURCE
   runAsUser:
     rule: RunAsAny
   seLinux:

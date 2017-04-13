@@ -51,6 +51,7 @@ spec:
             capabilities:
               add:
                 - DAC_READ_SEARCH
+                - SYS_RESOURCE
           args:
             - "-provisioner=example.com/nfs"
           env:
