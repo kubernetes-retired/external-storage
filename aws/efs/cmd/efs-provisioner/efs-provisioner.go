@@ -58,7 +58,6 @@ type efsProvisioner struct {
 	dnsName    string
 	mountpoint string
 	source     string
-	svc        *efs.EFS
 	allocator  gidallocator.Allocator
 }
 
@@ -83,7 +82,7 @@ func NewEFSProvisioner(client kubernetes.Interface) controller.Provisioner {
 
 	sess, err := session.NewSession()
 	if err != nil {
-		glog.Fatal(err)
+		glog.Warningf("couldn't create an AWS session: %v", err)
 	}
 
 	svc := efs.New(sess, &aws.Config{Region: aws.String(awsRegion)})
@@ -93,14 +92,13 @@ func NewEFSProvisioner(client kubernetes.Interface) controller.Provisioner {
 
 	_, err = svc.DescribeFileSystems(params)
 	if err != nil {
-		glog.Fatal(err)
+		glog.Warningf("couldn't confirm that the EFS file system exists: %v", err)
 	}
 
 	return &efsProvisioner{
 		dnsName:    dnsName,
 		mountpoint: mountpoint,
 		source:     source,
-		svc:        svc,
 		allocator:  gidallocator.New(client),
 	}
 }
@@ -120,7 +118,7 @@ func getMount(dnsName string) (string, string, error) {
 		}
 	}
 
-	return "", "", fmt.Errorf("No mount entry found for %s", dnsName)
+	return "", "", fmt.Errorf("no mount entry found for %s", dnsName)
 }
 
 var _ controller.Provisioner = &efsProvisioner{}
