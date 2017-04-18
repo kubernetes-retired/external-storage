@@ -164,6 +164,14 @@ type ProvisionController struct {
 	// Map of failed claims
 	failedClaimsStats      map[types.UID]int
 	failedClaimsStatsMutex *sync.Mutex
+
+	// Threshold for max number of retries on failure of the deletion of provisioner. Non positive number means controller will retry the deletion infinitely.
+	failedDeletionRetryThreshold int
+
+	// Map of deletion failed volumes
+	failedDeletionVolumesStats map[types.UID]int
+
+	failedDeletionVolumesMutex *sync.Mutex
 }
 
 // NewProvisionController creates a new provision controller
@@ -212,6 +220,8 @@ func NewProvisionController(
 		failedClaimsStats:             make(map[types.UID]int),
 		failedRetryThreshold:          failedRetryThreshold,
 		failedClaimsStatsMutex:        &sync.Mutex{},
+		failedDeletionVolumesStats:    make(map[types.UID]int),
+		failedDeletionVolumesMutex:    &sync.Mutex{},
 	}
 
 	controller.claimSource = &cache.ListWatch{
@@ -297,6 +307,13 @@ func (ctrl *ProvisionController) Run(stopCh <-chan struct{}) {
 	<-stopCh
 }
 
+// SetFailedDeletionRetryThreshold sets the value of failedDeletionRetryThreshold
+func (ctrl *ProvisionController) SetFailedDeletionRetryThreshold(threshold int) {
+	ctrl.failedDeletionVolumesMutex.Lock()
+	ctrl.failedDeletionRetryThreshold = threshold
+	ctrl.failedDeletionVolumesMutex.Unlock()
+}
+
 // On add claim, check if the added claim should have a volume provisioned for
 // it and provision one if so.
 func (ctrl *ProvisionController) addClaim(obj interface{}) {
@@ -373,7 +390,9 @@ func (ctrl *ProvisionController) updateVolume(oldObj, newObj interface{}) {
 	if ctrl.shouldDelete(volume) {
 		opName := fmt.Sprintf("delete-%s[%s]", volume.Name, string(volume.UID))
 		ctrl.scheduleOperation(opName, func() error {
-			return ctrl.deleteVolumeOperation(volume)
+			err := ctrl.deleteVolumeOperation(volume)
+			ctrl.updateDeletionVolumesStats(volume, err)
+			return err
 		})
 	}
 }
@@ -453,6 +472,16 @@ func (ctrl *ProvisionController) shouldProvision(claim *v1.PersistentVolumeClaim
 }
 
 func (ctrl *ProvisionController) shouldDelete(volume *v1.PersistentVolume) bool {
+	ctrl.failedDeletionVolumesMutex.Lock()
+	if failureCount, exists := ctrl.failedDeletionVolumesStats[volume.UID]; exists == true {
+		if failureCount >= ctrl.failedDeletionRetryThreshold && ctrl.failedDeletionRetryThreshold > 0 {
+			glog.Errorf("Exceeded failedDeletionRetryThreshold threshold: %d, for volume %q, provisioner will not attempt retries for this volume", ctrl.failedDeletionRetryThreshold, volume.Name)
+			ctrl.failedDeletionVolumesMutex.Unlock()
+			return false
+		}
+	}
+	ctrl.failedDeletionVolumesMutex.Unlock()
+
 	// In 1.5+ we delete only if the volume is in state Released. In 1.4 we must
 	// delete if the volume is in state Failed too.
 	if ctrl.kubeVersion.AtLeast(utilversion.MustParseSemantic("v1.5.0")) {
@@ -563,6 +592,27 @@ func (ctrl *ProvisionController) updateStats(claim *v1.PersistentVolumeClaim, er
 
 	} else {
 		delete(ctrl.failedClaimsStats, claim.UID)
+	}
+}
+
+func (ctrl *ProvisionController) updateDeletionVolumesStats(volume *v1.PersistentVolume, err error) {
+	// Do not record the failed volume info when failedDeletionRetryThreshold is not set
+	if ctrl.failedDeletionRetryThreshold <= 0 {
+		return
+	}
+
+	ctrl.failedDeletionVolumesMutex.Lock()
+	defer ctrl.failedDeletionVolumesMutex.Unlock()
+	if err != nil {
+		if failureRetryCount, exists := ctrl.failedDeletionVolumesStats[volume.UID]; exists == true {
+			failureRetryCount = failureRetryCount + 1
+			ctrl.failedDeletionVolumesStats[volume.UID] = failureRetryCount
+		} else {
+			ctrl.failedDeletionVolumesStats[volume.UID] = 1
+		}
+
+	} else {
+		delete(ctrl.failedDeletionVolumesStats, volume.UID)
 	}
 }
 
