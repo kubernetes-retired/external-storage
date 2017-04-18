@@ -307,7 +307,7 @@ func startProvisionerPod(c clientset.Interface, ns string) *v1.Pod {
 					Image: "quay.io/kubernetes_incubator/nfs-provisioner:latest",
 					SecurityContext: &v1.SecurityContext{
 						Capabilities: &v1.Capabilities{
-							Add: []v1.Capability{"DAC_READ_SEARCH"},
+							Add: []v1.Capability{"DAC_READ_SEARCH", "SYS_RESOURCE"},
 						},
 					},
 					Args: []string{

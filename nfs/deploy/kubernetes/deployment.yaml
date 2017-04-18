@@ -33,7 +33,7 @@ spec:
     spec:
       containers:
         - name: nfs-provisioner
-          image: quay.io/kubernetes_incubator/nfs-provisioner:v1.0.6
+          image: quay.io/kubernetes_incubator/nfs-provisioner:v1.0.7
           ports:
             - name: nfs
               containerPort: 2049
@@ -48,6 +48,7 @@ spec:
             capabilities:
               add:
                 - DAC_READ_SEARCH
+                - SYS_RESOURCE
           args:
             - "-provisioner=example.com/nfs"
           env:
