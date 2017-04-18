@@ -1,3 +1,6 @@
+# v1.0.7
+- Set a high limit for maximum number of files Ganesha may have open (setrlimit RLIMIT_NOFILE) -- this requires the additional SYS_RESOURCE capability, if not available the provisioner will still start but with a warning
+
 # v1.0.6
 - Reduce image size by a lot
 
