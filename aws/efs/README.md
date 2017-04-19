@@ -6,7 +6,6 @@ quay.io/external_storage/efs-provisioner:latest
 ```
 
 ## Prerequisites
-* An IAM user assigned the AmazonElasticFileSystemReadOnlyAccess policy (or better)
 * An EFS file system in your cluster's region
 * [Mount targets](http://docs.aws.amazon.com/efs/latest/ug/accessing-fs.html) and [security groups](http://docs.aws.amazon.com/efs/latest/ug/accessing-fs-create-security-groups.html) such that any node (in any zone in the cluster's region) can mount the EFS file system by its [File system DNS name](http://docs.aws.amazon.com/efs/latest/ug/mounting-fs-mount-cmd-dns-name.html)
 
@@ -21,13 +20,7 @@ $ kubectl create configmap efs-provisioner \
 --from-literal=provisioner.name=example.com/aws-efs
 ```
 
-Create a secret containing the AWS credentials of a user assigned the AmazonElasticFileSystemReadOnlyAccess policy. The credentials will be used by the provisioner only once at startup to check that the EFS file system you specified in the configmap actually exists.
-
-```console
-$ kubectl create secret generic aws-credentials \
---from-literal=aws-access-key-id=AKIAIOSFODNN7EXAMPLE \
---from-literal=aws-secret-access-key=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
-```
+> See [Optional: AWS credentials secret](#optional-aws-credentials-secret) if you want the provisioner to only once at startup check that the EFS file system you specified in the configmap actually exists.
 
 Decide on & set aside a directory within the EFS file system for the provisioner to use. The provisioner will create child directories to back each PV it provisions. Then edit the `volumes` section at the bottom of "deploy/deployment.yaml" so that the `path` refers to the directory you set aside and the `server` is the same EFS file system you specified. Create the deployment, and you're done.
 
@@ -114,3 +107,30 @@ NAME                                       CAPACITY   ACCESSMODES   RECLAIMPOLIC
 pvc-557b4436-ed73-11e6-84b3-06a700dda5f5   1Mi        RWX           Delete          Bound     default/efs             2s
 ```
 Note: any pod that consumes the claim will be able to read/write to the volume. This is because the volumes are provisioned with a GID (from the default range or according to `gidMin` + `gidMax`) and any pod that mounts the volume via the claim automatically gets the GID as a supplemental group.
+
+---
+##### Optional: AWS credentials secret
+
+Create a secret containing the AWS credentials of a user assigned the AmazonElasticFileSystemReadOnlyAccess policy. The credentials will be used by the provisioner only once at startup to check that the EFS file system you specified in the configmap actually exists.
+
+```console
+$ kubectl create secret generic aws-credentials \
+--from-literal=aws-access-key-id=AKIAIOSFODNN7EXAMPLE \
+--from-literal=aws-secret-access-key=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+```
+
+Add a reference to the secret in the deployment yaml.
+```yaml
+...
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: aws-credentials
+              key: aws-access-key-id
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: aws-credentials
+              key: aws-secret-access-key
+...
+```
