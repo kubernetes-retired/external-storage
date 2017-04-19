@@ -21,6 +21,4 @@ Follow either of the two links above to access the appropriate CLA and instructi
 1. Fork the desired repo, develop and test your code changes.
 1. Submit a pull request.
 
-### Adding dependencies
-
-If your patch depends on new packages, add that package with [`godep`](https://github.com/tools/godep). Follow the [instructions to add a dependency](https://github.com/kubernetes/kubernetes/blob/master/docs/devel/development.md#godep-and-dependency-management).
+### See also the [Contributing](./docs/README.md#contributing) section of the docs for information on how this repo is structured, how to add a dependency, etc.

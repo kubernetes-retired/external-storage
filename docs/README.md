@@ -6,6 +6,7 @@
 		* [Authorizing provisioners for RBAC or OpenShift](#authorizing-provisioners-for-rbac-or-openshift)
 		* [Running multiple provisioners and giving provisioners identities](#running-multiple-provisioners-and-giving-provisioners-identities)
 	* [The code](../lib/controller) - being a library, the code is *supposed* to be well-documented -- if you find it insufficient, open an issue
+* [Contributing](#contributing)
 
 ## Building provisioner programs and managing dependencies
 
@@ -100,3 +101,23 @@ There is no such race to lock implementation for deleting PVs: all provisioners 
 In some cases, the provisioner who is *responsible* for deleting a PV is also the only one *capable* of deleting a PV, in which case it's not only desirable to implement the identity idea, but necessary. This is the case with the `hostPath` provisioner example: obviously only the provisioner running on a certain host can delete the backing storage asset because the backing storage asset is local to the host.
 
 Now, actually giving provisioners identities and effectively making them pets may be the hard part. In the `hostPath` example, the sensible thing to do was tie a provisioner's identity to the node/host it runs on. In your case, maybe it makes sense to tie each provisioner to e.g. a certain member in a storage pool. And should a certain provisioner die, when it comes back it should retain its identity lest the cluster be left with dangling volumes that no running provisioner can delete.
+
+## Contributing
+
+This repository is structured such that each external provisioner gets its own directory for its code, docs, examples, yamls, etc. What they don't get is individual "vendor" directories for their respective dependencies, they must depend on the shared top-level vendor and lib directories. This helps reduce the size of the repo and forces all parts of it to stay updated, but introduces some complications for contributors.
+
+### Adding a provisioner
+
+Basically you create a directory to house everything you want to check in, add build and/or test invocations to [travis](../.travis.yml), and add dependencies to the top-level vendor directory.
+
+### Adding a vendor dependency
+
+This repository uses [glide](https://github.com/Masterminds/glide) for package management. Add the packages to [glide.yaml](../glide.yaml), run "glide up -v", then run "glide-vc --use-lock-file".
+
+### Updating a vendor dependency and/or contributing to the library
+
+Any breaking update to a vendor dependency requires an update to every external provisioner that depends on it. It follows that any breaking update to the library requires an update to every external provisioner. If the provisioners that need to be updated are not updated, they simply won't build.
+
+Generally, breaking vendor dependency updates won't happen often (at least every time kubernetes/client-go updates, maybe) and all the provisioners can be updated with ease, without requiring explicit approval from their respective OWNERS, unless the change is big enough or they've asked that it be required.
+
+As the contributor of a dependency/library update, you're usually responsible for updating the dependents so travis CI passes, as it shouldn't be harder than a find/replace. Otherwise, if it's decided that you don't need to be responsible, some other solution will be worked out to make sure everything stays in a buildable state.
