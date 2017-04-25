@@ -125,6 +125,9 @@ type ProvisionController struct {
 	// is the leader of a given claim
 	leaderElectors      map[types.UID]*leaderelection.LeaderElector
 	leaderElectorsMutex *sync.Mutex
+
+	hasRun     bool
+	hasRunLock *sync.Mutex
 }
 
 const (
@@ -140,18 +143,29 @@ const (
 	defaultTermLimit                     = 30 * time.Second
 )
 
+var errRuntime = fmt.Errorf("cannot call option functions after controller has Run")
+
 // ResyncPeriod is how often the controller relists PVCs, PVs, & storage
 // classes. OnUpdate will be called even if nothing has changed, meaning failed
 // operations may be retried on a PVC/PV every resyncPeriod regardless of
 // whether it changed. Defaults to 15 seconds.
 func ResyncPeriod(resyncPeriod time.Duration) func(*ProvisionController) error {
-	return func(c *ProvisionController) error { c.resyncPeriod = resyncPeriod; return nil }
+	return func(c *ProvisionController) error {
+		if c.HasRun() {
+			return errRuntime
+		}
+		c.resyncPeriod = resyncPeriod
+		return nil
+	}
 }
 
 // ExponentialBackOffOnError determines whether to exponentially back off from
 // failures of Provision and Delete. Defaults to true.
 func ExponentialBackOffOnError(exponentialBackOffOnError bool) func(*ProvisionController) error {
 	return func(c *ProvisionController) error {
+		if c.HasRun() {
+			return errRuntime
+		}
 		c.runningOperations = goroutinemap.NewGoRoutineMap(exponentialBackOffOnError)
 		return nil
 	}
@@ -161,6 +175,9 @@ func ExponentialBackOffOnError(exponentialBackOffOnError bool) func(*ProvisionCo
 // object for a provisioned volume. Defaults to 5.
 func CreateProvisionedPVRetryCount(createProvisionedPVRetryCount int) func(*ProvisionController) error {
 	return func(c *ProvisionController) error {
+		if c.HasRun() {
+			return errRuntime
+		}
 		c.createProvisionedPVRetryCount = createProvisionedPVRetryCount
 		return nil
 	}
@@ -170,6 +187,9 @@ func CreateProvisionedPVRetryCount(createProvisionedPVRetryCount int) func(*Prov
 // PV object for a provisioned volume. Defaults to 10 seconds.
 func CreateProvisionedPVInterval(createProvisionedPVInterval time.Duration) func(*ProvisionController) error {
 	return func(c *ProvisionController) error {
+		if c.HasRun() {
+			return errRuntime
+		}
 		c.createProvisionedPVInterval = createProvisionedPVInterval
 		return nil
 	}
@@ -197,26 +217,50 @@ func FailedDeleteThreshold(failedDeleteThreshold int) func(*ProvisionController)
 // wait to force acquire leadership. This is measured against time of
 // last observed ack. Defaults to 15 seconds.
 func LeaseDuration(leaseDuration time.Duration) func(*ProvisionController) error {
-	return func(c *ProvisionController) error { c.leaseDuration = leaseDuration; return nil }
+	return func(c *ProvisionController) error {
+		if c.HasRun() {
+			return errRuntime
+		}
+		c.leaseDuration = leaseDuration
+		return nil
+	}
 }
 
 // RenewDeadline is the duration that the acting master will retry
 // refreshing leadership before giving up. Defaults to 10 seconds.
 func RenewDeadline(renewDeadline time.Duration) func(*ProvisionController) error {
-	return func(c *ProvisionController) error { c.renewDeadline = renewDeadline; return nil }
+	return func(c *ProvisionController) error {
+		if c.HasRun() {
+			return errRuntime
+		}
+		c.renewDeadline = renewDeadline
+		return nil
+	}
 }
 
 // RetryPeriod is the duration the LeaderElector clients should wait
 // between tries of actions. Defaults to 2 seconds.
 func RetryPeriod(retryPeriod time.Duration) func(*ProvisionController) error {
-	return func(c *ProvisionController) error { c.retryPeriod = retryPeriod; return nil }
+	return func(c *ProvisionController) error {
+		if c.HasRun() {
+			return errRuntime
+		}
+		c.retryPeriod = retryPeriod
+		return nil
+	}
 }
 
 // TermLimit is the maximum duration that a leader may remain the leader
 // to complete the task before it must give up its leadership. 0 for forever
 // or indefinite. Defaults to 30 seconds.
 func TermLimit(termLimit time.Duration) func(*ProvisionController) error {
-	return func(c *ProvisionController) error { c.termLimit = termLimit; return nil }
+	return func(c *ProvisionController) error {
+		if c.HasRun() {
+			return errRuntime
+		}
+		c.termLimit = termLimit
+		return nil
+	}
 }
 
 // NewProvisionController creates a new provision controller
@@ -261,6 +305,8 @@ func NewProvisionController(
 		termLimit:                     defaultTermLimit,
 		leaderElectors:                make(map[types.UID]*leaderelection.LeaderElector),
 		leaderElectorsMutex:           &sync.Mutex{},
+		hasRun:                        false,
+		hasRunLock:                    &sync.Mutex{},
 	}
 
 	for _, option := range options {
@@ -344,10 +390,20 @@ func NewProvisionController(
 // Run starts all of this controller's control loops
 func (ctrl *ProvisionController) Run(stopCh <-chan struct{}) {
 	glog.Infof("Starting provisioner controller %s!", string(ctrl.identity))
+	ctrl.hasRunLock.Lock()
+	ctrl.hasRun = true
+	ctrl.hasRunLock.Unlock()
 	go ctrl.claimController.Run(stopCh)
 	go ctrl.volumeController.Run(stopCh)
 	go ctrl.classReflector.RunUntil(stopCh)
 	<-stopCh
+}
+
+// HasRun returns whether the controller has Run
+func (ctrl *ProvisionController) HasRun() bool {
+	ctrl.hasRunLock.Lock()
+	defer ctrl.hasRunLock.Unlock()
+	return ctrl.hasRun
 }
 
 // SetFailedProvisionThreshold sets the value of failedProvisionThreshold
