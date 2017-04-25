@@ -172,19 +172,19 @@ var _ controller.Provisioner = &nfsProvisioner{}
 // Provision creates a volume i.e. the storage asset and returns a PV object for
 // the volume.
 func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.PersistentVolume, error) {
-	server, path, supGroup, exportBlock, exportID, projectBlock, projectID, err := p.createVolume(options)
+	volume, err := p.createVolume(options)
 	if err != nil {
 		return nil, err
 	}
 
 	annotations := make(map[string]string)
 	annotations[annCreatedBy] = createdBy
-	annotations[annExportBlock] = exportBlock
-	annotations[annExportID] = strconv.FormatUint(uint64(exportID), 10)
-	annotations[annProjectBlock] = projectBlock
-	annotations[annProjectID] = strconv.FormatUint(uint64(projectID), 10)
-	if supGroup != 0 {
-		annotations[VolumeGidAnnotationKey] = strconv.FormatUint(supGroup, 10)
+	annotations[annExportBlock] = volume.exportBlock
+	annotations[annExportID] = strconv.FormatUint(uint64(volume.exportID), 10)
+	annotations[annProjectBlock] = volume.projectBlock
+	annotations[annProjectID] = strconv.FormatUint(uint64(volume.projectID), 10)
+	if volume.supGroup != 0 {
+		annotations[VolumeGidAnnotationKey] = strconv.FormatUint(volume.supGroup, 10)
 	}
 	annotations[annProvisionerID] = string(p.identity)
 
@@ -202,8 +202,8 @@ func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 			},
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				NFS: &v1.NFSVolumeSource{
-					Server:   server,
-					Path:     path,
+					Server:   volume.server,
+					Path:     volume.path,
 					ReadOnly: false,
 				},
 			},
@@ -213,42 +213,60 @@ func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 	return pv, nil
 }
 
+type volume struct {
+	server       string
+	path         string
+	supGroup     uint64
+	exportBlock  string
+	exportID     uint16
+	projectBlock string
+	projectID    uint16
+}
+
 // createVolume creates a volume i.e. the storage asset. It creates a unique
 // directory under /export and exports it. Returns the server IP, the path, a
 // zero/non-zero supplemental group, the block it added to either the ganesha
 // config or /etc/exports, and the exportID
 // TODO return values
-func (p *nfsProvisioner) createVolume(options controller.VolumeOptions) (string, string, uint64, string, uint16, string, uint16, error) {
+func (p *nfsProvisioner) createVolume(options controller.VolumeOptions) (volume, error) {
 	gid, err := p.validateOptions(options)
 	if err != nil {
-		return "", "", 0, "", 0, "", 0, fmt.Errorf("error validating options for volume: %v", err)
+		return volume{}, fmt.Errorf("error validating options for volume: %v", err)
 	}
 
 	server, err := p.getServer()
 	if err != nil {
-		return "", "", 0, "", 0, "", 0, fmt.Errorf("error getting NFS server IP for volume: %v", err)
+		return volume{}, fmt.Errorf("error getting NFS server IP for volume: %v", err)
 	}
 
 	path := path.Join(p.exportDir, options.PVName)
 
 	err = p.createDirectory(options.PVName, gid)
 	if err != nil {
-		return "", "", 0, "", 0, "", 0, fmt.Errorf("error creating directory for volume: %v", err)
+		return volume{}, fmt.Errorf("error creating directory for volume: %v", err)
 	}
 
 	exportBlock, exportID, err := p.createExport(options.PVName)
 	if err != nil {
 		os.RemoveAll(path)
-		return "", "", 0, "", 0, "", 0, fmt.Errorf("error creating export for volume: %v", err)
+		return volume{}, fmt.Errorf("error creating export for volume: %v", err)
 	}
 
 	projectBlock, projectID, err := p.createQuota(options.PVName, options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)])
 	if err != nil {
 		os.RemoveAll(path)
-		return "", "", 0, "", 0, "", 0, fmt.Errorf("error creating quota for volume: %v", err)
+		return volume{}, fmt.Errorf("error creating quota for volume: %v", err)
 	}
 
-	return server, path, 0, exportBlock, exportID, projectBlock, projectID, nil
+	return volume{
+		server:       server,
+		path:         path,
+		supGroup:     0,
+		exportBlock:  exportBlock,
+		exportID:     exportID,
+		projectBlock: projectBlock,
+		projectID:    projectID,
+	}, nil
 }
 
 func (p *nfsProvisioner) validateOptions(options controller.VolumeOptions) (string, error) {
