@@ -161,13 +161,13 @@ func TestCreateVolume(t *testing.T) {
 	for _, test := range tests {
 		os.Setenv(test.envKey, "1.1.1.1")
 
-		server, path, supGroup, block, exportID, _, _, err := p.createVolume(test.options)
+		volume, err := p.createVolume(test.options)
 
-		evaluate(t, test.name, test.expectError, err, test.expectedServer, server, "server")
-		evaluate(t, test.name, test.expectError, err, test.expectedPath, path, "path")
-		evaluate(t, test.name, test.expectError, err, test.expectedGroup, supGroup, "group")
-		evaluate(t, test.name, test.expectError, err, test.expectedBlock, block, "block")
-		evaluate(t, test.name, test.expectError, err, test.expectedExportID, exportID, "export id")
+		evaluate(t, test.name, test.expectError, err, test.expectedServer, volume.server, "server")
+		evaluate(t, test.name, test.expectError, err, test.expectedPath, volume.path, "path")
+		evaluate(t, test.name, test.expectError, err, test.expectedGroup, volume.supGroup, "group")
+		evaluate(t, test.name, test.expectError, err, test.expectedBlock, volume.exportBlock, "block")
+		evaluate(t, test.name, test.expectError, err, test.expectedExportID, volume.exportID, "export id")
 
 		os.Unsetenv(test.envKey)
 	}
@@ -234,6 +234,15 @@ func TestValidateOptions(t *testing.T) {
 			expectedGid: "",
 			expectError: true,
 		},
+		{
+			name: "mount options parameter key",
+			options: controller.VolumeOptions{
+				Parameters: map[string]string{"mountOptions": "asdf"},
+				PVC:        newClaim(resource.MustParse("1Ki"), nil, nil),
+			},
+			expectedGid: "none",
+			expectError: false,
+		},
 		// TODO implement options.ProvisionerSelector parsing
 		{
 			name: "non-nil selector",
@@ -257,7 +266,7 @@ func TestValidateOptions(t *testing.T) {
 	p := newNFSProvisionerInternal(tmpDir+"/", client, false, &testExporter{}, newDummyQuotaer(), "")
 
 	for _, test := range tests {
-		gid, err := p.validateOptions(test.options)
+		gid, _, err := p.validateOptions(test.options)
 
 		evaluate(t, test.name, test.expectError, err, test.expectedGid, gid, "gid")
 	}

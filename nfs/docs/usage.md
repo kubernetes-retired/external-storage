@@ -6,6 +6,7 @@ Edit the `provisioner` field in `deploy/kubernetes/class.yaml` to be the provisi
 
 ### Parameters
 * `gid`: `"none"` or a [supplemental group](http://kubernetes.io/docs/user-guide/security-context/) like `"1001"`. NFS shares will be created with permissions such that only pods running with the supplemental group can read & write to the share. Or if `"none"`, anybody can write to the share. This will only work in conjunction with the `root-squash` flag set true.  Default (if omitted) `"none"`.
+* `mountOptions`: a comma separated list of [mount options](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#mount-options) for every PV of this class to be mounted with. The list is inserted directly into every PV's mount options annotation/field without any validation. Default blank `""`.
 
 Name the `StorageClass` however you like; the name is how claims will request this class. Create the class.
  

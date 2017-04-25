@@ -63,6 +63,10 @@ const (
 	// object that specifies a supplemental GID.
 	VolumeGidAnnotationKey = "pv.beta.kubernetes.io/gid"
 
+	// MountOptionAnnotation is the annotation on a PV object that specifies a
+	// comma separated list of mount options
+	MountOptionAnnotation = "volume.beta.kubernetes.io/mount-options"
+
 	// A PV annotation for the identity of the nfsProvisioner that provisioned it
 	annProvisionerID = "Provisioner_Id"
 
@@ -186,6 +190,9 @@ func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 	if volume.supGroup != 0 {
 		annotations[VolumeGidAnnotationKey] = strconv.FormatUint(volume.supGroup, 10)
 	}
+	if volume.mountOptions != "" {
+		annotations[MountOptionAnnotation] = volume.mountOptions
+	}
 	annotations[annProvisionerID] = string(p.identity)
 
 	pv := &v1.PersistentVolume{
@@ -216,11 +223,12 @@ func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 type volume struct {
 	server       string
 	path         string
-	supGroup     uint64
 	exportBlock  string
 	exportID     uint16
 	projectBlock string
 	projectID    uint16
+	supGroup     uint64
+	mountOptions string
 }
 
 // createVolume creates a volume i.e. the storage asset. It creates a unique
@@ -229,7 +237,7 @@ type volume struct {
 // config or /etc/exports, and the exportID
 // TODO return values
 func (p *nfsProvisioner) createVolume(options controller.VolumeOptions) (volume, error) {
-	gid, err := p.validateOptions(options)
+	gid, mountOptions, err := p.validateOptions(options)
 	if err != nil {
 		return volume{}, fmt.Errorf("error validating options for volume: %v", err)
 	}
@@ -261,16 +269,18 @@ func (p *nfsProvisioner) createVolume(options controller.VolumeOptions) (volume,
 	return volume{
 		server:       server,
 		path:         path,
-		supGroup:     0,
 		exportBlock:  exportBlock,
 		exportID:     exportID,
 		projectBlock: projectBlock,
 		projectID:    projectID,
+		supGroup:     0,
+		mountOptions: mountOptions,
 	}, nil
 }
 
-func (p *nfsProvisioner) validateOptions(options controller.VolumeOptions) (string, error) {
+func (p *nfsProvisioner) validateOptions(options controller.VolumeOptions) (string, string, error) {
 	gid := "none"
+	mountOptions := ""
 	for k, v := range options.Parameters {
 		switch strings.ToLower(k) {
 		case "gid":
@@ -279,10 +289,12 @@ func (p *nfsProvisioner) validateOptions(options controller.VolumeOptions) (stri
 			} else if i, err := strconv.ParseUint(v, 10, 64); err == nil && i != 0 {
 				gid = v
 			} else {
-				return "", fmt.Errorf("invalid value for parameter gid: %v. valid values are: 'none' or a non-zero integer", v)
+				return "", "", fmt.Errorf("invalid value for parameter gid: %v. valid values are: 'none' or a non-zero integer", v)
 			}
+		case "mountoptions":
+			mountOptions = v
 		default:
-			return "", fmt.Errorf("invalid parameter: %q", k)
+			return "", "", fmt.Errorf("invalid parameter: %q", k)
 		}
 	}
 
@@ -290,21 +302,21 @@ func (p *nfsProvisioner) validateOptions(options controller.VolumeOptions) (stri
 	// pv.Labels MUST be set to match claim.spec.selector
 	// gid selector? with or without pv annotation?
 	if options.PVC.Spec.Selector != nil {
-		return "", fmt.Errorf("claim.Spec.Selector is not supported")
+		return "", "", fmt.Errorf("claim.Spec.Selector is not supported")
 	}
 
 	var stat syscall.Statfs_t
 	if err := syscall.Statfs(p.exportDir, &stat); err != nil {
-		return "", fmt.Errorf("error calling statfs on %v: %v", p.exportDir, err)
+		return "", "", fmt.Errorf("error calling statfs on %v: %v", p.exportDir, err)
 	}
 	capacity := options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	requestBytes := capacity.Value()
 	available := int64(stat.Bavail) * int64(stat.Bsize)
 	if requestBytes > available {
-		return "", fmt.Errorf("insufficient available space %v bytes to satisfy claim for %v bytes", available, requestBytes)
+		return "", "", fmt.Errorf("insufficient available space %v bytes to satisfy claim for %v bytes", available, requestBytes)
 	}
 
-	return gid, nil
+	return gid, mountOptions, nil
 }
 
 // getServer gets the server IP to put in a provisioned PV's spec.
