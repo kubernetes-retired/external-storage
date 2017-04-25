@@ -14,18 +14,7 @@
 
 IMAGE = quay.io/kubernetes_incubator/flex-provisioner
 
-VERSION :=
-TAG := $(shell git describe --abbrev=0 --tags HEAD 2>/dev/null)
-COMMIT := $(shell git rev-parse HEAD)
-ifeq ($(TAG),)
-    VERSION := latest
-else
-    ifeq ($(COMMIT), $(shell git rev-list -n1 $(TAG)))
-        VERSION := $(TAG)
-    else
-        VERSION := latest
-    endif
-endif
+VERSION := latest
 
 all build:
 	GOOS=linux go install -v ./cmd/flex-provisioner
@@ -43,14 +32,6 @@ quick-container:
 push: container
 	docker push $(IMAGE):$(VERSION)
 .PHONY: push
-
-test-integration: verify
-	go test `go list ./... | grep -v 'vendor\|test\|demo'`
-.PHONY: test-integration
-
-test-e2e: verify
-	go test ./test/e2e -v --kubeconfig=$(HOME)/.kube/config
-.PHONY: test-e2e
 
 verify:
 	@tput bold; echo Running gofmt:; tput sgr0

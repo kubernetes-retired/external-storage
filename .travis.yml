@@ -65,6 +65,9 @@ script:
   - pushd ./gluster/block
   - go build glusterblock-provisioner.go
   - popd
+  - pushd ./flex
+  - make container
+  - popd
     # Test building and running nfs-provisioner
   - pushd ./nfs
   - make container

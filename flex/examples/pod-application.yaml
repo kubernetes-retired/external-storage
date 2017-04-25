@@ -14,4 +14,3 @@ spec:
     - name: vol1
       persistentVolumeClaim:
         claimName: "pv1"
-
