@@ -14,14 +14,14 @@
 
 #!/bin/sh
 
-# Set this to true to log the call output to /tmp/s3fs-container
+# Set this to true to log the call output to /tmp/flex-provisioner.log
 INTERNAL_DEBUG=true
 
 INTERNAL_DEBUG=${INTERNAL_DEBUG:-"false"}
 
 usage() {
-    echo "Invalid usage of s3 provisioner CLI.. :"
-    debug "Invalid usage of s3 provisioner CLI.. :"
+    echo "Invalid usage of flex provisioner CLI.. :"
+    debug "Invalid usage of flex provisioner CLI.. :"
     exit 1
 }
 

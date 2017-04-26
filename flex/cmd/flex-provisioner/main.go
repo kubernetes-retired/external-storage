@@ -18,6 +18,8 @@ package main
 
 import (
 	"flag"
+	"strings"
+
 	"github.com/golang/glog"
 	vol "github.com/kubernetes-incubator/external-storage/flex/pkg/volume"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
@@ -27,23 +29,13 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"strings"
-	"time"
 )
 
 var (
-	provisioner          = flag.String("provisioner", "k8s.io/default", "Name of the provisioner. The provisioner will only provision volumes for claims that request a StorageClass with a provisioner field set equal to this name.")
-	master               = flag.String("master", "", "Master URL to build a client config from. Either this or kubeconfig needs to be set if the provisioner is being run out of cluster.")
-	kubeconfig           = flag.String("kubeconfig", "", "Absolute path to the kubeconfig file. Either this or master needs to be set if the provisioner is being run out of cluster.")
-	execCommand          = flag.String("execCommand", "/opt/storage/flex-provision.sh", "The provisioner executable.")
-	failedRetryThreshold = flag.Int("failed-retry-threshold", 10, "If the number of retries on provisioning failure need to be limited to a set number of attempts. Default 10")
-)
-
-const (
-	leasePeriod   = controller.DefaultLeaseDuration
-	retryPeriod   = controller.DefaultRetryPeriod
-	renewDeadline = controller.DefaultRenewDeadline
-	termLimit     = controller.DefaultTermLimit
+	provisioner = flag.String("provisioner", "example.com/default", "Name of the provisioner. The provisioner will only provision volumes for claims that request a StorageClass with a provisioner field set equal to this name.")
+	master      = flag.String("master", "", "Master URL to build a client config from. Either this or kubeconfig needs to be set if the provisioner is being run out of cluster.")
+	kubeconfig  = flag.String("kubeconfig", "", "Absolute path to the kubeconfig file. Either this or master needs to be set if the provisioner is being run out of cluster.")
+	execCommand = flag.String("execCommand", "/opt/storage/flex-provision.sh", "The provisioner executable.")
 )
 
 func main() {
@@ -89,7 +81,12 @@ func main() {
 	flexProvisioner := vol.NewFlexProvisioner(clientset, *execCommand)
 
 	// Start the provision controller which will dynamically provision NFS PVs
-	pc := controller.NewProvisionController(clientset, 15*time.Second, *provisioner, flexProvisioner, serverVersion.GitVersion, false, *failedRetryThreshold, leasePeriod, renewDeadline, retryPeriod, termLimit)
+	pc := controller.NewProvisionController(
+		clientset,
+		*provisioner,
+		flexProvisioner,
+		serverVersion.GitVersion,
+	)
 
 	pc.Run(wait.NeverStop)
 }

@@ -11,4 +11,3 @@ spec:
         - "-provisioner=external/flex-simple"
         - "-execCommand=/opt/storage/flex-provision.sh"
       imagePullPolicy: "IfNotPresent"
-

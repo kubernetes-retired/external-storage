@@ -17,9 +17,9 @@ limitations under the License.
 package volume
 
 import (
-	"github.com/golang/glog"
 	"os/exec"
 
+	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -107,7 +107,6 @@ func (p *flexProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 }
 
 func (p *flexProvisioner) createVolume(volumeOptions controller.VolumeOptions) error {
-
 	cmd := exec.Command(p.execCommand, "provision")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -116,5 +115,4 @@ func (p *flexProvisioner) createVolume(volumeOptions controller.VolumeOptions) e
 	}
 
 	return nil
-
 }
