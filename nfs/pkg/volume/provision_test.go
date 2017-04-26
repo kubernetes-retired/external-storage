@@ -178,10 +178,11 @@ func TestValidateOptions(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	tests := []struct {
-		name        string
-		options     controller.VolumeOptions
-		expectedGid string
-		expectError bool
+		name               string
+		options            controller.VolumeOptions
+		expectedGid        string
+		expectedRootSquash bool
+		expectError        bool
 	}{
 		{
 			name: "empty parameters",
@@ -235,6 +236,36 @@ func TestValidateOptions(t *testing.T) {
 			expectError: true,
 		},
 		{
+			name: "root squash parameter value 'true'",
+			options: controller.VolumeOptions{
+				Parameters: map[string]string{"rootSquash": "true"},
+				PVC:        newClaim(resource.MustParse("1Ki"), nil, nil),
+			},
+			expectedGid:        "none",
+			expectedRootSquash: true,
+			expectError:        false,
+		},
+		{
+			name: "root squash parameter value 'false'",
+			options: controller.VolumeOptions{
+				Parameters: map[string]string{"rootSquash": "false"},
+				PVC:        newClaim(resource.MustParse("1Ki"), nil, nil),
+			},
+			expectedGid:        "none",
+			expectedRootSquash: false,
+			expectError:        false,
+		},
+		{
+			name: "bad root squash parameter value neither 'true' nor 'false'",
+			options: controller.VolumeOptions{
+				Parameters: map[string]string{"rootSquash": "asdf"},
+				PVC:        newClaim(resource.MustParse("1Ki"), nil, nil),
+			},
+			expectError: true,
+		},
+
+		// TODO implement options.ProvisionerSelector parsing
+		{
 			name: "mount options parameter key",
 			options: controller.VolumeOptions{
 				Parameters: map[string]string{"mountOptions": "asdf"},
@@ -266,9 +297,10 @@ func TestValidateOptions(t *testing.T) {
 	p := newNFSProvisionerInternal(tmpDir+"/", client, false, &testExporter{}, newDummyQuotaer(), "")
 
 	for _, test := range tests {
-		gid, _, err := p.validateOptions(test.options)
+		gid, rootSquash, _, err := p.validateOptions(test.options)
 
 		evaluate(t, test.name, test.expectError, err, test.expectedGid, gid, "gid")
+		evaluate(t, test.name, test.expectError, err, test.expectedRootSquash, rootSquash, "root squash")
 	}
 }
 
@@ -679,7 +711,7 @@ type testExporter struct {
 
 var _ exporter = &testExporter{}
 
-func (e *testExporter) AddExportBlock(path string) (string, uint16, error) {
+func (e *testExporter) AddExportBlock(path string, _ bool) (string, uint16, error) {
 	return "\nExport_Id = 0;\n", 0, nil
 }
 
