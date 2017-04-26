@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
-	"time"
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
@@ -37,13 +36,10 @@ import (
 )
 
 const (
-	resyncPeriod              = 15 * time.Second
-	provisionerName           = "ceph.com/cephfs"
-	exponentialBackOffOnError = false
-	failedRetryThreshold      = 5
-	provisionCmd              = "/usr/local/bin/cephfs_provisioner"
-	provisionerIDAnn          = "cephFSProvisionerIdentity"
-	cephShareAnn              = "cephShare"
+	provisionerName  = "ceph.com/cephfs"
+	provisionCmd     = "/usr/local/bin/cephfs_provisioner"
+	provisionerIDAnn = "cephFSProvisionerIdentity"
+	cephShareAnn     = "cephShare"
 )
 
 type provisionOutput struct {
@@ -302,7 +298,12 @@ func main() {
 
 	// Start the provision controller which will dynamically provision cephFS
 	// PVs
-	pc := controller.NewProvisionController(clientset, resyncPeriod, provisionerName, cephFSProvisioner, serverVersion.GitVersion, exponentialBackOffOnError, failedRetryThreshold, 2*resyncPeriod, resyncPeriod, resyncPeriod/2, 2*resyncPeriod)
+	pc := controller.NewProvisionController(
+		clientset,
+		provisionerName,
+		cephFSProvisioner,
+		serverVersion.GitVersion,
+	)
 
 	pc.Run(wait.NeverStop)
 }

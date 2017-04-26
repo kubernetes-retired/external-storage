@@ -19,7 +19,6 @@ package main
 import (
 	"flag"
 	"strings"
-	"time"
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
@@ -49,10 +48,6 @@ var (
 const (
 	exportDir     = "/export"
 	ganeshaConfig = "/export/vfs.conf"
-	leasePeriod   = controller.DefaultLeaseDuration
-	retryPeriod   = controller.DefaultRetryPeriod
-	renewDeadline = controller.DefaultRenewDeadline
-	termLimit     = controller.DefaultTermLimit
 )
 
 func main() {
@@ -116,7 +111,13 @@ func main() {
 	nfsProvisioner := vol.NewNFSProvisioner(exportDir, clientset, outOfCluster, *useGanesha, ganeshaConfig, *rootSquash, *enableXfsQuota, *serverHostname)
 
 	// Start the provision controller which will dynamically provision NFS PVs
-	pc := controller.NewProvisionController(clientset, 15*time.Second, *provisioner, nfsProvisioner, serverVersion.GitVersion, false, *failedRetryThreshold, leasePeriod, renewDeadline, retryPeriod, termLimit)
+	pc := controller.NewProvisionController(
+		clientset,
+		*provisioner,
+		nfsProvisioner,
+		serverVersion.GitVersion,
+	)
+
 	pc.Run(wait.NeverStop)
 }
 

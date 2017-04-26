@@ -24,7 +24,6 @@ import (
 	"path"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -44,14 +43,6 @@ const (
 	provisionerNameKey = "PROVISIONER_NAME"
 	fileSystemIDKey    = "FILE_SYSTEM_ID"
 	awsRegionKey       = "AWS_REGION"
-
-	resyncPeriod              = 15 * time.Second
-	exponentialBackOffOnError = true
-	failedRetryThreshold      = 5
-	leasePeriod               = controller.DefaultLeaseDuration
-	retryPeriod               = controller.DefaultRetryPeriod
-	renewDeadline             = controller.DefaultRenewDeadline
-	termLimit                 = controller.DefaultTermLimit
 )
 
 type efsProvisioner struct {
@@ -270,6 +261,12 @@ func main() {
 
 	// Start the provision controller which will dynamically provision efs NFS
 	// PVs
-	pc := controller.NewProvisionController(clientset, resyncPeriod, provisionerName, efsProvisioner, serverVersion.GitVersion, exponentialBackOffOnError, failedRetryThreshold, leasePeriod, renewDeadline, retryPeriod, termLimit)
+	pc := controller.NewProvisionController(
+		clientset,
+		provisionerName,
+		efsProvisioner,
+		serverVersion.GitVersion,
+	)
+
 	pc.Run(wait.NeverStop)
 }

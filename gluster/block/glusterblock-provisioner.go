@@ -24,7 +24,6 @@ import (
 	exec "os/exec"
 	"strconv"
 	dstrings "strings"
-	"time"
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
@@ -39,16 +38,9 @@ import (
 )
 
 const (
-	resyncPeriod              = 15 * time.Second
-	provisionerName           = "gluster.org/glusterblock"
-	exponentialBackOffOnError = false
-	failedRetryThreshold      = 5
-	defaultExecPath           = "./createiscsi"
-	secretKeyName             = "key"
-	leasePeriod               = controller.DefaultLeaseDuration
-	retryPeriod               = controller.DefaultRetryPeriod
-	renewDeadline             = controller.DefaultRenewDeadline
-	termLimit                 = controller.DefaultTermLimit
+	provisionerName = "gluster.org/glusterblock"
+	defaultExecPath = "./createiscsi"
+	secretKeyName   = "key"
 )
 
 type glusterBlockProvisioner struct {
@@ -360,7 +352,12 @@ func main() {
 	// Start the provision controller which will dynamically provision glusterblock
 	// PVs
 
-	pc := controller.NewProvisionController(clientset, resyncPeriod, provisionerName, glusterBlockProvisioner, serverVersion.GitVersion, exponentialBackOffOnError, failedRetryThreshold, leasePeriod, renewDeadline, retryPeriod, termLimit)
+	pc := controller.NewProvisionController(
+		clientset,
+		provisionerName,
+		glusterBlockProvisioner,
+		serverVersion.GitVersion,
+	)
 
 	pc.Run(wait.NeverStop)
 }
