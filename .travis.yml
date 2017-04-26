@@ -68,6 +68,9 @@ script:
   - pushd ./flex
   - make container
   - popd
+  - pushd ./nfs-client
+  - ./build.sh
+  - popd
     # Test building and running nfs-provisioner
   - pushd ./nfs
   - make container
