@@ -5,7 +5,8 @@ The nfs-provisioner has been deployed and is now watching for claims it should p
 Edit the `provisioner` field in `deploy/kubernetes/class.yaml` to be the provisioner's name. Configure the `parameters`.
 
 ### Parameters
-* `gid`: `"none"` or a [supplemental group](http://kubernetes.io/docs/user-guide/security-context/) like `"1001"`. NFS shares will be created with permissions such that only pods running with the supplemental group can read & write to the share. Or if `"none"`, anybody can write to the share. This will only work in conjunction with the `root-squash` flag set true.  Default (if omitted) `"none"`.
+* `gid`: `"none"` or a [supplemental group](http://kubernetes.io/docs/user-guide/security-context/) like `"1001"`. NFS shares will be created with permissions such that pods running with the supplemental group can read & write to the share, but non-root pods without the supplemental group cannot. Pods running as root can read & write to shares regardless of the setting here, unless the `rootSquash` parameter is set true. If set to `"none"`, anybody root or non-root can write to the share. Default (if omitted) `"none"`.
+* `rootSquash`: `"true"` or `"false"`. Whether to squash root users by adding the NFS Ganesha root_id_squash or kernel root_squash option to each export. Default `"false"`.
 * `mountOptions`: a comma separated list of [mount options](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#mount-options) for every PV of this class to be mounted with. The list is inserted directly into every PV's mount options annotation/field without any validation. Default blank `""`.
 
 Name the `StorageClass` however you like; the name is how claims will request this class. Create the class.

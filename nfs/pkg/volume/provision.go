@@ -78,12 +78,12 @@ const (
 
 // NewNFSProvisioner creates a Provisioner that provisions NFS PVs backed by
 // the given directory.
-func NewNFSProvisioner(exportDir string, client kubernetes.Interface, outOfCluster bool, useGanesha bool, ganeshaConfig string, rootSquash bool, enableXfsQuota bool, serverHostname string) controller.Provisioner {
+func NewNFSProvisioner(exportDir string, client kubernetes.Interface, outOfCluster bool, useGanesha bool, ganeshaConfig string, enableXfsQuota bool, serverHostname string) controller.Provisioner {
 	var exporter exporter
 	if useGanesha {
-		exporter = newGaneshaExporter(ganeshaConfig, rootSquash)
+		exporter = newGaneshaExporter(ganeshaConfig)
 	} else {
-		exporter = newKernelExporter(rootSquash)
+		exporter = newKernelExporter()
 	}
 	var quotaer quotaer
 	var err error
@@ -237,7 +237,7 @@ type volume struct {
 // config or /etc/exports, and the exportID
 // TODO return values
 func (p *nfsProvisioner) createVolume(options controller.VolumeOptions) (volume, error) {
-	gid, mountOptions, err := p.validateOptions(options)
+	gid, rootSquash, mountOptions, err := p.validateOptions(options)
 	if err != nil {
 		return volume{}, fmt.Errorf("error validating options for volume: %v", err)
 	}
@@ -254,7 +254,7 @@ func (p *nfsProvisioner) createVolume(options controller.VolumeOptions) (volume,
 		return volume{}, fmt.Errorf("error creating directory for volume: %v", err)
 	}
 
-	exportBlock, exportID, err := p.createExport(options.PVName)
+	exportBlock, exportID, err := p.createExport(options.PVName, rootSquash)
 	if err != nil {
 		os.RemoveAll(path)
 		return volume{}, fmt.Errorf("error creating export for volume: %v", err)
@@ -278,8 +278,9 @@ func (p *nfsProvisioner) createVolume(options controller.VolumeOptions) (volume,
 	}, nil
 }
 
-func (p *nfsProvisioner) validateOptions(options controller.VolumeOptions) (string, string, error) {
+func (p *nfsProvisioner) validateOptions(options controller.VolumeOptions) (string, bool, string, error) {
 	gid := "none"
+	rootSquash := false
 	mountOptions := ""
 	for k, v := range options.Parameters {
 		switch strings.ToLower(k) {
@@ -289,12 +290,18 @@ func (p *nfsProvisioner) validateOptions(options controller.VolumeOptions) (stri
 			} else if i, err := strconv.ParseUint(v, 10, 64); err == nil && i != 0 {
 				gid = v
 			} else {
-				return "", "", fmt.Errorf("invalid value for parameter gid: %v. valid values are: 'none' or a non-zero integer", v)
+				return "", false, "", fmt.Errorf("invalid value for parameter gid: %v. valid values are: 'none' or a non-zero integer", v)
+			}
+		case "rootsquash":
+			var err error
+			rootSquash, err = strconv.ParseBool(v)
+			if err != nil {
+				return "", false, "", fmt.Errorf("invalid value for parameter rootSquash: %v. valid values are: 'true' or 'false'", v)
 			}
 		case "mountoptions":
 			mountOptions = v
 		default:
-			return "", "", fmt.Errorf("invalid parameter: %q", k)
+			return "", false, "", fmt.Errorf("invalid parameter: %q", k)
 		}
 	}
 
@@ -302,21 +309,21 @@ func (p *nfsProvisioner) validateOptions(options controller.VolumeOptions) (stri
 	// pv.Labels MUST be set to match claim.spec.selector
 	// gid selector? with or without pv annotation?
 	if options.PVC.Spec.Selector != nil {
-		return "", "", fmt.Errorf("claim.Spec.Selector is not supported")
+		return "", false, "", fmt.Errorf("claim.Spec.Selector is not supported")
 	}
 
 	var stat syscall.Statfs_t
 	if err := syscall.Statfs(p.exportDir, &stat); err != nil {
-		return "", "", fmt.Errorf("error calling statfs on %v: %v", p.exportDir, err)
+		return "", false, "", fmt.Errorf("error calling statfs on %v: %v", p.exportDir, err)
 	}
 	capacity := options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	requestBytes := capacity.Value()
 	available := int64(stat.Bavail) * int64(stat.Bsize)
 	if requestBytes > available {
-		return "", "", fmt.Errorf("insufficient available space %v bytes to satisfy claim for %v bytes", available, requestBytes)
+		return "", false, "", fmt.Errorf("insufficient available space %v bytes to satisfy claim for %v bytes", available, requestBytes)
 	}
 
-	return gid, mountOptions, nil
+	return gid, rootSquash, mountOptions, nil
 }
 
 // getServer gets the server IP to put in a provisioned PV's spec.
@@ -443,10 +450,10 @@ func (p *nfsProvisioner) createDirectory(directory, gid string) error {
 
 // createExport creates the export by adding a block to the appropriate config
 // file and exporting it
-func (p *nfsProvisioner) createExport(directory string) (string, uint16, error) {
+func (p *nfsProvisioner) createExport(directory string, rootSquash bool) (string, uint16, error) {
 	path := path.Join(p.exportDir, directory)
 
-	block, exportID, err := p.exporter.AddExportBlock(path)
+	block, exportID, err := p.exporter.AddExportBlock(path, rootSquash)
 	if err != nil {
 		return "", 0, fmt.Errorf("error adding export block for path %s: %v", path, err)
 	}

@@ -30,14 +30,14 @@ import (
 )
 
 type exporter interface {
-	AddExportBlock(string) (string, uint16, error)
+	AddExportBlock(string, bool) (string, uint16, error)
 	RemoveExportBlock(string, uint16) error
 	Export(string) error
 	Unexport(*v1.PersistentVolume) error
 }
 
 type exportBlockCreator interface {
-	CreateExportBlock(string, string) string
+	CreateExportBlock(string, string, bool) string
 }
 
 type genericExporter struct {
@@ -71,11 +71,11 @@ func newGenericExporter(ebc exportBlockCreator, config string, re *regexp.Regexp
 	}
 }
 
-func (e *genericExporter) AddExportBlock(path string) (string, uint16, error) {
+func (e *genericExporter) AddExportBlock(path string, rootSquash bool) (string, uint16, error) {
 	exportID := generateID(e.mapMutex, e.exportIDs)
 	exportIDStr := strconv.FormatUint(uint64(exportID), 10)
 
-	block := e.ebc.CreateExportBlock(exportIDStr, path)
+	block := e.ebc.CreateExportBlock(exportIDStr, path, rootSquash)
 
 	// Add the export block to the config file
 	if err := addToFile(e.fileMutex, e.config, block); err != nil {
@@ -96,9 +96,9 @@ type ganeshaExporter struct {
 
 var _ exporter = &ganeshaExporter{}
 
-func newGaneshaExporter(ganeshaConfig string, rootSquash bool) exporter {
+func newGaneshaExporter(ganeshaConfig string) exporter {
 	return &ganeshaExporter{
-		genericExporter: *newGenericExporter(&ganeshaExportBlockCreator{rootSquash}, ganeshaConfig, regexp.MustCompile("Export_Id = ([0-9]+);")),
+		genericExporter: *newGenericExporter(&ganeshaExportBlockCreator{}, ganeshaConfig, regexp.MustCompile("Export_Id = ([0-9]+);")),
 	}
 }
 
@@ -140,17 +140,14 @@ func (e *ganeshaExporter) Unexport(volume *v1.PersistentVolume) error {
 	return nil
 }
 
-type ganeshaExportBlockCreator struct {
-	// Whether to export with squash = root_id_squash, not no_root_squash
-	rootSquash bool
-}
+type ganeshaExportBlockCreator struct{}
 
 var _ exportBlockCreator = &ganeshaExportBlockCreator{}
 
 // CreateBlock creates the text block to add to the ganesha config file.
-func (e *ganeshaExportBlockCreator) CreateExportBlock(exportID, path string) string {
+func (e *ganeshaExportBlockCreator) CreateExportBlock(exportID, path string, rootSquash bool) string {
 	squash := "no_root_squash"
-	if e.rootSquash {
+	if rootSquash {
 		squash = "root_id_squash"
 	}
 	return "\nEXPORT\n{\n" +
@@ -170,9 +167,9 @@ type kernelExporter struct {
 
 var _ exporter = &kernelExporter{}
 
-func newKernelExporter(rootSquash bool) exporter {
+func newKernelExporter() exporter {
 	return &kernelExporter{
-		genericExporter: *newGenericExporter(&kernelExportBlockCreator{rootSquash}, "/etc/exports", regexp.MustCompile("fsid=([0-9]+)")),
+		genericExporter: *newGenericExporter(&kernelExportBlockCreator{}, "/etc/exports", regexp.MustCompile("fsid=([0-9]+)")),
 	}
 }
 
@@ -199,17 +196,14 @@ func (e *kernelExporter) Unexport(volume *v1.PersistentVolume) error {
 	return nil
 }
 
-type kernelExportBlockCreator struct {
-	// Whether to export with option root_squash, not no_root_squash
-	rootSquash bool
-}
+type kernelExportBlockCreator struct{}
 
 var _ exportBlockCreator = &kernelExportBlockCreator{}
 
 // CreateBlock creates the text block to add to the /etc/exports file.
-func (e *kernelExportBlockCreator) CreateExportBlock(exportID, path string) string {
+func (e *kernelExportBlockCreator) CreateExportBlock(exportID, path string, rootSquash bool) string {
 	squash := "no_root_squash"
-	if e.rootSquash {
+	if rootSquash {
 		squash = "root_squash"
 	}
 	return "\n" + path + " *(rw,insecure," + squash + ",fsid=" + exportID + ")\n"
