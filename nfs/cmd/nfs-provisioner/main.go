@@ -46,6 +46,7 @@ var (
 
 const (
 	exportDir     = "/export"
+	ganeshaLog    = "/export/ganesha.log"
 	ganeshaConfig = "/export/vfs.conf"
 )
 
@@ -77,7 +78,7 @@ func main() {
 
 	if *runServer {
 		glog.Infof("Starting NFS server!")
-		err := server.Start(ganeshaConfig, *gracePeriod)
+		err := server.Start(ganeshaLog, ganeshaConfig, *gracePeriod)
 		if err != nil {
 			glog.Fatalf("Error starting NFS server: %v", err)
 		}

@@ -73,7 +73,7 @@ NFSV4
 `)
 
 // Start starts the NFS server. If an error is encountered at any point it returns it instantly
-func Start(ganeshaConfig string, gracePeriod uint) error {
+func Start(ganeshaLog, ganeshaConfig string, gracePeriod uint) error {
 	// Start rpcbind if it is not started yet
 	cmd := exec.Command("/usr/sbin/rpcinfo", "127.0.0.1")
 	if err := cmd.Run(); err != nil {
@@ -115,7 +115,7 @@ func Start(ganeshaConfig string, gracePeriod uint) error {
 		return fmt.Errorf("error setting fsid device to ganesha config: %v", err)
 	}
 	// Start ganesha.nfsd
-	cmd = exec.Command("ganesha.nfsd", "-L", "/var/log/ganesha.log", "-f", ganeshaConfig)
+	cmd = exec.Command("ganesha.nfsd", "-L", ganeshaLog, "-f", ganeshaConfig)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("ganesha.nfsd failed with error: %v, output: %s", err, out)
 	}
