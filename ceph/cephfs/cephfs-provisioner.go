@@ -170,7 +170,9 @@ func (p *cephFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 		return errors.New("ceph share annotation not found on PV")
 	}
 	// delete CephFS
-	class, err := p.client.Storage().StorageClasses().Get(v1.GetPersistentVolumeClass(volume), metav1.GetOptions{})
+	// TODO when beta is removed, have to check kube version and pick v1/beta
+	// accordingly: maybe the controller lib should offer a function for that
+	class, err := p.client.StorageV1beta1().StorageClasses().Get(v1.GetPersistentVolumeClass(volume), metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
