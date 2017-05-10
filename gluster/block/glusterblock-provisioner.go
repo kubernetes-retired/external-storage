@@ -217,18 +217,6 @@ func (p *glusterBlockProvisioner) createVolume(PVName string) (*glusterBlockVolu
 		return nil, fmt.Errorf("error parsing value for 'opmode' for volume plugin %s", provisionerName)
 	}
 	return &p.volConfig, nil
-
-	/*
-		if p.provConfig.opMode == "executable" {
-			cmd := exec.Command("sh", p.provConfig.execPath)
-			err := cmd.Run()
-			if err != nil {
-				glog.Errorf("%v", err)
-			}
-			dtarget = os.Getenv("TARGET")
-			diqn = os.Getenv("IQN")
-		} */
-
 }
 
 // Delete removes the storage asset that was created by Provision represented
