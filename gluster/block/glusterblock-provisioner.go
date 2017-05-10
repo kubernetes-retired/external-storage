@@ -38,9 +38,14 @@ import (
 )
 
 const (
-	provisionerName = "gluster.org/glusterblock"
-	defaultExecPath = "./createiscsi"
-	secretKeyName   = "key"
+	provisionerName  = "gluster.org/glusterblock"
+	defaultExecPath  = "./createiscsi"
+	secretKeyName    = "key"
+	shareIDAnn       = "glusterBlockShare"
+	provisionerIDAnn = "glusterBlockProvisionerIdentity"
+	creatorAnn       = "kubernetes.io/createdby"
+	volumeTypeAnn    = "gluster.org/type"
+	descriptionAnn   = "Description"
 )
 
 type glusterBlockProvisioner struct {
@@ -70,7 +75,7 @@ type provisionerConfig struct {
 	secretName      string
 	secretValue     string
 
-	// Optinal:  clusterID from which the provisioner create the block volume
+	// Optional:  clusterID from which the provisioner create the block volume
 	clusterID string
 
 	// Optional: high availability count in case of multipathing
@@ -119,11 +124,18 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 	}
 	glog.V(1).Infof("Target Portal and IQN returned :%v %v", target, iqn)
 
+	// Create unique PVC identity.
+	blockVolIdentity := fmt.Sprintf("kubernetes-dynamic-pvc-%s", uuid.NewUUID())
+
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: options.PVName,
 			Annotations: map[string]string{
-				"glusterBlockProvisionerIdentity": p.identity,
+				provisionerIDAnn: p.identity,
+				shareIDAnn:       blockVolIdentity,
+				creatorAnn:       "heketi-dynamic-provisioner",
+				volumeTypeAnn:    "block",
+				descriptionAnn:   "Gluster: Dynamically provisioned PV",
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{
@@ -166,13 +178,23 @@ func (p *glusterBlockProvisioner) createVolume(PVName string) (string, string, e
 // Delete removes the storage asset that was created by Provision represented
 // by the given PV.
 func (p *glusterBlockProvisioner) Delete(volume *v1.PersistentVolume) error {
-	ann, ok := volume.Annotations["glusterBlockProvisionerIdentity"]
+	ann, ok := volume.Annotations[provisionerIDAnn]
+
 	if !ok {
 		return errors.New("identity annotation not found on PV")
 	}
 	if ann != p.identity {
-		return &controller.IgnoredError{"identity annotation on PV does not match ours"}
+		return &controller.IgnoredError{"identity annotation on PV does not match this provisioners identity"}
 	}
+
+	blockVol, ok := volume.Annotations[shareIDAnn]
+	if !ok {
+		return errors.New("gluster block share annotation not found on PV")
+	}
+
+	// Delete this blockVol
+	glog.V(1).Infof("blockVolume  %v", blockVol)
+
 	// Unset the variables.
 	os.Setenv("TARGET", "")
 	os.Setenv("IQN", "")
