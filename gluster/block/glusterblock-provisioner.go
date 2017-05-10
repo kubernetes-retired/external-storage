@@ -70,8 +70,8 @@ type provisionerConfig struct {
 	secretName      string
 	secretValue     string
 
-	// Optinal:  ClusterID from which the provisioner create the block volume
-	clusterId string
+	// Optinal:  clusterID from which the provisioner create the block volume
+	clusterID string
 
 	// Optional: high availability count in case of multipathing
 	haCount int
@@ -201,9 +201,9 @@ func parseClassParameters(params map[string]string, kubeclient kubernetes.Interf
 			cfg.secretName = v
 		case "secretnamespace":
 			cfg.secretNamespace = v
-		case "clusterid":
+		case "clusterID":
 			if len(v) != 0 {
-				cfg.clusterId = v
+				cfg.clusterID = v
 			}
 		case "restauthenabled":
 			authEnabled = dstrings.ToLower(v) == "true"
