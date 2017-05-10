@@ -1,3 +1,9 @@
+# v1.0.8
+- Add mountOptions StorageClass parameter (#84) (see [Usage](./docs/usage.md) for complete SC parameter info)
+- Replace root-squash argument with a rootSquash SC parameter (#86) (see [Usage](./docs/usage.md) for complete SC parameter info)
+	- If the root-squash argument is specified, the provisioner will fail to start; please if you're using it, convert to the SC parameter before updating!
+- Watch for unexpected stop of ganesha.nfsd and restart if seen (#98). This is a simple health check that mitigates NFS ganesha crashes which are under investigation (but probably out of the provisioner's control to prevent at the moment).
+
 # v1.0.7
 - Set a high limit for maximum number of files Ganesha may have open (setrlimit RLIMIT_NOFILE) -- this requires the additional SYS_RESOURCE capability, if not available the provisioner will still start but with a warning
 
