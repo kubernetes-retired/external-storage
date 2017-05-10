@@ -76,22 +76,6 @@ var (
 	testHEDs []testHED
 )
 
-// variables used by tests
-var (
-	testVerbose        bool
-	testInitDebug      bool
-	testUseIoEncDec    bool
-	testStructToArray  bool
-	testCanonical      bool
-	testUseReset       bool
-	testWriteNoSymbols bool
-	testSkipIntf       bool
-	testInternStr      bool
-	testUseMust        bool
-	testCheckCircRef   bool
-	testJsonIndent     int
-)
-
 func init() {
 	testHEDs = make([]testHED, 0, 32)
 	testHandles = append(testHandles,

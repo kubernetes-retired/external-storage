@@ -13,7 +13,7 @@ import (
 
 var defaultRequestContentType string
 
-var doCacheReadEntityBytes = false
+var doCacheReadEntityBytes = true
 
 // Request is a wrapper for a http Request that provides convenience methods
 type Request struct {
@@ -107,15 +107,10 @@ func (r *Request) ReadEntity(entityPointer interface{}) (err error) {
 		r.Request.Body = zlibReader
 	}
 
-	// lookup the EntityReader, use defaultRequestContentType if needed and provided
+	// lookup the EntityReader
 	entityReader, ok := entityAccessRegistry.accessorAt(contentType)
 	if !ok {
-		if len(defaultRequestContentType) != 0 {
-			entityReader, ok = entityAccessRegistry.accessorAt(defaultRequestContentType)
-		}
-		if !ok {
-			return NewError(http.StatusBadRequest, "Unable to unmarshal content of type:"+contentType)
-		}
+		return NewError(http.StatusBadRequest, "Unable to unmarshal content of type:"+contentType)
 	}
 	return entityReader.Read(r, entityPointer)
 }
