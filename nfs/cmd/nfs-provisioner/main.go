@@ -18,7 +18,11 @@ package main
 
 import (
 	"flag"
+	"io/ioutil"
+	"os"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
@@ -46,6 +50,8 @@ var (
 
 const (
 	exportDir     = "/export"
+	ganeshaLog    = "/export/ganesha.log"
+	ganeshaPid    = "/var/run/ganesha.pid"
 	ganeshaConfig = "/export/vfs.conf"
 )
 
@@ -77,10 +83,41 @@ func main() {
 
 	if *runServer {
 		glog.Infof("Starting NFS server!")
-		err := server.Start(ganeshaConfig, *gracePeriod)
+		err := server.Setup(ganeshaConfig, *gracePeriod)
+		if err != nil {
+			glog.Fatalf("Error setting up NFS server: %v", err)
+		}
+		err = server.Start(ganeshaLog, ganeshaPid, ganeshaConfig)
 		if err != nil {
 			glog.Fatalf("Error starting NFS server: %v", err)
 		}
+		go func() {
+			for {
+				time.Sleep(time.Second)
+				read, err := ioutil.ReadFile(ganeshaPid)
+				if err != nil {
+					glog.Errorf("Error reading ganesha pid file %s: %v", ganeshaPid, err)
+					continue
+				}
+				pid, err := strconv.Atoi(strings.TrimSpace(string(read)))
+				if err != nil {
+					glog.Errorf("Error parsing ganesha pid %v from file %s: %v", read, ganeshaPid, err)
+					continue
+				}
+
+				process, _ := os.FindProcess(pid)
+				processState, err := process.Wait()
+				if err != nil {
+					glog.Errorf("Error waiting on NFS server process: %v", err)
+				}
+
+				glog.Errorf("NFS server stopped unexpectedly, restarting: Pid: %v, ProcessState: %v", process.Pid, processState)
+				err = server.Start(ganeshaLog, ganeshaPid, ganeshaConfig)
+				if err != nil {
+					glog.Fatalf("Error starting NFS server: %v", err)
+				}
+			}
+		}()
 	}
 
 	var config *rest.Config
