@@ -26,6 +26,8 @@ import (
 	dstrings "strings"
 
 	"github.com/golang/glog"
+	gcli "github.com/heketi/heketi/client/api/go-client"
+	gapi "github.com/heketi/heketi/pkg/glusterfs/api"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -58,6 +60,8 @@ type glusterBlockProvisioner struct {
 
 	// Configuration of gluster block provisioner
 	provConfig provisionerConfig
+
+	volConfig glusterBlockVolume
 }
 
 type provisionerConfig struct {
@@ -86,6 +90,18 @@ type provisionerConfig struct {
 
 	// Optional: Executable path if we are operating in executable mode.
 	execPath string
+}
+
+type glusterBlockVolume struct {
+	TargetPortal      string
+	Portals           []string
+	IQN               string
+	Lun               int32
+	FSType            string
+	ISCSIInterface    string
+	DiscoveryCHAPAuth bool
+	SessionCHAPAuth   bool
+	ReadOnly          bool
 }
 
 func NewglusterBlockProvisioner(client kubernetes.Interface, id string) controller.Provisioner {
@@ -118,11 +134,11 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 
 	glog.V(4).Infof("glusterfs: creating volume with configuration %+v", p.provConfig)
 
-	target, iqn, err := p.createVolume(options.PVName)
+	vol, err := p.createVolume(options.PVName)
 	if err != nil {
 		return nil, err
 	}
-	glog.V(1).Infof("Target Portal and IQN returned :%v %v", target, iqn)
+	glog.V(1).Infof("Target Portal and IQN returned :%v %v", vol.TargetPortal, vol.IQN)
 
 	// Create unique PVC identity.
 	blockVolIdentity := fmt.Sprintf("kubernetes-dynamic-pvc-%s", uuid.NewUUID())
@@ -146,8 +162,8 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 			},
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				ISCSI: &v1.ISCSIVolumeSource{
-					TargetPortal: target,
-					IQN:          iqn,
+					TargetPortal: vol.TargetPortal,
+					IQN:          vol.IQN,
 					Lun:          0,
 					FSType:       "ext4",
 					ReadOnly:     false,
@@ -161,25 +177,52 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 
 // createVolume creates a gluster block volume i.e. the storage asset.
 
-func (p *glusterBlockProvisioner) createVolume(PVName string) (string, string, error) {
-	var dtarget, diqn string
-	if p.provConfig.opMode == "executable" {
+func (p *glusterBlockProvisioner) createVolume(PVName string) (*glusterBlockVolume, error) {
+
+	switch p.provConfig.opMode {
+
+	case "executable":
 		cmd := exec.Command("sh", p.provConfig.execPath)
 		err := cmd.Run()
 		if err != nil {
 			glog.Errorf("%v", err)
 		}
-		dtarget = os.Getenv("TARGET")
-		diqn = os.Getenv("IQN")
+
+		dtarget := os.Getenv("TARGET")
+		diqn := os.Getenv("IQN")
+
+		p.volConfig.TargetPortal = dtarget
+		p.volConfig.IQN = diqn
+
+	case "rest":
+		cli := gcli.NewClient(p.provConfig.url, p.provConfig.user, p.provConfig.secretValue)
+		if cli == nil {
+			glog.Errorf("glusterfs: failed to create glusterfs rest client")
+			return nil, fmt.Errorf("glusterfs: failed to create glusterfs rest client, REST server authentication failed")
+		}
+
+		//TODO:
+		sz := 1
+		volumeReq := &gapi.VolumeCreateRequest{Size: sz}
+		_, err := cli.VolumeCreate(volumeReq)
+		if err != nil {
+			glog.Errorf("glusterfs: error creating volume %v ", err)
+			return nil, fmt.Errorf("error creating volume %v", err)
+		}
+
+		p.volConfig.IQN = "iqn.2016-12.org.gluster-block:aafea465-9167-4880-b37c-2c36db8562ea"
+		p.volConfig.TargetPortal = "192.168.1.11"
+
+	default:
+		return nil, fmt.Errorf("error parsing value for 'opmode' for volume plugin %s", provisionerName)
 	}
-	return dtarget, diqn, nil
+	return &p.volConfig, nil
 }
 
 // Delete removes the storage asset that was created by Provision represented
 // by the given PV.
 func (p *glusterBlockProvisioner) Delete(volume *v1.PersistentVolume) error {
 	ann, ok := volume.Annotations[provisionerIDAnn]
-
 	if !ok {
 		return errors.New("identity annotation not found on PV")
 	}
