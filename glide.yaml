@@ -56,3 +56,4 @@ import:
   version: 7a54b6f
 - package: github.com/lpabon/godbc
   version: 9577782
+- package: github.com/dgrijalva/jwt-go

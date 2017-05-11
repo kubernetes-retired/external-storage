@@ -1,5 +1,5 @@
-hash: 366751aa5cdb52c032b0952a55dafe65fa5f6332621ac8d6787ea0e2e620875b
-updated: 2017-05-10T23:07:53.670389301+05:30
+hash: d803764de3938797ca1727c0b0bd4ab8b506950d98a134fa624204b7ee90c8ad
+updated: 2017-05-11T10:37:43.054378779+05:30
 imports:
 - name: github.com/aws/aws-sdk-go
   version: 6669bce73b4e3bc922ff5ea3a3983ede26e02b39
@@ -34,6 +34,8 @@ imports:
   version: 5215b55f46b2b919f50a1df0eaa5886afe4e3b3d
   subpackages:
   - spew
+- name: github.com/dgrijalva/jwt-go
+  version: 6c8dedd55f8a2e41f605de6d5d66e51ed1f299fc
 - name: github.com/docker/distribution
   version: cd27f179f2c10c5d300e6d09025b538c475b0d51
   subpackages:
