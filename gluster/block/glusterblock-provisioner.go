@@ -185,7 +185,7 @@ func (p *glusterBlockProvisioner) createVolume(PVName string) (*glusterBlockVolu
 		cmd := exec.Command("sh", p.provConfig.execPath)
 		err := cmd.Run()
 		if err != nil {
-			glog.Errorf("%v", err)
+			glog.Errorf("glusterblock: error [%v] when running command %v", err, cmd)
 		}
 
 		dtarget := os.Getenv("TARGET")
@@ -329,7 +329,7 @@ func parseClassParameters(params map[string]string, kubeclient kubernetes.Interf
 // parseSecret finds a given Secret instance and reads user password from it.
 func parseSecret(namespace, secretName string, kubeClient kubernetes.Interface) (string, error) {
 
-	secretMap, err := GetSecretForPV(namespace, secretName, "glusterblock", kubeClient)
+	secretMap, err := GetSecretForPV(namespace, secretName, provisionerName, kubeClient)
 	if err != nil {
 		glog.Errorf("failed to get secret %s/%s: %v", namespace, secretName, err)
 		return "", fmt.Errorf("failed to get secret %s/%s: %v", namespace, secretName, err)
@@ -389,15 +389,16 @@ func main() {
 		config, err = rest.InClusterConfig()
 	}
 
+	if err != nil {
+		glog.Fatalf("Failed to create config: %v", err)
+	}
+
 	prId := string(uuid.NewUUID())
 
 	if *id != "" {
 		prId = *id
 	}
 
-	if err != nil {
-		glog.Fatalf("Failed to create config: %v", err)
-	}
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		glog.Fatalf("Failed to create client: %v", err)
