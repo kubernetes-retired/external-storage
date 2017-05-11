@@ -48,3 +48,11 @@ import:
   subpackages:
   - pkg/util/goroutinemap
   - pkg/util/version
+- package: github.com/heketi/heketi/client/api/go-client
+  version: 7a54b6f
+- package: github.com/heketi/heketi/pkg/glusterfs/api
+  version: 7a54b6f
+- package: github.com/heketi/heketi/pkg/utils
+  version: 7a54b6f
+- package: github.com/lpabon/godbc
+  version: 9577782
