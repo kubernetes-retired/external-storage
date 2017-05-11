@@ -44,3 +44,4 @@ flycheck_*.el
 *.pyc
 
 .idea/
+/.project
