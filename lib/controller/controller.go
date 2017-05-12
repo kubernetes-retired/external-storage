@@ -135,8 +135,8 @@ const (
 	defaultExponentialBackOffOnError     = true
 	defaultCreateProvisionedPVRetryCount = 5
 	defaultCreateProvisionedPVInterval   = 10 * time.Second
-	defaultFailedProvisionThreshold      = 5
-	defaultFailedDeleteThreshold         = 5
+	defaultFailedProvisionThreshold      = 15
+	defaultFailedDeleteThreshold         = 15
 	defaultLeaseDuration                 = 15 * time.Second
 	defaultRenewDeadline                 = 10 * time.Second
 	defaultRetryPeriod                   = 2 * time.Second
@@ -196,7 +196,7 @@ func CreateProvisionedPVInterval(createProvisionedPVInterval time.Duration) func
 }
 
 // FailedProvisionThreshold is the threshold for max number of retries on
-// failures of Provision. Defaults to 5.
+// failures of Provision. Defaults to 15.
 func FailedProvisionThreshold(failedProvisionThreshold int) func(*ProvisionController) error {
 	return func(c *ProvisionController) error {
 		c.SetFailedProvisionThreshold(failedProvisionThreshold)
@@ -205,7 +205,7 @@ func FailedProvisionThreshold(failedProvisionThreshold int) func(*ProvisionContr
 }
 
 // FailedDeleteThreshold is the threshold for max number of retries on failures
-// of Delete. Defaults to 5.
+// of Delete. Defaults to 15.
 func FailedDeleteThreshold(failedDeleteThreshold int) func(*ProvisionController) error {
 	return func(c *ProvisionController) error {
 		c.SetFailedDeleteThreshold(failedDeleteThreshold)
