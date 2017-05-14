@@ -1,0 +1,119 @@
+/*
+Copyright 2017 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package cache
+
+import (
+	"github.com/golang/glog"
+	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
+	"os"
+	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/pkg/api/v1"
+	kcache "k8s.io/client-go/tools/cache"
+)
+
+type Populator struct {
+	client *kubernetes.Clientset
+	cache  *VolumeCache
+	name   string
+}
+
+func NewPopulator(client *kubernetes.Clientset, cache *VolumeCache, name string) *Populator {
+	return &Populator{client: client, cache: cache, name: name}
+}
+
+func (p *Populator) Start() {
+	_, controller := kcache.NewInformer(
+		&kcache.ListWatch{
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				pvs, err := p.client.Core().PersistentVolumes().List(options)
+				return pvs, err
+			},
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				w, err := p.client.Core().PersistentVolumes().Watch(options)
+				return w, err
+			},
+		},
+		&v1.PersistentVolume{},
+		0,
+		kcache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				pv, ok := obj.(*v1.PersistentVolume)
+				if !ok {
+					glog.Errorf("Added object is not a v1.PersistentVolume type")
+				}
+				p.handlePVUpdate(pv)
+			},
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				newPV, ok := newObj.(*v1.PersistentVolume)
+				if !ok {
+					glog.Errorf("Updated object is not a v1.PersistentVolume type")
+				}
+				p.handlePVUpdate(newPV)
+			},
+			DeleteFunc: func(obj interface{}) {
+				pv, ok := obj.(*v1.PersistentVolume)
+				if !ok {
+					glog.Errorf("Added object is not a v1.PersistentVolume type")
+				}
+				p.handlePVDelete(pv)
+			},
+		},
+	)
+
+	glog.Infof("Starting Informer controller")
+	// Controller never stops TODO: will this go out of scope and stop the controller?
+	go controller.Run(make(chan struct{}))
+
+	glog.Infof("Waiting for Informer initial sync")
+	wait.Poll(time.Second, 5*time.Minute, func() (bool, error) {
+		return controller.HasSynced(), nil
+	})
+	if !controller.HasSynced() {
+		glog.Errorf("Informer controller initial sync timeout")
+		os.Exit(1)
+	}
+}
+
+func (p *Populator) handlePVUpdate(pv *v1.PersistentVolume) {
+	if p.cache.PVExists(pv.Name) {
+		p.cache.UpdatePV(pv)
+	} else {
+		if pv.Annotations != nil {
+			provisioner, found := pv.Annotations[common.AnnProvisionedBy]
+			if !found {
+				return
+			}
+			if provisioner == p.name {
+				// This PV was created by this provisioner
+				p.cache.AddPV(pv)
+			}
+		}
+	}
+}
+
+func (p *Populator) handlePVDelete(pv *v1.PersistentVolume) {
+	if p.cache.PVExists(pv.Name) {
+		// Don't do cleanup, just delete from cache
+		p.cache.DeletePV(pv.Name)
+	}
+}
