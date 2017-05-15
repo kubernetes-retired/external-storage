@@ -105,7 +105,8 @@ type glusterBlockVolume struct {
 	ReadOnly          bool
 }
 
-func NewglusterBlockProvisioner(client kubernetes.Interface, id string) controller.Provisioner {
+//NewGlusterBlockProvisioner create a new provisioner.
+func NewGlusterBlockProvisioner(client kubernetes.Interface, id string) controller.Provisioner {
 	return &glusterBlockProvisioner{
 		client:   client,
 		identity: id,
@@ -229,7 +230,7 @@ func (p *glusterBlockProvisioner) Delete(volume *v1.PersistentVolume) error {
 		return errors.New("identity annotation not found on PV")
 	}
 	if ann != p.identity {
-		return &controller.IgnoredError{"identity annotation on PV does not match this provisioners identity"}
+		return &controller.IgnoredError{Reason: "identity annotation on PV does not match this provisioners identity"}
 	}
 
 	blockVol, ok := volume.Annotations[shareIDAnn]
@@ -351,7 +352,6 @@ func parseSecret(namespace, secretName string, kubeClient kubernetes.Interface) 
 }
 
 // GetSecretForPV locates secret by name and namespace, verifies the secret type, and returns secret map
-
 func GetSecretForPV(secretNamespace, secretName, volumePluginName string, kubeClient kubernetes.Interface) (map[string]string, error) {
 	secret := make(map[string]string)
 	if kubeClient == nil {
@@ -395,10 +395,10 @@ func main() {
 		glog.Fatalf("Failed to create config: %v", err)
 	}
 
-	prId := string(uuid.NewUUID())
+	prID := string(uuid.NewUUID())
 
 	if *id != "" {
-		prId = *id
+		prID = *id
 	}
 
 	clientset, err := kubernetes.NewForConfig(config)
@@ -415,7 +415,7 @@ func main() {
 
 	// Create the provisioner: it implements the Provisioner interface expected by
 	// the controller
-	glusterBlockProvisioner := NewglusterBlockProvisioner(clientset, prId)
+	glusterBlockProvisioner := NewGlusterBlockProvisioner(clientset, prID)
 
 	// Start the provision controller which will dynamically provision glusterblock
 	// PVs
