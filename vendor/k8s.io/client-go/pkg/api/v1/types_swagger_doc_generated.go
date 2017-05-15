@@ -173,7 +173,7 @@ func (ComponentStatusList) SwaggerDoc() map[string]string {
 var map_ConfigMap = map[string]string{
 	"":         "ConfigMap holds configuration data for pods to consume.",
 	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-	"data":     "Data contains the configuration data. Each key must be a valid DNS_SUBDOMAIN with an optional leading dot.",
+	"data":     "Data contains the configuration data. Each key must consist of alphanumeric characters, '-', '_' or '.'.",
 }
 
 func (ConfigMap) SwaggerDoc() map[string]string {
@@ -481,7 +481,7 @@ func (EnvVar) SwaggerDoc() map[string]string {
 
 var map_EnvVarSource = map[string]string{
 	"":                 "EnvVarSource represents a source for the value of an EnvVar.",
-	"fieldRef":         "Selects a field of the pod: supports metadata.name, metadata.namespace, metadata.labels, metadata.annotations, spec.nodeName, spec.serviceAccountName, status.podIP.",
+	"fieldRef":         "Selects a field of the pod: supports metadata.name, metadata.namespace, metadata.labels, metadata.annotations, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP.",
 	"resourceFieldRef": "Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.",
 	"configMapKeyRef":  "Selects a key of a ConfigMap.",
 	"secretKeyRef":     "Selects a key of a secret in the pod's namespace",
@@ -650,14 +650,17 @@ func (HostPathVolumeSource) SwaggerDoc() map[string]string {
 }
 
 var map_ISCSIVolumeSource = map[string]string{
-	"":               "Represents an ISCSI disk. ISCSI volumes can only be mounted as read/write once. ISCSI volumes support ownership management and SELinux relabeling.",
-	"targetPortal":   "iSCSI target portal. The portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
-	"iqn":            "Target iSCSI Qualified Name.",
-	"lun":            "iSCSI target lun number.",
-	"iscsiInterface": "Optional: Defaults to 'default' (tcp). iSCSI interface name that uses an iSCSI transport.",
-	"fsType":         "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://kubernetes.io/docs/user-guide/volumes#iscsi",
-	"readOnly":       "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false.",
-	"portals":        "iSCSI target portal List. The portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
+	"":                  "Represents an ISCSI disk. ISCSI volumes can only be mounted as read/write once. ISCSI volumes support ownership management and SELinux relabeling.",
+	"targetPortal":      "iSCSI target portal. The portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
+	"iqn":               "Target iSCSI Qualified Name.",
+	"lun":               "iSCSI target lun number.",
+	"iscsiInterface":    "Optional: Defaults to 'default' (tcp). iSCSI interface name that uses an iSCSI transport.",
+	"fsType":            "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: http://kubernetes.io/docs/user-guide/volumes#iscsi",
+	"readOnly":          "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false.",
+	"portals":           "iSCSI target portal List. The portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
+	"chapAuthDiscovery": "whether support iSCSI Discovery CHAP authentication",
+	"chapAuthSession":   "whether support iSCSI Session CHAP authentication",
+	"secretRef":         "CHAP secret for iSCSI target and initiator authentication",
 }
 
 func (ISCSIVolumeSource) SwaggerDoc() map[string]string {
@@ -1662,7 +1665,7 @@ func (ScaleIOVolumeSource) SwaggerDoc() map[string]string {
 var map_Secret = map[string]string{
 	"":           "Secret holds secret data of a certain type. The total bytes of the values in the Data field must be less than MaxSecretSize bytes.",
 	"metadata":   "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-	"data":       "Data contains the secret data. Each key must be a valid DNS_SUBDOMAIN or leading dot followed by valid DNS_SUBDOMAIN. The serialized form of the secret data is a base64 encoded string, representing the arbitrary (possibly non-string) data value here. Described in https://tools.ietf.org/html/rfc4648#section-4",
+	"data":       "Data contains the secret data. Each key must consist of alphanumeric characters, '-', '_' or '.'. The serialized form of the secret data is a base64 encoded string, representing the arbitrary (possibly non-string) data value here. Described in https://tools.ietf.org/html/rfc4648#section-4",
 	"stringData": "stringData allows specifying non-binary secret data in string form. It is provided as a write-only convenience method. All keys and values are merged into the data field on write, overwriting any existing values. It is never output when reading from the API.",
 	"type":       "Used to facilitate programmatic handling of secret data.",
 }
@@ -1840,6 +1843,7 @@ func (ServiceStatus) SwaggerDoc() map[string]string {
 var map_TCPSocketAction = map[string]string{
 	"":     "TCPSocketAction describes an action based on opening a socket",
 	"port": "Number or name of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.",
+	"host": "Optional: Host name to connect to, defaults to the pod IP.",
 }
 
 func (TCPSocketAction) SwaggerDoc() map[string]string {

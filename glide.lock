@@ -1,5 +1,5 @@
-hash: d803764de3938797ca1727c0b0bd4ab8b506950d98a134fa624204b7ee90c8ad
-updated: 2017-05-11T10:37:43.054378779+05:30
+hash: 3e6bbfb2e9e50d70a7bdd4667a0caaeaaed064812055ea77cbdca1df9262254d
+updated: 2017-05-15T22:57:59.676721234+05:30
 imports:
 - name: github.com/aws/aws-sdk-go
   version: 6669bce73b4e3bc922ff5ea3a3983ede26e02b39
@@ -146,7 +146,7 @@ imports:
 - name: gopkg.in/yaml.v2
   version: 53feefa2559fb8dfa8d81baad31be332c97d6c77
 - name: k8s.io/apimachinery
-  version: c1c4a7fe832857c75cc1d79c8e40d71d5da15fc6
+  version: 28d5d926c7c976d5885f31ace03d4a9b3ad8abd2
   subpackages:
   - pkg/api/errors
   - pkg/api/meta
@@ -192,7 +192,7 @@ imports:
   - third_party/forked/golang/json
   - third_party/forked/golang/reflect
 - name: k8s.io/client-go
-  version: 76153773eaa3a268131d3d993290a194a1370585
+  version: 0ec10d4351f32832ab60d381d15e6d9e1f858bd3
   subpackages:
   - discovery
   - discovery/fake

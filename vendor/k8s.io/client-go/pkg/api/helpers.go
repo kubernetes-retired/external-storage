@@ -18,6 +18,7 @@ package api
 
 import (
 	"crypto/md5"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -428,46 +429,22 @@ func NodeSelectorRequirementsAsSelector(nsm []NodeSelectorRequirement) (labels.S
 	return selector, nil
 }
 
-const (
-	// SeccompPodAnnotationKey represents the key of a seccomp profile applied
-	// to all containers of a pod.
-	SeccompPodAnnotationKey string = "seccomp.security.alpha.kubernetes.io/pod"
-
-	// SeccompContainerAnnotationKeyPrefix represents the key of a seccomp profile applied
-	// to one container of a pod.
-	SeccompContainerAnnotationKeyPrefix string = "container.seccomp.security.alpha.kubernetes.io/"
-
-	// CreatedByAnnotation represents the key used to store the spec(json)
-	// used to create the resource.
-	CreatedByAnnotation = "kubernetes.io/created-by"
-
-	// PreferAvoidPodsAnnotationKey represents the key of preferAvoidPods data (json serialized)
-	// in the Annotations of a Node.
-	PreferAvoidPodsAnnotationKey string = "scheduler.alpha.kubernetes.io/preferAvoidPods"
-
-	// SysctlsPodAnnotationKey represents the key of sysctls which are set for the infrastructure
-	// container of a pod. The annotation value is a comma separated list of sysctl_name=value
-	// key-value pairs. Only a limited set of whitelisted and isolated sysctls is supported by
-	// the kubelet. Pods with other sysctls will fail to launch.
-	SysctlsPodAnnotationKey string = "security.alpha.kubernetes.io/sysctls"
-
-	// UnsafeSysctlsPodAnnotationKey represents the key of sysctls which are set for the infrastructure
-	// container of a pod. The annotation value is a comma separated list of sysctl_name=value
-	// key-value pairs. Unsafe sysctls must be explicitly enabled for a kubelet. They are properly
-	// namespaced to a pod or a container, but their isolation is usually unclear or weak. Their use
-	// is at-your-own-risk. Pods that attempt to set an unsafe sysctl that is not enabled for a kubelet
-	// will fail to launch.
-	UnsafeSysctlsPodAnnotationKey string = "security.alpha.kubernetes.io/unsafe-sysctls"
-
-	// ObjectTTLAnnotations represents a suggestion for kubelet for how long it can cache
-	// an object (e.g. secret, config map) before fetching it again from apiserver.
-	// This annotation can be attached to node.
-	ObjectTTLAnnotationKey string = "node.alpha.kubernetes.io/ttl"
-)
+// GetTolerationsFromPodAnnotations gets the json serialized tolerations data from Pod.Annotations
+// and converts it to the []Toleration type in api.
+func GetTolerationsFromPodAnnotations(annotations map[string]string) ([]Toleration, error) {
+	var tolerations []Toleration
+	if len(annotations) > 0 && annotations[TolerationsAnnotationKey] != "" {
+		err := json.Unmarshal([]byte(annotations[TolerationsAnnotationKey]), &tolerations)
+		if err != nil {
+			return tolerations, err
+		}
+	}
+	return tolerations, nil
+}
 
 // AddOrUpdateTolerationInPod tries to add a toleration to the pod's toleration list.
 // Returns true if something was updated, false otherwise.
-func AddOrUpdateTolerationInPod(pod *Pod, toleration *Toleration) (bool, error) {
+func AddOrUpdateTolerationInPod(pod *Pod, toleration *Toleration) bool {
 	podTolerations := pod.Spec.Tolerations
 
 	var newTolerations []Toleration
@@ -475,7 +452,7 @@ func AddOrUpdateTolerationInPod(pod *Pod, toleration *Toleration) (bool, error) 
 	for i := range podTolerations {
 		if toleration.MatchToleration(&podTolerations[i]) {
 			if Semantic.DeepEqual(toleration, podTolerations[i]) {
-				return false, nil
+				return false
 			}
 			newTolerations = append(newTolerations, *toleration)
 			updated = true
@@ -490,7 +467,7 @@ func AddOrUpdateTolerationInPod(pod *Pod, toleration *Toleration) (bool, error) 
 	}
 
 	pod.Spec.Tolerations = newTolerations
-	return true, nil
+	return true
 }
 
 // MatchToleration checks if the toleration matches tolerationToMatch. Tolerations are unique by <key,effect,operator,value>,
@@ -548,6 +525,19 @@ func (t *Taint) ToString() string {
 	return fmt.Sprintf("%v=%v:%v", t.Key, t.Value, t.Effect)
 }
 
+// GetTaintsFromNodeAnnotations gets the json serialized taints data from Pod.Annotations
+// and converts it to the []Taint type in api.
+func GetTaintsFromNodeAnnotations(annotations map[string]string) ([]Taint, error) {
+	var taints []Taint
+	if len(annotations) > 0 && annotations[TaintsAnnotationKey] != "" {
+		err := json.Unmarshal([]byte(annotations[TaintsAnnotationKey]), &taints)
+		if err != nil {
+			return []Taint{}, err
+		}
+	}
+	return taints, nil
+}
+
 // SysctlsFromPodAnnotations parses the sysctl annotations into a slice of safe Sysctls
 // and a slice of unsafe Sysctls. This is only a convenience wrapper around
 // SysctlsFromPodAnnotation.
@@ -594,6 +584,21 @@ func PodAnnotationsFromSysctls(sysctls []Sysctl) string {
 		kvs[i] = fmt.Sprintf("%s=%s", sysctls[i].Name, sysctls[i].Value)
 	}
 	return strings.Join(kvs, ",")
+}
+
+// GetAffinityFromPodAnnotations gets the json serialized affinity data from Pod.Annotations
+// and converts it to the Affinity type in api.
+// TODO: remove when alpha support for affinity is removed
+func GetAffinityFromPodAnnotations(annotations map[string]string) (*Affinity, error) {
+	if len(annotations) > 0 && annotations[AffinityAnnotationKey] != "" {
+		var affinity Affinity
+		err := json.Unmarshal([]byte(annotations[AffinityAnnotationKey]), &affinity)
+		if err != nil {
+			return nil, err
+		}
+		return &affinity, nil
+	}
+	return nil, nil
 }
 
 // GetPersistentVolumeClass returns StorageClassName.
