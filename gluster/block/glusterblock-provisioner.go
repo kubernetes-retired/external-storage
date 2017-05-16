@@ -241,7 +241,7 @@ func (p *glusterBlockProvisioner) createVolume(blockVol string) (*glusterBlockVo
 			p.provConfig.opMode, "create",
 			p.provConfig.blockModeArgs["glustervol"]+"/"+blockVol,
 			"ha", haCountStr,
-			p.provConfig.blockModeArgs["confighosts"],
+			p.provConfig.blockModeArgs["hosts"],
 			"2GiB", "--json")
 
 		out, cmdErr := cmd.CombinedOutput()
@@ -445,12 +445,12 @@ func parseBlockModeArgs(mode string, inArgs string) (*map[string]string, error) 
 			} else {
 				return nil, fmt.Errorf("StorageClass for provisioner %s must contain valid parameter for %v ", "glusterblock", "glustervol")
 			}
-		case "confighosts":
+		case "hosts":
 			blockHosts := dstrings.Split(v, "=")[1]
 			if blockHosts != "" {
-				modeArgs["confighosts"] = blockHosts
+				modeArgs["hosts"] = blockHosts
 			} else {
-				return nil, fmt.Errorf("StorageClass for provisioner %s must contain valid  parameter for %v", "glusterblock", "confighosts")
+				return nil, fmt.Errorf("StorageClass for provisioner %s must contain valid  parameter for %v", "glusterblock", "hosts")
 			}
 		default:
 			return nil, fmt.Errorf("parseBlockModeArgs: StorageClass for provisioner %s must contain valid parameter for %v", "glusterblock", mode)
