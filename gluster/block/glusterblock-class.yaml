@@ -8,6 +8,6 @@ parameters:
     restuser: "admin"
     secretnamespace: "default"
     secretname: "heketi-secret"
-    opmode: "gluster-block:glustervol=blockmaster1,confighosts=10.67.116.108"
+    opmode: "gluster-block:glustervol=blockmaster1,hosts=10.67.116.108"
     hacount: "3"
 

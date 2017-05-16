@@ -35,7 +35,7 @@ parameters:
     restuser: "admin"
     secretnamespace: "default"
     secretname: "heketi-secret"
-    opmode: "gluster-block:glustervol=blockmaster1,confighosts=10.67.116.108"
+    opmode: "gluster-block:glustervol=blockmaster1,hosts=10.67.116.108"
     hacount: "3"
 
 
@@ -58,4 +58,21 @@ parameters:
 
 ```bash
 kubectl create -f glusterblock-claim1.yaml
+
+
+persistentvolumeclaim "claim1" created
+
+[root@localhost]# kubectl get pvc
+NAME      STATUS    VOLUME                                     CAPACITY   ACCESSMODES   STORAGECLASS   AGE
+claim1    Bound     pvc-b7045edf-3a26-11e7-af53-c85b7636c232   1Gi        RWX           glusterblock   56s
+[root@localhost]# kubectl get pv
+NAME                                       CAPACITY   ACCESSMODES   RECLAIMPOLICY   STATUS    CLAIM            STORAGECLASS   REASON    AGE
+pvc-b7045edf-3a26-11e7-af53-c85b7636c232   1Gi        RWX           Delete          Bound     default/claim1   glusterblock             46s
+
+[root@localhost]# kubectl get pvc,pv
+NAME         STATUS    VOLUME                                     CAPACITY   ACCESSMODES   STORAGECLASS   AGE
+pvc/claim1   Bound     pvc-b7045edf-3a26-11e7-af53-c85b7636c232   1Gi        RWX           glusterblock   1m
+
+NAME                                          CAPACITY   ACCESSMODES   RECLAIMPOLICY   STATUS    CLAIM            STORAGECLASS   REASON    AGE
+pv/pvc-b7045edf-3a26-11e7-af53-c85b7636c232   1Gi        RWX           Delete          Bound     default/claim1   glusterblock             1m
 ```
