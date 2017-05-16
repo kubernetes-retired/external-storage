@@ -50,7 +50,8 @@ const (
 	creatorAnn         = "kubernetes.io/createdby"
 	volumeTypeAnn      = "gluster.org/type"
 	descriptionAnn     = "Description"
-	provisionerVersion = "v0.5"
+	provisionerVersion = "v0.6"
+	chapType           = "kubernetes.io/iscsi-chap"
 )
 
 type glusterBlockProvisioner struct {
@@ -149,6 +150,34 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 
 	// Create unique PVC identity.
 	blockVolIdentity := fmt.Sprintf("kubernetes-dynamic-pvc-%s", uuid.NewUUID())
+	nameSpace := options.PVC.Namespace
+
+	// Todo: fetch user from info response.
+	user := fmt.Sprintf("glusterblock-dynamic-user-%s", uuid.NewUUID())
+	password := "4a5c9b84-3a6d-44b4-9668-c9a6d699a5e9"
+	secretName := "glusterblk-" + user + "-secret"
+	secretRef := &v1.LocalObjectReference{}
+	if user != "" && password != "" {
+		secret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: nameSpace,
+				Name:      secretName,
+			},
+			Data: map[string][]byte{
+				"node.session.auth.username": []byte(user),
+				"node.session.auth.password": []byte(password),
+			},
+			Type: chapType,
+		}
+		_, err = p.client.Core().Secrets(nameSpace).Create(secret)
+		if err != nil {
+			return nil, fmt.Errorf("gluster block failed to create secret")
+		}
+		secretRef.Name = secretName
+		glog.V(1).Infof("gluster block secret [%v]: secretRef [%v]", secret, secretRef)
+	} else {
+		glog.V(1).Infof("gluster block response does not contain username and password")
+	}
 
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
@@ -170,11 +199,13 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 			},
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				ISCSI: &v1.ISCSIVolumeSource{
-					TargetPortal: vol.TargetPortal,
-					IQN:          vol.Iqn,
-					Lun:          0,
-					FSType:       "ext4",
-					ReadOnly:     false,
+					TargetPortal:    vol.TargetPortal,
+					IQN:             vol.Iqn,
+					Lun:             0,
+					FSType:          "ext4",
+					ReadOnly:        false,
+					SessionCHAPAuth: true,
+					SecretRef:       secretRef,
 				},
 			},
 		},
