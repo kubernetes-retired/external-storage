@@ -4,7 +4,7 @@ NOTE: provisioner is still in development and is not functional yet
 
 local-volume-provisioner is an out-of-tree static provisioner for the Local volume plugin, which is a 1.7 alpha feature.
 
-It runs on each node in the cluster and monitors specified directories to look for new local mount points.  It then statically creates a Local PersistentVolume for each mount point.  It also monitors when the PersistentVolumes have been deleted, and will clean up the volume.
+It runs on each node in the cluster and monitors specified directories to look for new local file-based volumes.  The volumes can be a mount point or a directory in a shared filesystem.  It then statically creates a Local PersistentVolume for each local volume.  It also monitors when the PersistentVolumes have been released, and will clean up the volume, and recreate the PV.
 
 
 ## Quickstart
@@ -38,6 +38,18 @@ Bring up a GCE cluster with local SSDs
 ``` console
 NODE_LOCAL_SSDS=3 kube-up.sh
 ```
+
+## Best Practices
+* For IO isolation, a whole disk per volume is recommended
+* For capacity isolation, separate partitions per volume is recommended
+
+### Deleting/removing the underlying volume
+When you want to decommission the local volume, here is a possible workflow.
+1. Stop the pods that are using the volume
+2. Remove the local volume from the node (ie unmounting, pulling out the disk, etc)
+3. Delete the PVC
+4. The provisioner will try to cleanup the volume, but will fail since the volume no longer exists
+5. Manually delete the PV object
 
 ## Design
 There is one provisioner instance on each node in the cluster.  Each instance is reponsible for monitoring and managing the local volumes on its node.
