@@ -5,3 +5,4 @@ metadata:
 data:
   file.system.id: fs-47a2c22e
   aws.region: us-west-2
+  provisioner.name: example.com/aws-efs
