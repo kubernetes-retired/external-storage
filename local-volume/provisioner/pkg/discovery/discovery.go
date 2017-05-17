@@ -58,11 +58,27 @@ func (d *Discoverer) discoverVolumesAtPath(class, relativePath string) {
 		// Check if PV already exists for it
 		pvName := generatePVName(file, d.NodeName, class)
 		if !d.Cache.PVExists(pvName) {
-			// If not, create PV
-			// TODO: Validate that this path is file-based, and detect capacity
+			filePath := filepath.Join(fullPath, file)
+			err = d.validateFile(filePath)
+			if err != nil {
+				glog.Errorf("Path %q validation failed: %v\n", filePath, err)
+				continue
+			}
+			// TODO: detect capacity
 			d.createPV(file, relativePath, class)
 		}
 	}
+}
+
+func (d *Discoverer) validateFile(fullPath string) error {
+	isDir, err := d.VolUtil.IsDir(fullPath)
+	if err != nil {
+		return fmt.Errorf("Error getting path info: %v", err)
+	}
+	if !isDir {
+		return fmt.Errorf("Path is not a directory")
+	}
+	return nil
 }
 
 // TODO: maybe a better way would be to hash the 3 fields
@@ -80,6 +96,7 @@ func (d *Discoverer) createPV(file, relativePath, class string) {
 			Name: pvName,
 			Annotations: map[string]string{
 				common.AnnProvisionedBy: d.Name,
+				// TODO: add topology constraint once we have API
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{

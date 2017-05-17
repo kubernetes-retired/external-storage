@@ -17,11 +17,17 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/golang/glog"
 )
 
 type VolumeUtil interface {
+	// IsDir checks if the given path is a directory
+	IsDir(fullPath string) (bool, error)
+
 	// ReadDir returns a list of files under the specified directory
 	ReadDir(fullPath string) ([]string, error)
 
@@ -35,6 +41,21 @@ type volumeUtil struct{}
 
 func NewVolumeUtil() VolumeUtil {
 	return &volumeUtil{}
+}
+
+func (u *volumeUtil) IsDir(fullPath string) (bool, error) {
+	dir, err := os.Open(fullPath)
+	if err != nil {
+		return false, err
+	}
+	defer dir.Close()
+
+	stat, err := dir.Stat()
+	if err != nil {
+		return false, err
+	}
+
+	return stat.IsDir(), nil
 }
 
 func (u *volumeUtil) ReadDir(fullPath string) ([]string, error) {
@@ -77,17 +98,46 @@ var _ VolumeUtil = &FakeVolumeUtil{}
 
 type FakeVolumeUtil struct {
 	// List of files underneath the given path
-	directoryFiles map[string][]string
+	directoryFiles map[string][]*FakeFile
+}
+
+type FakeFile struct {
+	Name     string
+	IsNotDir bool
 }
 
 func NewFakeVolumeUtil() *FakeVolumeUtil {
 	return &FakeVolumeUtil{
-		directoryFiles: map[string][]string{},
+		directoryFiles: map[string][]*FakeFile{},
 	}
 }
 
+func (u *FakeVolumeUtil) IsDir(fullPath string) (bool, error) {
+	dir, file := filepath.Split(fullPath)
+	dir = filepath.Clean(dir)
+	files, found := u.directoryFiles[dir]
+	if !found {
+		return false, fmt.Errorf("Directory %q not found", dir)
+	}
+
+	for _, f := range files {
+		if file == f.Name {
+			return !f.IsNotDir, nil
+		}
+	}
+	return false, fmt.Errorf("File %q not found", fullPath)
+}
+
 func (u *FakeVolumeUtil) ReadDir(fullPath string) ([]string, error) {
-	return u.directoryFiles[fullPath], nil
+	fileNames := []string{}
+	files, found := u.directoryFiles[fullPath]
+	if !found {
+		return nil, fmt.Errorf("Directory %q not found", fullPath)
+	}
+	for _, file := range files {
+		fileNames = append(fileNames, file.Name)
+	}
+	return fileNames, nil
 }
 
 func (u *FakeVolumeUtil) DeleteContents(fullPath string) error {
@@ -96,13 +146,14 @@ func (u *FakeVolumeUtil) DeleteContents(fullPath string) error {
 
 // AddNewFiles adds the given files to the current directory listing
 // This is only for testing
-func (u *FakeVolumeUtil) AddNewFiles(mountDir string, dirFiles map[string][]string) {
+func (u *FakeVolumeUtil) AddNewFiles(mountDir string, dirFiles map[string][]*FakeFile) {
 	for dir, files := range dirFiles {
 		mountedPath := filepath.Join(mountDir, dir)
 		curFiles := u.directoryFiles[mountedPath]
 		if curFiles == nil {
-			curFiles = []string{}
+			curFiles = []*FakeFile{}
 		}
+		glog.Infof("Adding to directory %q: files %v\n", dir, files)
 		u.directoryFiles[mountedPath] = append(curFiles, files...)
 	}
 }

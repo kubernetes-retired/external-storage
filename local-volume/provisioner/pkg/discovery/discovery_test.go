@@ -32,13 +32,18 @@ const (
 	testNode     = "test-node"
 )
 
+var scMapping = map[string]string{
+	"sc1": "dir1",
+	"sc2": "dir2",
+}
+
 type testConfig struct {
-	// Directory is relative path to hostdir
-	dirFiles map[string][]string
-	// Directory is relative path to basedir
-	scMapping map[string]string
-	// The directory-file mapping expected to be created as PVs
-	expectedVolumes map[string][]string
+	// The directory layout for the test
+	// Key = directory, Value = list of volumes under that directory
+	dirLayout map[string][]*util.FakeFile
+	// The volumes that are expected to be created as PVs
+	// Key = directory, Value = list of volumes under that directory
+	expectedVolumes map[string][]*util.FakeFile
 	// True if testing api failure
 	apiShouldFail bool
 	// The rest are set during setup
@@ -48,17 +53,19 @@ type testConfig struct {
 }
 
 func TestDiscoverVolumes_Basic(t *testing.T) {
-	vols := map[string][]string{
-		"dir1": []string{"mount1", "mount2"},
-		"dir2": []string{"mount1", "mount2"},
+	vols := map[string][]*util.FakeFile{
+		"dir1": []*util.FakeFile{
+			&util.FakeFile{Name: "mount1"},
+			&util.FakeFile{Name: "mount2"},
+		},
+		"dir2": []*util.FakeFile{
+			&util.FakeFile{Name: "mount1"},
+			&util.FakeFile{Name: "mount2"},
+		},
 	}
 	test := &testConfig{
-		dirFiles:        vols,
+		dirLayout:       vols,
 		expectedVolumes: vols,
-		scMapping: map[string]string{
-			"sc1": "dir1",
-			"sc2": "dir2",
-		},
 	}
 	d := testSetup(test)
 
@@ -67,17 +74,19 @@ func TestDiscoverVolumes_Basic(t *testing.T) {
 }
 
 func TestDiscoverVolumes_BasicTwice(t *testing.T) {
-	vols := map[string][]string{
-		"dir1": []string{"mount1", "mount2"},
-		"dir2": []string{"mount1", "mount2"},
+	vols := map[string][]*util.FakeFile{
+		"dir1": []*util.FakeFile{
+			&util.FakeFile{Name: "mount1"},
+			&util.FakeFile{Name: "mount2"},
+		},
+		"dir2": []*util.FakeFile{
+			&util.FakeFile{Name: "mount1"},
+			&util.FakeFile{Name: "mount2"},
+		},
 	}
 	test := &testConfig{
-		dirFiles:        vols,
+		dirLayout:       vols,
 		expectedVolumes: vols,
-		scMapping: map[string]string{
-			"sc1": "dir1",
-			"sc2": "dir2",
-		},
 	}
 	d := testSetup(test)
 
@@ -85,20 +94,16 @@ func TestDiscoverVolumes_BasicTwice(t *testing.T) {
 	verifyCreatedPVs(t, test)
 
 	// Second time should not create any new volumes
-	test.expectedVolumes = map[string][]string{}
+	test.expectedVolumes = map[string][]*util.FakeFile{}
 	d.DiscoverLocalVolumes()
 	verifyCreatedPVs(t, test)
 }
 
 func TestDiscoverVolumes_NoDir(t *testing.T) {
-	vols := map[string][]string{}
+	vols := map[string][]*util.FakeFile{}
 	test := &testConfig{
-		dirFiles:        vols,
+		dirLayout:       vols,
 		expectedVolumes: vols,
-		scMapping: map[string]string{
-			"sc1": "dir1",
-			"sc2": "dir2",
-		},
 	}
 	d := testSetup(test)
 
@@ -107,16 +112,12 @@ func TestDiscoverVolumes_NoDir(t *testing.T) {
 }
 
 func TestDiscoverVolumes_EmptyDir(t *testing.T) {
-	vols := map[string][]string{
-		"dir1": []string{},
+	vols := map[string][]*util.FakeFile{
+		"dir1": []*util.FakeFile{},
 	}
 	test := &testConfig{
-		dirFiles:        vols,
+		dirLayout:       vols,
 		expectedVolumes: vols,
-		scMapping: map[string]string{
-			"sc1": "dir1",
-			"sc2": "dir2",
-		},
 	}
 	d := testSetup(test)
 
@@ -125,17 +126,19 @@ func TestDiscoverVolumes_EmptyDir(t *testing.T) {
 }
 
 func TestDiscoverVolumes_NewVolumesLater(t *testing.T) {
-	vols := map[string][]string{
-		"dir1": []string{"mount1", "mount2"},
-		"dir2": []string{"mount1", "mount2"},
+	vols := map[string][]*util.FakeFile{
+		"dir1": []*util.FakeFile{
+			&util.FakeFile{Name: "mount1"},
+			&util.FakeFile{Name: "mount2"},
+		},
+		"dir2": []*util.FakeFile{
+			&util.FakeFile{Name: "mount1"},
+			&util.FakeFile{Name: "mount2"},
+		},
 	}
 	test := &testConfig{
-		dirFiles:        vols,
+		dirLayout:       vols,
 		expectedVolumes: vols,
-		scMapping: map[string]string{
-			"sc1": "dir1",
-			"sc2": "dir2",
-		},
 	}
 	d := testSetup(test)
 
@@ -144,8 +147,11 @@ func TestDiscoverVolumes_NewVolumesLater(t *testing.T) {
 	verifyCreatedPVs(t, test)
 
 	// Some new mount points show up
-	newVols := map[string][]string{
-		"dir1": []string{"mount3", "mount4"},
+	newVols := map[string][]*util.FakeFile{
+		"dir1": []*util.FakeFile{
+			&util.FakeFile{Name: "mount3"},
+			&util.FakeFile{Name: "mount4"},
+		},
 	}
 	test.volUtil.AddNewFiles(testMountDir, newVols)
 	test.expectedVolumes = newVols
@@ -156,18 +162,38 @@ func TestDiscoverVolumes_NewVolumesLater(t *testing.T) {
 }
 
 func TestDiscoverVolumes_CreatePVFails(t *testing.T) {
-	vols := map[string][]string{
-		"dir1": []string{"mount1", "mount2"},
-		"dir2": []string{"mount1", "mount2"},
+	vols := map[string][]*util.FakeFile{
+		"dir1": []*util.FakeFile{
+			&util.FakeFile{Name: "mount1"},
+			&util.FakeFile{Name: "mount2"},
+		},
+		"dir2": []*util.FakeFile{
+			&util.FakeFile{Name: "mount1"},
+			&util.FakeFile{Name: "mount2"},
+		},
 	}
 	test := &testConfig{
 		apiShouldFail:   true,
-		dirFiles:        vols,
-		expectedVolumes: map[string][]string{},
-		scMapping: map[string]string{
-			"sc1": "dir1",
-			"sc2": "dir2",
+		dirLayout:       vols,
+		expectedVolumes: map[string][]*util.FakeFile{},
+	}
+	d := testSetup(test)
+
+	d.DiscoverLocalVolumes()
+
+	verifyCreatedPVs(t, test)
+	verifyPVsNotInCache(t, test)
+}
+
+func TestDiscoverVolumes_BadVolume(t *testing.T) {
+	vols := map[string][]*util.FakeFile{
+		"dir1": []*util.FakeFile{
+			&util.FakeFile{Name: "mount1", IsNotDir: true},
 		},
+	}
+	test := &testConfig{
+		dirLayout:       vols,
+		expectedVolumes: map[string][]*util.FakeFile{},
 	}
 	d := testSetup(test)
 
@@ -179,7 +205,7 @@ func TestDiscoverVolumes_CreatePVFails(t *testing.T) {
 
 func testSetup(t *testConfig) *Discoverer {
 	t.volUtil = util.NewFakeVolumeUtil()
-	t.volUtil.AddNewFiles(testMountDir, t.dirFiles)
+	t.volUtil.AddNewFiles(testMountDir, t.dirLayout)
 	t.apiUtil = util.NewFakeAPIUtil(t.apiShouldFail)
 	t.cache = cache.NewVolumeCache()
 
@@ -187,7 +213,7 @@ func testSetup(t *testConfig) *Discoverer {
 		NodeName:     testNode,
 		MountDir:     testMountDir,
 		HostDir:      testHostDir,
-		DiscoveryMap: t.scMapping,
+		DiscoveryMap: scMapping,
 	}
 	config := &types.RuntimeConfig{
 		UserConfig: userConfig,
@@ -199,12 +225,12 @@ func testSetup(t *testConfig) *Discoverer {
 }
 
 func findSCName(t *testing.T, targetDir string, config *testConfig) string {
-	for sc, dir := range config.scMapping {
+	for sc, dir := range scMapping {
 		if dir == targetDir {
 			return sc
 		}
 	}
-	t.Fatalf("Failed to find SC name for directory %v", targetDir)
+	t.Fatalf("Failed to find SC Name for directory %v", targetDir)
 	return ""
 }
 
@@ -213,8 +239,8 @@ func verifyCreatedPVs(t *testing.T, config *testConfig) {
 	for dir, files := range config.expectedVolumes {
 		sc := findSCName(t, dir, config)
 		for _, file := range files {
-			pvName := fmt.Sprintf("%v-%v-%v", sc, testNode, file)
-			path := filepath.Join(testHostDir, dir, file)
+			pvName := fmt.Sprintf("%v-%v-%v", sc, testNode, file.Name)
+			path := filepath.Join(testHostDir, dir, file.Name)
 			expectedPVs[pvName] = path
 		}
 	}
@@ -244,10 +270,10 @@ func verifyCreatedPVs(t *testing.T, config *testConfig) {
 }
 
 func verifyPVsNotInCache(t *testing.T, config *testConfig) {
-	for dir, files := range config.dirFiles {
+	for dir, files := range config.dirLayout {
 		sc := findSCName(t, dir, config)
 		for _, file := range files {
-			pvName := fmt.Sprintf("%v-%v-%v", sc, testNode, file)
+			pvName := fmt.Sprintf("%v-%v-%v", sc, testNode, file.Name)
 			if config.cache.PVExists(pvName) {
 				t.Errorf("Expected PV %q to not be in cache", pvName)
 			}
