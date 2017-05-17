@@ -1,0 +1,24 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: glusterblock-provisioner
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: glusterblock-provisioner
+    spec:
+      containers:
+        -
+          env:
+            -
+              name: PROVISIONER_NAME
+              valueFrom:
+                configMapKeyRef:
+                  key: provisioner.name
+                  name: glusterblock-provisioner
+          image: "quay.io/external_storage/glusterblock-provisioner:latest"
+          name: glusterblock-provisioner
