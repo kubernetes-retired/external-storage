@@ -34,7 +34,8 @@ const (
 )
 
 type testConfig struct {
-	apiShouldFail bool
+	apiShouldFail       bool
+	volDeleteShouldFail bool
 	// Precreated PVs
 	vols map[string]*testVol
 	// Expected names of deleted PV
@@ -130,8 +131,26 @@ func TestDeleteVolumes_DeletePVFails(t *testing.T) {
 	verifyPVExists(t, test)
 }
 
+func TestDeleteVolumes_CleanupFails(t *testing.T) {
+	vols := map[string]*testVol{
+		"pv4": &testVol{
+			pvPhase: v1.VolumeReleased,
+		},
+	}
+	test := &testConfig{
+		volDeleteShouldFail: true,
+		vols:                vols,
+		expectedDeletedPVs:  map[string]string{},
+	}
+	d := testSetup(t, test)
+
+	d.DeletePVs()
+	verifyDeletedPVs(t, test)
+	verifyPVExists(t, test)
+}
+
 func testSetup(t *testing.T, config *testConfig) Deleter {
-	config.volUtil = util.NewFakeVolumeUtil()
+	config.volUtil = util.NewFakeVolumeUtil(config.volDeleteShouldFail)
 	config.apiUtil = util.NewFakeAPIUtil(false)
 	config.cache = cache.NewVolumeCache()
 

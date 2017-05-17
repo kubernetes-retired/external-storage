@@ -48,7 +48,7 @@ func (d *deleter) DeletePVs() {
 			err := d.cleanupPV(pv)
 			if err != nil {
 				// TODO: Log event on PV
-				glog.Errorf("Error reading directory: %v\n", err.Error())
+				glog.Errorf("Error cleaning PV: %v\n", err.Error())
 				continue
 			}
 

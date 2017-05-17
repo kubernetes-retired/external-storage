@@ -99,6 +99,8 @@ var _ VolumeUtil = &FakeVolumeUtil{}
 type FakeVolumeUtil struct {
 	// List of files underneath the given path
 	directoryFiles map[string][]*FakeFile
+	// True if DeleteContents should fail
+	deleteShouldFail bool
 }
 
 type FakeFile struct {
@@ -106,9 +108,10 @@ type FakeFile struct {
 	IsNotDir bool
 }
 
-func NewFakeVolumeUtil() *FakeVolumeUtil {
+func NewFakeVolumeUtil(deleteShouldFail bool) *FakeVolumeUtil {
 	return &FakeVolumeUtil{
-		directoryFiles: map[string][]*FakeFile{},
+		directoryFiles:   map[string][]*FakeFile{},
+		deleteShouldFail: deleteShouldFail,
 	}
 }
 
@@ -141,6 +144,9 @@ func (u *FakeVolumeUtil) ReadDir(fullPath string) ([]string, error) {
 }
 
 func (u *FakeVolumeUtil) DeleteContents(fullPath string) error {
+	if u.deleteShouldFail {
+		return fmt.Errorf("Fake delete contents failed")
+	}
 	return nil
 }
 
