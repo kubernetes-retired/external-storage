@@ -24,6 +24,7 @@ import (
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/cache"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/deleter"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/discovery"
+	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/populator"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/types"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/util"
 
@@ -38,8 +39,13 @@ func StartLocalController(client *kubernetes.Clientset, config *types.UserConfig
 		Cache:      cache.NewVolumeCache(),
 		VolUtil:    util.NewVolumeUtil(),
 		APIUtil:    util.NewAPIUtil(client),
+		Client:     client,
+		// TODO: make this unique based on node name?
+		Name: "local-volume-provisioner",
 	}
 
+	populator := populator.NewPopulator(runtimeConfig)
+	populator.Start()
 	discoverer := discovery.NewDiscoverer(runtimeConfig)
 	deleter := deleter.NewDeleter(runtimeConfig)
 

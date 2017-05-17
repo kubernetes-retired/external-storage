@@ -19,6 +19,7 @@ package types
 import (
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/cache"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/util"
+	"k8s.io/client-go/kubernetes"
 )
 
 const (
@@ -41,6 +42,8 @@ type RuntimeConfig struct {
 	*UserConfig
 	// Unique name of this provisioner
 	Name string
+	// K8s API client
+	Client *kubernetes.Clientset
 	// Cache to store PVs managed by this provisioner
 	Cache *cache.VolumeCache
 	// K8s API layer

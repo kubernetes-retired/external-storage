@@ -14,42 +14,40 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cache
+package populator
 
 import (
-	"github.com/golang/glog"
-	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
 	"os"
 	"time"
+
+	"github.com/golang/glog"
+	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/types"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
 	kcache "k8s.io/client-go/tools/cache"
 )
 
 type Populator struct {
-	client *kubernetes.Clientset
-	cache  *VolumeCache
-	name   string
+	*types.RuntimeConfig
 }
 
-func NewPopulator(client *kubernetes.Clientset, cache *VolumeCache, name string) *Populator {
-	return &Populator{client: client, cache: cache, name: name}
+func NewPopulator(config *types.RuntimeConfig) *Populator {
+	return &Populator{RuntimeConfig: config}
 }
 
 func (p *Populator) Start() {
 	_, controller := kcache.NewInformer(
 		&kcache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				pvs, err := p.client.Core().PersistentVolumes().List(options)
+				pvs, err := p.Client.Core().PersistentVolumes().List(options)
 				return pvs, err
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				w, err := p.client.Core().PersistentVolumes().Watch(options)
+				w, err := p.Client.Core().PersistentVolumes().Watch(options)
 				return w, err
 			},
 		},
@@ -95,25 +93,25 @@ func (p *Populator) Start() {
 }
 
 func (p *Populator) handlePVUpdate(pv *v1.PersistentVolume) {
-	if p.cache.PVExists(pv.Name) {
-		p.cache.UpdatePV(pv)
+	if p.Cache.PVExists(pv.Name) {
+		p.Cache.UpdatePV(pv)
 	} else {
 		if pv.Annotations != nil {
-			provisioner, found := pv.Annotations[common.AnnProvisionedBy]
+			provisioner, found := pv.Annotations[types.AnnProvisionedBy]
 			if !found {
 				return
 			}
-			if provisioner == p.name {
+			if provisioner == p.Name {
 				// This PV was created by this provisioner
-				p.cache.AddPV(pv)
+				p.Cache.AddPV(pv)
 			}
 		}
 	}
 }
 
 func (p *Populator) handlePVDelete(pv *v1.PersistentVolume) {
-	if p.cache.PVExists(pv.Name) {
+	if p.Cache.PVExists(pv.Name) {
 		// Don't do cleanup, just delete from cache
-		p.cache.DeletePV(pv.Name)
+		p.Cache.DeletePV(pv.Name)
 	}
 }

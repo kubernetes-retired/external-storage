@@ -21,7 +21,6 @@ import (
 	"path/filepath"
 
 	"github.com/golang/glog"
-	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/types"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -95,7 +94,7 @@ func (d *Discoverer) createPV(file, relativePath, class string) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: pvName,
 			Annotations: map[string]string{
-				common.AnnProvisionedBy: d.Name,
+				types.AnnProvisionedBy: d.Name,
 				// TODO: add topology constraint once we have API
 			},
 		},
