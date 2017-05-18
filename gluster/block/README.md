@@ -1,13 +1,18 @@
 # glusterblock Volume Provisioner for Kubernetes 1.5+
 
 
+[![Docker Repository on Quay](https://quay.io/repository/external_storage/glusterblock-provisioner/status "Docker Repository on Quay")](https://quay.io/repository/external_storage/glusterblock-provisioner)
+```
+quay.io/external_storage/glusterblock-provisioner:latest
+```
+
 # Test instruction
 
 * Build glusterblock-provisioner and container image
 
 ```bash
-go build glusterblock-provisioner.go
-docker build -t glusterblock-provisioner .
+[root@localhost]#go build glusterblock-provisioner.go
+[root@localhost]#docker build -t glusterblock-provisioner .
 ```
 
 * Start Kubernetes local cluster
@@ -57,9 +62,7 @@ parameters:
 * Create a claim
 
 ```bash
-kubectl create -f glusterblock-claim1.yaml
-
-
+[root@localhost]# kubectl create -f glusterblock-claim1.yaml
 persistentvolumeclaim "claim1" created
 
 [root@localhost]# kubectl get pvc
