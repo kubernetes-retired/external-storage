@@ -17,8 +17,9 @@ limitations under the License.
 package cache
 
 import (
-	"github.com/golang/glog"
 	"sync"
+
+	"github.com/golang/glog"
 
 	"k8s.io/client-go/pkg/api/v1"
 )
@@ -41,31 +42,28 @@ func (cache *VolumeCache) PVExists(pvName string) bool {
 	return exists
 }
 
-func (cache *VolumeCache) AddPV(pv *v1.PersistentVolume) error {
+func (cache *VolumeCache) AddPV(pv *v1.PersistentVolume) {
 	cache.mutex.Lock()
 	defer cache.mutex.Unlock()
 
 	cache.pvs[pv.Name] = pv
-	glog.Infof("Added pv %v to cache", pv.Name)
-	return nil
+	glog.Infof("Added pv %q to cache", pv.Name)
 }
 
-func (cache *VolumeCache) UpdatePV(pv *v1.PersistentVolume) error {
+func (cache *VolumeCache) UpdatePV(pv *v1.PersistentVolume) {
 	cache.mutex.Lock()
 	defer cache.mutex.Unlock()
 
 	cache.pvs[pv.Name] = pv
-	glog.Infof("Updated pv %v to cache", pv.Name)
-	return nil
+	glog.Infof("Updated pv %q to cache", pv.Name)
 }
 
-func (cache *VolumeCache) DeletePV(pvName string) error {
+func (cache *VolumeCache) DeletePV(pvName string) {
 	cache.mutex.Lock()
 	defer cache.mutex.Unlock()
 
 	delete(cache.pvs, pvName)
-	glog.Infof("Deleted pv %v from cache", pvName)
-	return nil
+	glog.Infof("Deleted pv %q from cache", pvName)
 }
 
 func (cache *VolumeCache) ListPVs() []*v1.PersistentVolume {

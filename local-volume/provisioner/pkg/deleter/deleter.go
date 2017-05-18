@@ -42,13 +42,13 @@ func (d *deleter) DeletePVs() {
 	for _, pv := range d.Cache.ListPVs() {
 		if pv.Status.Phase == v1.VolumeReleased {
 			name := pv.Name
-			glog.Infof("Deleting PV: %v\n", name)
+			glog.Infof("Deleting PV %q", name)
 
 			// Cleanup volume
 			err := d.cleanupPV(pv)
 			if err != nil {
 				// TODO: Log event on PV
-				glog.Errorf("Error cleaning PV: %v\n", err.Error())
+				glog.Errorf("Error cleaning PV %q: %v", name, err.Error())
 				continue
 			}
 
@@ -56,15 +56,12 @@ func (d *deleter) DeletePVs() {
 			err = d.APIUtil.DeletePV(name)
 			if err != nil {
 				// TODO: Log event on PV
-				glog.Errorf("Error reading directory: %v\n", err.Error())
+				glog.Errorf("Error deleting PV %q: %v", name, err.Error())
 				continue
 			}
 
-			glog.Infof("Done deleting PV: %v\n", name)
-			err = d.Cache.DeletePV(name)
-			if err != nil {
-				glog.Errorf("Error deleting PV %q from cache: %v\n", name, err.Error())
-			}
+			d.Cache.DeletePV(name)
+			glog.Infof("Deleted PV %q", name)
 		}
 	}
 }
@@ -74,7 +71,7 @@ func (d *deleter) cleanupPV(pv *v1.PersistentVolume) error {
 	// TODO: Need to extract the hostDir from the spec path, and replace with mountdir
 	path := "TODO-PLACEHOLDER"
 	fullPath := filepath.Join(d.MountDir, path)
-	glog.Infof("Deleting contents at %q", fullPath)
+	glog.Infof("Deleting PV %q contents at %q", pv.Name, fullPath)
 
 	return d.VolUtil.DeleteContents(fullPath)
 }

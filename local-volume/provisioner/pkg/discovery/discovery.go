@@ -49,7 +49,7 @@ func (d *Discoverer) discoverVolumesAtPath(class, relativePath string) {
 
 	files, err := d.VolUtil.ReadDir(fullPath)
 	if err != nil {
-		glog.Errorf("Error reading directory: %v\n", err)
+		glog.Errorf("Error reading directory: %v", err)
 		return
 	}
 
@@ -60,7 +60,7 @@ func (d *Discoverer) discoverVolumesAtPath(class, relativePath string) {
 			filePath := filepath.Join(fullPath, file)
 			err = d.validateFile(filePath)
 			if err != nil {
-				glog.Errorf("Path %q validation failed: %v\n", filePath, err)
+				glog.Errorf("Path %q validation failed: %v", filePath, err)
 				continue
 			}
 			// TODO: detect capacity
@@ -89,7 +89,7 @@ func (d *Discoverer) createPV(file, relativePath, class string) {
 	pvName := generatePVName(file, d.NodeName, class)
 	outsidePath := filepath.Join(d.HostDir, relativePath, file)
 
-	glog.Infof("Found new volume at host path %v, creating LocalVolume PV %q\n", outsidePath, pvName)
+	glog.Infof("Found new volume at host path %q, creating Local PV %q", outsidePath, pvName)
 	pvSpec := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: pvName,
@@ -114,7 +114,7 @@ func (d *Discoverer) createPV(file, relativePath, class string) {
 			AccessModes: []v1.PersistentVolumeAccessMode{
 				v1.ReadWriteOnce,
 			},
-			StorageClassName: "local-fast",
+			StorageClassName: class,
 		},
 	}
 
@@ -123,10 +123,6 @@ func (d *Discoverer) createPV(file, relativePath, class string) {
 		glog.Errorf("Error creating PV %q: %v", pvName, err)
 		return
 	}
-	err = d.Cache.AddPV(pv)
-	if err != nil {
-		glog.Errorf("Error adding PV %q to cache: %v", pvName, err)
-		return
-	}
-	glog.Infof("Created PV: %v", pvName)
+	d.Cache.AddPV(pv)
+	glog.Infof("Created PV %q", pvName)
 }
