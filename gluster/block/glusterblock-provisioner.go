@@ -224,6 +224,7 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				ISCSI: &v1.ISCSIVolumeSource{
 					TargetPortal:    vol.TargetPortal,
+					Portals:         vol.Portals,
 					IQN:             vol.Iqn,
 					Lun:             0,
 					FSType:          "ext4",
