@@ -21,6 +21,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"os"
 	exec "os/exec"
 	"strconv"
 	dstrings "strings"
@@ -43,6 +44,7 @@ import (
 const (
 	provisionerName    = "gluster.org/glusterblock"
 	secretKeyName      = "key"
+	provisionerNameKey = "PROVISIONER_NAME"
 	shareIDAnn         = "glusterBlockShare"
 	provisionerIDAnn   = "glusterBlockProvisionerIdentity"
 	creatorAnn         = "kubernetes.io/createdby"
@@ -556,10 +558,16 @@ func main() {
 		glog.Fatalf("Failed to create config: %v", err)
 	}
 
-	prID := string(uuid.NewUUID())
+	prName := provisionerName
+	provName := os.Getenv(provisionerNameKey)
 
-	if *id != "" {
-		prID = *id
+	// Precedence is given for ProvisionerNameKey
+	if provName != "" && *id != "" {
+		prName = provName
+	}
+
+	if provName == "" && *id != "" {
+		prName = *id
 	}
 
 	clientset, err := kubernetes.NewForConfig(config)
@@ -576,14 +584,14 @@ func main() {
 
 	// Create the provisioner: it implements the Provisioner interface expected by
 	// the controller
-	glusterBlockProvisioner := NewGlusterBlockProvisioner(clientset, prID)
+	glusterBlockProvisioner := NewGlusterBlockProvisioner(clientset, prName)
 
 	// Start the provision controller which will dynamically provision glusterblock
 	// PVs
 
 	pc := controller.NewProvisionController(
 		clientset,
-		provisionerName,
+		prName,
 		glusterBlockProvisioner,
 		serverVersion.GitVersion,
 	)
