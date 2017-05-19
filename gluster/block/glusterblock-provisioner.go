@@ -179,28 +179,15 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 	password := vol.AuthKey
 	secretName := "glusterblk-" + user + "-secret"
 	secretRef := &v1.LocalObjectReference{}
-	if p.provConfig.chapAuthEnabled && user != "" && password != "" {
-		secret := &v1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: nameSpace,
-				Name:      secretName,
-			},
-			Data: map[string][]byte{
-				"node.session.auth.username": []byte(user),
-				"node.session.auth.password": []byte(password),
-			},
-			Type: chapType,
-		}
-		_, err = p.client.Core().Secrets(nameSpace).Create(secret)
-		if err != nil {
-			return nil, fmt.Errorf("glusterblock: failed to create secret, error %v", err)
-		}
 
-		if secretRef != nil {
-			secretRef.Name = secretName
-			glog.V(1).Infof("glusterblock: secret [%v]: secretRef [%v]", secret, secretRef)
-			vol.SessionCHAPAuth = p.provConfig.chapAuthEnabled
+	if p.provConfig.chapAuthEnabled && user != "" && password != "" {
+		secretRef, err = p.createSecret(nameSpace, secretName, user, password)
+		if err != nil {
+			glog.Errorf("glusterblock: failed to create credentials for pv")
+			return nil, fmt.Errorf("glusterblock: failed to create credentials for pv")
 		}
+		glog.Errorf("secretRef:%#v", secretRef)
+		vol.SessionCHAPAuth = p.provConfig.chapAuthEnabled
 	} else {
 		glog.V(1).Infof("glusterblock: authentication is nil")
 	}
@@ -239,6 +226,33 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 	}
 	glog.Infof("successfully created Gluster Block volume %+v", pv.Spec.PersistentVolumeSource.ISCSI)
 	return pv, nil
+}
+
+func (p *glusterBlockProvisioner) createSecret(nameSpace string, secretName string, user string, password string) (*v1.LocalObjectReference, error) {
+	var err error
+
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: nameSpace,
+			Name:      secretName,
+		},
+		Data: map[string][]byte{
+			"node.session.auth.username": []byte(user),
+			"node.session.auth.password": []byte(password),
+		},
+		Type: chapType,
+	}
+	_, err = p.client.Core().Secrets(nameSpace).Create(secret)
+	if err != nil {
+		return nil, fmt.Errorf("glusterblock: failed to create secret, error %v", err)
+	}
+	secretRef := &v1.LocalObjectReference{}
+	if secretRef != nil {
+		secretRef.Name = secretName
+		glog.V(1).Infof("glusterblock: secret [%v]: secretRef [%v]", secret, secretRef)
+
+	}
+	return secretRef, nil
 }
 
 // createVolume creates a gluster block volume i.e. the storage asset.
