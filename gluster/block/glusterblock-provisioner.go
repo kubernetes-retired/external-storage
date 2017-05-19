@@ -30,6 +30,7 @@ import (
 	gcli "github.com/heketi/heketi/client/api/go-client"
 	gapi "github.com/heketi/heketi/pkg/glusterfs/api"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
+	"github.com/kubernetes-incubator/external-storage/lib/util"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -172,7 +173,7 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 	}
 
 	//TODO: move to info
-	glog.Errorf("glusterblock: Volume configuration : %+v", vol)
+	glog.V(1).Infof("glusterblock: Volume configuration : %+v", vol)
 
 	nameSpace := options.PVC.Namespace
 	user := vol.User
@@ -186,7 +187,6 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 			glog.Errorf("glusterblock: failed to create credentials for pv")
 			return nil, fmt.Errorf("glusterblock: failed to create credentials for pv")
 		}
-		glog.Errorf("secretRef:%#v", secretRef)
 		vol.SessionCHAPAuth = p.provConfig.chapAuthEnabled
 	} else {
 		glog.V(1).Infof("glusterblock: authentication is nil")
@@ -257,14 +257,11 @@ func (p *glusterBlockProvisioner) createSecret(nameSpace string, secretName stri
 
 // createVolume creates a gluster block volume i.e. the storage asset.
 func (p *glusterBlockProvisioner) createVolume(blockVol string) (*glusterBlockVolume, error) {
-	/*
-		TODO: calculation of size
-		volSize := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-		volSizeBytes := volSize.Value()
-		sz := int(volume.RoundUpSize(volSizeBytes, 1024*1024*1024))
-	*/
 
-	volSizeBytes := "1073741824"
+	volSize := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
+	volSizeBytes := volSize.Value()
+	volszInt := int(util.RoundUpSize(volSizeBytes, 1024*1024*1024))
+	sizeStr := strconv.Itoa(volszInt)
 	glog.V(2).Infof("glusterfs: create block volume of size: %d bytes and configuration %+v", volSizeBytes, p.provConfig)
 
 	// Possible opModes are gluster-block and heketi:
@@ -274,7 +271,7 @@ func (p *glusterBlockProvisioner) createVolume(blockVol string) (*glusterBlockVo
 		haCountStr := "1"
 		cmd := exec.Command(
 			p.provConfig.opMode, "create", p.provConfig.blockModeArgs["glustervol"]+"/"+blockVol,
-			"ha", haCountStr, p.provConfig.blockModeArgs["hosts"], "2GiB", "--json")
+			"ha", haCountStr, p.provConfig.blockModeArgs["hosts"], sizeStr, "--json")
 
 		out, cmdErr := cmd.CombinedOutput()
 		if cmdErr != nil {
@@ -314,9 +311,7 @@ func (p *glusterBlockProvisioner) createVolume(blockVol string) (*glusterBlockVo
 			return nil, fmt.Errorf("glusterfs: failed to create glusterfs rest client, REST server authentication failed")
 		}
 
-		//TODO:
-		sz, _ := strconv.Atoi(volSizeBytes)
-		volumeReq := &gapi.VolumeCreateRequest{Size: sz}
+		volumeReq := &gapi.VolumeCreateRequest{Size: volszInt}
 		_, err := cli.VolumeCreate(volumeReq)
 		if err != nil {
 			glog.Errorf("glusterfs: error creating volume %v ", err)
