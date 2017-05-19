@@ -57,7 +57,7 @@ func (d *Discoverer) discoverVolumesAtPath(class, relativePath string) {
 
 	for _, file := range files {
 		// Check if PV already exists for it
-		pvName := generatePVName(file, d.NodeName, class)
+		pvName := generatePVName(file, d.Node.Name, class)
 		if !d.Cache.PVExists(pvName) {
 			filePath := filepath.Join(fullPath, file)
 			err = d.validateFile(filePath)
@@ -88,7 +88,7 @@ func generatePVName(file, node, class string) string {
 }
 
 func (d *Discoverer) createPV(file, relativePath, class string) {
-	pvName := generatePVName(file, d.NodeName, class)
+	pvName := generatePVName(file, d.Node.Name, class)
 	outsidePath := filepath.Join(d.HostDir, relativePath, file)
 
 	glog.Infof("Found new volume at host path %q, creating Local PV %q", outsidePath, pvName)

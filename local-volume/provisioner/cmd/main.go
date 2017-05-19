@@ -24,7 +24,9 @@ import (
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/controller"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/types"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 )
 
@@ -45,20 +47,29 @@ func main() {
 	flag.Set("logtostderr", "true")
 	flag.Parse()
 
-	node := os.Getenv("MY_NODE_NAME")
-	if node == "" {
+	nodeName := os.Getenv("MY_NODE_NAME")
+	if nodeName == "" {
 		glog.Fatalf("MY_NODE_NAME environment variable not set\n")
 	}
 
 	client := setupClient()
+	node := getNode(client, nodeName)
 
 	glog.Info("Starting controller\n")
 	controller.StartLocalController(client, &types.UserConfig{
-		NodeName:     node,
+		Node:         node,
 		HostDir:      "/mnt/disks",
 		MountDir:     "/local-disks",
 		DiscoveryMap: createDiscoveryMap(),
 	})
+}
+
+func getNode(client *kubernetes.Clientset, name string) *v1.Node {
+	node, err := client.CoreV1().Nodes().Get(name, metav1.GetOptions{})
+	if err != nil {
+		glog.Fatalf("Could not get node information: %v", err)
+	}
+	return node
 }
 
 func createDiscoveryMap() map[string]string {

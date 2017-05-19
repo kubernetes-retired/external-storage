@@ -30,7 +30,6 @@ import (
 const (
 	testHostDir  = "/mnt/disks"
 	testMountDir = "/discoveryPath"
-	testNode     = "test-node"
 )
 
 type testConfig struct {
@@ -173,7 +172,6 @@ func testSetup(t *testing.T, config *testConfig) *Deleter {
 
 	config.apiUtil = util.NewFakeAPIUtil(config.apiShouldFail)
 	userConfig := &types.UserConfig{
-		NodeName: testNode,
 		MountDir: testMountDir,
 		HostDir:  testHostDir,
 	}

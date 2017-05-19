@@ -20,6 +20,7 @@ import (
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/cache"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/util"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/pkg/api/v1"
 )
 
 const (
@@ -27,9 +28,8 @@ const (
 )
 
 type UserConfig struct {
-	// Name of the node this is running on
-	// TODO: Need to resolve nodename vs hostname
-	NodeName string
+	// Node object for this node
+	Node *v1.Node
 	// The hostpath directory
 	HostDir string
 	// The mount point of the hostpath volume

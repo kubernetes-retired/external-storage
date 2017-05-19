@@ -21,6 +21,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"k8s.io/client-go/pkg/api/v1"
+
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/cache"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/types"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/util"
@@ -29,8 +31,12 @@ import (
 const (
 	testHostDir  = "/mnt/disks"
 	testMountDir = "/discoveryPath"
-	testNode     = "test-node"
+	testNodeName = "test-node"
 )
+
+var testNode = &v1.Node{
+	Name: testNodeName,
+}
 
 var scMapping = map[string]string{
 	"sc1": "dir1",
@@ -210,7 +216,7 @@ func testSetup(t *testConfig) *Discoverer {
 	t.cache = cache.NewVolumeCache()
 
 	userConfig := &types.UserConfig{
-		NodeName:     testNode,
+		Node:         testNode,
 		MountDir:     testMountDir,
 		HostDir:      testHostDir,
 		DiscoveryMap: scMapping,

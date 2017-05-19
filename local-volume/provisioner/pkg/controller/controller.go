@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/golang/glog"
@@ -40,8 +41,7 @@ func StartLocalController(client *kubernetes.Clientset, config *types.UserConfig
 		VolUtil:    util.NewVolumeUtil(),
 		APIUtil:    util.NewAPIUtil(client),
 		Client:     client,
-		// TODO: make this unique based on node name?
-		Name: "local-volume-provisioner",
+		Name:       fmt.Sprintf("local-volume-provisioner-%v", config.Node.UID),
 	}
 
 	populator := populator.NewPopulator(runtimeConfig)
