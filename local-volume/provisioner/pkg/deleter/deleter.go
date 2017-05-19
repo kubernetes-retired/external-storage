@@ -25,20 +25,17 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 )
 
-type Deleter interface {
-	// Cleanup and delete all its owned PVs that have been released
-	DeletePVs()
-}
-
-type deleter struct {
+// Deleter handles PV cleanup and object deletion
+// For file-based volumes, it deletes the contents of the directory
+type Deleter struct {
 	*types.RuntimeConfig
 }
 
-func NewDeleter(config *types.RuntimeConfig) Deleter {
-	return &deleter{RuntimeConfig: config}
+func NewDeleter(config *types.RuntimeConfig) *Deleter {
+	return &Deleter{RuntimeConfig: config}
 }
 
-func (d *deleter) DeletePVs() {
+func (d *Deleter) DeletePVs() {
 	for _, pv := range d.Cache.ListPVs() {
 		if pv.Status.Phase == v1.VolumeReleased {
 			name := pv.Name
@@ -66,7 +63,7 @@ func (d *deleter) DeletePVs() {
 	}
 }
 
-func (d *deleter) cleanupPV(pv *v1.PersistentVolume) error {
+func (d *Deleter) cleanupPV(pv *v1.PersistentVolume) error {
 	// path := pv.Spec.Local.Path
 	// TODO: Need to extract the hostDir from the spec path, and replace with mountdir
 	path := "TODO-PLACEHOLDER"

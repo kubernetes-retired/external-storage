@@ -28,6 +28,8 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 )
 
+// Discoverer finds available volumes and creates PVs for them
+// It looks for volumes in the directories specified in the discoveryMap
 type Discoverer struct {
 	*types.RuntimeConfig
 }

@@ -40,7 +40,7 @@ type testConfig struct {
 	vols map[string]*testVol
 	// Expected names of deleted PV
 	expectedDeletedPVs map[string]string
-	// These two interfaces are set during setup
+	// The remaining fields are set during setup
 	volUtil *util.FakeVolumeUtil
 	apiUtil *util.FakeAPIUtil
 	cache   *cache.VolumeCache
@@ -149,7 +149,7 @@ func TestDeleteVolumes_CleanupFails(t *testing.T) {
 	verifyPVExists(t, test)
 }
 
-func testSetup(t *testing.T, config *testConfig) Deleter {
+func testSetup(t *testing.T, config *testConfig) *Deleter {
 	config.volUtil = util.NewFakeVolumeUtil(config.volDeleteShouldFail)
 	config.apiUtil = util.NewFakeAPIUtil(false)
 	config.cache = cache.NewVolumeCache()
@@ -168,10 +168,7 @@ func testSetup(t *testing.T, config *testConfig) Deleter {
 		if err != nil {
 			t.Fatalf("Error creating fake PV: %v", err)
 		}
-		err = config.cache.AddPV(pv)
-		if err != nil {
-			t.Fatalf("Error adding PV to cache: %v", err)
-		}
+		config.cache.AddPV(pv)
 	}
 
 	config.apiUtil = util.NewFakeAPIUtil(config.apiShouldFail)

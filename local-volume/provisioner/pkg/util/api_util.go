@@ -24,6 +24,7 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 )
 
+// APIUtil is an interface for the K8s API
 type APIUtil interface {
 	// Create PersistentVolume object
 	CreatePV(pv *v1.PersistentVolume) (*v1.PersistentVolume, error)

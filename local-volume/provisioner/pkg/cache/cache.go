@@ -24,6 +24,9 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 )
 
+// VolumeCache keeps all the PersistentVolumes that have been created by this provisioner.
+// It is periodically updated by the Populator.
+// The Deleter and Discoverer use the VolumeCache to check on created PVs
 type VolumeCache struct {
 	mutex sync.Mutex
 	pvs   map[string]*v1.PersistentVolume

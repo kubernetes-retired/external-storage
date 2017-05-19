@@ -24,6 +24,7 @@ import (
 	"github.com/golang/glog"
 )
 
+// VolumeUtil is an interface for local filesystem operations
 type VolumeUtil interface {
 	// IsDir checks if the given path is a directory
 	IsDir(fullPath string) (bool, error)

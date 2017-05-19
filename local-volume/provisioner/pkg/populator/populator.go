@@ -31,6 +31,7 @@ import (
 	kcache "k8s.io/client-go/tools/cache"
 )
 
+// The Populator uses an Informer to populate the VolumeCache.
 type Populator struct {
 	*types.RuntimeConfig
 }
