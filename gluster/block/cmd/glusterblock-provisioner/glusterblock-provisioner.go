@@ -152,8 +152,15 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 
 	glog.V(4).Infof("glusterblock: creating volume with configuration %+v", p.provConfig)
 
-	blockVol := volPrefix + string(uuid.NewUUID())
-	vol, err := p.createVolume(blockVol)
+	// Calculate the size
+	volSize := options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
+	volSizeBytes := volSize.Value()
+	volszInt := int(util.RoundUpSize(volSizeBytes, 1024*1024*1024))
+
+	// Create Volume
+	blockVolName := volPrefix + string(uuid.NewUUID())
+	vol, err := p.createVolume(volszInt, blockVolName)
+
 	if err != nil {
 		return nil, fmt.Errorf("glusterblock: failed to create volume: %v", err)
 	}
@@ -201,7 +208,7 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 			Annotations: map[string]string{
 				provisionerIDAnn:   p.identity,
 				provisionerVersion: provisionerVersion,
-				shareIDAnn:         blockVol,
+				shareIDAnn:         blockVolName,
 				creatorAnn:         heketiAnn,
 				volumeTypeAnn:      "block",
 				"Description":      descAnn,
@@ -259,19 +266,20 @@ func (p *glusterBlockProvisioner) createSecret(nameSpace string, secretName stri
 }
 
 // createVolume creates a gluster block volume i.e. the storage asset.
-func (p *glusterBlockProvisioner) createVolume(blockVol string) (*glusterBlockVolume, error) {
+func (p *glusterBlockProvisioner) createVolume(volSizeInt int, blockVol string) (*glusterBlockVolume, error) {
 
-	volSize := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-	volSizeBytes := volSize.Value()
-	volszInt := int(util.RoundUpSize(volSizeBytes, 1024*1024*1024))
-	sizeStr := strconv.Itoa(volszInt)
-	glog.V(2).Infof("glusterfs: create block volume of size: %d bytes and configuration %+v", volSizeBytes, p.provConfig)
+	// Convert sizeStr and hacount to string
+	sizeStr := strconv.Itoa(volSizeInt)
+	haCountStr := strconv.Itoa(p.provConfig.haCount)
+
+	glog.V(2).Infof("glusterfs: create block volume of size: %d  and configuration %+v", volSizeInt, p.provConfig)
 
 	// Possible opModes are gluster-block and heketi:
 	switch p.provConfig.opMode {
 
+	// An experimental/Test Mode:
 	case "gluster-block":
-		haCountStr := "1"
+
 		cmd := exec.Command(
 			p.provConfig.opMode, "create", p.provConfig.blockModeArgs["glustervol"]+"/"+blockVol,
 			"ha", haCountStr, p.provConfig.blockModeArgs["hosts"], sizeStr, "--json")
@@ -316,7 +324,7 @@ func (p *glusterBlockProvisioner) createVolume(blockVol string) (*glusterBlockVo
 			return nil, fmt.Errorf("glusterfs: failed to create glusterfs rest client, REST server authentication failed")
 		}
 		// TODO: call blockvolcreate
-		volumeReq := &gapi.VolumeCreateRequest{Size: volszInt}
+		volumeReq := &gapi.VolumeCreateRequest{Size: volSizeInt}
 		_, err := cli.VolumeCreate(volumeReq)
 		if err != nil {
 			glog.Errorf("glusterfs: error creating volume %v ", err)
@@ -344,31 +352,31 @@ func (p *glusterBlockProvisioner) Delete(volume *v1.PersistentVolume) error {
 		return &controller.IgnoredError{Reason: "identity annotation on PV does not match this provisioners identity"}
 	}
 
-	delBlockVol, ok := volume.Annotations[shareIDAnn]
+	delBlockVolName, ok := volume.Annotations[shareIDAnn]
 	if !ok {
 		return errors.New("gluster block share annotation not found on PV")
 	}
 
 	// Delete this blockVol
-	glog.V(1).Infof("blockVolume  %v", delBlockVol)
+	glog.V(1).Infof("blockVolume  %v", delBlockVolName)
 
 	switch p.provConfig.opMode {
 	case "gluster-block":
-		glog.V(1).Infof("gluster-block: Deleteing Volume %v ", delBlockVol)
+		glog.V(1).Infof("gluster-block: Deleteing Volume %v ", delBlockVolName)
 		deleteCmd := exec.Command(
 			p.provConfig.opMode, "delete",
-			p.provConfig.blockModeArgs["glustervol"]+"/"+delBlockVol, "--json")
+			p.provConfig.blockModeArgs["glustervol"]+"/"+delBlockVolName, "--json")
 		_, cmdErr := deleteCmd.CombinedOutput()
 		if cmdErr != nil {
 			glog.Errorf("glusterblock: error [%v] when running command %v", cmdErr, deleteCmd)
 			return cmdErr
 		}
-		glog.V(1).Infof("gluster-block: Successfully deleted Volume %v ", delBlockVol)
+		glog.V(1).Infof("gluster-block: Successfully deleted Volume %v ", delBlockVolName)
 
 	case "heketi":
-		glog.V(1).Infof("heketik: Deleteing Volume %v", delBlockVol)
+		glog.V(1).Infof("heketik: Deleteing Volume %v", delBlockVolName)
 	default:
-		glog.Errorf("Unknown OpMode, failed to delete volume %v", delBlockVol)
+		glog.Errorf("Unknown OpMode, failed to delete volume %v", delBlockVolName)
 
 	}
 
