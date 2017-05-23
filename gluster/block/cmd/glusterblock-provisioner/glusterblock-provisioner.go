@@ -192,7 +192,7 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 	secretRef := &v1.LocalObjectReference{}
 
 	if p.provConfig.chapAuthEnabled && user != "" && password != "" {
-		secretRef, err = p.createSecret(nameSpace, secretName, user, password)
+		secretRef, err = p.createSecretRef(nameSpace, secretName, user, password)
 		if err != nil {
 			glog.Errorf("glusterblock: failed to create credentials for pv")
 			return nil, fmt.Errorf("glusterblock: failed to create credentials for pv")
@@ -238,7 +238,7 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 	return pv, nil
 }
 
-func (p *glusterBlockProvisioner) createSecret(nameSpace string, secretName string, user string, password string) (*v1.LocalObjectReference, error) {
+func (p *glusterBlockProvisioner) createSecretRef(nameSpace string, secretName string, user string, password string) (*v1.LocalObjectReference, error) {
 	var err error
 
 	secret := &v1.Secret{
@@ -252,14 +252,20 @@ func (p *glusterBlockProvisioner) createSecret(nameSpace string, secretName stri
 		},
 		Type: chapType,
 	}
-	_, err = p.client.Core().Secrets(nameSpace).Create(secret)
-	if err != nil {
-		return nil, fmt.Errorf("glusterblock: failed to create secret, error %v", err)
-	}
+
 	secretRef := &v1.LocalObjectReference{}
-	if secretRef != nil {
-		secretRef.Name = secretName
-		glog.V(1).Infof("glusterblock: secret [%v]: secretRef [%v]", secret, secretRef)
+	if secret != nil {
+		_, err = p.client.Core().Secrets(nameSpace).Create(secret)
+		if err != nil {
+			return nil, fmt.Errorf("glusterblock: failed to create secret, error %v", err)
+		}
+
+		if secretRef != nil {
+			secretRef.Name = secretName
+			glog.V(1).Infof("glusterblock: secret [%v]: secretRef [%v]", secret, secretRef)
+		}
+	} else {
+		return nil, fmt.Errorf("glusterblock: secret is nil")
 
 	}
 	return secretRef, nil
