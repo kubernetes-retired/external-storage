@@ -165,24 +165,16 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 		return nil, fmt.Errorf("glusterblock: failed to create volume: %v", err)
 	}
 
-	if len(vol.Portals) == 1 && vol.Portals[0] != "" {
-		vol.TargetPortal = vol.Portals[0]
-		vol.Portals = nil
-	} else {
-
-		portals := vol.Portals
-		vol.Portals = nil
-		for _, v := range portals {
-			if v != "" && vol.TargetPortal == "" {
-				vol.TargetPortal = v
-				continue
-			} else {
-				vol.Portals = append(vol.Portals, v)
-			}
-		}
+	//Sort Target Portal from portal.
+	sortErr := p.sortTargetPortal(vol)
+	if sortErr != nil {
+		return nil, fmt.Errorf("glusterblock: failed to fetch Target Portal: %v", err)
 	}
 
-	//TODO: move to info
+	if vol.TargetPortal == "" || vol.Iqn == "" {
+		return nil, fmt.Errorf("glusterblock: Target portal/IQN is nil")
+	}
+
 	glog.V(1).Infof("glusterblock: Volume configuration : %+v", vol)
 
 	nameSpace := options.PVC.Namespace
@@ -299,9 +291,6 @@ func (p *glusterBlockProvisioner) createVolume(volSizeInt int, blockVol string) 
 		blockRes := &p.volConfig
 		json.Unmarshal([]byte(out), blockRes)
 
-		//TODO:
-		dTarget := blockRes.Portals[0]
-
 		if p.provConfig.chapAuthEnabled {
 			cmd := exec.Command(
 				p.provConfig.opMode, "modify", p.provConfig.blockModeArgs["glustervol"]+"/"+blockVol,
@@ -318,9 +307,6 @@ func (p *glusterBlockProvisioner) createVolume(volSizeInt int, blockVol string) 
 				return nil, fmt.Errorf("gluster-block: missing CHAP - invalid volume creation ")
 			}
 
-		}
-		if dTarget == "" || blockRes.Iqn == "" {
-			return nil, fmt.Errorf("gluster-block: missing IQN - invalid volume creation")
 		}
 
 	case "heketi":
@@ -386,6 +372,29 @@ func (p *glusterBlockProvisioner) Delete(volume *v1.PersistentVolume) error {
 
 	}
 
+	return nil
+}
+
+func (p *glusterBlockProvisioner) sortTargetPortal(vol *glusterBlockVolume) error {
+	if len(vol.Portals) == 0 {
+		return fmt.Errorf("portal is empty")
+	}
+	if len(vol.Portals) == 1 && vol.Portals[0] != "" {
+		vol.TargetPortal = vol.Portals[0]
+		vol.Portals = nil
+	} else {
+
+		portals := vol.Portals
+		vol.Portals = nil
+		for _, v := range portals {
+			if v != "" && vol.TargetPortal == "" {
+				vol.TargetPortal = v
+				continue
+			} else {
+				vol.Portals = append(vol.Portals, v)
+			}
+		}
+	}
 	return nil
 }
 
