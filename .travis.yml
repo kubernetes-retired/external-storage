@@ -63,7 +63,8 @@ script:
   - make clean
   - popd
   - pushd ./gluster/block
-  - go build glusterblock-provisioner.go
+  - go build cmd/glusterblock-provisioner/glusterblock-provisioner.go
+  - make container
   - popd
   - pushd ./flex
   - make container
