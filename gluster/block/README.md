@@ -8,16 +8,16 @@ quay.io/external_storage/glusterblock-provisioner:latest
 
 # Test instruction
 
-* Build glusterblock-provisioner and container image
+## Build glusterblock-provisioner and container image
 
 ```bash
-[root@localhost]#go build glusterblock-provisioner.go
-[root@localhost]#docker build -t glusterblock-provisioner .
+[root@localhost]# go build glusterblock-provisioner.go
+[root@localhost]# docker build -t glusterblock-provisioner .
 ```
 
-* Start Kubernetes local cluster
+## Start Kubernetes local cluster
 
-* Start glusterblock provisioner
+## Start glusterblock provisioner
 
 The following example uses `glusterblock-provisioner-1` as the identity for the instance and assumes kubeconfig is at `/root/.kube`. The identity should remain the same if the provisioner restarts. If there are multiple provisioners, each should have a different identity.
 
@@ -25,7 +25,7 @@ The following example uses `glusterblock-provisioner-1` as the identity for the 
 docker run -ti -v /root/.kube:/kube -v /var/run/kubernetes:/var/run/kubernetes --privileged --net=host  glusterblock-provisioner /usr/local/bin/glusterblock-provisioner -master=http://127.0.0.1:8080 -kubeconfig=/kube/config -id=glusterblock-provisioner-1
 ```
 
-* Create a glusterblock Storage Class
+## Create a glusterblock Storage Class
 
 ```bash
 kubectl create -f glusterblock-class.yaml
@@ -57,9 +57,9 @@ parameters:
 
 * `opmode`: Gluster Block provisioner can operate in more than one mode for provisioning gluster block volume. Available modes are `gluster-block` and `heketi`. Heketi will be the default or recommended operation mode.
 
-*`hacount`: This is the count of number of paths to the block target server. This provide high availability via multipathing capability of iscsi. If there is a path failure, the I/Os will not be disturbed and will be served via another available paths.
+* `hacount`: This is the count of number of paths to the block target server. This provide high availability via multipathing capability of iscsi. If there is a path failure, the I/Os will not be disturbed and will be served via another available paths.
 
-* Create a claim
+## Create a claim
 
 ```bash
 [root@localhost]# kubectl create -f glusterblock-claim1.yaml
