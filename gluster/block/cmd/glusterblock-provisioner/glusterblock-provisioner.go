@@ -396,6 +396,7 @@ func parseClassParameters(params map[string]string, kubeclient kubernetes.Interf
 	authEnabled := true
 	chapAuthEnabled := true
 	parseOpmode := ""
+	blkmodeArgs := ""
 	haCount := 3
 
 	for k, v := range params {
@@ -424,6 +425,8 @@ func parseClassParameters(params map[string]string, kubeclient kubernetes.Interf
 			cfg.haCount = haCount
 		case "opmode":
 			parseOpmode = v
+		case "blockmodeargs":
+			blkmodeArgs = v
 		case "chapauth":
 			chapAuthEnabled = dstrings.ToLower(v) == "true"
 			cfg.chapAuthEnabled = chapAuthEnabled
@@ -432,65 +435,72 @@ func parseClassParameters(params map[string]string, kubeclient kubernetes.Interf
 		}
 	}
 
-	//TODO:
-	if len(cfg.url) == 0 {
-		return nil, fmt.Errorf("StorageClass for provisioner %s must contain 'resturl' parameter", "glusterblock")
-	}
-
 	if len(parseOpmode) == 0 {
 		cfg.opMode = "gluster-block"
 	} else {
-		parseOpmodeInfo := dstrings.Split(parseOpmode, ":")
 
-		switch parseOpmodeInfo[0] {
+		switch parseOpmode {
 		// Gluster Block opmode
 		case "gluster-block":
-			if len(parseOpmodeInfo) >= 2 {
-				cfg.opMode = "gluster-block"
-				argsDict, err := parseBlockModeArgs(cfg.opMode, parseOpmodeInfo[1])
-				if err != nil {
-					glog.Errorf("Failed to parse gluster-block arguments")
-					return nil, fmt.Errorf("Failed to parse gluster-block arguments")
-				}
-				cfg.blockModeArgs = *argsDict
+			cfg.opMode = "gluster-block"
+			if len(blkmodeArgs) == 0 {
+				glog.Errorf("glusterblock: block mode args has to be set if this opmode is set")
+
 			} else {
-				return nil, fmt.Errorf("StorageClass for provisioner %s contains wrong number of arguments for %s", "glusterblock", parseOpmode)
+				parseOpmodeInfo := dstrings.Split(blkmodeArgs, "=")
+				if len(parseOpmodeInfo) >= 2 {
+					argsDict, err := parseBlockModeArgs(cfg.opMode, blkmodeArgs)
+					if err != nil {
+						glog.Errorf("Failed to parse gluster-block arguments")
+						return nil, fmt.Errorf("Failed to parse gluster-block arguments")
+					}
+					cfg.blockModeArgs = *argsDict
+				} else {
+					return nil, fmt.Errorf("StorageClass for provisioner %s contains wrong number of arguments for %s", "glusterblock", parseOpmode)
+				}
 			}
 
 			// Heketi Opmode
 		case "heketi":
-			if len(parseOpmodeInfo) >= 2 {
-				cfg.opMode = "heketi"
-				// TODO:
-			} else {
-				return nil, fmt.Errorf("StorageClass for provisioner %s contains wrong number of arguments for %s", "heketi", parseOpmode)
+			cfg.opMode = "heketi"
+			err := parseHeketiModeArgs(&cfg)
+			if err != nil {
+				glog.Errorf("Failed to parse gluster-block arguments")
+				return nil, fmt.Errorf("Failed to parse gluster-block arguments")
 			}
-
 		default:
-			return nil, fmt.Errorf("StorageClass for provisioner %s contains unknown [%v] parameter", "glusterblock", parseOpmodeInfo[0])
+			return nil, fmt.Errorf("StorageClass for provisioner %s contains unknown [%v] parameter", "glusterblock", parseOpmode)
 		}
 	}
 
-	if !authEnabled {
-		cfg.user = ""
-		cfg.secretName = ""
-		cfg.secretNamespace = ""
-		cfg.userKey = ""
-		cfg.secretValue = ""
+	if len(cfg.url) == 0 && cfg.opMode == "heketi" {
+		return nil, fmt.Errorf("StorageClass for provisioner %s must contain 'resturl' parameter", "glusterblock")
 	}
 
-	if len(cfg.secretName) != 0 || len(cfg.secretNamespace) != 0 {
-		// secretName + Namespace has precedence over userKey
-		if len(cfg.secretName) != 0 && len(cfg.secretNamespace) != 0 {
-			cfg.secretValue, err = parseSecret(cfg.secretNamespace, cfg.secretName, kubeclient)
-			if err != nil {
-				return nil, err
+	if cfg.opMode == "heketi" {
+		if !authEnabled {
+			cfg.user = ""
+			cfg.secretName = ""
+			cfg.secretNamespace = ""
+			cfg.userKey = ""
+			cfg.secretValue = ""
+		}
+
+		if len(cfg.secretName) != 0 || len(cfg.secretNamespace) != 0 {
+			// secretName + Namespace has precedence over userKey
+			if len(cfg.secretName) != 0 && len(cfg.secretNamespace) != 0 {
+				cfg.secretValue, err = parseSecret(cfg.secretNamespace, cfg.secretName, kubeclient)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				return nil, fmt.Errorf("StorageClass for provisioner %q must have secretNamespace and secretName either both set or both empty", "glusterblock")
+
 			}
 		} else {
-			return nil, fmt.Errorf("StorageClass for provisioner %q must have secretNamespace and secretName either both set or both empty", "glusterblock")
+			cfg.secretValue = cfg.userKey
 		}
-	} else {
-		cfg.secretValue = cfg.userKey
+
 	}
 
 	return &cfg, nil
@@ -521,6 +531,17 @@ func parseBlockModeArgs(mode string, inArgs string) (*map[string]string, error) 
 		}
 	}
 	return &modeArgs, nil
+}
+
+func parseHeketiModeArgs(cfg *provisionerConfig) error {
+	cfg.heketiModeArgs = make(map[string]string)
+	cfg.heketiModeArgs["url"] = cfg.url
+	cfg.heketiModeArgs["user"] = cfg.user
+	cfg.heketiModeArgs["userkey"] = cfg.userKey
+	cfg.heketiModeArgs["secret"] = cfg.secretName
+	cfg.heketiModeArgs["secretnamespace"] = cfg.secretNamespace
+
+	return nil
 }
 
 // parseSecret finds a given Secret instance and reads user password from it.
