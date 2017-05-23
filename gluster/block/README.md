@@ -6,9 +6,8 @@
 quay.io/external_storage/glusterblock-provisioner:latest
 ```
 
-# Test instruction
+## Build Gluster Block Provisioner and container image
 
-## Build glusterblock-provisioner and container image
 
 ```bash
 [root@localhost]# go build glusterblock-provisioner.go
@@ -40,13 +39,29 @@ parameters:
     restuser: "admin"
     secretnamespace: "default"
     secretname: "heketi-secret"
-    opmode: "gluster-block:glustervol=blockmaster1,hosts=10.67.116.108"
     hacount: "3"
-
-
-
+    chapauth: "true"
+    opmode: "gluster-block"
+    blockmodeargs: "glustervol=blockmaster1,hosts=10.67.116.108"
 
 ```
+Gluster Block Provisioner can operate on below modes:
+`heketi` and `gluster-block`.
+
+`gluster-block` is an experimental mode which can be used for dev/test environment. Heketi will be the default or recommended operation mode.
+
+### Global parameters applicable for both modes:
+
+* `opmode`: This value decide in which mode gluster block provisioner has to work.
+
+* `chapauth`: This value has to be set to `true` if we want provision block volume with CHAP authentication enabled. This is an optional parameter.
+
+* `hacount`: This is the count of number of paths to the block target server. This provide high availability via multipathing capability of iscsi. If there is a path failure, the I/Os will not be disturbed and will be served via another available paths.
+
+
+### Heketi Mode Parameters:
+
+If provisioner want to operate on `heketi` mode, below args can be  filled in storageclass accordingly.
 
 * `resturl` : Gluster REST service/Heketi service url which provision gluster block volumes on demand. The general format should be `IPaddress:Port` and this is a mandatory parameter for GlusterFS dynamic provisioner. If Heketi service is exposed as a routable service in openshift/kubernetes setup, this can have a format similar to
 `http://heketi-storage-project.cloudapps.mystorage.com` where the fqdn is a resolvable heketi service url.
@@ -55,9 +70,21 @@ parameters:
 
 * `secretNamespace` + `secretName` : Identification of Secret instance that contains user password to use when talking to Gluster REST service. These parameters are optional, empty password will be used when both `secretNamespace` and `secretName` are omitted. The provided secret must have type "gluster.org/glusterblock".
 
-* `opmode`: Gluster Block provisioner can operate in more than one mode for provisioning gluster block volume. Available modes are `gluster-block` and `heketi`. Heketi will be the default or recommended operation mode.
 
-* `hacount`: This is the count of number of paths to the block target server. This provide high availability via multipathing capability of iscsi. If there is a path failure, the I/Os will not be disturbed and will be served via another available paths.
+### Gluster-Block Mode parameters:
+
+If provisioner want to operate on `gluster-block`, below args are required to be filled in storageclass.
+
+* `blockmodeargs`:
+
+This mode requires `glustervol` name and `hosts` to be mentioned in `,` seperated values as shown below. This is a mandatory parameter to be filled
+in storage class parameter.
+
+```
+"glustervol=blockmaster1,hosts=10.67.116.108"
+```
+
+# How to test:
 
 ## Create a claim
 
