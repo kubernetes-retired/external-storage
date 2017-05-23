@@ -38,8 +38,6 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	//k8s.io/kubernetes/pkg/volume
-	//storage "k8s.io/client-go/pkg/apis/storage/v1beta1"
 )
 
 const (
@@ -47,7 +45,7 @@ const (
 	secretKeyName      = "key"
 	provisionerNameKey = "PROVISIONER_NAME"
 	shareIDAnn         = "glusterBlockShare"
-	provisionerIDAnn   = "glusterBlockProvisionerIdentity"
+	provisionerIDAnn   = "glusterBlkProvIdentity"
 	creatorAnn         = "kubernetes.io/createdby"
 	volumeTypeAnn      = "gluster.org/type"
 	descAnn            = "Gluster: Dynamically provisioned PV"
@@ -55,6 +53,8 @@ const (
 	chapType           = "kubernetes.io/iscsi-chap"
 	heketiAnn          = "heketi-dynamic-provisioner"
 	volPrefix          = "blockvol-"
+	defaultIqn         = "iqn.2016-12.org.gluster-block:aafea465-9167-4880-b37c-2c36db8562ea"
+	defaultPortal      = "192.168.1.11"
 )
 
 type glusterBlockProvisioner struct {
@@ -89,17 +89,20 @@ type provisionerConfig struct {
 	secretName      string
 	secretValue     string
 
-	// Optional:  clusterID from which the provisioner create the block volume
+	// Optional:  Heketi clusterID from which the provisioner create the block volume
 	clusterID string
 
-	// Optional: high availability count in case of multipathing
+	// Optional: high availability count for multipathing
 	haCount int
 
 	// Optional: Operation mode  (heketi, gluster-block)
 	opMode string
 
-	// Optional: Gluster Block command Args or Heketi command args
+	// Optional: Gluster Block command Args.
 	blockModeArgs map[string]string
+
+	// Optional: Heketi Service parameters.
+	heketiModeArgs map[string]string
 
 	// Optional: Chap Auth Enable
 	chapAuthEnabled bool
@@ -143,16 +146,16 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 
 	cfg, err := parseClassParameters(options.Parameters, p.client)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("glusterblock: failed to parse class parameters: %v", err)
 	}
 	p.provConfig = *cfg
 
-	glog.V(4).Infof("glusterfs: creating volume with configuration %+v", p.provConfig)
+	glog.V(4).Infof("glusterblock: creating volume with configuration %+v", p.provConfig)
 
 	blockVol := volPrefix + string(uuid.NewUUID())
 	vol, err := p.createVolume(blockVol)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("glusterblock: failed to create volume: %v", err)
 	}
 
 	if len(vol.Portals) == 1 && vol.Portals[0] != "" {
@@ -275,12 +278,14 @@ func (p *glusterBlockProvisioner) createVolume(blockVol string) (*glusterBlockVo
 
 		out, cmdErr := cmd.CombinedOutput()
 		if cmdErr != nil {
-			glog.Errorf("glusterblock: error [%v] when running command %v", cmdErr, cmd)
-			return nil, cmdErr
+			glog.Errorf("glusterblock: command [%v] failed: %v", cmd, cmdErr)
+			return nil, fmt.Errorf("gluster block command failed")
 		}
-
+		// Fill the block configuration.
 		blockRes := &p.volConfig
 		json.Unmarshal([]byte(out), blockRes)
+
+		//TODO:
 		dTarget := blockRes.Portals[0]
 
 		if p.provConfig.chapAuthEnabled {
@@ -310,15 +315,17 @@ func (p *glusterBlockProvisioner) createVolume(blockVol string) (*glusterBlockVo
 			glog.Errorf("glusterfs: failed to create glusterfs rest client")
 			return nil, fmt.Errorf("glusterfs: failed to create glusterfs rest client, REST server authentication failed")
 		}
-
+		// TODO: call blockvolcreate
 		volumeReq := &gapi.VolumeCreateRequest{Size: volszInt}
 		_, err := cli.VolumeCreate(volumeReq)
 		if err != nil {
 			glog.Errorf("glusterfs: error creating volume %v ", err)
 			return nil, fmt.Errorf("error creating volume %v", err)
 		}
-		p.volConfig.Iqn = "iqn.2016-12.org.gluster-block:aafea465-9167-4880-b37c-2c36db8562ea"
-		p.volConfig.TargetPortal = "192.168.1.11"
+
+		// TODO: Fill the params
+		p.volConfig.Iqn = defaultIqn
+		p.volConfig.TargetPortal = defaultPortal
 
 	default:
 		return nil, fmt.Errorf("error parsing value for 'opmode' for volume plugin %s", provisionerName)
