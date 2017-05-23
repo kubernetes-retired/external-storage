@@ -21,21 +21,31 @@ import (
 	"path/filepath"
 	"testing"
 
-	"k8s.io/client-go/pkg/api/v1"
-
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/cache"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/types"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/util"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	ktypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/pkg/api/v1"
 )
 
 const (
-	testHostDir  = "/mnt/disks"
-	testMountDir = "/discoveryPath"
-	testNodeName = "test-node"
+	testHostDir         = "/mnt/disks"
+	testMountDir        = "/discoveryPath"
+	testNodeName        = "test-node"
+	testNodeUID         = ktypes.UID(1234)
+	testProvisionerName = "test-provisioner"
 )
 
 var testNode = &v1.Node{
-	Name: testNodeName,
+	ObjectMeta: metav1.ObjectMeta{
+		Name: testNodeName,
+		UID:  testNodeUID,
+		Labels: map[string]string{
+			types.NodeLabelKey: testNodeName,
+		},
+	},
 }
 
 var scMapping = map[string]string{
@@ -73,7 +83,7 @@ func TestDiscoverVolumes_Basic(t *testing.T) {
 		dirLayout:       vols,
 		expectedVolumes: vols,
 	}
-	d := testSetup(test)
+	d := testSetup(t, test)
 
 	d.DiscoverLocalVolumes()
 	verifyCreatedPVs(t, test)
@@ -94,7 +104,7 @@ func TestDiscoverVolumes_BasicTwice(t *testing.T) {
 		dirLayout:       vols,
 		expectedVolumes: vols,
 	}
-	d := testSetup(test)
+	d := testSetup(t, test)
 
 	d.DiscoverLocalVolumes()
 	verifyCreatedPVs(t, test)
@@ -111,7 +121,7 @@ func TestDiscoverVolumes_NoDir(t *testing.T) {
 		dirLayout:       vols,
 		expectedVolumes: vols,
 	}
-	d := testSetup(test)
+	d := testSetup(t, test)
 
 	d.DiscoverLocalVolumes()
 	verifyCreatedPVs(t, test)
@@ -125,7 +135,7 @@ func TestDiscoverVolumes_EmptyDir(t *testing.T) {
 		dirLayout:       vols,
 		expectedVolumes: vols,
 	}
-	d := testSetup(test)
+	d := testSetup(t, test)
 
 	d.DiscoverLocalVolumes()
 	verifyCreatedPVs(t, test)
@@ -146,7 +156,7 @@ func TestDiscoverVolumes_NewVolumesLater(t *testing.T) {
 		dirLayout:       vols,
 		expectedVolumes: vols,
 	}
-	d := testSetup(test)
+	d := testSetup(t, test)
 
 	d.DiscoverLocalVolumes()
 
@@ -183,7 +193,7 @@ func TestDiscoverVolumes_CreatePVFails(t *testing.T) {
 		dirLayout:       vols,
 		expectedVolumes: map[string][]*util.FakeFile{},
 	}
-	d := testSetup(test)
+	d := testSetup(t, test)
 
 	d.DiscoverLocalVolumes()
 
@@ -201,7 +211,7 @@ func TestDiscoverVolumes_BadVolume(t *testing.T) {
 		dirLayout:       vols,
 		expectedVolumes: map[string][]*util.FakeFile{},
 	}
-	d := testSetup(test)
+	d := testSetup(t, test)
 
 	d.DiscoverLocalVolumes()
 
@@ -209,11 +219,11 @@ func TestDiscoverVolumes_BadVolume(t *testing.T) {
 	verifyPVsNotInCache(t, test)
 }
 
-func testSetup(t *testConfig) *Discoverer {
-	t.volUtil = util.NewFakeVolumeUtil(false)
-	t.volUtil.AddNewFiles(testMountDir, t.dirLayout)
-	t.apiUtil = util.NewFakeAPIUtil(t.apiShouldFail)
-	t.cache = cache.NewVolumeCache()
+func testSetup(t *testing.T, test *testConfig) *Discoverer {
+	test.volUtil = util.NewFakeVolumeUtil(false)
+	test.volUtil.AddNewFiles(testMountDir, test.dirLayout)
+	test.apiUtil = util.NewFakeAPIUtil(test.apiShouldFail)
+	test.cache = cache.NewVolumeCache()
 
 	userConfig := &types.UserConfig{
 		Node:         testNode,
@@ -221,16 +231,21 @@ func testSetup(t *testConfig) *Discoverer {
 		HostDir:      testHostDir,
 		DiscoveryMap: scMapping,
 	}
-	config := &types.RuntimeConfig{
+	runConfig := &types.RuntimeConfig{
 		UserConfig: userConfig,
-		Cache:      t.cache,
-		VolUtil:    t.volUtil,
-		APIUtil:    t.apiUtil,
+		Cache:      test.cache,
+		VolUtil:    test.volUtil,
+		APIUtil:    test.apiUtil,
+		Name:       testProvisionerName,
 	}
-	return NewDiscoverer(config)
+	d, err := NewDiscoverer(runConfig)
+	if err != nil {
+		t.Fatalf("Error setting up test discoverer: %v", err)
+	}
+	return d
 }
 
-func findSCName(t *testing.T, targetDir string, config *testConfig) string {
+func findSCName(t *testing.T, targetDir string, test *testConfig) string {
 	for sc, dir := range scMapping {
 		if dir == targetDir {
 			return sc
@@ -240,25 +255,76 @@ func findSCName(t *testing.T, targetDir string, config *testConfig) string {
 	return ""
 }
 
-func verifyCreatedPVs(t *testing.T, config *testConfig) {
+func verifyNodeAffinity(t *testing.T, pv *v1.PersistentVolume) {
+	// TODO: Get node affinity from annotation
+	return
+
+	var affinity *v1.NodeAffinity
+	selector := affinity.RequiredDuringSchedulingIgnoredDuringExecution
+	if selector == nil {
+		t.Errorf("NodeAffinity node selector is nil")
+		return
+	}
+	terms := selector.NodeSelectorTerms
+	if len(terms) != 1 {
+		t.Errorf("Node selector term count is %v, expected 1", len(terms))
+		return
+	}
+	reqs := terms[0].MatchExpressions
+	if len(reqs) != 1 {
+		t.Errorf("Node selector term requirements count is %v, expected 1", len(reqs))
+		return
+	}
+	req := reqs[0]
+	if req.Key != types.NodeLabelKey {
+		t.Errorf("Node selector requirement key is %v, expected %v", req.Key, types.NodeLabelKey)
+	}
+	if req.Operator != v1.NodeSelectorOpIn {
+		t.Errorf("Node selector requirement operator is %v, expected %v", req.Operator, v1.NodeSelectorOpIn)
+	}
+	if len(req.Values) != 1 {
+		t.Errorf("Node selector requirement value count is %v, expected 1", len(req.Values))
+		return
+	}
+	if req.Values[0] != testNodeName {
+		t.Errorf("Node selector requirement value is %v, expected %v", req.Values[0], testNodeName)
+	}
+}
+
+func verifyProvisionerName(t *testing.T, pv *v1.PersistentVolume) {
+	if len(pv.Annotations) == 0 {
+		t.Errorf("Annotations not set")
+		return
+	}
+	name, found := pv.Annotations[types.AnnProvisionedBy]
+	if !found {
+		t.Errorf("Provisioned by annotations not set")
+		return
+	}
+	if name != testProvisionerName {
+		t.Errorf("Provisioned name is %q, expected %q", name, testProvisionerName)
+	}
+}
+
+func verifyCreatedPVs(t *testing.T, test *testConfig) {
 	expectedPVs := map[string]string{}
-	for dir, files := range config.expectedVolumes {
-		sc := findSCName(t, dir, config)
+	for dir, files := range test.expectedVolumes {
+		sc := findSCName(t, dir, test)
 		for _, file := range files {
-			pvName := fmt.Sprintf("%v-%v-%v", sc, testNode, file.Name)
+			pvName := fmt.Sprintf("%v-%v-%v", sc, testNodeName, file.Name)
 			path := filepath.Join(testHostDir, dir, file.Name)
 			expectedPVs[pvName] = path
 		}
 	}
 
-	createdPVs := config.apiUtil.GetAndResetCreatedPVs()
+	createdPVs := test.apiUtil.GetAndResetCreatedPVs()
 	expectedLen := len(expectedPVs)
 	actualLen := len(createdPVs)
 	if expectedLen != actualLen {
 		t.Errorf("Expected %v created PVs, got %v", expectedLen, actualLen)
 	}
 
-	for pvName := range createdPVs {
+	for pvName, pv := range createdPVs {
 		expectedPath, found := expectedPVs[pvName]
 		if !found {
 			t.Errorf("Did not expect created PVs %v", pvName)
@@ -269,18 +335,20 @@ func verifyCreatedPVs(t *testing.T, config *testConfig) {
 			// TODO: fix when api
 			t.Errorf("Expected path %q, got %q", expectedPath, expectedPath)
 		}
-		if !config.cache.PVExists(pvName) {
+		if !test.cache.PVExists(pvName) {
 			t.Errorf("PV %q not in cache", pvName)
 		}
+		verifyProvisionerName(t, pv)
+		verifyNodeAffinity(t, pv)
 	}
 }
 
-func verifyPVsNotInCache(t *testing.T, config *testConfig) {
-	for dir, files := range config.dirLayout {
-		sc := findSCName(t, dir, config)
+func verifyPVsNotInCache(t *testing.T, test *testConfig) {
+	for dir, files := range test.dirLayout {
+		sc := findSCName(t, dir, test)
 		for _, file := range files {
-			pvName := fmt.Sprintf("%v-%v-%v", sc, testNode, file.Name)
-			if config.cache.PVExists(pvName) {
+			pvName := fmt.Sprintf("%v-%v-%v", sc, testNodeName, file.Name)
+			if test.cache.PVExists(pvName) {
 				t.Errorf("Expected PV %q to not be in cache", pvName)
 			}
 		}

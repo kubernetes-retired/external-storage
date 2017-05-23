@@ -25,6 +25,8 @@ import (
 
 const (
 	AnnProvisionedBy = "pv.kubernetes.io/provisioned-by"
+	// TODO: is this the correct key?
+	NodeLabelKey = "kubernetes.io/hostname"
 )
 
 type UserConfig struct {

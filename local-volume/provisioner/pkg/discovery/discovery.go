@@ -32,10 +32,41 @@ import (
 // It looks for volumes in the directories specified in the discoveryMap
 type Discoverer struct {
 	*types.RuntimeConfig
+	nodeAffinity *v1.NodeAffinity
 }
 
-func NewDiscoverer(config *types.RuntimeConfig) *Discoverer {
-	return &Discoverer{RuntimeConfig: config}
+func NewDiscoverer(config *types.RuntimeConfig) (*Discoverer, error) {
+	affinity, err := generateNodeAffinity(config.Node)
+	if err != nil {
+		return nil, err
+	}
+	return &Discoverer{RuntimeConfig: config, nodeAffinity: affinity}, nil
+}
+
+func generateNodeAffinity(node *v1.Node) (*v1.NodeAffinity, error) {
+	if node.Labels == nil {
+		return nil, fmt.Errorf("Node does not have labels")
+	}
+	nodeValue, found := node.Labels[types.NodeLabelKey]
+	if !found {
+		return nil, fmt.Errorf("Node does not have expected label %s", types.NodeLabelKey)
+	}
+
+	return &v1.NodeAffinity{
+		RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+			NodeSelectorTerms: []v1.NodeSelectorTerm{
+				{
+					MatchExpressions: []v1.NodeSelectorRequirement{
+						{
+							Key:      types.NodeLabelKey,
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{nodeValue},
+						},
+					},
+				},
+			},
+		},
+	}, nil
 }
 
 // DiscoverLocalVolumes reads the configured discovery paths, and creates PVs for the new volumes
@@ -107,11 +138,12 @@ func (d *Discoverer) createPV(file, relativePath, class string) {
 				v1.ResourceName(v1.ResourceStorage): resource.MustParse("10Gi"),
 			},
 			PersistentVolumeSource: v1.PersistentVolumeSource{
-			/** TODO: api not merged yet
-			LocalVolume: &v1.LocalVolumeSource{
-				NodeName: config.NodeName,
-				Fs: v1.LocalFsVolume{Path: outsidePath},
-			},*/
+			// TODO update when we have API
+			/**
+			Local: &v1.LocalVolumeSource{
+				Path: outsidePath,
+			},
+			*/
 			},
 			AccessModes: []v1.PersistentVolumeAccessMode{
 				v1.ReadWriteOnce,

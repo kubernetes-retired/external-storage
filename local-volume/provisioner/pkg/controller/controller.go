@@ -46,7 +46,12 @@ func StartLocalController(client *kubernetes.Clientset, config *types.UserConfig
 
 	populator := populator.NewPopulator(runtimeConfig)
 	populator.Start()
-	discoverer := discovery.NewDiscoverer(runtimeConfig)
+
+	discoverer, err := discovery.NewDiscoverer(runtimeConfig)
+	if err != nil {
+		glog.Fatalf("Error starting discoverer: %v", err)
+	}
+
 	deleter := deleter.NewDeleter(runtimeConfig)
 
 	glog.Info("Controller started\n")
