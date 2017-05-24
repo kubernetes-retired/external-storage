@@ -1,5 +1,5 @@
-hash: 3e6bbfb2e9e50d70a7bdd4667a0caaeaaed064812055ea77cbdca1df9262254d
-updated: 2017-05-15T22:57:59.676721234+05:30
+hash: 05439a71e5e5d94a0f3f436d6c6f52991b9f201a892700974ff037627c8bf441
+updated: 2017-05-24T19:48:36.661204265+05:30
 imports:
 - name: github.com/aws/aws-sdk-go
   version: 6669bce73b4e3bc922ff5ea3a3983ede26e02b39
@@ -53,7 +53,7 @@ imports:
 - name: github.com/ghodss/yaml
   version: 73d445a93680fa1a78ae23a5839bad48f32ba1ee
 - name: github.com/go-ini/ini
-  version: e7fea39b01aea8d5671f6858f0532f56e8bff3a5
+  version: afbc45e87f3ba324c532d12c71918ef52e0fb194
 - name: github.com/go-openapi/jsonpointer
   version: 46af16f9f7b149af66e5d1bd010e3574dc06de98
 - name: github.com/go-openapi/jsonreference
@@ -78,7 +78,7 @@ imports:
 - name: github.com/guelfey/go.dbus
   version: f6a3a2366cc39b8479cadc499d3c735fb10fbdda
 - name: github.com/heketi/heketi
-  version: 7a54b6fc903feab1e7cb6573177ca09b544eb1e2
+  version: 7bb2c5b9e03985acb40da143be06f48c102e02b2
   subpackages:
   - client/api/go-client
   - pkg/glusterfs/api
