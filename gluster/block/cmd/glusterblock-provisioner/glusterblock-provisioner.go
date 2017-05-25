@@ -447,38 +447,9 @@ func parseClassParameters(params map[string]string, kubeclient kubernetes.Interf
 	if len(parseOpmode) == 0 {
 		cfg.opMode = "gluster-block"
 	} else {
-
-		switch parseOpmode {
-		// Gluster Block opmode
-		case "gluster-block":
-			cfg.opMode = "gluster-block"
-			if len(blkmodeArgs) == 0 {
-				glog.Errorf("glusterblock: block mode args has to be set if this opmode is set")
-
-			} else {
-				parseOpmodeInfo := dstrings.Split(blkmodeArgs, "=")
-				if len(parseOpmodeInfo) >= 2 {
-					argsDict, err := parseBlockModeArgs(cfg.opMode, blkmodeArgs)
-					if err != nil {
-						glog.Errorf("Failed to parse gluster-block arguments")
-						return nil, fmt.Errorf("Failed to parse gluster-block arguments")
-					}
-					cfg.blockModeArgs = *argsDict
-				} else {
-					return nil, fmt.Errorf("StorageClass for provisioner %s contains wrong number of arguments for %s", "glusterblock", parseOpmode)
-				}
-			}
-
-			// Heketi Opmode
-		case "heketi":
-			cfg.opMode = "heketi"
-			err := parseHeketiModeArgs(&cfg)
-			if err != nil {
-				glog.Errorf("Failed to parse gluster-block arguments")
-				return nil, fmt.Errorf("Failed to parse gluster-block arguments")
-			}
-		default:
-			return nil, fmt.Errorf("StorageClass for provisioner %s contains unknown [%v] parameter", "glusterblock", parseOpmode)
+		parseErr := parseOpmodeArgs(parseOpmode, &cfg, blkmodeArgs)
+		if parseErr != nil {
+			return nil, fmt.Errorf("glusterblock: parsing failed :%v", parseErr)
 		}
 	}
 
@@ -515,6 +486,38 @@ func parseClassParameters(params map[string]string, kubeclient kubernetes.Interf
 	return &cfg, nil
 }
 
+func parseOpmodeArgs(parseOpmode string, cfg *provisionerConfig, blkmodeArgs string) error {
+	switch parseOpmode {
+	// Gluster Block opmode
+	case "gluster-block":
+		cfg.opMode = "gluster-block"
+		if len(blkmodeArgs) == 0 {
+			return fmt.Errorf("glusterblock: block mode args has to be set if 'gluster-block' opmode is set")
+		}
+		parseOpmodeInfo := dstrings.Split(blkmodeArgs, "=")
+		if len(parseOpmodeInfo) >= 2 {
+			argsDict, err := parseBlockModeArgs(cfg.opMode, blkmodeArgs)
+			if err != nil {
+				return fmt.Errorf("Failed to parse gluster-block arguments: %v", err)
+			}
+			cfg.blockModeArgs = *argsDict
+		} else {
+			return fmt.Errorf("StorageClass for provisioner %s contains wrong number of arguments for %s", "glusterblock", parseOpmode)
+		}
+
+		// Heketi Opmode
+	case "heketi":
+		cfg.opMode = "heketi"
+		err := parseHeketiModeArgs(cfg)
+		if err != nil {
+			return fmt.Errorf("Failed to parse gluster-block arguments: %v", err)
+		}
+	default:
+		return fmt.Errorf("StorageClass for provisioner %s contains unknown [%v] parameter", "glusterblock", parseOpmode)
+	}
+	return nil
+}
+
 func parseBlockModeArgs(mode string, inArgs string) (*map[string]string, error) {
 	modeArgs := make(map[string]string)
 	modeCommandParams := dstrings.Split(inArgs, ",")
@@ -543,6 +546,12 @@ func parseBlockModeArgs(mode string, inArgs string) (*map[string]string, error) 
 }
 
 func parseHeketiModeArgs(cfg *provisionerConfig) error {
+
+	if cfg == nil {
+		return fmt.Errorf("Provisiner config is nil")
+	}
+
+	//Store args to heketimodeargs dict.
 	cfg.heketiModeArgs = make(map[string]string)
 	cfg.heketiModeArgs["url"] = cfg.url
 	cfg.heketiModeArgs["user"] = cfg.user
