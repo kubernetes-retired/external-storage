@@ -37,6 +37,7 @@ import (
 	fakev1core "k8s.io/client-go/kubernetes/typed/core/v1/fake"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/pkg/api/v1/ref"
 	storagebeta "k8s.io/client-go/pkg/apis/storage/v1beta1"
 	testclient "k8s.io/client-go/testing"
 	fcache "k8s.io/client-go/tools/cache/testing"
@@ -553,7 +554,8 @@ func newProvisionedVolume(storageClass *storagebeta.StorageClass, claim *v1.Pers
 	volume, _ := newTestProvisioner().Provision(options)
 
 	// pv.Spec.ClaimRef MUST point to the claim that led to its creation (including the claim UID).
-	volume.Spec.ClaimRef, _ = v1.GetReference(api.Scheme, claim)
+	v1.AddToScheme(api.Scheme)
+	volume.Spec.ClaimRef, _ = ref.GetReference(api.Scheme, claim)
 
 	// pv.Annotations["pv.kubernetes.io/provisioned-by"] MUST be set to name of the external provisioner. This provisioner will be used to delete the volume.
 	// pv.Annotations["volume.beta.kubernetes.io/storage-class"] MUST be set to name of the storage class requested by the claim.

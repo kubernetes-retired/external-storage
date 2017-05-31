@@ -74,14 +74,8 @@ if [ "$TEST_SUITE" = "nfs" ]; then
 	fi
 	make test-e2e
 elif [ "$TEST_SUITE" = "everything-else" ]; then
-	# Test building library using its dependencies (they ought to be the same as
-	# the shared ones)
 	pushd ./lib
-	glide install -v
 	./verify.sh
-	go test ./controller
-	# Test building library using shared dependencies
-	rm -rf ./vendor
 	go test ./controller
 	popd
 	# Test building hostpath-provisioner demo

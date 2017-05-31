@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/pkg/api/v1/helper"
 )
 
 const (
@@ -65,7 +66,7 @@ func New(client kubernetes.Interface) Allocator {
 // AllocateNext allocates the next available GID for the given VolumeOptions
 // (claim's options for a volume it wants) from the appropriate GID table.
 func (a *Allocator) AllocateNext(options controller.VolumeOptions) (int, error) {
-	class := v1.GetPersistentVolumeClaimClass(options.PVC)
+	class := helper.GetPersistentVolumeClaimClass(options.PVC)
 	gidMin, gidMax, err := parseClassParameters(options.Parameters)
 	if err != nil {
 		return 0, err
@@ -87,7 +88,7 @@ func (a *Allocator) AllocateNext(options controller.VolumeOptions) (int, error) 
 // Release releases the given volume's allocated GID from the appropriate GID
 // table.
 func (a *Allocator) Release(volume *v1.PersistentVolume) error {
-	class, err := a.client.Storage().StorageClasses().Get(v1.GetPersistentVolumeClass(volume), metav1.GetOptions{})
+	class, err := a.client.Storage().StorageClasses().Get(helper.GetPersistentVolumeClass(volume), metav1.GetOptions{})
 	gidMin, gidMax, err := parseClassParameters(class.Parameters)
 	if err != nil {
 		return err
@@ -181,7 +182,7 @@ func (a *Allocator) collectGids(className string, gidTable *allocator.MinMaxAllo
 	}
 
 	for _, pv := range pvList.Items {
-		if v1.GetPersistentVolumeClass(&pv) != className {
+		if helper.GetPersistentVolumeClass(&pv) != className {
 			continue
 		}
 
