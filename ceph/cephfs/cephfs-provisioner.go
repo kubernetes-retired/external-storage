@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/pkg/api/v1/helper"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -172,7 +173,7 @@ func (p *cephFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 	// delete CephFS
 	// TODO when beta is removed, have to check kube version and pick v1/beta
 	// accordingly: maybe the controller lib should offer a function for that
-	class, err := p.client.StorageV1beta1().StorageClasses().Get(v1.GetPersistentVolumeClass(volume), metav1.GetOptions{})
+	class, err := p.client.StorageV1beta1().StorageClasses().Get(helper.GetPersistentVolumeClass(volume), metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
