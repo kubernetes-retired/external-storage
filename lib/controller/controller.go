@@ -284,6 +284,9 @@ func NewProvisionController(
 		eventRecorder = broadcaster.NewRecorder(api.Scheme, v1.EventSource{Component: fmt.Sprintf("%s %s %s", provisionerName, strings.TrimSpace(string(out)), string(identity))})
 	}
 
+	// TODO: GetReference fails otherwise
+	v1.AddToScheme(api.Scheme)
+
 	controller := &ProvisionController{
 		client:                        client,
 		provisionerName:               provisionerName,
