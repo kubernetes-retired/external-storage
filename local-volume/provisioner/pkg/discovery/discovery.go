@@ -18,6 +18,7 @@ package discovery
 
 import (
 	"fmt"
+	"hash/fnv"
 	"path/filepath"
 
 	"github.com/golang/glog"
@@ -113,9 +114,13 @@ func (d *Discoverer) validateFile(fullPath string) error {
 	return nil
 }
 
-// TODO: maybe a better way would be to hash the 3 fields
 func generatePVName(file, node, class string) string {
-	return fmt.Sprintf("%v-%v-%v", class, node, file)
+	h := fnv.New32a()
+	h.Write([]byte(file))
+	h.Write([]byte(node))
+	h.Write([]byte(class))
+	// This is the FNV-1a 32-bit hash
+	return fmt.Sprintf("local-pv-%x", h.Sum32())
 }
 
 func (d *Discoverer) createPV(file, relativePath, class string) {
@@ -154,9 +159,9 @@ func (d *Discoverer) createPV(file, relativePath, class string) {
 
 	pv, err := d.APIUtil.CreatePV(pvSpec)
 	if err != nil {
-		glog.Errorf("Error creating PV %q: %v", pvName, err)
+		glog.Errorf("Error creating PV %q for volume at %q: %v", pvName, outsidePath, err)
 		return
 	}
 	d.Cache.AddPV(pv)
-	glog.Infof("Created PV %q", pvName)
+	glog.Infof("Created PV %q for volume at %q", pvName, outsidePath)
 }

@@ -107,6 +107,8 @@ type FakeVolumeUtil struct {
 type FakeFile struct {
 	Name     string
 	IsNotDir bool
+	// Expected hash value of the PV name
+	Hash uint32
 }
 
 func NewFakeVolumeUtil(deleteShouldFail bool) *FakeVolumeUtil {
