@@ -33,18 +33,6 @@ push: container
 	docker push $(IMAGE):$(VERSION)
 .PHONY: push
 
-verify:
-	@tput bold; echo Running gofmt:; tput sgr0
-	(gofmt -s -w -l `find . -type f -name "*.go" | grep -v vendor`) || exit 1
-	@tput bold; echo Running golint and go vet:; tput sgr0
-	for i in $$(find . -type f -name "*.go" | grep -v 'vendor\|framework'); do \
-		golint --set_exit_status $$i || exit 1; \
-		go vet $$i; \
-	done
-	@tput bold; echo Running verify-boilerplate; tput sgr0
-	../repo-infra/verify/verify-boilerplate.sh
-.PHONY: verify
-
 clean:
 	rm -f flex-provisioner
 	rm -f deploy/docker/flex-provisioner
