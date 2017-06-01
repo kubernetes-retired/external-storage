@@ -122,6 +122,8 @@ type glusterBlockVolume struct {
 	DiscoveryCHAPAuth bool
 	SessionCHAPAuth   bool
 	ReadOnly          bool
+	BlockSecret       string
+	BlockSecretNs     string
 }
 
 //NewGlusterBlockProvisioner create a new provisioner.
@@ -245,7 +247,9 @@ func (p *glusterBlockProvisioner) createSecretRef(nameSpace string, secretName s
 		Type: chapType,
 	}
 
+	p.volConfig.BlockSecret = secretName
 	secretRef := &v1.LocalObjectReference{}
+	p.volConfig.BlockSecretNs = nameSpace
 	if secret != nil {
 		_, err = p.client.Core().Secrets(nameSpace).Create(secret)
 		if err != nil {
@@ -370,6 +374,11 @@ func (p *glusterBlockProvisioner) Delete(volume *v1.PersistentVolume) error {
 	default:
 		glog.Errorf("glusterblock: Unknown OpMode, failed to delete volume %v", delBlockVolName)
 
+	}
+
+	deleteSecErr := p.client.Core().Secrets(p.volConfig.BlockSecretNs).Delete(p.volConfig.BlockSecret, nil)
+	if deleteSecErr != nil {
+		return fmt.Errorf("glusterblock: failed to delete secret, error %v", deleteSecErr)
 	}
 
 	return nil
