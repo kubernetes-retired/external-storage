@@ -629,12 +629,12 @@ func (ctrl *ProvisionController) lockProvisionClaimOperation(claim *v1.Persisten
 	rl := rl.ProvisionPVCLock{
 		PVCMeta: claim.ObjectMeta,
 		Client:  ctrl.client,
-		LockConfig: rl.ResourceLockConfig{
+		LockConfig: rl.Config{
 			Identity:      string(ctrl.identity),
 			EventRecorder: ctrl.eventRecorder,
 		},
 	}
-	le, err := leaderelection.NewLeaderElector(leaderelection.LeaderElectionConfig{
+	le, err := leaderelection.NewLeaderElector(leaderelection.Config{
 		Lock:          &rl,
 		LeaseDuration: ctrl.leaseDuration,
 		RenewDeadline: ctrl.renewDeadline,
@@ -1018,7 +1018,8 @@ func (ctrl *ProvisionController) deleteVolumeOperation(volume *v1.PersistentVolu
 		return nil
 	}
 
-	if err := ctrl.provisioner.Delete(volume); err != nil {
+	err = ctrl.provisioner.Delete(volume)
+	if err != nil {
 		if ierr, ok := err.(*IgnoredError); ok {
 			// Delete ignored, do nothing and hope another provisioner will delete it.
 			glog.Infof("deletion of volume %q ignored: %v", volume.Name, ierr)

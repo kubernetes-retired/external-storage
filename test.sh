@@ -19,12 +19,14 @@ set -o nounset
 set -o pipefail
 set -o xtrace
 
-# TODO repo-wide verification; remove provisioner-specific verification
-
 # Install glide, golint, cfssl
 curl https://glide.sh/get | sh
 go get -u github.com/golang/lint/golint
 export PATH=$PATH:$GOPATH/bin
+go get -u github.com/alecthomas/gometalinter
+gometalinter --install
+#repo-infra/verify/verify-go-src.sh -v
+repo-infra/verify/verify-boilerplate.sh
 
 if [ "$TEST_SUITE" = "nfs" ]; then
 	# Install nfs, cfssl
@@ -75,7 +77,6 @@ if [ "$TEST_SUITE" = "nfs" ]; then
 	make test-e2e
 elif [ "$TEST_SUITE" = "everything-else" ]; then
 	pushd ./lib
-	./verify.sh
 	go test ./controller
 	popd
 	# Test building hostpath-provisioner demo

@@ -1,5 +1,4 @@
-#!/bin/sh
-
+#!/bin/bash
 # Copyright 2017 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,12 +13,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-tput bold; echo Running gofmt:; tput sgr0
-(gofmt -s -w -l `find . -type f -name "*.go" | grep -v vendor`) || exit 1
-tput bold; echo Running golint and go vet:; tput sgr0
-for i in $(find . -type f -name "*.go" | grep -v 'vendor\|framework\|leaderelection.go\|interface.go'); do \
-	golint --set_exit_status $i || exit 1; \
-	go vet $i; \
-done
-tput bold; echo Running verify-boilerplate; tput sgr0
-../repo-infra/verify/verify-boilerplate.sh
+set -o errexit
+set -o nounset
+set -o pipefail
+
+find_files() {
+  find . -not \( \
+      \( \
+        -wholename '*/vendor/*' \
+      \) -prune \
+    \) -name '*.go'
+}
+
+GOFMT="gofmt -s"
+bad_files=$(find_files | xargs $GOFMT -l)
+if [[ -n "${bad_files}" ]]; then
+  echo "!!! '$GOFMT' needs to be run on the following files: "
+  echo "${bad_files}"
+  exit 1
+fi
