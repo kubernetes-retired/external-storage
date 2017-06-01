@@ -22,11 +22,11 @@ import (
 	"testing"
 
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/cache"
-	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/types"
+	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/util"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	ktypes "k8s.io/apimachinery/pkg/types"
+	kcommon "k8s.io/apimachinery/pkg/common"
 	"k8s.io/client-go/pkg/api/v1"
 )
 
@@ -34,7 +34,7 @@ const (
 	testHostDir         = "/mnt/disks"
 	testMountDir        = "/discoveryPath"
 	testNodeName        = "test-node"
-	testNodeUID         = ktypes.UID(1234)
+	testNodeUID         = kcommon.UID(1234)
 	testProvisionerName = "test-provisioner"
 )
 
@@ -43,7 +43,7 @@ var testNode = &v1.Node{
 		Name: testNodeName,
 		UID:  testNodeUID,
 		Labels: map[string]string{
-			types.NodeLabelKey: testNodeName,
+			common.NodeLabelKey: testNodeName,
 		},
 	},
 }
@@ -225,13 +225,13 @@ func testSetup(t *testing.T, test *testConfig) *Discoverer {
 	test.apiUtil = util.NewFakeAPIUtil(test.apiShouldFail)
 	test.cache = cache.NewVolumeCache()
 
-	userConfig := &types.UserConfig{
+	userConfig := &common.UserConfig{
 		Node:         testNode,
 		MountDir:     testMountDir,
 		HostDir:      testHostDir,
 		DiscoveryMap: scMapping,
 	}
-	runConfig := &types.RuntimeConfig{
+	runConfig := &common.RuntimeConfig{
 		UserConfig: userConfig,
 		Cache:      test.cache,
 		VolUtil:    test.volUtil,
@@ -276,8 +276,8 @@ func verifyNodeAffinity(t *testing.T, pv *v1.PersistentVolume) {
 		return
 	}
 	req := reqs[0]
-	if req.Key != types.NodeLabelKey {
-		t.Errorf("Node selector requirement key is %v, expected %v", req.Key, types.NodeLabelKey)
+	if req.Key != common.NodeLabelKey {
+		t.Errorf("Node selector requirement key is %v, expected %v", req.Key, common.NodeLabelKey)
 	}
 	if req.Operator != v1.NodeSelectorOpIn {
 		t.Errorf("Node selector requirement operator is %v, expected %v", req.Operator, v1.NodeSelectorOpIn)
@@ -296,7 +296,7 @@ func verifyProvisionerName(t *testing.T, pv *v1.PersistentVolume) {
 		t.Errorf("Annotations not set")
 		return
 	}
-	name, found := pv.Annotations[types.AnnProvisionedBy]
+	name, found := pv.Annotations[common.AnnProvisionedBy]
 	if !found {
 		t.Errorf("Provisioned by annotations not set")
 		return

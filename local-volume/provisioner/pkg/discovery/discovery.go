@@ -22,7 +22,7 @@ import (
 	"path/filepath"
 
 	"github.com/golang/glog"
-	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/types"
+	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,11 +32,11 @@ import (
 // Discoverer finds available volumes and creates PVs for them
 // It looks for volumes in the directories specified in the discoveryMap
 type Discoverer struct {
-	*types.RuntimeConfig
-	nodeAffinity *v1.NodeAffinity
+	*common.RuntimeConfig
+	nodeAffinityAnn string
 }
 
-func NewDiscoverer(config *types.RuntimeConfig) (*Discoverer, error) {
+func NewDiscoverer(config *common.RuntimeConfig) (*Discoverer, error) {
 	affinity, err := generateNodeAffinity(config.Node)
 	if err != nil {
 		return nil, err
@@ -48,9 +48,9 @@ func generateNodeAffinity(node *v1.Node) (*v1.NodeAffinity, error) {
 	if node.Labels == nil {
 		return nil, fmt.Errorf("Node does not have labels")
 	}
-	nodeValue, found := node.Labels[types.NodeLabelKey]
+	nodeValue, found := node.Labels[common.NodeLabelKey]
 	if !found {
-		return nil, fmt.Errorf("Node does not have expected label %s", types.NodeLabelKey)
+		return nil, fmt.Errorf("Node does not have expected label %s", common.NodeLabelKey)
 	}
 
 	return &v1.NodeAffinity{
@@ -59,7 +59,7 @@ func generateNodeAffinity(node *v1.Node) (*v1.NodeAffinity, error) {
 				{
 					MatchExpressions: []v1.NodeSelectorRequirement{
 						{
-							Key:      types.NodeLabelKey,
+							Key:      common.NodeLabelKey,
 							Operator: v1.NodeSelectorOpIn,
 							Values:   []string{nodeValue},
 						},
@@ -132,8 +132,8 @@ func (d *Discoverer) createPV(file, relativePath, class string) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: pvName,
 			Annotations: map[string]string{
-				types.AnnProvisionedBy: d.Name,
-				// TODO: add topology constraint once we have API
+				common.AnnProvisionedBy:               d.Name,
+				v1.AlphaStorageNodeAffinityAnnotation: d.nodeAffinityAnn,
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{

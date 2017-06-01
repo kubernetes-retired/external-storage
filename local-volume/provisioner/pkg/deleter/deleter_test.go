@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/cache"
-	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/types"
+	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/util"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -171,11 +171,11 @@ func testSetup(t *testing.T, config *testConfig) *Deleter {
 	}
 
 	config.apiUtil = util.NewFakeAPIUtil(config.apiShouldFail)
-	userConfig := &types.UserConfig{
+	userConfig := &common.UserConfig{
 		MountDir: testMountDir,
 		HostDir:  testHostDir,
 	}
-	runtimeConfig := &types.RuntimeConfig{
+	runtimeConfig := &common.RuntimeConfig{
 		UserConfig: userConfig,
 		Cache:      config.cache,
 		VolUtil:    config.volUtil,

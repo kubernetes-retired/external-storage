@@ -20,7 +20,7 @@ import (
 	"path/filepath"
 
 	"github.com/golang/glog"
-	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/types"
+	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
 
 	"k8s.io/client-go/pkg/api/v1"
 )
@@ -28,10 +28,10 @@ import (
 // Deleter handles PV cleanup and object deletion
 // For file-based volumes, it deletes the contents of the directory
 type Deleter struct {
-	*types.RuntimeConfig
+	*common.RuntimeConfig
 }
 
-func NewDeleter(config *types.RuntimeConfig) *Deleter {
+func NewDeleter(config *common.RuntimeConfig) *Deleter {
 	return &Deleter{RuntimeConfig: config}
 }
 

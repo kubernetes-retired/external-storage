@@ -23,19 +23,19 @@ import (
 	"github.com/golang/glog"
 
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/cache"
+	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/deleter"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/discovery"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/populator"
-	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/types"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/util"
 
 	"k8s.io/client-go/kubernetes"
 )
 
-func StartLocalController(client *kubernetes.Clientset, config *types.UserConfig) {
+func StartLocalController(client *kubernetes.Clientset, config *common.UserConfig) {
 	glog.Info("Initializing volume cache\n")
 
-	runtimeConfig := &types.RuntimeConfig{
+	runtimeConfig := &common.RuntimeConfig{
 		UserConfig: config,
 		Cache:      cache.NewVolumeCache(),
 		VolUtil:    util.NewVolumeUtil(),

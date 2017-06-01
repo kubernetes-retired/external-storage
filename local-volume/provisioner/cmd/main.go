@@ -21,8 +21,8 @@ import (
 	"os"
 
 	"github.com/golang/glog"
+	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/controller"
-	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/types"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -56,7 +56,7 @@ func main() {
 	node := getNode(client, nodeName)
 
 	glog.Info("Starting controller\n")
-	controller.StartLocalController(client, &types.UserConfig{
+	controller.StartLocalController(client, &common.UserConfig{
 		Node:         node,
 		HostDir:      "/mnt/disks",
 		MountDir:     "/local-disks",

@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/types"
+	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -33,10 +33,10 @@ import (
 
 // The Populator uses an Informer to populate the VolumeCache.
 type Populator struct {
-	*types.RuntimeConfig
+	*common.RuntimeConfig
 }
 
-func NewPopulator(config *types.RuntimeConfig) *Populator {
+func NewPopulator(config *common.RuntimeConfig) *Populator {
 	return &Populator{RuntimeConfig: config}
 }
 
@@ -98,7 +98,7 @@ func (p *Populator) handlePVUpdate(pv *v1.PersistentVolume) {
 		p.Cache.UpdatePV(pv)
 	} else {
 		if pv.Annotations != nil {
-			provisioner, found := pv.Annotations[types.AnnProvisionedBy]
+			provisioner, found := pv.Annotations[common.AnnProvisionedBy]
 			if !found {
 				return
 			}
