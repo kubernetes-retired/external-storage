@@ -164,7 +164,7 @@ func (p *cephFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 		return errors.New("identity annotation not found on PV")
 	}
 	if ann != p.identity {
-		return &controller.IgnoredError{"identity annotation on PV does not match ours"}
+		return &controller.IgnoredError{Reason: "identity annotation on PV does not match ours"}
 	}
 	share, ok := volume.Annotations[cephShareAnn]
 	if !ok {
@@ -276,9 +276,9 @@ func main() {
 	} else {
 		config, err = rest.InClusterConfig()
 	}
-	prId := string(uuid.NewUUID())
+	prID := string(uuid.NewUUID())
 	if *id != "" {
-		prId = *id
+		prID = *id
 	}
 	if err != nil {
 		glog.Fatalf("Failed to create config: %v", err)
@@ -297,7 +297,7 @@ func main() {
 
 	// Create the provisioner: it implements the Provisioner interface expected by
 	// the controller
-	cephFSProvisioner := newCephFSProvisioner(clientset, prId)
+	cephFSProvisioner := newCephFSProvisioner(clientset, prID)
 
 	// Start the provision controller which will dynamically provision cephFS
 	// PVs

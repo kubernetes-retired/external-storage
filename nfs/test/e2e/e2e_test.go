@@ -386,12 +386,12 @@ func startProvisionerDeployment(c clientset.Interface, ns string) (*v1.Service, 
 	tmpDir, err := ioutil.TempDir("", "nfs-provisioner-deployment")
 	Expect(err).NotTo(HaveOccurred())
 	if selinux.SelinuxEnabled() {
-		fcon, err := selinux.Getfilecon(tmpDir)
-		Expect(err).NotTo(HaveOccurred())
+		fcon, serr := selinux.Getfilecon(tmpDir)
+		Expect(serr).NotTo(HaveOccurred())
 		context := selinux.NewContext(fcon)
 		context["type"] = "svirt_sandbox_file_t"
-		err = selinux.Chcon(tmpDir, context.Get(), false)
-		Expect(err).NotTo(HaveOccurred())
+		serr = selinux.Chcon(tmpDir, context.Get(), false)
+		Expect(serr).NotTo(HaveOccurred())
 	}
 	deployment.Spec.Template.Spec.Volumes[0].HostPath.Path = tmpDir
 	deployment.Spec.Template.Spec.Containers[0].Image = "quay.io/kubernetes_incubator/nfs-provisioner:latest"
@@ -432,7 +432,7 @@ func svcFromManifest(fileName string) *v1.Service {
 	var chunk []byte
 	for {
 		chunk = make([]byte, len(data))
-		_, err := decoder.Read(chunk)
+		_, err = decoder.Read(chunk)
 		chunk = bytes.Trim(chunk, "\x00")
 		Expect(err).NotTo(HaveOccurred())
 		if strings.Contains(string(chunk), "kind: Service") {
@@ -458,7 +458,7 @@ func deployFromManifest(fileName string) *extensions.Deployment {
 	var chunk []byte
 	for {
 		chunk = make([]byte, len(data))
-		_, err := decoder.Read(chunk)
+		_, err = decoder.Read(chunk)
 		chunk = bytes.Trim(chunk, "\x00")
 		Expect(err).NotTo(HaveOccurred())
 		if strings.Contains(string(chunk), "kind: Deployment") {

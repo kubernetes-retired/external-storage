@@ -364,8 +364,9 @@ func TestCreateDirectory(t *testing.T) {
 
 		var gid uint32
 		var perm os.FileMode
+		var fi os.FileInfo
 		if !test.expectError {
-			fi, err := os.Stat(path)
+			fi, err = os.Stat(path)
 			if err != nil {
 				t.Logf("test case: %s", test.name)
 				t.Errorf("stat %s failed with error: %v", path, err)
