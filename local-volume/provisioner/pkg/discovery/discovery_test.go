@@ -26,15 +26,16 @@ import (
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/util"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kcommon "k8s.io/apimachinery/pkg/common"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/pkg/api/v1"
+	v1helper "k8s.io/client-go/pkg/api/v1/helper"
 )
 
 const (
 	testHostDir         = "/mnt/disks"
 	testMountDir        = "/discoveryPath"
 	testNodeName        = "test-node"
-	testNodeUID         = kcommon.UID(1234)
+	testNodeUID         = types.UID(1234)
 	testProvisionerName = "test-provisioner"
 )
 
@@ -256,10 +257,16 @@ func findSCName(t *testing.T, targetDir string, test *testConfig) string {
 }
 
 func verifyNodeAffinity(t *testing.T, pv *v1.PersistentVolume) {
-	// TODO: Get node affinity from annotation
-	return
+	affinity, err := v1helper.GetStorageNodeAffinityFromAnnotation(pv.Annotations)
+	if err != nil {
+		t.Errorf("Could not get node affinity from annotation: %v", err)
+		return
+	}
+	if affinity == nil {
+		t.Errorf("No node affinity found")
+		return
+	}
 
-	var affinity *v1.NodeAffinity
 	selector := affinity.RequiredDuringSchedulingIgnoredDuringExecution
 	if selector == nil {
 		t.Errorf("NodeAffinity node selector is nil")
@@ -275,6 +282,7 @@ func verifyNodeAffinity(t *testing.T, pv *v1.PersistentVolume) {
 		t.Errorf("Node selector term requirements count is %v, expected 1", len(reqs))
 		return
 	}
+
 	req := reqs[0]
 	if req.Key != common.NodeLabelKey {
 		t.Errorf("Node selector requirement key is %v, expected %v", req.Key, common.NodeLabelKey)
@@ -328,10 +336,7 @@ func verifyCreatedPVs(t *testing.T, test *testConfig) {
 		if !found {
 			t.Errorf("Did not expect created PVs %v", pvName)
 		}
-		// TODO: replace when API is checked in
-		// if pv.PersistentVolumeSource.Local.Path != expectedPath {
-		if false {
-			// TODO: fix when api
+		if pv.Spec.PersistentVolumeSource.Local.Path != expectedPath {
 			t.Errorf("Expected path %q, got %q", expectedPath, expectedPath)
 		}
 		if !test.cache.PVExists(pvName) {

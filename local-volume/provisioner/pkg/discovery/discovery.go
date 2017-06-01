@@ -24,9 +24,8 @@ import (
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
 
-	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/api/v1"
+	v1helper "k8s.io/client-go/pkg/api/v1/helper"
 )
 
 // Discoverer finds available volumes and creates PVs for them
@@ -39,9 +38,14 @@ type Discoverer struct {
 func NewDiscoverer(config *common.RuntimeConfig) (*Discoverer, error) {
 	affinity, err := generateNodeAffinity(config.Node)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Failed to generate node affinity: %v", err)
 	}
-	return &Discoverer{RuntimeConfig: config, nodeAffinity: affinity}, nil
+	tmpAnnotations := map[string]string{}
+	err = v1helper.StorageNodeAffinityToAlphaAnnotation(tmpAnnotations, affinity)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to convert node affinity to alpha annotation: %v", err)
+	}
+	return &Discoverer{RuntimeConfig: config, nodeAffinityAnn: tmpAnnotations[v1.AlphaStorageNodeAffinityAnnotation]}, nil
 }
 
 func generateNodeAffinity(node *v1.Node) (*v1.NodeAffinity, error) {
@@ -94,7 +98,7 @@ func (d *Discoverer) discoverVolumesAtPath(class, relativePath string) {
 			filePath := filepath.Join(fullPath, file)
 			err = d.validateFile(filePath)
 			if err != nil {
-				glog.Errorf("Path %q validation failed: %v", filePath, err)
+				glog.Errorf("Mount path %q validation failed: %v", filePath, err)
 				continue
 			}
 			// TODO: detect capacity
@@ -128,34 +132,13 @@ func (d *Discoverer) createPV(file, relativePath, class string) {
 	outsidePath := filepath.Join(d.HostDir, relativePath, file)
 
 	glog.Infof("Found new volume at host path %q, creating Local PV %q", outsidePath, pvName)
-	pvSpec := &v1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: pvName,
-			Annotations: map[string]string{
-				common.AnnProvisionedBy:               d.Name,
-				v1.AlphaStorageNodeAffinityAnnotation: d.nodeAffinityAnn,
-			},
-		},
-		Spec: v1.PersistentVolumeSpec{
-			PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
-			Capacity: v1.ResourceList{
-				// TODO: detect capacity
-				v1.ResourceName(v1.ResourceStorage): resource.MustParse("10Gi"),
-			},
-			PersistentVolumeSource: v1.PersistentVolumeSource{
-			// TODO update when we have API
-			/**
-			Local: &v1.LocalVolumeSource{
-				Path: outsidePath,
-			},
-			*/
-			},
-			AccessModes: []v1.PersistentVolumeAccessMode{
-				v1.ReadWriteOnce,
-			},
-			StorageClassName: class,
-		},
-	}
+	pvSpec := common.CreateLocalPVSpec(&common.LocalPVConfig{
+		Name:            pvName,
+		HostPath:        outsidePath,
+		StorageClass:    class,
+		ProvisionerName: d.Name,
+		AffinityAnn:     d.nodeAffinityAnn,
+	})
 
 	pv, err := d.APIUtil.CreatePV(pvSpec)
 	if err != nil {

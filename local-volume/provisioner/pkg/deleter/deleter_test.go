@@ -17,13 +17,13 @@ limitations under the License.
 package deleter
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/cache"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/util"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/api/v1"
 )
 
@@ -153,16 +153,15 @@ func testSetup(t *testing.T, config *testConfig) *Deleter {
 	config.apiUtil = util.NewFakeAPIUtil(false)
 	config.cache = cache.NewVolumeCache()
 
+	fakePath := filepath.Join(testHostDir, "test-dir")
 	// Precreate PVs
 	for pvName, vol := range config.vols {
-		pv := &v1.PersistentVolume{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: pvName,
-			},
-			Status: v1.PersistentVolumeStatus{
-				Phase: vol.pvPhase,
-			},
-		}
+		pv := common.CreateLocalPVSpec(&common.LocalPVConfig{
+			Name:     pvName,
+			HostPath: fakePath,
+		})
+		pv.Status.Phase = vol.pvPhase
+
 		_, err := config.apiUtil.CreatePV(pv)
 		if err != nil {
 			t.Fatalf("Error creating fake PV: %v", err)

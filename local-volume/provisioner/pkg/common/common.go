@@ -19,6 +19,9 @@ package common
 import (
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/cache"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/util"
+
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
 )
@@ -52,4 +55,40 @@ type RuntimeConfig struct {
 	APIUtil util.APIUtil
 	// Volume util layer
 	VolUtil util.VolumeUtil
+}
+
+type LocalPVConfig struct {
+	Name            string
+	HostPath        string
+	StorageClass    string
+	ProvisionerName string
+	AffinityAnn     string
+}
+
+func CreateLocalPVSpec(config *LocalPVConfig) *v1.PersistentVolume {
+	return &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: config.Name,
+			Annotations: map[string]string{
+				AnnProvisionedBy:                      config.ProvisionerName,
+				v1.AlphaStorageNodeAffinityAnnotation: config.AffinityAnn,
+			},
+		},
+		Spec: v1.PersistentVolumeSpec{
+			PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
+			Capacity: v1.ResourceList{
+				// TODO: detect capacity
+				v1.ResourceName(v1.ResourceStorage): resource.MustParse("10Gi"),
+			},
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				Local: &v1.LocalVolumeSource{
+					Path: config.HostPath,
+				},
+			},
+			AccessModes: []v1.PersistentVolumeAccessMode{
+				v1.ReadWriteOnce,
+			},
+			StorageClassName: config.StorageClass,
+		},
+	}
 }

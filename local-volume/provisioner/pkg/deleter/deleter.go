@@ -17,6 +17,7 @@ limitations under the License.
 package deleter
 
 import (
+	"fmt"
 	"path/filepath"
 
 	"github.com/golang/glog"
@@ -64,11 +65,18 @@ func (d *Deleter) DeletePVs() {
 }
 
 func (d *Deleter) cleanupPV(pv *v1.PersistentVolume) error {
-	// path := pv.Spec.Local.Path
-	// TODO: Need to extract the hostDir from the spec path, and replace with mountdir
-	path := "TODO-PLACEHOLDER"
-	fullPath := filepath.Join(d.MountDir, path)
-	glog.Infof("Deleting PV %q contents at %q", pv.Name, fullPath)
+	if pv.Spec.Local == nil {
+		return fmt.Errorf("Unsupported volume type")
+	}
 
-	return d.VolUtil.DeleteContents(fullPath)
+	specPath := pv.Spec.Local.Path
+	relativePath, err := filepath.Rel(d.HostDir, specPath)
+	if err != nil {
+		return fmt.Errorf("Could not get relative path: %v", err)
+	}
+
+	mountPath := filepath.Join(d.MountDir, relativePath)
+
+	glog.Infof("Deleting PV %q contents at hostpath %q, mountpath %q", pv.Name, specPath, mountPath)
+	return d.VolUtil.DeleteContents(mountPath)
 }
