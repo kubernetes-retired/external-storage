@@ -95,7 +95,8 @@ func (d *Discoverer) discoverVolumesAtPath(class, relativePath string) {
 	for _, file := range files {
 		// Check if PV already exists for it
 		pvName := generatePVName(file, d.Node.Name, class)
-		if !d.Cache.PVExists(pvName) {
+		_, exists := d.Cache.GetPV(pvName)
+		if !exists {
 			filePath := filepath.Join(mountPath, file)
 			err = d.validateFile(filePath)
 			if err != nil {
@@ -141,12 +142,8 @@ func (d *Discoverer) createPV(file, relativePath, class string) {
 		AffinityAnn:     d.nodeAffinityAnn,
 	})
 
-	// Add to cache first to handle race condition between discoverer and informer updating the same pv in the cache
-	// This way the ordering is consistent. First discoverer adds to cache, then informer will update the pv object
-	d.Cache.AddPV(pvSpec)
 	_, err := d.APIUtil.CreatePV(pvSpec)
 	if err != nil {
-		d.Cache.DeletePV(pvName)
 		glog.Errorf("Error creating PV %q for volume at %q: %v", pvName, outsidePath, err)
 		return
 	}

@@ -95,7 +95,8 @@ func (p *Populator) Start() {
 }
 
 func (p *Populator) handlePVUpdate(pv *v1.PersistentVolume) {
-	if p.Cache.PVExists(pv.Name) {
+	_, exists := p.Cache.GetPV(pv.Name)
+	if exists {
 		p.Cache.UpdatePV(pv)
 	} else {
 		if pv.Annotations != nil {
@@ -112,7 +113,8 @@ func (p *Populator) handlePVUpdate(pv *v1.PersistentVolume) {
 }
 
 func (p *Populator) handlePVDelete(pv *v1.PersistentVolume) {
-	if p.Cache.PVExists(pv.Name) {
+	_, exists := p.Cache.GetPV(pv.Name)
+	if exists {
 		// Don't do cleanup, just delete from cache
 		p.Cache.DeletePV(pv.Name)
 	}

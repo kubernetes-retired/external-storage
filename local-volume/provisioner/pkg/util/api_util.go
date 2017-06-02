@@ -56,7 +56,6 @@ func (u *apiUtil) DeletePV(pvName string) error {
 var _ APIUtil = &FakeAPIUtil{}
 
 type FakeAPIUtil struct {
-	allPVs     map[string]*v1.PersistentVolume
 	createdPVs map[string]*v1.PersistentVolume
 	deletedPVs map[string]*v1.PersistentVolume
 	shouldFail bool
@@ -65,7 +64,6 @@ type FakeAPIUtil struct {
 
 func NewFakeAPIUtil(shouldFail bool, cache *cache.VolumeCache) *FakeAPIUtil {
 	return &FakeAPIUtil{
-		allPVs:     map[string]*v1.PersistentVolume{},
 		createdPVs: map[string]*v1.PersistentVolume{},
 		deletedPVs: map[string]*v1.PersistentVolume{},
 		shouldFail: shouldFail,
@@ -78,8 +76,8 @@ func (u *FakeAPIUtil) CreatePV(pv *v1.PersistentVolume) (*v1.PersistentVolume, e
 		return nil, fmt.Errorf("API failed")
 	}
 
-	u.allPVs[pv.Name] = pv
 	u.createdPVs[pv.Name] = pv
+	u.cache.AddPV(pv)
 	return pv, nil
 }
 
@@ -88,10 +86,10 @@ func (u *FakeAPIUtil) DeletePV(pvName string) error {
 		return fmt.Errorf("API failed")
 	}
 
-	u.deletedPVs[pvName] = u.allPVs[pvName]
-	delete(u.allPVs, pvName)
-	delete(u.createdPVs, pvName)
-	if u.cache != nil {
+	pv, exists := u.cache.GetPV(pvName)
+	if exists {
+		u.deletedPVs[pvName] = pv
+		delete(u.createdPVs, pvName)
 		u.cache.DeletePV(pvName)
 	}
 	return nil

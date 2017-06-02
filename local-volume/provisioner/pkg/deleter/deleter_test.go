@@ -149,9 +149,9 @@ func TestDeleteVolumes_CleanupFails(t *testing.T) {
 }
 
 func testSetup(t *testing.T, config *testConfig) *Deleter {
-	config.volUtil = util.NewFakeVolumeUtil(config.volDeleteShouldFail)
-	config.apiUtil = util.NewFakeAPIUtil(false, nil)
 	config.cache = cache.NewVolumeCache()
+	config.volUtil = util.NewFakeVolumeUtil(config.volDeleteShouldFail)
+	config.apiUtil = util.NewFakeAPIUtil(false, config.cache)
 
 	fakePath := filepath.Join(testHostDir, "test-dir")
 	// Precreate PVs
@@ -197,7 +197,8 @@ func verifyDeletedPVs(t *testing.T, config *testConfig) {
 			t.Errorf("Did not expect deleted PVs %v", pvName)
 			continue
 		}
-		if config.cache.PVExists(pvName) {
+		_, found = config.cache.GetPV(pvName)
+		if found {
 			t.Errorf("PV %q still exists in cache", pvName)
 		}
 	}
@@ -205,8 +206,9 @@ func verifyDeletedPVs(t *testing.T, config *testConfig) {
 
 func verifyPVExists(t *testing.T, config *testConfig) {
 	for pvName := range config.vols {
-		if !config.cache.PVExists(pvName) {
-			t.Errorf("PV doesn't exists in cache", pvName)
+		_, found := config.cache.GetPV(pvName)
+		if !found {
+			t.Errorf("PV doesn't exist in cache", pvName)
 		}
 	}
 }

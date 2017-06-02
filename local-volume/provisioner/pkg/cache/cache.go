@@ -33,16 +33,15 @@ type VolumeCache struct {
 }
 
 func NewVolumeCache() *VolumeCache {
-	cache := &VolumeCache{pvs: map[string]*v1.PersistentVolume{}}
-	return cache
+	return &VolumeCache{pvs: map[string]*v1.PersistentVolume{}}
 }
 
-func (cache *VolumeCache) PVExists(pvName string) bool {
+func (cache *VolumeCache) GetPV(pvName string) (*v1.PersistentVolume, bool) {
 	cache.mutex.Lock()
 	defer cache.mutex.Unlock()
 
-	_, exists := cache.pvs[pvName]
-	return exists
+	pv, exists := cache.pvs[pvName]
+	return pv, exists
 }
 
 func (cache *VolumeCache) AddPV(pv *v1.PersistentVolume) {

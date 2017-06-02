@@ -221,10 +221,10 @@ func TestDiscoverVolumes_BadVolume(t *testing.T) {
 }
 
 func testSetup(t *testing.T, test *testConfig) *Discoverer {
+	test.cache = cache.NewVolumeCache()
 	test.volUtil = util.NewFakeVolumeUtil(false)
 	test.volUtil.AddNewFiles(testMountDir, test.dirLayout)
-	test.apiUtil = util.NewFakeAPIUtil(test.apiShouldFail, nil)
-	test.cache = cache.NewVolumeCache()
+	test.apiUtil = util.NewFakeAPIUtil(test.apiShouldFail, test.cache)
 
 	userConfig := &common.UserConfig{
 		Node:         testNode,
@@ -339,7 +339,8 @@ func verifyCreatedPVs(t *testing.T, test *testConfig) {
 		if pv.Spec.PersistentVolumeSource.Local.Path != expectedPath {
 			t.Errorf("Expected path %q, got %q", expectedPath, expectedPath)
 		}
-		if !test.cache.PVExists(pvName) {
+		_, exists := test.cache.GetPV(pvName)
+		if !exists {
 			t.Errorf("PV %q not in cache", pvName)
 		}
 		// TODO: verify storage class
@@ -349,11 +350,11 @@ func verifyCreatedPVs(t *testing.T, test *testConfig) {
 }
 
 func verifyPVsNotInCache(t *testing.T, test *testConfig) {
-	for dir, files := range test.dirLayout {
-		sc := findSCName(t, dir, test)
+	for _, files := range test.dirLayout {
 		for _, file := range files {
-			pvName := fmt.Sprintf("%v-%v-%v", sc, testNodeName, file.Name)
-			if test.cache.PVExists(pvName) {
+			pvName := fmt.Sprintf("local-pv-%x", file.Hash)
+			_, exists := test.cache.GetPV(pvName)
+			if exists {
 				t.Errorf("Expected PV %q to not be in cache", pvName)
 			}
 		}
