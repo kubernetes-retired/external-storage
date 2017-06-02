@@ -81,7 +81,7 @@ func (p *Populator) Start() {
 	)
 
 	glog.Infof("Starting Informer controller")
-	// Controller never stops TODO: will this go out of scope and stop the controller?
+	// Controller never stops
 	go controller.Run(make(chan struct{}))
 
 	glog.Infof("Waiting for Informer initial sync")

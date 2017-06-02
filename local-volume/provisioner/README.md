@@ -36,7 +36,7 @@ make push
 ### Setting up a cluster with local storage
 Bring up a GCE cluster with local SSDs
 ``` console
-NODE_LOCAL_SSDS=3 kube-up.sh
+KUBE_FEATURE_GATES=PersistentLocalVolumes NODE_LOCAL_SSDS=3 kube-up.sh
 ```
 
 ## Best Practices
@@ -62,4 +62,4 @@ Deleter: The deleter routine is invoked by the Informer when a PV phase changes.
 
 Cache: A central cache stores all the Local PersistentVolumes that the provisioner has created.  It is populated by a PV informer that filters out the PVs that belong to this node and have been created by this provisioner.  It is used by the Discovery and Deleter routines to get the existing PVs.
 
-Controller: The controller runs a sync loop that coordinates the other components.
+Controller: The controller runs a sync loop that coordinates the other components.  The discovery and deleter run serially to simplify synchronization with the cache and create/delete operations.

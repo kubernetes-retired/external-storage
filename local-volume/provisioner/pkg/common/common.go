@@ -28,8 +28,8 @@ import (
 
 const (
 	AnnProvisionedBy = "pv.kubernetes.io/provisioned-by"
-	// TODO: is this the correct key?
-	NodeLabelKey = "kubernetes.io/hostname"
+	// hostname is not the best choice, but it's what pod and node affinity also use
+	NodeLabelKey = metav1.LabelHostname
 )
 
 type UserConfig struct {

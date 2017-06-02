@@ -14,3 +14,5 @@
 ## P2
 * Partitioning, formatting, and mount extensions (needs mount propagation)
 * Block device support (needs API and volume plugin changes too)
+* Refactor to just use informer's cache (and need to stub out API calls for unit
+  testing)
