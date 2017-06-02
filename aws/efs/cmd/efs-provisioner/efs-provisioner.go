@@ -157,7 +157,7 @@ func (p *efsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 }
 
 func (p *efsProvisioner) createVolume(path string, gid int) error {
-	perm := os.FileMode(0071 | os.ModeSetgid)
+	perm := os.FileMode(0771 | os.ModeSetgid)
 
 	if err := os.MkdirAll(path, perm); err != nil {
 		return err
