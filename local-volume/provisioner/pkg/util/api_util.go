@@ -19,6 +19,8 @@ package util
 import (
 	"fmt"
 
+	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/cache"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
@@ -58,14 +60,16 @@ type FakeAPIUtil struct {
 	createdPVs map[string]*v1.PersistentVolume
 	deletedPVs map[string]*v1.PersistentVolume
 	shouldFail bool
+	cache      *cache.VolumeCache
 }
 
-func NewFakeAPIUtil(shouldFail bool) *FakeAPIUtil {
+func NewFakeAPIUtil(shouldFail bool, cache *cache.VolumeCache) *FakeAPIUtil {
 	return &FakeAPIUtil{
 		allPVs:     map[string]*v1.PersistentVolume{},
 		createdPVs: map[string]*v1.PersistentVolume{},
 		deletedPVs: map[string]*v1.PersistentVolume{},
 		shouldFail: shouldFail,
+		cache:      cache,
 	}
 }
 
@@ -87,6 +91,9 @@ func (u *FakeAPIUtil) DeletePV(pvName string) error {
 	u.deletedPVs[pvName] = u.allPVs[pvName]
 	delete(u.allPVs, pvName)
 	delete(u.createdPVs, pvName)
+	if u.cache != nil {
+		u.cache.DeletePV(pvName)
+	}
 	return nil
 }
 

@@ -48,6 +48,7 @@ func (p *Populator) Start() {
 				return pvs, err
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				// TODO: can we just watch for changes on the phase field?
 				w, err := p.Client.Core().PersistentVolumes().Watch(options)
 				return w, err
 			},

@@ -150,7 +150,7 @@ func TestDeleteVolumes_CleanupFails(t *testing.T) {
 
 func testSetup(t *testing.T, config *testConfig) *Deleter {
 	config.volUtil = util.NewFakeVolumeUtil(config.volDeleteShouldFail)
-	config.apiUtil = util.NewFakeAPIUtil(false)
+	config.apiUtil = util.NewFakeAPIUtil(false, nil)
 	config.cache = cache.NewVolumeCache()
 
 	fakePath := filepath.Join(testHostDir, "test-dir")
@@ -169,7 +169,7 @@ func testSetup(t *testing.T, config *testConfig) *Deleter {
 		config.cache.AddPV(pv)
 	}
 
-	config.apiUtil = util.NewFakeAPIUtil(config.apiShouldFail)
+	config.apiUtil = util.NewFakeAPIUtil(config.apiShouldFail, config.cache)
 	userConfig := &common.UserConfig{
 		MountDir: testMountDir,
 		HostDir:  testHostDir,

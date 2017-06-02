@@ -223,7 +223,7 @@ func TestDiscoverVolumes_BadVolume(t *testing.T) {
 func testSetup(t *testing.T, test *testConfig) *Discoverer {
 	test.volUtil = util.NewFakeVolumeUtil(false)
 	test.volUtil.AddNewFiles(testMountDir, test.dirLayout)
-	test.apiUtil = util.NewFakeAPIUtil(test.apiShouldFail)
+	test.apiUtil = util.NewFakeAPIUtil(test.apiShouldFail, nil)
 	test.cache = cache.NewVolumeCache()
 
 	userConfig := &common.UserConfig{

@@ -19,11 +19,19 @@ package deleter
 import (
 	"fmt"
 	"path/filepath"
+	"time"
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/pkg/api/v1"
+)
+
+const (
+	pollInterval = 1 * time.Second
+	// TODO: is this too fast?
+	waitForDeleteTimeout = 1 * time.Minute
 )
 
 // Deleter handles PV cleanup and object deletion
@@ -37,6 +45,7 @@ func NewDeleter(config *common.RuntimeConfig) *Deleter {
 }
 
 func (d *Deleter) DeletePVs() {
+	deletedPVs := []string{}
 	for _, pv := range d.Cache.ListPVs() {
 		if pv.Status.Phase == v1.VolumeReleased {
 			name := pv.Name
@@ -54,12 +63,26 @@ func (d *Deleter) DeletePVs() {
 			err = d.APIUtil.DeletePV(name)
 			if err != nil {
 				// TODO: Log event on PV
+				// TODO: Does delete return an error if object has already been deleted?
 				glog.Errorf("Error deleting PV %q: %v", name, err.Error())
 				continue
 			}
 
-			d.Cache.DeletePV(name)
+			deletedPVs = append(deletedPVs, name)
 			glog.Infof("Deleted PV %q", name)
+		}
+	}
+
+	// Wait for informer to delete PV objects from cache so we don't try to clean it up again.
+	for _, name := range deletedPVs {
+		err := wait.Poll(pollInterval, waitForDeleteTimeout, func() (bool, error) {
+			if d.Cache.PVExists(name) {
+				return false, nil
+			}
+			return true, nil
+		})
+		if err != nil {
+			glog.Errorf("PV %q not deleted from cache after %v", name, waitForDeleteTimeout)
 		}
 	}
 }

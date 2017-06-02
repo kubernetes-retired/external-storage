@@ -82,10 +82,11 @@ func (d *Discoverer) DiscoverLocalVolumes() {
 }
 
 func (d *Discoverer) discoverVolumesAtPath(class, relativePath string) {
-	fullPath := filepath.Join(d.MountDir, relativePath)
-	glog.Infof("Discovering volumes at mount path %q for storage class %q", fullPath, class)
+	mountPath := filepath.Join(d.MountDir, relativePath)
+	hostPath := filepath.Join(d.HostDir, relativePath)
+	glog.V(7).Infof("Discovering volumes at hostpath %q, mount path %q for storage class %q", hostPath, mountPath, class)
 
-	files, err := d.VolUtil.ReadDir(fullPath)
+	files, err := d.VolUtil.ReadDir(mountPath)
 	if err != nil {
 		glog.Errorf("Error reading directory: %v", err)
 		return
@@ -95,7 +96,7 @@ func (d *Discoverer) discoverVolumesAtPath(class, relativePath string) {
 		// Check if PV already exists for it
 		pvName := generatePVName(file, d.Node.Name, class)
 		if !d.Cache.PVExists(pvName) {
-			filePath := filepath.Join(fullPath, file)
+			filePath := filepath.Join(mountPath, file)
 			err = d.validateFile(filePath)
 			if err != nil {
 				glog.Errorf("Mount path %q validation failed: %v", filePath, err)
@@ -140,11 +141,14 @@ func (d *Discoverer) createPV(file, relativePath, class string) {
 		AffinityAnn:     d.nodeAffinityAnn,
 	})
 
-	pv, err := d.APIUtil.CreatePV(pvSpec)
+	// Add to cache first to handle race condition between discoverer and informer updating the same pv in the cache
+	// This way the ordering is consistent. First discoverer adds to cache, then informer will update the pv object
+	d.Cache.AddPV(pvSpec)
+	_, err := d.APIUtil.CreatePV(pvSpec)
 	if err != nil {
+		d.Cache.DeletePV(pvName)
 		glog.Errorf("Error creating PV %q for volume at %q: %v", pvName, outsidePath, err)
 		return
 	}
-	d.Cache.AddPV(pv)
 	glog.Infof("Created PV %q for volume at %q", pvName, outsidePath)
 }
