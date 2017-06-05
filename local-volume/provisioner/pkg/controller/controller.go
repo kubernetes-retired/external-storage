@@ -41,7 +41,7 @@ func StartLocalController(client *kubernetes.Clientset, config *common.UserConfi
 		VolUtil:    util.NewVolumeUtil(),
 		APIUtil:    util.NewAPIUtil(client),
 		Client:     client,
-		Name:       fmt.Sprintf("local-volume-provisioner-%v", config.Node.UID),
+		Name:       fmt.Sprintf("local-volume-provisioner-%v-%v", config.Node.Name, config.Node.UID),
 	}
 
 	populator := populator.NewPopulator(runtimeConfig)

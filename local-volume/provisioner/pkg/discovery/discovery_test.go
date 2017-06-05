@@ -26,7 +26,6 @@ import (
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/util"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/pkg/api/v1"
 	v1helper "k8s.io/client-go/pkg/api/v1/helper"
 )
@@ -35,14 +34,12 @@ const (
 	testHostDir         = "/mnt/disks"
 	testMountDir        = "/discoveryPath"
 	testNodeName        = "test-node"
-	testNodeUID         = types.UID(1234)
 	testProvisionerName = "test-provisioner"
 )
 
 var testNode = &v1.Node{
 	ObjectMeta: metav1.ObjectMeta{
 		Name: testNodeName,
-		UID:  testNodeUID,
 		Labels: map[string]string{
 			common.NodeLabelKey: testNodeName,
 		},
