@@ -32,10 +32,12 @@ type VolumeCache struct {
 	pvs   map[string]*v1.PersistentVolume
 }
 
+// NewVolumeCache creates a new PV cache object for storing PVs created by this provisioner.
 func NewVolumeCache() *VolumeCache {
 	return &VolumeCache{pvs: map[string]*v1.PersistentVolume{}}
 }
 
+// GetPV returns the PV object given the PV name
 func (cache *VolumeCache) GetPV(pvName string) (*v1.PersistentVolume, bool) {
 	cache.mutex.Lock()
 	defer cache.mutex.Unlock()
@@ -44,6 +46,7 @@ func (cache *VolumeCache) GetPV(pvName string) (*v1.PersistentVolume, bool) {
 	return pv, exists
 }
 
+// AddPV adds the PV object to the cache
 func (cache *VolumeCache) AddPV(pv *v1.PersistentVolume) {
 	cache.mutex.Lock()
 	defer cache.mutex.Unlock()
@@ -52,6 +55,7 @@ func (cache *VolumeCache) AddPV(pv *v1.PersistentVolume) {
 	glog.Infof("Added pv %q to cache", pv.Name)
 }
 
+// UpdatePV updates the PV object in the cache
 func (cache *VolumeCache) UpdatePV(pv *v1.PersistentVolume) {
 	cache.mutex.Lock()
 	defer cache.mutex.Unlock()
@@ -60,6 +64,7 @@ func (cache *VolumeCache) UpdatePV(pv *v1.PersistentVolume) {
 	glog.Infof("Updated pv %q to cache", pv.Name)
 }
 
+// DeletePV deletes the PV object from the cache
 func (cache *VolumeCache) DeletePV(pvName string) {
 	cache.mutex.Lock()
 	defer cache.mutex.Unlock()
@@ -68,6 +73,7 @@ func (cache *VolumeCache) DeletePV(pvName string) {
 	glog.Infof("Deleted pv %q from cache", pvName)
 }
 
+// ListPVs returns a list of all the PVs in the cache
 func (cache *VolumeCache) ListPVs() []*v1.PersistentVolume {
 	cache.mutex.Lock()
 	defer cache.mutex.Unlock()

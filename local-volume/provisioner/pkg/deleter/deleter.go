@@ -32,10 +32,14 @@ type Deleter struct {
 	*common.RuntimeConfig
 }
 
+// NewDeleter creates a Deleter object to handle the cleanup and deletion of local PVs
+// allocated by this provisioner
 func NewDeleter(config *common.RuntimeConfig) *Deleter {
 	return &Deleter{RuntimeConfig: config}
 }
 
+// DeletePVs will scan through all the existing PVs that are released, and cleanup and
+// delete them
 func (d *Deleter) DeletePVs() {
 	for _, pv := range d.Cache.ListPVs() {
 		if pv.Status.Phase == v1.VolumeReleased {

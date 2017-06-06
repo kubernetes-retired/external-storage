@@ -35,6 +35,8 @@ type Discoverer struct {
 	nodeAffinityAnn string
 }
 
+// NewDiscoverer creates a Discoverer object that will scan through
+// the configured directories and create local PVs for any new directories found
 func NewDiscoverer(config *common.RuntimeConfig) (*Discoverer, error) {
 	affinity, err := generateNodeAffinity(config.Node)
 	if err != nil {

@@ -41,20 +41,24 @@ type apiUtil struct {
 	client *kubernetes.Clientset
 }
 
+// NewAPIUtil creates a new APIUtil object that represents the K8s API
 func NewAPIUtil(client *kubernetes.Clientset) APIUtil {
 	return &apiUtil{client: client}
 }
 
+// CreatePV will create a PersistentVolume
 func (u *apiUtil) CreatePV(pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
 	return u.client.Core().PersistentVolumes().Create(pv)
 }
 
+// DeletePV will delete a PersistentVolume
 func (u *apiUtil) DeletePV(pvName string) error {
 	return u.client.Core().PersistentVolumes().Delete(pvName, &metav1.DeleteOptions{})
 }
 
 var _ APIUtil = &FakeAPIUtil{}
 
+// FakeAPIUtil is a fake API wrapper for unit testing
 type FakeAPIUtil struct {
 	createdPVs map[string]*v1.PersistentVolume
 	deletedPVs map[string]*v1.PersistentVolume
@@ -62,6 +66,7 @@ type FakeAPIUtil struct {
 	cache      *cache.VolumeCache
 }
 
+// NewFakeAPIUtil returns an APIUtil object that can be used for unit testing
 func NewFakeAPIUtil(shouldFail bool, cache *cache.VolumeCache) *FakeAPIUtil {
 	return &FakeAPIUtil{
 		createdPVs: map[string]*v1.PersistentVolume{},
@@ -71,6 +76,7 @@ func NewFakeAPIUtil(shouldFail bool, cache *cache.VolumeCache) *FakeAPIUtil {
 	}
 }
 
+// CreatePV will add the PV to the created list and cache
 func (u *FakeAPIUtil) CreatePV(pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
 	if u.shouldFail {
 		return nil, fmt.Errorf("API failed")
@@ -81,6 +87,7 @@ func (u *FakeAPIUtil) CreatePV(pv *v1.PersistentVolume) (*v1.PersistentVolume, e
 	return pv, nil
 }
 
+// DeletePV will delete the PV from the created list and cache, and also add it to the deleted list
 func (u *FakeAPIUtil) DeletePV(pvName string) error {
 	if u.shouldFail {
 		return fmt.Errorf("API failed")

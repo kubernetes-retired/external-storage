@@ -68,13 +68,13 @@ type testConfig struct {
 
 func TestDiscoverVolumes_Basic(t *testing.T) {
 	vols := map[string][]*util.FakeFile{
-		"dir1": []*util.FakeFile{
-			&util.FakeFile{Name: "mount1", Hash: 0xaaaafef5},
-			&util.FakeFile{Name: "mount2", Hash: 0x79412c38},
+		"dir1": {
+			{Name: "mount1", Hash: 0xaaaafef5},
+			{Name: "mount2", Hash: 0x79412c38},
 		},
-		"dir2": []*util.FakeFile{
-			&util.FakeFile{Name: "mount1", Hash: 0xa7aafa3c},
-			&util.FakeFile{Name: "mount2", Hash: 0x7c4130f1},
+		"dir2": {
+			{Name: "mount1", Hash: 0xa7aafa3c},
+			{Name: "mount2", Hash: 0x7c4130f1},
 		},
 	}
 	test := &testConfig{
@@ -89,13 +89,13 @@ func TestDiscoverVolumes_Basic(t *testing.T) {
 
 func TestDiscoverVolumes_BasicTwice(t *testing.T) {
 	vols := map[string][]*util.FakeFile{
-		"dir1": []*util.FakeFile{
-			&util.FakeFile{Name: "mount1", Hash: 0xaaaafef5},
-			&util.FakeFile{Name: "mount2", Hash: 0x79412c38},
+		"dir1": {
+			{Name: "mount1", Hash: 0xaaaafef5},
+			{Name: "mount2", Hash: 0x79412c38},
 		},
-		"dir2": []*util.FakeFile{
-			&util.FakeFile{Name: "mount1", Hash: 0xa7aafa3c},
-			&util.FakeFile{Name: "mount2", Hash: 0x7c4130f1},
+		"dir2": {
+			{Name: "mount1", Hash: 0xa7aafa3c},
+			{Name: "mount2", Hash: 0x7c4130f1},
 		},
 	}
 	test := &testConfig{
@@ -127,7 +127,7 @@ func TestDiscoverVolumes_NoDir(t *testing.T) {
 
 func TestDiscoverVolumes_EmptyDir(t *testing.T) {
 	vols := map[string][]*util.FakeFile{
-		"dir1": []*util.FakeFile{},
+		"dir1": {},
 	}
 	test := &testConfig{
 		dirLayout:       vols,
@@ -141,13 +141,13 @@ func TestDiscoverVolumes_EmptyDir(t *testing.T) {
 
 func TestDiscoverVolumes_NewVolumesLater(t *testing.T) {
 	vols := map[string][]*util.FakeFile{
-		"dir1": []*util.FakeFile{
-			&util.FakeFile{Name: "mount1", Hash: 0xaaaafef5},
-			&util.FakeFile{Name: "mount2", Hash: 0x79412c38},
+		"dir1": {
+			{Name: "mount1", Hash: 0xaaaafef5},
+			{Name: "mount2", Hash: 0x79412c38},
 		},
-		"dir2": []*util.FakeFile{
-			&util.FakeFile{Name: "mount1", Hash: 0xa7aafa3c},
-			&util.FakeFile{Name: "mount2", Hash: 0x7c4130f1},
+		"dir2": {
+			{Name: "mount1", Hash: 0xa7aafa3c},
+			{Name: "mount2", Hash: 0x7c4130f1},
 		},
 	}
 	test := &testConfig{
@@ -162,9 +162,9 @@ func TestDiscoverVolumes_NewVolumesLater(t *testing.T) {
 
 	// Some new mount points show up
 	newVols := map[string][]*util.FakeFile{
-		"dir1": []*util.FakeFile{
-			&util.FakeFile{Name: "mount3", Hash: 0xf34b8003},
-			&util.FakeFile{Name: "mount4", Hash: 0x144e29de},
+		"dir1": {
+			{Name: "mount3", Hash: 0xf34b8003},
+			{Name: "mount4", Hash: 0x144e29de},
 		},
 	}
 	test.volUtil.AddNewFiles(testMountDir, newVols)
@@ -177,13 +177,13 @@ func TestDiscoverVolumes_NewVolumesLater(t *testing.T) {
 
 func TestDiscoverVolumes_CreatePVFails(t *testing.T) {
 	vols := map[string][]*util.FakeFile{
-		"dir1": []*util.FakeFile{
-			&util.FakeFile{Name: "mount1", Hash: 0xaaaafef5},
-			&util.FakeFile{Name: "mount2", Hash: 0x79412c38},
+		"dir1": {
+			{Name: "mount1", Hash: 0xaaaafef5},
+			{Name: "mount2", Hash: 0x79412c38},
 		},
-		"dir2": []*util.FakeFile{
-			&util.FakeFile{Name: "mount1", Hash: 0xa7aafa3c},
-			&util.FakeFile{Name: "mount2", Hash: 0x7c4130f1},
+		"dir2": {
+			{Name: "mount1", Hash: 0xa7aafa3c},
+			{Name: "mount2", Hash: 0x7c4130f1},
 		},
 	}
 	test := &testConfig{
@@ -201,8 +201,8 @@ func TestDiscoverVolumes_CreatePVFails(t *testing.T) {
 
 func TestDiscoverVolumes_BadVolume(t *testing.T) {
 	vols := map[string][]*util.FakeFile{
-		"dir1": []*util.FakeFile{
-			&util.FakeFile{Name: "mount1", IsNotDir: true},
+		"dir1": {
+			{Name: "mount1", IsNotDir: true},
 		},
 	}
 	test := &testConfig{

@@ -40,10 +40,12 @@ var _ VolumeUtil = &volumeUtil{}
 
 type volumeUtil struct{}
 
+// NewVolumeUtil returns a VolumeUtil object for performing local filesystem operations
 func NewVolumeUtil() VolumeUtil {
 	return &volumeUtil{}
 }
 
+// IsDir checks if the given path is a directory
 func (u *volumeUtil) IsDir(fullPath string) (bool, error) {
 	dir, err := os.Open(fullPath)
 	if err != nil {
@@ -59,6 +61,7 @@ func (u *volumeUtil) IsDir(fullPath string) (bool, error) {
 	return stat.IsDir(), nil
 }
 
+// ReadDir returns a list all the files under the given directory
 func (u *volumeUtil) ReadDir(fullPath string) ([]string, error) {
 	dir, err := os.Open(fullPath)
 	if err != nil {
@@ -73,6 +76,7 @@ func (u *volumeUtil) ReadDir(fullPath string) ([]string, error) {
 	return files, nil
 }
 
+// DeleteContents deletes all the contents under the given directory
 func (u *volumeUtil) DeleteContents(fullPath string) error {
 	dir, err := os.Open(fullPath)
 	if err != nil {
@@ -97,6 +101,7 @@ func (u *volumeUtil) DeleteContents(fullPath string) error {
 
 var _ VolumeUtil = &FakeVolumeUtil{}
 
+// FakeVolumeUtil is a stub interface for unit testing
 type FakeVolumeUtil struct {
 	// List of files underneath the given path
 	directoryFiles map[string][]*FakeFile
@@ -104,6 +109,7 @@ type FakeVolumeUtil struct {
 	deleteShouldFail bool
 }
 
+// FakeFile contains a representation of a file under a directory
 type FakeFile struct {
 	Name     string
 	IsNotDir bool
@@ -111,6 +117,7 @@ type FakeFile struct {
 	Hash uint32
 }
 
+// NewFakeVolumeUtil returns a VolumeUtil object for use in unit testing
 func NewFakeVolumeUtil(deleteShouldFail bool) *FakeVolumeUtil {
 	return &FakeVolumeUtil{
 		directoryFiles:   map[string][]*FakeFile{},
@@ -118,6 +125,7 @@ func NewFakeVolumeUtil(deleteShouldFail bool) *FakeVolumeUtil {
 	}
 }
 
+// IsDir checks if the given path is a directory
 func (u *FakeVolumeUtil) IsDir(fullPath string) (bool, error) {
 	dir, file := filepath.Split(fullPath)
 	dir = filepath.Clean(dir)
@@ -134,6 +142,7 @@ func (u *FakeVolumeUtil) IsDir(fullPath string) (bool, error) {
 	return false, fmt.Errorf("File %q not found", fullPath)
 }
 
+// ReadDir returns the list of all files under the given directory
 func (u *FakeVolumeUtil) ReadDir(fullPath string) ([]string, error) {
 	fileNames := []string{}
 	files, found := u.directoryFiles[fullPath]
@@ -146,6 +155,7 @@ func (u *FakeVolumeUtil) ReadDir(fullPath string) ([]string, error) {
 	return fileNames, nil
 }
 
+// DeleteContents removes all the contents under the given directory
 func (u *FakeVolumeUtil) DeleteContents(fullPath string) error {
 	if u.deleteShouldFail {
 		return fmt.Errorf("Fake delete contents failed")

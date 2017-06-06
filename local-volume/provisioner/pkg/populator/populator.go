@@ -36,10 +36,12 @@ type Populator struct {
 	*common.RuntimeConfig
 }
 
+// NewPopulator returns a Populator object to update the PV cache
 func NewPopulator(config *common.RuntimeConfig) *Populator {
 	return &Populator{RuntimeConfig: config}
 }
 
+// Start launches the PV informer
 func (p *Populator) Start() {
 	_, controller := kcache.NewInformer(
 		&kcache.ListWatch{

@@ -32,6 +32,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+// StartLocalController starts the sync loop for the local PV discovery and deleter
 func StartLocalController(client *kubernetes.Clientset, config *common.UserConfig) {
 	glog.Info("Initializing volume cache\n")
 

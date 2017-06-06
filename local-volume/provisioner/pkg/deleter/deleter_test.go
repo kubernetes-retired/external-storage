@@ -51,19 +51,19 @@ type testVol struct {
 
 func TestDeleteVolumes_Basic(t *testing.T) {
 	vols := map[string]*testVol{
-		"pv1": &testVol{
+		"pv1": {
 			pvPhase: v1.VolumePending,
 		},
-		"pv2": &testVol{
+		"pv2": {
 			pvPhase: v1.VolumeAvailable,
 		},
-		"pv3": &testVol{
+		"pv3": {
 			pvPhase: v1.VolumeBound,
 		},
-		"pv4": &testVol{
+		"pv4": {
 			pvPhase: v1.VolumeReleased,
 		},
-		"pv5": &testVol{
+		"pv5": {
 			pvPhase: v1.VolumeFailed,
 		},
 	}
@@ -80,7 +80,7 @@ func TestDeleteVolumes_Basic(t *testing.T) {
 
 func TestDeleteVolumes_Twice(t *testing.T) {
 	vols := map[string]*testVol{
-		"pv4": &testVol{
+		"pv4": {
 			pvPhase: v1.VolumeReleased,
 		},
 	}
@@ -114,7 +114,7 @@ func TestDeleteVolumes_Empty(t *testing.T) {
 
 func TestDeleteVolumes_DeletePVFails(t *testing.T) {
 	vols := map[string]*testVol{
-		"pv4": &testVol{
+		"pv4": {
 			pvPhase: v1.VolumeReleased,
 		},
 	}
@@ -132,7 +132,7 @@ func TestDeleteVolumes_DeletePVFails(t *testing.T) {
 
 func TestDeleteVolumes_CleanupFails(t *testing.T) {
 	vols := map[string]*testVol{
-		"pv4": &testVol{
+		"pv4": {
 			pvPhase: v1.VolumeReleased,
 		},
 	}
@@ -208,7 +208,7 @@ func verifyPVExists(t *testing.T, config *testConfig) {
 	for pvName := range config.vols {
 		_, found := config.cache.GetPV(pvName)
 		if !found {
-			t.Errorf("PV doesn't exist in cache", pvName)
+			t.Errorf("PV %q doesn't exist in cache", pvName)
 		}
 	}
 }

@@ -27,11 +27,14 @@ import (
 )
 
 const (
+	// External provisioner annotation in PV object
 	AnnProvisionedBy = "pv.kubernetes.io/provisioned-by"
+	// The label key that this provisioner uses for PV node affinity
 	// hostname is not the best choice, but it's what pod and node affinity also use
 	NodeLabelKey = metav1.LabelHostname
 )
 
+// UserConfig stores all the user-defined parameters to the provisioner
 type UserConfig struct {
 	// Node object for this node
 	Node *v1.Node
@@ -43,6 +46,7 @@ type UserConfig struct {
 	DiscoveryMap map[string]string
 }
 
+// RuntimeConfig stores all the objects that the provisioner needs to run
 type RuntimeConfig struct {
 	*UserConfig
 	// Unique name of this provisioner
@@ -57,6 +61,7 @@ type RuntimeConfig struct {
 	VolUtil util.VolumeUtil
 }
 
+// LocalPVConfig defines the parameters for creating a local PV
 type LocalPVConfig struct {
 	Name            string
 	HostPath        string
@@ -65,6 +70,7 @@ type LocalPVConfig struct {
 	AffinityAnn     string
 }
 
+// CreateLocalPVSpec returns a PV spec that can be used for PV creation
 func CreateLocalPVSpec(config *LocalPVConfig) *v1.PersistentVolume {
 	return &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
