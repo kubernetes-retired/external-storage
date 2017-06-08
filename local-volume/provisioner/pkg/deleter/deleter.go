@@ -17,28 +17,30 @@ limitations under the License.
 package deleter
 
 import (
+	"fmt"
 	"path/filepath"
 
 	"github.com/golang/glog"
-	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/types"
+	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
 
 	"k8s.io/client-go/pkg/api/v1"
 )
 
-type Deleter interface {
-	// Cleanup and delete all its owned PVs that have been released
-	DeletePVs()
+// Deleter handles PV cleanup and object deletion
+// For file-based volumes, it deletes the contents of the directory
+type Deleter struct {
+	*common.RuntimeConfig
 }
 
-type deleter struct {
-	*types.RuntimeConfig
+// NewDeleter creates a Deleter object to handle the cleanup and deletion of local PVs
+// allocated by this provisioner
+func NewDeleter(config *common.RuntimeConfig) *Deleter {
+	return &Deleter{RuntimeConfig: config}
 }
 
-func NewDeleter(config *types.RuntimeConfig) Deleter {
-	return &deleter{RuntimeConfig: config}
-}
-
-func (d *deleter) DeletePVs() {
+// DeletePVs will scan through all the existing PVs that are released, and cleanup and
+// delete them
+func (d *Deleter) DeletePVs() {
 	for _, pv := range d.Cache.ListPVs() {
 		if pv.Status.Phase == v1.VolumeReleased {
 			name := pv.Name
@@ -56,22 +58,28 @@ func (d *deleter) DeletePVs() {
 			err = d.APIUtil.DeletePV(name)
 			if err != nil {
 				// TODO: Log event on PV
+				// TODO: Does delete return an error if object has already been deleted?
 				glog.Errorf("Error deleting PV %q: %v", name, err.Error())
 				continue
 			}
-
-			d.Cache.DeletePV(name)
 			glog.Infof("Deleted PV %q", name)
 		}
 	}
 }
 
-func (d *deleter) cleanupPV(pv *v1.PersistentVolume) error {
-	// path := pv.Spec.Local.Path
-	// TODO: Need to extract the hostDir from the spec path, and replace with mountdir
-	path := "TODO-PLACEHOLDER"
-	fullPath := filepath.Join(d.MountDir, path)
-	glog.Infof("Deleting PV %q contents at %q", pv.Name, fullPath)
+func (d *Deleter) cleanupPV(pv *v1.PersistentVolume) error {
+	if pv.Spec.Local == nil {
+		return fmt.Errorf("Unsupported volume type")
+	}
 
-	return d.VolUtil.DeleteContents(fullPath)
+	specPath := pv.Spec.Local.Path
+	relativePath, err := filepath.Rel(d.HostDir, specPath)
+	if err != nil {
+		return fmt.Errorf("Could not get relative path: %v", err)
+	}
+
+	mountPath := filepath.Join(d.MountDir, relativePath)
+
+	glog.Infof("Deleting PV %q contents at hostpath %q, mountpath %q", pv.Name, specPath, mountPath)
+	return d.VolUtil.DeleteContents(mountPath)
 }

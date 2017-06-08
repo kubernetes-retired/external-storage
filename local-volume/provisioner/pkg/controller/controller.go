@@ -17,36 +17,42 @@ limitations under the License.
 package controller
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/golang/glog"
 
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/cache"
+	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/deleter"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/discovery"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/populator"
-	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/types"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/util"
 
 	"k8s.io/client-go/kubernetes"
 )
 
-func StartLocalController(client *kubernetes.Clientset, config *types.UserConfig) {
+// StartLocalController starts the sync loop for the local PV discovery and deleter
+func StartLocalController(client *kubernetes.Clientset, config *common.UserConfig) {
 	glog.Info("Initializing volume cache\n")
 
-	runtimeConfig := &types.RuntimeConfig{
+	runtimeConfig := &common.RuntimeConfig{
 		UserConfig: config,
 		Cache:      cache.NewVolumeCache(),
 		VolUtil:    util.NewVolumeUtil(),
 		APIUtil:    util.NewAPIUtil(client),
 		Client:     client,
-		// TODO: make this unique based on node name?
-		Name: "local-volume-provisioner",
+		Name:       fmt.Sprintf("local-volume-provisioner-%v-%v", config.Node.Name, config.Node.UID),
 	}
 
 	populator := populator.NewPopulator(runtimeConfig)
 	populator.Start()
-	discoverer := discovery.NewDiscoverer(runtimeConfig)
+
+	discoverer, err := discovery.NewDiscoverer(runtimeConfig)
+	if err != nil {
+		glog.Fatalf("Error starting discoverer: %v", err)
+	}
+
 	deleter := deleter.NewDeleter(runtimeConfig)
 
 	glog.Info("Controller started\n")

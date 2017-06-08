@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/types"
+	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -31,14 +31,17 @@ import (
 	kcache "k8s.io/client-go/tools/cache"
 )
 
+// The Populator uses an Informer to populate the VolumeCache.
 type Populator struct {
-	*types.RuntimeConfig
+	*common.RuntimeConfig
 }
 
-func NewPopulator(config *types.RuntimeConfig) *Populator {
+// NewPopulator returns a Populator object to update the PV cache
+func NewPopulator(config *common.RuntimeConfig) *Populator {
 	return &Populator{RuntimeConfig: config}
 }
 
+// Start launches the PV informer
 func (p *Populator) Start() {
 	_, controller := kcache.NewInformer(
 		&kcache.ListWatch{
@@ -47,6 +50,7 @@ func (p *Populator) Start() {
 				return pvs, err
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				// TODO: can we just watch for changes on the phase field?
 				w, err := p.Client.Core().PersistentVolumes().Watch(options)
 				return w, err
 			},
@@ -79,7 +83,7 @@ func (p *Populator) Start() {
 	)
 
 	glog.Infof("Starting Informer controller")
-	// Controller never stops TODO: will this go out of scope and stop the controller?
+	// Controller never stops
 	go controller.Run(make(chan struct{}))
 
 	glog.Infof("Waiting for Informer initial sync")
@@ -93,11 +97,12 @@ func (p *Populator) Start() {
 }
 
 func (p *Populator) handlePVUpdate(pv *v1.PersistentVolume) {
-	if p.Cache.PVExists(pv.Name) {
+	_, exists := p.Cache.GetPV(pv.Name)
+	if exists {
 		p.Cache.UpdatePV(pv)
 	} else {
 		if pv.Annotations != nil {
-			provisioner, found := pv.Annotations[types.AnnProvisionedBy]
+			provisioner, found := pv.Annotations[common.AnnProvisionedBy]
 			if !found {
 				return
 			}
@@ -110,7 +115,8 @@ func (p *Populator) handlePVUpdate(pv *v1.PersistentVolume) {
 }
 
 func (p *Populator) handlePVDelete(pv *v1.PersistentVolume) {
-	if p.Cache.PVExists(pv.Name) {
+	_, exists := p.Cache.GetPV(pv.Name)
+	if exists {
 		// Don't do cleanup, just delete from cache
 		p.Cache.DeletePV(pv.Name)
 	}

@@ -17,20 +17,19 @@ limitations under the License.
 package deleter
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/cache"
-	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/types"
+	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/util"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/api/v1"
 )
 
 const (
 	testHostDir  = "/mnt/disks"
 	testMountDir = "/discoveryPath"
-	testNode     = "test-node"
 )
 
 type testConfig struct {
@@ -40,7 +39,7 @@ type testConfig struct {
 	vols map[string]*testVol
 	// Expected names of deleted PV
 	expectedDeletedPVs map[string]string
-	// These two interfaces are set during setup
+	// The remaining fields are set during setup
 	volUtil *util.FakeVolumeUtil
 	apiUtil *util.FakeAPIUtil
 	cache   *cache.VolumeCache
@@ -52,19 +51,19 @@ type testVol struct {
 
 func TestDeleteVolumes_Basic(t *testing.T) {
 	vols := map[string]*testVol{
-		"pv1": &testVol{
+		"pv1": {
 			pvPhase: v1.VolumePending,
 		},
-		"pv2": &testVol{
+		"pv2": {
 			pvPhase: v1.VolumeAvailable,
 		},
-		"pv3": &testVol{
+		"pv3": {
 			pvPhase: v1.VolumeBound,
 		},
-		"pv4": &testVol{
+		"pv4": {
 			pvPhase: v1.VolumeReleased,
 		},
-		"pv5": &testVol{
+		"pv5": {
 			pvPhase: v1.VolumeFailed,
 		},
 	}
@@ -81,7 +80,7 @@ func TestDeleteVolumes_Basic(t *testing.T) {
 
 func TestDeleteVolumes_Twice(t *testing.T) {
 	vols := map[string]*testVol{
-		"pv4": &testVol{
+		"pv4": {
 			pvPhase: v1.VolumeReleased,
 		},
 	}
@@ -115,7 +114,7 @@ func TestDeleteVolumes_Empty(t *testing.T) {
 
 func TestDeleteVolumes_DeletePVFails(t *testing.T) {
 	vols := map[string]*testVol{
-		"pv4": &testVol{
+		"pv4": {
 			pvPhase: v1.VolumeReleased,
 		},
 	}
@@ -133,7 +132,7 @@ func TestDeleteVolumes_DeletePVFails(t *testing.T) {
 
 func TestDeleteVolumes_CleanupFails(t *testing.T) {
 	vols := map[string]*testVol{
-		"pv4": &testVol{
+		"pv4": {
 			pvPhase: v1.VolumeReleased,
 		},
 	}
@@ -149,38 +148,33 @@ func TestDeleteVolumes_CleanupFails(t *testing.T) {
 	verifyPVExists(t, test)
 }
 
-func testSetup(t *testing.T, config *testConfig) Deleter {
-	config.volUtil = util.NewFakeVolumeUtil(config.volDeleteShouldFail)
-	config.apiUtil = util.NewFakeAPIUtil(false)
+func testSetup(t *testing.T, config *testConfig) *Deleter {
 	config.cache = cache.NewVolumeCache()
+	config.volUtil = util.NewFakeVolumeUtil(config.volDeleteShouldFail)
+	config.apiUtil = util.NewFakeAPIUtil(false, config.cache)
 
+	fakePath := filepath.Join(testHostDir, "test-dir")
 	// Precreate PVs
 	for pvName, vol := range config.vols {
-		pv := &v1.PersistentVolume{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: pvName,
-			},
-			Status: v1.PersistentVolumeStatus{
-				Phase: vol.pvPhase,
-			},
-		}
+		pv := common.CreateLocalPVSpec(&common.LocalPVConfig{
+			Name:     pvName,
+			HostPath: fakePath,
+		})
+		pv.Status.Phase = vol.pvPhase
+
 		_, err := config.apiUtil.CreatePV(pv)
 		if err != nil {
 			t.Fatalf("Error creating fake PV: %v", err)
 		}
-		err = config.cache.AddPV(pv)
-		if err != nil {
-			t.Fatalf("Error adding PV to cache: %v", err)
-		}
+		config.cache.AddPV(pv)
 	}
 
-	config.apiUtil = util.NewFakeAPIUtil(config.apiShouldFail)
-	userConfig := &types.UserConfig{
-		NodeName: testNode,
+	config.apiUtil = util.NewFakeAPIUtil(config.apiShouldFail, config.cache)
+	userConfig := &common.UserConfig{
 		MountDir: testMountDir,
 		HostDir:  testHostDir,
 	}
-	runtimeConfig := &types.RuntimeConfig{
+	runtimeConfig := &common.RuntimeConfig{
 		UserConfig: userConfig,
 		Cache:      config.cache,
 		VolUtil:    config.volUtil,
@@ -203,7 +197,8 @@ func verifyDeletedPVs(t *testing.T, config *testConfig) {
 			t.Errorf("Did not expect deleted PVs %v", pvName)
 			continue
 		}
-		if config.cache.PVExists(pvName) {
+		_, found = config.cache.GetPV(pvName)
+		if found {
 			t.Errorf("PV %q still exists in cache", pvName)
 		}
 	}
@@ -211,8 +206,9 @@ func verifyDeletedPVs(t *testing.T, config *testConfig) {
 
 func verifyPVExists(t *testing.T, config *testConfig) {
 	for pvName := range config.vols {
-		if !config.cache.PVExists(pvName) {
-			t.Errorf("PV doesn't exists in cache", pvName)
+		_, found := config.cache.GetPV(pvName)
+		if !found {
+			t.Errorf("PV %q doesn't exist in cache", pvName)
 		}
 	}
 }

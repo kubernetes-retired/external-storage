@@ -18,22 +18,62 @@ package discovery
 
 import (
 	"fmt"
+	"hash/fnv"
 	"path/filepath"
 
 	"github.com/golang/glog"
-	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/types"
+	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
 
-	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/api/v1"
+	v1helper "k8s.io/client-go/pkg/api/v1/helper"
 )
 
+// Discoverer finds available volumes and creates PVs for them
+// It looks for volumes in the directories specified in the discoveryMap
 type Discoverer struct {
-	*types.RuntimeConfig
+	*common.RuntimeConfig
+	nodeAffinityAnn string
 }
 
-func NewDiscoverer(config *types.RuntimeConfig) *Discoverer {
-	return &Discoverer{RuntimeConfig: config}
+// NewDiscoverer creates a Discoverer object that will scan through
+// the configured directories and create local PVs for any new directories found
+func NewDiscoverer(config *common.RuntimeConfig) (*Discoverer, error) {
+	affinity, err := generateNodeAffinity(config.Node)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to generate node affinity: %v", err)
+	}
+	tmpAnnotations := map[string]string{}
+	err = v1helper.StorageNodeAffinityToAlphaAnnotation(tmpAnnotations, affinity)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to convert node affinity to alpha annotation: %v", err)
+	}
+	return &Discoverer{RuntimeConfig: config, nodeAffinityAnn: tmpAnnotations[v1.AlphaStorageNodeAffinityAnnotation]}, nil
+}
+
+func generateNodeAffinity(node *v1.Node) (*v1.NodeAffinity, error) {
+	if node.Labels == nil {
+		return nil, fmt.Errorf("Node does not have labels")
+	}
+	nodeValue, found := node.Labels[common.NodeLabelKey]
+	if !found {
+		return nil, fmt.Errorf("Node does not have expected label %s", common.NodeLabelKey)
+	}
+
+	return &v1.NodeAffinity{
+		RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+			NodeSelectorTerms: []v1.NodeSelectorTerm{
+				{
+					MatchExpressions: []v1.NodeSelectorRequirement{
+						{
+							Key:      common.NodeLabelKey,
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{nodeValue},
+						},
+					},
+				},
+			},
+		},
+	}, nil
 }
 
 // DiscoverLocalVolumes reads the configured discovery paths, and creates PVs for the new volumes
@@ -44,10 +84,11 @@ func (d *Discoverer) DiscoverLocalVolumes() {
 }
 
 func (d *Discoverer) discoverVolumesAtPath(class, relativePath string) {
-	fullPath := filepath.Join(d.MountDir, relativePath)
-	glog.Infof("Discovering volumes at mount path %q for storage class %q", fullPath, class)
+	mountPath := filepath.Join(d.MountDir, relativePath)
+	hostPath := filepath.Join(d.HostDir, relativePath)
+	glog.V(7).Infof("Discovering volumes at hostpath %q, mount path %q for storage class %q", hostPath, mountPath, class)
 
-	files, err := d.VolUtil.ReadDir(fullPath)
+	files, err := d.VolUtil.ReadDir(mountPath)
 	if err != nil {
 		glog.Errorf("Error reading directory: %v", err)
 		return
@@ -55,12 +96,13 @@ func (d *Discoverer) discoverVolumesAtPath(class, relativePath string) {
 
 	for _, file := range files {
 		// Check if PV already exists for it
-		pvName := generatePVName(file, d.NodeName, class)
-		if !d.Cache.PVExists(pvName) {
-			filePath := filepath.Join(fullPath, file)
+		pvName := generatePVName(file, d.Node.Name, class)
+		_, exists := d.Cache.GetPV(pvName)
+		if !exists {
+			filePath := filepath.Join(mountPath, file)
 			err = d.validateFile(filePath)
 			if err != nil {
-				glog.Errorf("Path %q validation failed: %v", filePath, err)
+				glog.Errorf("Mount path %q validation failed: %v", filePath, err)
 				continue
 			}
 			// TODO: detect capacity
@@ -80,49 +122,32 @@ func (d *Discoverer) validateFile(fullPath string) error {
 	return nil
 }
 
-// TODO: maybe a better way would be to hash the 3 fields
 func generatePVName(file, node, class string) string {
-	return fmt.Sprintf("%v-%v-%v", class, node, file)
+	h := fnv.New32a()
+	h.Write([]byte(file))
+	h.Write([]byte(node))
+	h.Write([]byte(class))
+	// This is the FNV-1a 32-bit hash
+	return fmt.Sprintf("local-pv-%x", h.Sum32())
 }
 
 func (d *Discoverer) createPV(file, relativePath, class string) {
-	pvName := generatePVName(file, d.NodeName, class)
+	pvName := generatePVName(file, d.Node.Name, class)
 	outsidePath := filepath.Join(d.HostDir, relativePath, file)
 
 	glog.Infof("Found new volume at host path %q, creating Local PV %q", outsidePath, pvName)
-	pvSpec := &v1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: pvName,
-			Annotations: map[string]string{
-				types.AnnProvisionedBy: d.Name,
-				// TODO: add topology constraint once we have API
-			},
-		},
-		Spec: v1.PersistentVolumeSpec{
-			PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
-			Capacity: v1.ResourceList{
-				// TODO: detect capacity
-				v1.ResourceName(v1.ResourceStorage): resource.MustParse("10Gi"),
-			},
-			PersistentVolumeSource: v1.PersistentVolumeSource{
-			/** TODO: api not merged yet
-			LocalVolume: &v1.LocalVolumeSource{
-				NodeName: config.NodeName,
-				Fs: v1.LocalFsVolume{Path: outsidePath},
-			},*/
-			},
-			AccessModes: []v1.PersistentVolumeAccessMode{
-				v1.ReadWriteOnce,
-			},
-			StorageClassName: class,
-		},
-	}
+	pvSpec := common.CreateLocalPVSpec(&common.LocalPVConfig{
+		Name:            pvName,
+		HostPath:        outsidePath,
+		StorageClass:    class,
+		ProvisionerName: d.Name,
+		AffinityAnn:     d.nodeAffinityAnn,
+	})
 
-	pv, err := d.APIUtil.CreatePV(pvSpec)
+	_, err := d.APIUtil.CreatePV(pvSpec)
 	if err != nil {
-		glog.Errorf("Error creating PV %q: %v", pvName, err)
+		glog.Errorf("Error creating PV %q for volume at %q: %v", pvName, outsidePath, err)
 		return
 	}
-	d.Cache.AddPV(pv)
-	glog.Infof("Created PV %q", pvName)
+	glog.Infof("Created PV %q for volume at %q", pvName, outsidePath)
 }

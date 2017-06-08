@@ -24,24 +24,29 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 )
 
+// VolumeCache keeps all the PersistentVolumes that have been created by this provisioner.
+// It is periodically updated by the Populator.
+// The Deleter and Discoverer use the VolumeCache to check on created PVs
 type VolumeCache struct {
 	mutex sync.Mutex
 	pvs   map[string]*v1.PersistentVolume
 }
 
+// NewVolumeCache creates a new PV cache object for storing PVs created by this provisioner.
 func NewVolumeCache() *VolumeCache {
-	cache := &VolumeCache{pvs: map[string]*v1.PersistentVolume{}}
-	return cache
+	return &VolumeCache{pvs: map[string]*v1.PersistentVolume{}}
 }
 
-func (cache *VolumeCache) PVExists(pvName string) bool {
+// GetPV returns the PV object given the PV name
+func (cache *VolumeCache) GetPV(pvName string) (*v1.PersistentVolume, bool) {
 	cache.mutex.Lock()
 	defer cache.mutex.Unlock()
 
-	_, exists := cache.pvs[pvName]
-	return exists
+	pv, exists := cache.pvs[pvName]
+	return pv, exists
 }
 
+// AddPV adds the PV object to the cache
 func (cache *VolumeCache) AddPV(pv *v1.PersistentVolume) {
 	cache.mutex.Lock()
 	defer cache.mutex.Unlock()
@@ -50,6 +55,7 @@ func (cache *VolumeCache) AddPV(pv *v1.PersistentVolume) {
 	glog.Infof("Added pv %q to cache", pv.Name)
 }
 
+// UpdatePV updates the PV object in the cache
 func (cache *VolumeCache) UpdatePV(pv *v1.PersistentVolume) {
 	cache.mutex.Lock()
 	defer cache.mutex.Unlock()
@@ -58,6 +64,7 @@ func (cache *VolumeCache) UpdatePV(pv *v1.PersistentVolume) {
 	glog.Infof("Updated pv %q to cache", pv.Name)
 }
 
+// DeletePV deletes the PV object from the cache
 func (cache *VolumeCache) DeletePV(pvName string) {
 	cache.mutex.Lock()
 	defer cache.mutex.Unlock()
@@ -66,6 +73,7 @@ func (cache *VolumeCache) DeletePV(pvName string) {
 	glog.Infof("Deleted pv %q from cache", pvName)
 }
 
+// ListPVs returns a list of all the PVs in the cache
 func (cache *VolumeCache) ListPVs() []*v1.PersistentVolume {
 	cache.mutex.Lock()
 	defer cache.mutex.Unlock()

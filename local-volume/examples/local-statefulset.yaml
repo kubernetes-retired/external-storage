@@ -33,7 +33,7 @@ spec:
       name: local-vol
     spec:
       accessModes: [ "ReadWriteOnce" ]
-      storageClassName: "local-fast"
+      storageClassName: "local-storage"
       resources:
         requests:
           storage: 1Gi
