@@ -50,7 +50,7 @@ Future features:
 ``` console
 KUBE_FEATURE_GATES=PersistentLocalVolumes NODE_LOCAL_SSDS=<n> kube-up.sh
 ```
-#### GKE
+#### GKE (not available until 1.7)
 ``` console
 gcloud alpha container cluster create ... --local-ssd-count=<n>
 gcloud alpha container node-pools create ... --local-ssd-count=<n>
