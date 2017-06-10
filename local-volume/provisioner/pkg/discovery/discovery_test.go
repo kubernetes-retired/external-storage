@@ -311,6 +311,20 @@ func verifyProvisionerName(t *testing.T, pv *v1.PersistentVolume) {
 	}
 }
 
+func verifyCapacity(t *testing.T, createdPV *v1.PersistentVolume, expectedPV *testPVInfo) {
+	capacity, ok := createdPV.Spec.Capacity[v1.ResourceStorage]
+	if !ok {
+		t.Errorf("Unexpected empty resource storage")
+	}
+	capacityInt, ok := capacity.AsInt64()
+	if !ok {
+		t.Errorf("Unable to convert resource storage into int64")
+	}
+	if uint64(capacityInt) != expectedPV.capacity {
+		t.Errorf("Expected capacity %d, got %d", expectedPV.capacity, capacityInt)
+	}
+}
+
 // testPVInfo contains all the fields we are intested in validating.
 type testPVInfo struct {
 	pvName   string
@@ -324,7 +338,11 @@ func verifyCreatedPVs(t *testing.T, test *testConfig) {
 		for _, file := range files {
 			pvName := fmt.Sprintf("local-pv-%x", file.Hash)
 			path := filepath.Join(testHostDir, dir, file.Name)
-			expectedPVs[pvName] = &testPVInfo{pvName: pvName, path: path, capacity: file.Capacity}
+			expectedPVs[pvName] = &testPVInfo{
+				pvName:   pvName,
+				path:     path,
+				capacity: file.Capacity,
+			}
 		}
 	}
 
@@ -347,20 +365,11 @@ func verifyCreatedPVs(t *testing.T, test *testConfig) {
 		if !exists {
 			t.Errorf("PV %q not in cache", pvName)
 		}
-		capacity, ok := createdPV.Spec.Capacity[v1.ResourceStorage]
-		if !ok {
-			t.Errorf("Unexpected empty resource storage")
-		}
-		capacityInt, ok := capacity.AsInt64()
-		if !ok {
-			t.Errorf("Unable to convert resource storage into int64")
-		}
-		if uint64(capacityInt) != expectedPV.capacity {
-			t.Errorf("Expected capacity %d, got %d", expectedPV.capacity, capacityInt)
-		}
+
 		// TODO: verify storage class
 		verifyProvisionerName(t, createdPV)
 		verifyNodeAffinity(t, createdPV)
+		verifyCapacity(t, createdPV, expectedPV)
 	}
 }
 
