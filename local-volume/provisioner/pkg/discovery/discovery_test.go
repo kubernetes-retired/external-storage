@@ -327,9 +327,10 @@ func verifyCapacity(t *testing.T, createdPV *v1.PersistentVolume, expectedPV *te
 
 // testPVInfo contains all the fields we are intested in validating.
 type testPVInfo struct {
-	pvName   string
-	path     string
-	capacity uint64
+	pvName       string
+	path         string
+	capacity     uint64
+	storageClass string
 }
 
 func verifyCreatedPVs(t *testing.T, test *testConfig) {
@@ -339,9 +340,10 @@ func verifyCreatedPVs(t *testing.T, test *testConfig) {
 			pvName := fmt.Sprintf("local-pv-%x", file.Hash)
 			path := filepath.Join(testHostDir, dir, file.Name)
 			expectedPVs[pvName] = &testPVInfo{
-				pvName:   pvName,
-				path:     path,
-				capacity: file.Capacity,
+				pvName:       pvName,
+				path:         path,
+				capacity:     file.Capacity,
+				storageClass: findSCName(t, dir, test),
 			}
 		}
 	}
@@ -360,6 +362,9 @@ func verifyCreatedPVs(t *testing.T, test *testConfig) {
 		}
 		if createdPV.Spec.PersistentVolumeSource.Local.Path != expectedPV.path {
 			t.Errorf("Expected path %q, got %q", expectedPV.path, createdPV.Spec.PersistentVolumeSource.Local.Path)
+		}
+		if createdPV.Spec.StorageClassName != expectedPV.storageClass {
+			t.Errorf("Expected storage class %q, got %q", expectedPV.storageClass, createdPV.Spec.StorageClassName)
 		}
 		_, exists := test.cache.GetPV(pvName)
 		if !exists {
