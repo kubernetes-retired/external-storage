@@ -371,7 +371,6 @@ func verifyCreatedPVs(t *testing.T, test *testConfig) {
 			t.Errorf("PV %q not in cache", pvName)
 		}
 
-		// TODO: verify storage class
 		verifyProvisionerName(t, createdPV)
 		verifyNodeAffinity(t, createdPV)
 		verifyCapacity(t, createdPV, expectedPV)
