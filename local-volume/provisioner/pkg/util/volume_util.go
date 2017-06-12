@@ -21,6 +21,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/golang/glog"
 )
 
@@ -34,6 +36,9 @@ type VolumeUtil interface {
 
 	// Delete all the contents under the given path, but not the path itself
 	DeleteContents(fullPath string) error
+
+	// Get available capacity for fs on full path
+	GetFsAvailableByte(fullPath string) (uint64, error)
 }
 
 var _ VolumeUtil = &volumeUtil{}
@@ -99,6 +104,18 @@ func (u *volumeUtil) DeleteContents(fullPath string) error {
 	return nil
 }
 
+// GetFsAvailableByte returns available capacity in byte about a mounted filesystem.
+// fullPath is the pathname of any file within the mounted filesystem. Capacity
+// returned here is total capacity available to non-root users, and does not include
+// fs reserved space.
+func (u *volumeUtil) GetFsAvailableByte(fullPath string) (uint64, error) {
+	var s unix.Statfs_t
+	if err := unix.Statfs(fullPath, &s); err != nil {
+		return 0, err
+	}
+	return uint64(s.Frsize) * (s.Blocks - s.Bfree + s.Bavail), nil
+}
+
 var _ VolumeUtil = &FakeVolumeUtil{}
 
 // FakeVolumeUtil is a stub interface for unit testing
@@ -114,7 +131,8 @@ type FakeFile struct {
 	Name     string
 	IsNotDir bool
 	// Expected hash value of the PV name
-	Hash uint32
+	Hash     uint32
+	Capacity uint64
 }
 
 // NewFakeVolumeUtil returns a VolumeUtil object for use in unit testing
@@ -161,6 +179,22 @@ func (u *FakeVolumeUtil) DeleteContents(fullPath string) error {
 		return fmt.Errorf("Fake delete contents failed")
 	}
 	return nil
+}
+
+func (u *FakeVolumeUtil) GetFsAvailableByte(fullPath string) (uint64, error) {
+	dir, file := filepath.Split(fullPath)
+	dir = filepath.Clean(dir)
+	files, found := u.directoryFiles[dir]
+	if !found {
+		return 0, fmt.Errorf("Directory %q not found", dir)
+	}
+
+	for _, f := range files {
+		if file == f.Name {
+			return f.Capacity, nil
+		}
+	}
+	return 0, fmt.Errorf("File %q not found", fullPath)
 }
 
 // AddNewFiles adds the given files to the current directory listing

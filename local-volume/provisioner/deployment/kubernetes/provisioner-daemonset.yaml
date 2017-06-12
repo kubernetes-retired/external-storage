@@ -12,6 +12,8 @@ spec:
       - name: provisioner
         image: "gcr.io/msau-k8s-dev/local-volume-provisioner:latest"
         imagePullPolicy: Always
+        securityContext:
+          privileged: true
         volumeMounts:
         - name: discovery-vol
           mountPath: "/local-disks"

@@ -65,6 +65,7 @@ type RuntimeConfig struct {
 type LocalPVConfig struct {
 	Name            string
 	HostPath        string
+	Capacity        uint64
 	StorageClass    string
 	ProvisionerName string
 	AffinityAnn     string
@@ -83,8 +84,7 @@ func CreateLocalPVSpec(config *LocalPVConfig) *v1.PersistentVolume {
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 			Capacity: v1.ResourceList{
-				// TODO: detect capacity
-				v1.ResourceName(v1.ResourceStorage): resource.MustParse("10Gi"),
+				v1.ResourceName(v1.ResourceStorage): *resource.NewQuantity(int64(config.Capacity), resource.BinarySI),
 			},
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				Local: &v1.LocalVolumeSource{
