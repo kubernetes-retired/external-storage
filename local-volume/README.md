@@ -58,7 +58,9 @@ gcloud alpha container node-pools create ... --local-ssd-count=<n>
 
 #### Baremetal environments
 1. Partition and format the disks on each node according to your application's requirements.
-2. Mount all the filesystems under one directory per StorageClass.
+2. Mount all the filesystems under one directory per StorageClass. The directory is currently
+   specified in the daemonset pod definition (`/mnt/disks` by default) and may be more
+   configurable in the future.
 3. Configure a Kubernetes cluster with the `PersistentLocalVolumes` feature gate.
 
 ### Running the external static provisioner
@@ -69,9 +71,9 @@ See `provisioner/` for details and sample configuration files.
 ``` console
 $ kubectl create -f provisioner/deployment/kubernetes/admin_account.yaml
 ```
-2. Create a ConfigMap with your local storage configuration details.
-The default StorageClass is `local-storage`.
-TODO: TBD
+2. Create a ConfigMap with your local storage configuration details. There is nothing to configure at this
+point, the default StorageClass is hardcoded to `local-storage`.
+TBD: fill in the details and examples as the provisioner becomes more configurable.
 
 3. Launch the DaemonSet
 ``` console
