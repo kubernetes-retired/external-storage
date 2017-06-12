@@ -96,21 +96,21 @@ func (d *Discoverer) discoverVolumesAtPath(class string, config common.MountConf
 		// Check if PV already exists for it
 		pvName := generatePVName(file, d.Node.Name, class)
 		_, exists := d.Cache.GetPV(pvName)
-		if !exists {
-			filePath := filepath.Join(config.MountDir, file)
-			err = d.validateFile(filePath)
-			if err != nil {
-				glog.Errorf("Mount path %q validation failed: %v", filePath, err)
-				continue
-			}
-
-			availByte, err := d.VolUtil.GetFsAvailableByte(filePath)
-			if err != nil {
-				glog.Errorf("Path %q fs stats error: %v", filePath, err)
-				continue
-			}
-			d.createPV(file, class, config, availByte)
+		if exists {
+			continue
 		}
+		filePath := filepath.Join(config.MountDir, file)
+		err = d.validateFile(filePath)
+		if err != nil {
+			glog.Errorf("Mount path %q validation failed: %v", filePath, err)
+			continue
+		}
+		availByte, err := d.VolUtil.GetFsAvailableByte(filePath)
+		if err != nil {
+			glog.Errorf("Path %q fs stats error: %v", filePath, err)
+			continue
+		}
+		d.createPV(file, class, config, availByte)
 	}
 }
 
