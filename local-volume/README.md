@@ -75,7 +75,7 @@ TODO: TBD
 
 3. Launch the DaemonSet
 ``` console
-$ kubectl create -f provisioner/deployment/kubernetes/provisioner_daemonset.yaml
+$ kubectl create -f provisioner/deployment/kubernetes/provisioner-daemonset.yaml
 ```
 
 ### Specifying local PV
