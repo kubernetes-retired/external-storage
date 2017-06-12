@@ -44,6 +44,8 @@ push: container
 	docker push $(IMAGE):$(VERSION)
 .PHONY: push
 
+test: test-integration test-e2e
+
 test-integration:
 	go test `go list ./... | grep -v 'vendor\|test\|demo'`
 .PHONY: test-integration
