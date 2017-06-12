@@ -63,6 +63,26 @@ gcloud alpha container node-pools create ... --local-ssd-count=<n>
    configurable in the future.
 3. Configure a Kubernetes cluster with the `PersistentLocalVolumes` feature gate.
 
+#### Local test cluster
+
+1. Create `/mnt/disks` directory and mount several volumes into its subdirectories. The example
+   below uses three ram disks to simulate real local volumes:
+```console
+$ mkdir /mnt/disks
+$ for vol in vol1 vol2 vol3; do
+    mkdir /mnt/disks/$vol
+    mount -t tmpfs $vol /mnt/disks/$vol
+done
+```
+
+2. Run the local cluster.
+```console
+$ ALLOW_PRIVILEGED=true LOG_LEVEL=5 FEATURE_GATES=PersistentLocalVolumes=true hack/local-up-cluster.sh
+```
+
+3. Continue with [Running the external static provisioner](#running-the-external-static-provisioner)
+   below.
+
 ### Running the external static provisioner
 This is optional, only for automated creation and cleanup of local volumes.
 See `provisioner/` for details and sample configuration files.
