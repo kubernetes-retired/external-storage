@@ -78,17 +78,15 @@ func generateNodeAffinity(node *v1.Node) (*v1.NodeAffinity, error) {
 
 // DiscoverLocalVolumes reads the configured discovery paths, and creates PVs for the new volumes
 func (d *Discoverer) DiscoverLocalVolumes() {
-	for class, path := range d.DiscoveryMap {
-		d.discoverVolumesAtPath(class, path)
+	for class, config := range d.DiscoveryMap {
+		d.discoverVolumesAtPath(class, config)
 	}
 }
 
-func (d *Discoverer) discoverVolumesAtPath(class, relativePath string) {
-	mountPath := filepath.Join(d.MountDir, relativePath)
-	hostPath := filepath.Join(d.HostDir, relativePath)
-	glog.V(7).Infof("Discovering volumes at hostpath %q, mount path %q for storage class %q", hostPath, mountPath, class)
+func (d *Discoverer) discoverVolumesAtPath(class string, config common.MountConfig) {
+	glog.V(7).Infof("Discovering volumes at hostpath %q, mount path %q for storage class %q", config.HostDir, config.MountDir, class)
 
-	files, err := d.VolUtil.ReadDir(mountPath)
+	files, err := d.VolUtil.ReadDir(config.MountDir)
 	if err != nil {
 		glog.Errorf("Error reading directory: %v", err)
 		return
@@ -99,7 +97,7 @@ func (d *Discoverer) discoverVolumesAtPath(class, relativePath string) {
 		pvName := generatePVName(file, d.Node.Name, class)
 		_, exists := d.Cache.GetPV(pvName)
 		if !exists {
-			filePath := filepath.Join(mountPath, file)
+			filePath := filepath.Join(config.MountDir, file)
 			err = d.validateFile(filePath)
 			if err != nil {
 				glog.Errorf("Mount path %q validation failed: %v", filePath, err)
@@ -111,7 +109,7 @@ func (d *Discoverer) discoverVolumesAtPath(class, relativePath string) {
 				glog.Errorf("Path %q fs stats error: %v", filePath, err)
 				continue
 			}
-			d.createPV(file, relativePath, class, availByte)
+			d.createPV(file, class, config, availByte)
 		}
 	}
 }
@@ -136,9 +134,9 @@ func generatePVName(file, node, class string) string {
 	return fmt.Sprintf("local-pv-%x", h.Sum32())
 }
 
-func (d *Discoverer) createPV(file, relativePath, class string, availByte uint64) {
+func (d *Discoverer) createPV(file, class string, config common.MountConfig, availByte uint64) {
 	pvName := generatePVName(file, d.Node.Name, class)
-	outsidePath := filepath.Join(d.HostDir, relativePath, file)
+	outsidePath := filepath.Join(config.HostDir, file)
 
 	glog.Infof("Found new volume at host path %q with capacity %d, creating Local PV %q", outsidePath, availByte, pvName)
 	pvSpec := common.CreateLocalPVSpec(&common.LocalPVConfig{

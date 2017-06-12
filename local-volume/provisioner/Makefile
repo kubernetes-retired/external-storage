@@ -46,6 +46,9 @@ container: build
 push: container
 	gcloud docker -- push $(IMAGE):$(VERSION)
 
+test:
+	go test ./...
+
 clean:
 	rm -f local-volume-provisioner
 	rm -f deployment/docker/local-volume-provisioner

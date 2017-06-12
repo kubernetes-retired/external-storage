@@ -58,8 +58,6 @@ func main() {
 	glog.Info("Starting controller\n")
 	controller.StartLocalController(client, &common.UserConfig{
 		Node:         node,
-		HostDir:      "/mnt/disks",
-		MountDir:     "/local-disks",
 		DiscoveryMap: createDiscoveryMap(),
 	})
 }
@@ -72,9 +70,13 @@ func getNode(client *kubernetes.Clientset, name string) *v1.Node {
 	return node
 }
 
-func createDiscoveryMap() map[string]string {
-	m := make(map[string]string)
+func createDiscoveryMap() map[string]common.MountConfig {
 	// Default setting
-	m["local-storage"] = ""
+	// TODO: change this to configurable settings.
+	m := make(map[string]common.MountConfig)
+	m["local-storage"] = common.MountConfig{
+		HostDir:  "/mnt/disks",
+		MountDir: "/local-disks",
+	}
 	return m
 }
