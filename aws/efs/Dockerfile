@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM alpine:3.5
+FROM alpine:latest
 RUN apk update --no-cache && apk add ca-certificates
 COPY efs-provisioner /
 ENTRYPOINT ["/efs-provisioner"]
