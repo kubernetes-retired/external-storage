@@ -25,8 +25,7 @@ go get -u github.com/golang/lint/golint
 export PATH=$PATH:$GOPATH/bin
 go get -u github.com/alecthomas/gometalinter
 gometalinter --install
-#repo-infra/verify/verify-go-src.sh -v
-repo-infra/verify/verify-boilerplate.sh
+make verify
 
 if [ "$TEST_SUITE" = "nfs" ]; then
 	# Install nfs, cfssl

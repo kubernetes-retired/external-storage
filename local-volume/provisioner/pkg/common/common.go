@@ -27,9 +27,9 @@ import (
 )
 
 const (
-	// External provisioner annotation in PV object
+	// AnnProvisionedBy is the external provisioner annotation in PV object
 	AnnProvisionedBy = "pv.kubernetes.io/provisioned-by"
-	// The label key that this provisioner uses for PV node affinity
+	// NodeLabelKey is the label key that this provisioner uses for PV node affinity
 	// hostname is not the best choice, but it's what pod and node affinity also use
 	NodeLabelKey = metav1.LabelHostname
 )
