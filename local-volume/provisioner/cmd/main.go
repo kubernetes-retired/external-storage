@@ -30,6 +30,11 @@ import (
 	"k8s.io/client-go/rest"
 )
 
+const (
+	DefaultHostDir  = "/mnt/disks"
+	DefaultMountDir = "/local-disks"
+)
+
 func setupClient() *kubernetes.Clientset {
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -58,7 +63,7 @@ func main() {
 	glog.Info("Starting controller\n")
 	controller.StartLocalController(client, &common.UserConfig{
 		Node:         node,
-		DiscoveryMap: createDiscoveryMap(),
+		DiscoveryMap: createDiscoveryMap(client),
 	})
 }
 
@@ -70,13 +75,16 @@ func getNode(client *kubernetes.Clientset, name string) *v1.Node {
 	return node
 }
 
-func createDiscoveryMap() map[string]common.MountConfig {
-	// Default setting
-	// TODO: change this to configurable settings.
-	m := make(map[string]common.MountConfig)
-	m["local-storage"] = common.MountConfig{
-		HostDir:  "/mnt/disks",
-		MountDir: "/local-disks",
+func createDiscoveryMap(client *kubernetes.Clientset) map[string]common.MountConfig {
+	config, err := common.GetVolumeConfig(client, os.Getenv("MY_NAMESPACE"), os.Getenv("VOLUME_CONFIG_NAME"))
+	if err != nil {
+		return map[string]common.MountConfig{
+			"local-storage": common.MountConfig{
+				HostDir:  DefaultHostDir,
+				MountDir: DefaultMountDir,
+			},
+		}
+	} else {
+		return config
 	}
-	return m
 }

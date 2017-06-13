@@ -16,14 +16,14 @@ make
 Deploy to existing cluster:
 
 ```console
+kubectl create -f deployment/kubernetes/example-config.yaml
 kubectl create -f deployment/kubernetes/admin-account.yaml
-kubectl create -f deployment/kubernetes/config.yaml
 kubectl create -f deployment/kubernetes/bootstrapper.yaml
 ```
 
 ## TODO
 
 - Make provisioner parameter (like image name) configurable
-- Clean up resources upone error
-- `mountDir` can be auto-generated
+- Clean up resources upon error
+- Volume config parameter `mountDir` can be auto-generated
 - Update local volume docs

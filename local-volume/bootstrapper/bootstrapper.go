@@ -17,7 +17,6 @@ limitations under the License.
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"hash/fnv"
@@ -57,22 +56,6 @@ func setupClient() *kubernetes.Clientset {
 		glog.Fatalf("Error creating clientset: %v\n", err)
 	}
 	return clientset
-}
-
-func getVolumeConfig(client *kubernetes.Clientset, namespace, volumeConfigName string) map[string]common.MountConfig {
-	configMap, err := client.CoreV1().ConfigMaps(namespace).Get(volumeConfigName, metav1.GetOptions{})
-	if err != nil {
-		glog.Fatalf("Could not get config map information: %v", err)
-	}
-	mountConfig := make(map[string]common.MountConfig)
-	for class, data := range configMap.Data {
-		config := common.MountConfig{}
-		if err := json.Unmarshal([]byte(data), &config); err != nil {
-			glog.Fatalf("Unable to unmarshal config for class %v: %v", class, err)
-		}
-		mountConfig[class] = config
-	}
-	return mountConfig
 }
 
 func generateMountName(hostDir, mountDir string) string {
@@ -176,6 +159,18 @@ func createDaemonSet(client *kubernetes.Clientset, namespace string, config map[
 				},
 			},
 		},
+		{
+			Name: "MY_NAMESPACE",
+			ValueFrom: &v1.EnvVarSource{
+				FieldRef: &v1.ObjectFieldSelector{
+					FieldPath: "metadata.namespace",
+				},
+			},
+		},
+		{
+			Name:  "VOLUME_CONFIG_NAME",
+			Value: os.Getenv("VOLUME_CONFIG_NAME"),
+		},
 	}
 
 	containers := []v1.Container{
@@ -187,6 +182,7 @@ func createDaemonSet(client *kubernetes.Clientset, namespace string, config map[
 		},
 	}
 
+	// TODO: make daemonset configurable as well, using another configmap.
 	daemonSet := extv1beta1.DaemonSet{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "extensions/v1beta1",
@@ -228,7 +224,11 @@ func main() {
 	}
 
 	client := setupClient()
-	config := getVolumeConfig(client, namespace, volumeConfigName)
+	config, err := common.GetVolumeConfig(client, namespace, volumeConfigName)
+	if err != nil {
+		glog.Fatal("Could not get config map information: %v", err)
+	}
+
 	glog.Infof("Running bootstrap pod with config %+v\n", config)
 
 	// TODO: check error and clean up resources.

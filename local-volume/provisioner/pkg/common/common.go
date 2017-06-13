@@ -17,6 +17,9 @@ limitations under the License.
 package common
 
 import (
+	"encoding/json"
+
+	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/cache"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/util"
 
@@ -101,4 +104,21 @@ func CreateLocalPVSpec(config *LocalPVConfig) *v1.PersistentVolume {
 			StorageClassName: config.StorageClass,
 		},
 	}
+}
+
+// GetVolumeConfig gets volume configuration from given configmap.
+func GetVolumeConfig(client *kubernetes.Clientset, namespace, name string) (map[string]MountConfig, error) {
+	configMap, err := client.CoreV1().ConfigMaps(namespace).Get(name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	mountConfig := make(map[string]MountConfig)
+	for class, data := range configMap.Data {
+		config := MountConfig{}
+		if err := json.Unmarshal([]byte(data), &config); err != nil {
+			glog.Fatalf("Unable to unmarshal config for class %v: %v", class, err)
+		}
+		mountConfig[class] = config
+	}
+	return mountConfig, nil
 }
