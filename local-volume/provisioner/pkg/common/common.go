@@ -45,9 +45,9 @@ type UserConfig struct {
 // MountConfig stores a configuration for discoverying a specific storageclass
 type MountConfig struct {
 	// The hostpath directory
-	HostDir string
+	HostDir string `json:"hostDir"`
 	// The mount point of the hostpath volume
-	MountDir string
+	MountDir string `json:"mountDir"`
 }
 
 // RuntimeConfig stores all the objects that the provisioner needs to run
