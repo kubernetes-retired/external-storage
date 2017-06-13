@@ -46,9 +46,15 @@ var testNode = &v1.Node{
 	},
 }
 
-var scMapping = map[string]string{
-	"sc1": "dir1",
-	"sc2": "dir2",
+var scMapping = map[string]common.MountConfig{
+	"sc1": common.MountConfig{
+		HostDir:  testHostDir + "/dir1",
+		MountDir: testMountDir + "/dir1",
+	},
+	"sc2": common.MountConfig{
+		HostDir:  testHostDir + "/dir2",
+		MountDir: testMountDir + "/dir2",
+	},
 }
 
 type testConfig struct {
@@ -225,8 +231,6 @@ func testSetup(t *testing.T, test *testConfig) *Discoverer {
 
 	userConfig := &common.UserConfig{
 		Node:         testNode,
-		MountDir:     testMountDir,
-		HostDir:      testHostDir,
 		DiscoveryMap: scMapping,
 	}
 	runConfig := &common.RuntimeConfig{
@@ -244,7 +248,8 @@ func testSetup(t *testing.T, test *testConfig) *Discoverer {
 }
 
 func findSCName(t *testing.T, targetDir string, test *testConfig) string {
-	for sc, dir := range scMapping {
+	for sc, config := range scMapping {
+		_, dir := filepath.Split(config.HostDir)
 		if dir == targetDir {
 			return sc
 		}

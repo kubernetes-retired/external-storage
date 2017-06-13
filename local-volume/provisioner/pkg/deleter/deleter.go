@@ -72,13 +72,18 @@ func (d *Deleter) cleanupPV(pv *v1.PersistentVolume) error {
 		return fmt.Errorf("Unsupported volume type")
 	}
 
+	config, ok := d.DiscoveryMap[pv.Spec.StorageClassName]
+	if !ok {
+		return fmt.Errorf("Unkonwn storage class name %v", pv.Spec.StorageClassName)
+	}
+
 	specPath := pv.Spec.Local.Path
-	relativePath, err := filepath.Rel(d.HostDir, specPath)
+	relativePath, err := filepath.Rel(config.HostDir, specPath)
 	if err != nil {
 		return fmt.Errorf("Could not get relative path: %v", err)
 	}
 
-	mountPath := filepath.Join(d.MountDir, relativePath)
+	mountPath := filepath.Join(config.MountDir, relativePath)
 
 	glog.Infof("Deleting PV %q contents at hostpath %q, mountpath %q", pv.Name, specPath, mountPath)
 	return d.VolUtil.DeleteContents(mountPath)

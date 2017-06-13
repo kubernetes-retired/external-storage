@@ -157,8 +157,9 @@ func testSetup(t *testing.T, config *testConfig) *Deleter {
 	// Precreate PVs
 	for pvName, vol := range config.vols {
 		pv := common.CreateLocalPVSpec(&common.LocalPVConfig{
-			Name:     pvName,
-			HostPath: fakePath,
+			Name:         pvName,
+			HostPath:     fakePath,
+			StorageClass: "sc1",
 		})
 		pv.Status.Phase = vol.pvPhase
 
@@ -171,8 +172,12 @@ func testSetup(t *testing.T, config *testConfig) *Deleter {
 
 	config.apiUtil = util.NewFakeAPIUtil(config.apiShouldFail, config.cache)
 	userConfig := &common.UserConfig{
-		MountDir: testMountDir,
-		HostDir:  testHostDir,
+		DiscoveryMap: map[string]common.MountConfig{
+			"sc1": common.MountConfig{
+				HostDir:  testHostDir + "/test-dir",
+				MountDir: testMountDir + "/test-dir",
+			},
+		},
 	}
 	runtimeConfig := &common.RuntimeConfig{
 		UserConfig: userConfig,

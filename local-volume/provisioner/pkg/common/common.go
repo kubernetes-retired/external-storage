@@ -38,12 +38,16 @@ const (
 type UserConfig struct {
 	// Node object for this node
 	Node *v1.Node
+	// key = storageclass, value = mount configuration for the storageclass
+	DiscoveryMap map[string]MountConfig
+}
+
+// MountConfig stores a configuration for discoverying a specific storageclass
+type MountConfig struct {
 	// The hostpath directory
 	HostDir string
 	// The mount point of the hostpath volume
 	MountDir string
-	// key = storageclass, value = relative directory to search in
-	DiscoveryMap map[string]string
 }
 
 // RuntimeConfig stores all the objects that the provisioner needs to run
