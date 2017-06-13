@@ -13,8 +13,15 @@
 # limitations under the License.
 
 clean: clean-aws/efs clean-ceph/cephfs clean-flex clean-gluster/block clean-local-volume/provisioner clean-nfs-client clean-nfs
+.PHONY: clean
 
 test: test-aws/efs test-local-volume/provisioner test-nfs
+.PHONY: test
+
+verify:
+	repo-infra/verify/verify-go-src.sh -v
+	repo-infra/verify/verify-boilerplate.sh
+.PHONY: verify
 
 aws/efs:
 	cd aws/efs; \
