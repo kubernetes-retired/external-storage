@@ -181,6 +181,7 @@ func (u *FakeVolumeUtil) DeleteContents(fullPath string) error {
 	return nil
 }
 
+// GetFsAvailableByte returns available capacity in byte about a mounted filesystem.
 func (u *FakeVolumeUtil) GetFsAvailableByte(fullPath string) (uint64, error) {
 	dir, file := filepath.Split(fullPath)
 	dir = filepath.Clean(dir)
