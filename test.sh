@@ -66,15 +66,13 @@ if [ "$TEST_SUITE" = "nfs" ]; then
 	fi
 	$KUBECTL config set-context local --cluster=local --user=myself
 	$KUBECTL config use-context local
-
-	# Build nfs-provisioner and run tests
-	pushd ./nfs
-	make container
-	make test-integration
 	if [ "$KUBE_VERSION" != "1.5.4" ]; then
 		sudo chown -R $(logname) /var/run/kubernetes;
 	fi
-	make test-e2e
+
+	# Build nfs-provisioner and run tests
+	make nfs
+	make test-nfs
 elif [ "$TEST_SUITE" = "everything-else" ]; then
 	pushd ./lib
 	go test ./controller
@@ -84,26 +82,13 @@ elif [ "$TEST_SUITE" = "everything-else" ]; then
 	make image
 	make clean
 	popd
-	pushd ./ceph/cephfs
-	go build cephfs-provisioner.go
-	popd
-	pushd ./aws/efs
-	make container
-	make test
-	make clean
-	popd
-	pushd ./gluster/block
-	go build cmd/glusterblock-provisioner/glusterblock-provisioner.go
-	popd
-	pushd ./flex
-	make container
-	popd
-	pushd ./nfs-client
-	./build.sh
-	popd
+	make aws/efs
+	make test-aws/efs
+	make ceph/cephfs
+	make flex
+	make gluster/block
+	make nfs-client
 elif [ "$TEST_SUITE" = "local-volume" ]; then
-	pushd ./local-volume/provisioner
-	make
-	go test ./...
-	popd
+	make local-volume/provisioner
+	make test-local-volume/provisioner
 fi
