@@ -47,11 +47,11 @@ var testNode = &v1.Node{
 }
 
 var scMapping = map[string]common.MountConfig{
-	"sc1": common.MountConfig{
+	"sc1": {
 		HostDir:  testHostDir + "/dir1",
 		MountDir: testMountDir + "/dir1",
 	},
-	"sc2": common.MountConfig{
+	"sc2": {
 		HostDir:  testHostDir + "/dir2",
 		MountDir: testMountDir + "/dir2",
 	},
