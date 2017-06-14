@@ -13,7 +13,7 @@ spec:
     spec:
       containers:
         - name: efs-provisioner
-          image: quay.io/external_storage/efs-provisioner:latest
+          image: quay.io/external_storage/efs-provisioner:v0.1.0
           env:
             - name: FILE_SYSTEM_ID
               valueFrom:
