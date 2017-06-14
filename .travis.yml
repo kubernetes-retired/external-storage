@@ -19,4 +19,4 @@ deploy:
     script: ./deploy.sh
     on:
       tags: true
-      conditions: $TEST_SUITE = everything-else
+      condition: $TEST_SUITE = everything-else

@@ -2,7 +2,7 @@
 
 [![Docker Repository on Quay](https://quay.io/repository/external_storage/efs-provisioner/status "Docker Repository on Quay")](https://quay.io/repository/external_storage/efs-provisioner)
 ```
-quay.io/external_storage/efs-provisioner:latest
+quay.io/external_storage/efs-provisioner:v0.1.0
 ```
 
 ## Prerequisites
