@@ -173,7 +173,7 @@ func testSetup(t *testing.T, config *testConfig) *Deleter {
 	config.apiUtil = util.NewFakeAPIUtil(config.apiShouldFail, config.cache)
 	userConfig := &common.UserConfig{
 		DiscoveryMap: map[string]common.MountConfig{
-			"sc1": common.MountConfig{
+			"sc1": {
 				HostDir:  testHostDir + "/test-dir",
 				MountDir: testMountDir + "/test-dir",
 			},
