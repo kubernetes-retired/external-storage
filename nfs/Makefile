@@ -12,20 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-IMAGE = quay.io/kubernetes_incubator/nfs-provisioner
-
-VERSION :=
-TAG := $(shell git describe --abbrev=0 --tags HEAD 2>/dev/null)
-COMMIT := $(shell git rev-parse HEAD)
-ifeq ($(TAG),)
-    VERSION := latest
-else
-    ifeq ($(COMMIT), $(shell git rev-list -n1 $(TAG)))
-        VERSION := $(TAG)
-    else
-        VERSION := latest
-    endif
+ifeq ($(REGISTRY),)
+	REGISTRY = quay.io/kubernetes_incubator/
 endif
+ifeq ($(VERSION),)
+	VERSION = latest
+endif
+IMAGE = $(REGISTRY)nfs-provisioner:$(VERSION)
+MUTABLE_IMAGE = $(REGISTRY)nfs-provisioner:latest
 
 all build:
 	GOOS=linux go install -v ./cmd/nfs-provisioner
@@ -37,11 +31,13 @@ container: build quick-container
 
 quick-container:
 	cp nfs-provisioner deploy/docker/nfs-provisioner
-	docker build -t $(IMAGE):$(VERSION) deploy/docker
+	docker build -t $(MUTABLE_IMAGE) deploy/docker
+	docker tag $(MUTABLE_IMAGE) $(IMAGE)
 .PHONY: quick-container
 
 push: container
-	docker push $(IMAGE):$(VERSION)
+	docker push $(IMAGE)
+	docker push $(MUTABLE_IMAGE)
 .PHONY: push
 
 test: test-integration test-e2e
@@ -58,4 +54,5 @@ test-e2e:
 clean:
 	rm -f nfs-provisioner
 	rm -f deploy/docker/nfs-provisioner
+	rm -rf test/e2e/vendor
 .PHONY: clean

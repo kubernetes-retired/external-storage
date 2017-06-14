@@ -12,6 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+ifeq ($(REGISTRY),)
+	REGISTRY = quay.io/external_storage/
+endif
+ifeq ($(VERSION),)
+	VERSION = latest
+endif
+
 clean: clean-aws/efs clean-ceph/cephfs clean-flex clean-gluster/block clean-local-volume/provisioner clean-nfs-client clean-nfs
 .PHONY: clean
 
@@ -41,7 +48,8 @@ clean-aws/efs:
 ceph/cephfs: 
 	cd ceph/cephfs; \
 	go build cephfs-provisioner.go; \
-	docker build -t cephfs-provisioner .
+	docker build -t $(REGISTRY)cephfs-provisioner:latest .
+	docker tag $(REGISTRY)cephfs-provisioner:latest $(REGISTRY)cephfs-provisioner:$(VERSION)
 .PHONY: ceph/cephfs
 
 clean-ceph/cephfs:
@@ -87,7 +95,8 @@ clean-local-volume/provisioner:
 nfs-client:
 	cd nfs-client; \
 	./build.sh; \
-	docker build -t quay.io/external_storage/nfs-client-provisioner .
+	docker build -t $(REGISTRY)nfs-client-provisioner:latest .
+	docker tag $(REGISTRY)nfs-client-provisioner:latest $(REGISTRY)nfs-client-provisioner:$(VERSION)
 .PHONY: nfs-client
 
 clean-nfs-client:
@@ -109,3 +118,32 @@ clean-nfs:
 	cd nfs; \
 	make clean
 .PHONY: clean-nfs
+
+push-cephfs-provisioner: ceph/cephfs
+	docker push $(REGISTRY)cephfs-provisioner:$(VERSION)
+	docker push $(REGISTRY)cephfs-provisioner:latest
+.PHONY: push-nfs-client-provisioner
+
+push-efs-provisioner:
+	cd aws/efs; \
+	make push
+.PHONY: push-efs-provisioner
+
+push-glusterblock-provisioner:
+	cd gluster/block; \
+	make push
+.PHONY: push-glusterblock-provisioner
+
+push-local-volume:
+	@echo TODO
+.PHONY: push-local-volume
+
+push-nfs-client-provisioner: nfs-client
+	docker push $(REGISTRY)nfs-client-provisioner:$(VERSION)
+	docker push $(REGISTRY)nfs-client-provisioner:latest
+.PHONY: push-nfs-client-provisioner
+
+push-nfs-provisioner:
+	cd nfs; \
+	make push
+.PHONY: push-nfs-provisioner
