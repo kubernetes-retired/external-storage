@@ -12,9 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-IMAGE = quay.io/external_storage/efs-provisioner
-# TODO
-VERSION = latest
+ifeq ($(REGISTRY),)
+	REGISTRY = quay.io/external_storage/
+endif
+ifeq ($(VERSION),)
+	VERSION = latest
+endif
+IMAGE = $(REGISTRY)efs-provisioner:$(VERSION)
+MUTABLE_IMAGE = $(REGISTRY)efs-provisioner:latest
 
 all build:
 	@mkdir -p .go/src/github.com/kubernetes-incubator/external-storage/aws/efs/vendor
@@ -39,11 +44,13 @@ container: build quick-container
 .PHONY: container
 
 quick-container:
-	docker build -t $(IMAGE):$(VERSION) .
+	docker build -t $(MUTABLE_IMAGE) .
+	docker tag $(MUTABLE_IMAGE) $(IMAGE)
 .PHONY: quick-container
 
 push: container
-	docker push $(IMAGE):$(VERSION)
+	docker push $(IMAGE)
+	docker push $(MUTABLE_IMAGE)
 .PHONY: push
 
 test:
