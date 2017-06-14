@@ -1,4 +1,4 @@
-# Copyright 2017 The Kubernetes Authors.
+# Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,43 +12,40 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Use:
-#
-# `make all` will build the provisioner
-# `make container` will build a container-- you must supply a tag.
-# `make push` will push the container-- you must supply a tag.
-
-PROJECT=msau-k8s-dev
-IMAGE=gcr.io/$(PROJECT)/local-volume-provisioner
-GOARCH?=$(shell go env GOARCH)
-GOOS?=$(shell go env GOOS)
-
-VERSION :=
-TAG := $(shell git describe --abbrev=0 --tags HEAD 2>/dev/null)
-COMMIT := $(shell git rev-parse HEAD)
-ifeq ($(TAG),)
-    VERSION := latest
-else
-    ifeq ($(COMMIT), $(shell git rev-list -n1 $(TAG)))
-        VERSION := $(TAG)
-    else
-        VERSION := latest
-    endif
+ifeq ($(REGISTRY),)
+	REGISTRY = quay.io/external_storage
 endif
 
-all build:
-	CGO_ENABLED=0 go build -a -ldflags '-extldflags "-static"' -o local-volume-provisioner ./cmd
+ifeq ($(VERSION),)
+    VERSION = latest
+endif
 
-container: build
+IMAGE = $(REGISTRY)/local-volume-provisioner:$(VERSION)
+MUTABLE_IMAGE = $(REGISTRY)/local-volume-provisioner:latest
+
+all build:
+	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o local-volume-provisioner ./cmd
+.PHONY: all build
+
+container: build quick-container
+.PHONY: container
+
+quick-container:
 	cp local-volume-provisioner deployment/docker
-	docker build --pull -t $(IMAGE):$(VERSION) deployment/docker
+	docker build -t $(MUTABLE_IMAGE) deployment/docker
+	docker tag $(MUTABLE_IMAGE) $(IMAGE)
+.PHONY: quick-container
 
 push: container
-	gcloud docker -- push $(IMAGE):$(VERSION)
+	docker push $(IMAGE)
+	docker push $(MUTABLE_IMAGE)
+.PHONY: push
 
 test:
 	go test ./...
+.PHONY: test
 
 clean:
 	rm -f local-volume-provisioner
 	rm -f deployment/docker/local-volume-provisioner
+.PHONY: clean
