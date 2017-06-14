@@ -25,6 +25,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
@@ -34,15 +35,15 @@ import (
 )
 
 const (
-	DefaultImage                  = "local-volume-provisioner:dev"
-	ProvisionerDaemonSetName      = "local-volume-provisioner"
-	ProvisionerContainerName      = "provisioner"
-	ProvisionerServiceAccountName = "local-storage-admin"
+	defaultImage                  = "local-volume-provisioner:dev"
+	provisionerDaemonSetName      = "local-volume-provisioner"
+	provisionerContainerName      = "provisioner"
+	provisionerServiceAccountName = "local-storage-admin"
 
-	ProvisionerPVBindingName   = "local-storage:provisioner-pv-binding"
-	ProvisionerNodeBindingName = "local-storage:provisioner-node-binding"
-	SystemRoleNode             = "system:node"
-	SystemRolePVProvisioner    = "system:persistent-volume-provisioner"
+	provisionerPVBindingName   = "local-storage:provisioner-pv-binding"
+	provisionerNodeBindingName = "local-storage:provisioner-node-binding"
+	systemRoleNode             = "system:node"
+	systemRolePVProvisioner    = "system:persistent-volume-provisioner"
 )
 
 func setupClient() *kubernetes.Clientset {
@@ -72,7 +73,7 @@ func createServiceAccount(client *kubernetes.Clientset, namespace string) error 
 			Kind:       "ServiceAccount",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      ProvisionerServiceAccountName,
+			Name:      provisionerServiceAccountName,
 			Namespace: namespace,
 		},
 	}
@@ -84,7 +85,7 @@ func createClusterRoleBinding(client *kubernetes.Clientset, namespace string) er
 	subjects := []rbacv1beta1.Subject{
 		{
 			Kind:      rbacv1beta1.ServiceAccountKind,
-			Name:      ProvisionerServiceAccountName,
+			Name:      provisionerServiceAccountName,
 			Namespace: namespace,
 		},
 	}
@@ -95,12 +96,12 @@ func createClusterRoleBinding(client *kubernetes.Clientset, namespace string) er
 			Kind:       "ClusterRoleBinding",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: ProvisionerPVBindingName,
+			Name: provisionerPVBindingName,
 		},
 		RoleRef: rbacv1beta1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
 			Kind:     "ClusterRole",
-			Name:     SystemRolePVProvisioner,
+			Name:     systemRolePVProvisioner,
 		},
 		Subjects: subjects,
 	}
@@ -110,12 +111,12 @@ func createClusterRoleBinding(client *kubernetes.Clientset, namespace string) er
 			Kind:       "ClusterRoleBinding",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: ProvisionerNodeBindingName,
+			Name: provisionerNodeBindingName,
 		},
 		RoleRef: rbacv1beta1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
 			Kind:     "ClusterRole",
-			Name:     SystemRoleNode,
+			Name:     systemRoleNode,
 		},
 		Subjects: subjects,
 	}
@@ -175,8 +176,8 @@ func createDaemonSet(client *kubernetes.Clientset, namespace string, config map[
 
 	containers := []v1.Container{
 		{
-			Name:         ProvisionerContainerName,
-			Image:        DefaultImage,
+			Name:         provisionerContainerName,
+			Image:        defaultImage,
 			VolumeMounts: volumeMounts,
 			Env:          envVars,
 		},
@@ -189,18 +190,18 @@ func createDaemonSet(client *kubernetes.Clientset, namespace string, config map[
 			Kind:       "DaemonSet",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      ProvisionerDaemonSetName,
+			Name:      provisionerDaemonSetName,
 			Namespace: namespace,
 		},
 		Spec: extv1beta1.DaemonSetSpec{
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{"app": ProvisionerDaemonSetName},
+					Labels: map[string]string{"app": provisionerDaemonSetName},
 				},
 				Spec: v1.PodSpec{
 					Volumes:            volumes,
 					Containers:         containers,
-					ServiceAccountName: ProvisionerServiceAccountName,
+					ServiceAccountName: provisionerServiceAccountName,
 				},
 			},
 		},
@@ -226,20 +227,20 @@ func main() {
 	client := setupClient()
 	config, err := common.GetVolumeConfig(client, namespace, volumeConfigName)
 	if err != nil {
-		glog.Fatal("Could not get config map information: %v", err)
+		glog.Fatalf("Could not get config map information: %v", err)
 	}
 
 	glog.Infof("Running bootstrap pod with config %+v\n", config)
 
 	// TODO: check error and clean up resources.
-	if err := createServiceAccount(client, namespace); err != nil {
-		glog.Fatal("Unable to create service account: %v\n", err)
+	if err := createServiceAccount(client, namespace); err != nil && !errors.IsAlreadyExists(err) {
+		glog.Fatalf("Unable to create service account: %v\n", err)
 	}
-	if err := createClusterRoleBinding(client, namespace); err != nil {
-		glog.Fatal("Unable to create cluster role bindings: %v\n", err)
+	if err := createClusterRoleBinding(client, namespace); err != nil && !errors.IsAlreadyExists(err) {
+		glog.Fatalf("Unable to create cluster role bindings: %v\n", err)
 	}
 	if err := createDaemonSet(client, namespace, config); err != nil {
-		glog.Fatal("Unable to create daemonset: %v\n", err)
+		glog.Fatalf("Unable to create daemonset: %v\n", err)
 	}
 
 	glog.Infof("Successfully created local volume provisioner")

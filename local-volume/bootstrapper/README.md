@@ -26,4 +26,5 @@ kubectl create -f deployment/kubernetes/bootstrapper.yaml
 - Make provisioner parameter (like image name) configurable
 - Clean up resources upon error
 - Volume config parameter `mountDir` can be auto-generated
-- Update local volume docs
+- Update local volume docs (document service account and rolebindings)
+- Push public image

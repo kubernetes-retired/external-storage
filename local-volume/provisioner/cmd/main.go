@@ -31,8 +31,8 @@ import (
 )
 
 const (
-	DefaultHostDir  = "/mnt/disks"
-	DefaultMountDir = "/local-disks"
+	defaultHostDir  = "/mnt/disks"
+	defaultMountDir = "/local-disks"
 )
 
 func setupClient() *kubernetes.Clientset {
@@ -78,13 +78,13 @@ func getNode(client *kubernetes.Clientset, name string) *v1.Node {
 func createDiscoveryMap(client *kubernetes.Clientset) map[string]common.MountConfig {
 	config, err := common.GetVolumeConfig(client, os.Getenv("MY_NAMESPACE"), os.Getenv("VOLUME_CONFIG_NAME"))
 	if err != nil {
-		return map[string]common.MountConfig{
-			"local-storage": common.MountConfig{
-				HostDir:  DefaultHostDir,
-				MountDir: DefaultMountDir,
+		config = map[string]common.MountConfig{
+			"local-storage": {
+				HostDir:  defaultHostDir,
+				MountDir: defaultMountDir,
 			},
 		}
-	} else {
-		return config
 	}
+	glog.Infof("Running provisioner with config %+v\n", config)
+	return config
 }
