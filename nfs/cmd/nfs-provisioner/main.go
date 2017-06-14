@@ -48,10 +48,12 @@ var (
 )
 
 const (
-	exportDir     = "/export"
-	ganeshaLog    = "/export/ganesha.log"
-	ganeshaPid    = "/var/run/ganesha.pid"
-	ganeshaConfig = "/export/vfs.conf"
+	exportDir      = "/export"
+	ganeshaLog     = "/export/ganesha.log"
+	ganeshav4old   = "/export/v4old"
+	ganeshav4recov = "/export/v4recov"
+	ganeshaPid     = "/var/run/ganesha.pid"
+	ganeshaConfig  = "/export/vfs.conf"
 )
 
 func main() {
@@ -82,7 +84,7 @@ func main() {
 
 	if *runServer {
 		glog.Infof("Starting NFS server!")
-		err := server.Setup(ganeshaConfig, *gracePeriod)
+		err := server.Setup(ganeshaConfig, *gracePeriod, ganeshav4old, ganeshav4recov)
 		if err != nil {
 			glog.Fatalf("Error setting up NFS server: %v", err)
 		}

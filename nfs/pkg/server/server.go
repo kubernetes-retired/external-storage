@@ -74,7 +74,7 @@ NFSV4
 
 // Setup sets up various prerequisites and settings for the server. If an error
 // is encountered at any point it returns it instantly
-func Setup(ganeshaConfig string, gracePeriod uint) error {
+func Setup(ganeshaConfig string, gracePeriod uint, ganeshav4old, ganeshav4recov string) error {
 	// Start rpcbind if it is not started yet
 	cmd := exec.Command("/usr/sbin/rpcinfo", "127.0.0.1")
 	if err := cmd.Run(); err != nil {
@@ -114,6 +114,23 @@ func Setup(ganeshaConfig string, gracePeriod uint) error {
 	err = setFsidDevice(ganeshaConfig, true)
 	if err != nil {
 		return fmt.Errorf("error setting fsid device to ganesha config: %v", err)
+	}
+
+	// Symlink v4old and v4recov
+	if err := os.MkdirAll("/var/lib/nfs/ganesha", 0755); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(ganeshav4old, 0755); err != nil {
+		return err
+	}
+	if err := os.Symlink(ganeshav4old, "/var/lib/nfs/ganesha/v4old"); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(ganeshav4recov, 0755); err != nil {
+		return err
+	}
+	if err := os.Symlink(ganeshav4recov, "/var/lib/nfs/ganesha/v4recov"); err != nil {
+		return err
 	}
 
 	return nil
