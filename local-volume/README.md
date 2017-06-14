@@ -27,8 +27,8 @@ What doesn't work and workarounds:
     * Workarounds:
         * Run your pods that require local storage first.
         * Give your pods high priority.
-        * Run this workaround controller that unbinds PVCs for pods that are
-          stuck pending. LINK
+        * Run a workaround controller that unbinds PVCs for pods that are
+          stuck pending. TODO: add link
 * External provisioner cannot correctly detect capacity of mounts added after it
   has been started.
     * This requires mount propagation to work, which is targeted for 1.8.
