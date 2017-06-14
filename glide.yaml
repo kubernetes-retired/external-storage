@@ -17,7 +17,7 @@ import:
 - package: github.com/mitchellh/mapstructure
   version: db1efb5
 - package: k8s.io/apimachinery
-  version: c1c4a7f
+  version: cff8db6
   subpackages:
   - pkg/api/errors
   - pkg/api/resource
@@ -31,7 +31,7 @@ import:
   - pkg/util/wait
   - pkg/watch
 - package: k8s.io/client-go
-  version: 7615377
+  version: 83b4b27
   subpackages:
   - kubernetes
   - kubernetes/typed/core/v1
