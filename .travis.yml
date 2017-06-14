@@ -13,3 +13,10 @@ install: true
 
 script:
   - ./test.sh
+
+deploy:
+  - provider: script
+    script: ./deploy.sh
+    on:
+      tags: true
+      conditions: $TEST_SUITE = everything-else
