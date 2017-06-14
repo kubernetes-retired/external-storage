@@ -10,7 +10,7 @@ spec:
     spec:
       containers:
       - name: provisioner
-        image: "gcr.io/msau-k8s-dev/local-volume-provisioner:latest"
+        image: "quay.io/external_storage/local-volume-provisioner:latest"
         imagePullPolicy: Always
         securityContext:
           privileged: true

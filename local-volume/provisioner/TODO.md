@@ -1,9 +1,7 @@
 # TODO
 
 ## P0
-* Detect capacity of mount points (ddysher)
-* Deploy to public image repo (msau42)
-* E2E tests
+* E2E tests (msau42)
 
 ## P1
 * Can we filter the PV watch to only certain fields?
