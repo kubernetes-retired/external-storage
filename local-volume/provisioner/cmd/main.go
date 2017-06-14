@@ -30,11 +30,6 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-const (
-	defaultHostDir  = "/mnt/disks"
-	defaultMountDir = "/local-disks"
-)
-
 func setupClient() *kubernetes.Clientset {
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -76,14 +71,10 @@ func getNode(client *kubernetes.Clientset, name string) *v1.Node {
 }
 
 func createDiscoveryMap(client *kubernetes.Clientset) map[string]common.MountConfig {
-	config, err := common.GetVolumeConfig(client, os.Getenv("MY_NAMESPACE"), os.Getenv("VOLUME_CONFIG_NAME"))
+	config, err := common.GetVolumeConfigFromConfigMap(client, os.Getenv("MY_NAMESPACE"), os.Getenv("VOLUME_CONFIG_NAME"))
 	if err != nil {
-		config = map[string]common.MountConfig{
-			"local-storage": {
-				HostDir:  defaultHostDir,
-				MountDir: defaultMountDir,
-			},
-		}
+		glog.Infof("Could not get config map due to: %v, using default configmap", err)
+		config = common.GetDefaultVolumeConfig()
 	}
 	glog.Infof("Running provisioner with config %+v\n", config)
 	return config

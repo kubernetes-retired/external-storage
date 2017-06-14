@@ -18,8 +18,8 @@ package common
 
 import (
 	"encoding/json"
+	"fmt"
 
-	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/cache"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/util"
 
@@ -35,6 +35,11 @@ const (
 	// NodeLabelKey is the label key that this provisioner uses for PV node affinity
 	// hostname is not the best choice, but it's what pod and node affinity also use
 	NodeLabelKey = metav1.LabelHostname
+
+	// DefaultHostDir is the default host dir to discover local volumes.
+	DefaultHostDir = "/mnt/disks"
+	// DefaultMountDir is the container mount point for the default host dir.
+	DefaultMountDir = "/local-disks"
 )
 
 // UserConfig stores all the user-defined parameters to the provisioner
@@ -106,17 +111,46 @@ func CreateLocalPVSpec(config *LocalPVConfig) *v1.PersistentVolume {
 	}
 }
 
-// GetVolumeConfig gets volume configuration from given configmap.
-func GetVolumeConfig(client *kubernetes.Clientset, namespace, name string) (map[string]MountConfig, error) {
+// GetVolumeConfigFromConfigMap gets volume configuration from given configmap,
+func GetVolumeConfigFromConfigMap(client *kubernetes.Clientset, namespace, name string) (map[string]MountConfig, error) {
 	configMap, err := client.CoreV1().ConfigMaps(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
+	return ConfigMapDataToVolumeConfig(configMap.Data)
+}
+
+// GetDefaultVolumeConfig returns the default volume configuration.
+func GetDefaultVolumeConfig() map[string]MountConfig {
+	return map[string]MountConfig{
+		"local-storage": {
+			HostDir:  DefaultHostDir,
+			MountDir: DefaultMountDir,
+		},
+	}
+}
+
+// VolumeConfigToConfigMapData converts volume config to configmap data.
+func VolumeConfigToConfigMapData(config map[string]MountConfig) (map[string]string, error) {
+	configMapData := make(map[string]string)
+	for class, data := range config {
+		var val []byte
+		var err error
+		if val, err = json.Marshal(data); err != nil {
+			return nil, fmt.Errorf("unable to unmarshal config for class %v: %v", class, err)
+		}
+		configMapData[class] = string(val)
+	}
+	return configMapData, nil
+}
+
+// ConfigMapDataToVolumeConfig converts configmap data to volume config
+func ConfigMapDataToVolumeConfig(data map[string]string) (map[string]MountConfig, error) {
 	mountConfig := make(map[string]MountConfig)
-	for class, data := range configMap.Data {
+	for class, val := range data {
 		config := MountConfig{}
-		if err := json.Unmarshal([]byte(data), &config); err != nil {
-			glog.Fatalf("Unable to unmarshal config for class %v: %v", class, err)
+		if err := json.Unmarshal([]byte(val), &config); err != nil {
+			return nil, fmt.Errorf("unable to unmarshal config for class %v: %v", class, err)
 		}
 		mountConfig[class] = config
 	}

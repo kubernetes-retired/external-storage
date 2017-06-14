@@ -35,7 +35,9 @@ import (
 )
 
 const (
-	defaultImage                  = "local-volume-provisioner:dev"
+	defaultImage         = "local-volume-provisioner:dev"
+	defaultConfigMapName = "local-volume-config"
+
 	provisionerDaemonSetName      = "local-volume-provisioner"
 	provisionerContainerName      = "provisioner"
 	provisionerServiceAccountName = "local-storage-admin"
@@ -64,6 +66,34 @@ func generateMountName(hostDir, mountDir string) string {
 	h.Write([]byte(hostDir))
 	h.Write([]byte(mountDir))
 	return fmt.Sprintf("mount-%x", h.Sum32())
+}
+
+func getVolumeConfigName() string {
+	name := os.Getenv("VOLUME_CONFIG_NAME")
+	if name == "" {
+		return defaultConfigMapName
+	}
+	return name
+}
+
+func createConfigMap(client *kubernetes.Clientset, namespace string, config map[string]common.MountConfig) error {
+	data, err := common.VolumeConfigToConfigMapData(config)
+	if err != nil {
+		glog.Fatalf("Unable to convert volume config to configmap %v\n", err)
+	}
+	configMap := v1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "ConfigMap",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      getVolumeConfigName(),
+			Namespace: namespace,
+		},
+		Data: data,
+	}
+	_, err = client.CoreV1().ConfigMaps(namespace).Create(&configMap)
+	return err
 }
 
 func createServiceAccount(client *kubernetes.Clientset, namespace string) error {
@@ -219,15 +249,23 @@ func main() {
 	if namespace == "" {
 		glog.Fatalf("MY_NAMESPACE environment variable not set\n")
 	}
-	volumeConfigName := os.Getenv("VOLUME_CONFIG_NAME")
-	if volumeConfigName == "" {
-		glog.Fatalf("VOLUME_CONFIG_NAME environment variable not set\n")
-	}
-
 	client := setupClient()
-	config, err := common.GetVolumeConfig(client, namespace, volumeConfigName)
-	if err != nil {
-		glog.Fatalf("Could not get config map information: %v", err)
+
+	// Get config map from user or from a default configmap (if created before).
+	config, err := common.GetVolumeConfigFromConfigMap(client, namespace, getVolumeConfigName())
+	if err != nil && os.Getenv("VOLUME_CONFIG_NAME") != "" {
+		// If configmap is provided by user but we have problem getting it, fail fast.
+		glog.Fatalf("Could not get config map: %v", err)
+	} else if err != nil && errors.IsNotFound(err) {
+		// configmap is not provided by user and default configmap doesn't exist, create one.
+		glog.Infof("No config is given, creating default configmap")
+		config = common.GetDefaultVolumeConfig()
+		if err = createConfigMap(client, namespace, config); err != nil {
+			glog.Fatalf("Unable to create configmap: %v\n", err)
+		}
+	} else if err != nil {
+		// error exists, it might be that default configmap is damanged, fail fast.
+		glog.Fatalf("Could not get default config map: %v", err)
 	}
 
 	glog.Infof("Running bootstrap pod with config %+v\n", config)
