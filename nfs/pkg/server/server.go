@@ -140,6 +140,9 @@ func Setup(ganeshaConfig string, gracePeriod uint, ganeshav4old, ganeshav4recov 
 func Start(ganeshaLog, ganeshaPid, ganeshaConfig string) error {
 	// Start ganesha.nfsd
 	cmd := exec.Command("ganesha.nfsd", "-L", ganeshaLog, "-p", ganeshaPid, "-f", ganeshaConfig)
+	if os.Getenv("GANESHA_LOG_LEVEL") != "" {
+		cmd.Args = append(cmd.Args, "-N", os.Getenv("GANESHA_LOG_LEVEL"))
+	}
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("ganesha.nfsd failed with error: %v, output: %s", err, out)
 	}

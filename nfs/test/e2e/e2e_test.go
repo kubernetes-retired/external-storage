@@ -342,6 +342,10 @@ func startProvisionerPod(c clientset.Interface, ns string) *v1.Pod {
 								},
 							},
 						},
+						{
+							Name:  "GANESHA_LOG_LEVEL",
+							Value: "NIV_DEBUG",
+						},
 					},
 					ImagePullPolicy: v1.PullIfNotPresent,
 					VolumeMounts: []v1.VolumeMount{
@@ -399,6 +403,7 @@ func startProvisionerDeployment(c clientset.Interface, ns string) (*v1.Service, 
 		fmt.Sprintf("-provisioner=%s", pluginName),
 		"-grace-period=10",
 	}
+	deployment.Spec.Template.Spec.Containers[0].Env = append(deployment.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "GANESHA_LOG_LEVEL", Value: "NIV_DEBUG"})
 
 	service, err = c.Core().Services(ns).Create(service)
 	framework.ExpectNoError(err, "Failed to create %s service: %v", service.Name, err)
