@@ -18,7 +18,7 @@ ifeq ($(REGISTRY),)
 endif
 
 ifeq ($(VERSION),)
-    VERSION = latest
+	VERSION = latest
 endif
 
 IMAGE = $(REGISTRY)/local-volume-provisioner:$(VERSION)
