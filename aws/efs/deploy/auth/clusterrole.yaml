@@ -15,6 +15,3 @@ rules:
   - apiGroups: [""]
     resources: ["events"]
     verbs: ["list", "watch", "create", "update", "patch"]
-  - apiGroups: [""]
-    resources: ["services", "endpoints"]
-    verbs: ["get"]
