@@ -27,6 +27,11 @@ Assume kubeconfig is at `/root/.kube`:
 ```bash
 docker run -ti -v /root/.kube:/kube --privileged --net=host  cephfs-provisioner /usr/local/bin/cephfs-provisioner -master=http://127.0.0.1:8080 -kubeconfig=/kube/config
 ```
+Alternatively, start a deployment:
+
+```bash
+kubectl create -f deployment.yaml
+```
 
 * Create a CephFS Storage Class
 
