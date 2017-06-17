@@ -34,14 +34,7 @@ import (
 )
 
 const (
-	resyncPeriod              = 15 * time.Second
-	provisionerName           = "example.com/hostpath"
-	exponentialBackOffOnError = false
-	failedRetryThreshold      = 5
-	leasePeriod               = controller.DefaultLeaseDuration
-	retryPeriod               = controller.DefaultRetryPeriod
-	renewDeadline             = controller.DefaultRenewDeadline
-	termLimit                 = controller.DefaultTermLimit
+	provisionerName = "example.com/hostpath"
 )
 
 type hostPathProvisioner struct {
@@ -148,6 +141,6 @@ func main() {
 
 	// Start the provision controller which will dynamically provision hostPath
 	// PVs
-	pc := controller.NewProvisionController(clientset, resyncPeriod, provisionerName, hostPathProvisioner, serverVersion.GitVersion, exponentialBackOffOnError, failedRetryThreshold, leasePeriod, renewDeadline, retryPeriod, termLimit)
+	pc := controller.NewProvisionController(clientset, provisionerName, hostPathProvisioner, serverVersion.GitVersion)
 	pc.Run(wait.NeverStop)
 }
