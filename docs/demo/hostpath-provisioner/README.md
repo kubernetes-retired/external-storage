@@ -117,11 +117,7 @@ Now all that's left is to connect our `Provisioner` with a `ProvisionController`
 
 We need to create a couple of things the controller expects as arguments, including our `hostPathProvisioner`, before we create and run it. First we create a client for communicating with Kubernetes from within a pod. We use it to determine the server version of Kubernetes. Then we create our `hostPathProvisioner`. We pass all of these things into `NewProvisionController`, plus some other arguments we'll explain now. 
 
-* `resyncPeriod` determines how often the controller relists PVCs and PVs to check if they should be provisioned for or deleted.
 * `provisionerName` is the `provisioner` that storage classes will specify, "example.com/hostpath" here.  It must follow the `<vendor name>/<provisioner name>` naming scheme and `<vendor name>` cannot be "kubernetes.io"
-* `exponentialBackOffOnError` determines whether it should exponentially back off from calls to `Provision` or `Delete`, useful if either of those involves some API call.
-* `failedRetryThreshold` is the threshold for failed `Provision` attempts before giving up trying to provision for a claim.
-* The last four arguments configure leader election wherein mutliple controllers trying to provision for the same class of claims race to lock/lead claims in order to be the one to provision for them. The meaning of these parameters is documented in the [leaderelection package](https://github.com/kubernetes-incubator/external-storage/tree/master/lib/leaderelection). If you don't intend for users to run more than one instance of your provisioner for the same class of claims, you may ignore these and simply use the default as we do here. See [this doc](../../README.md#running-multiple-provisioners-and-giving-provisioners-identities) for more info on running multiple provisioners.
 
 (There are many other possible parameters of the controller that could be exposed, please create an issue if you would like one to be.)
 
@@ -129,14 +125,7 @@ Finally, we create and `Run` the controller.
 
 ```go
 const (
-	resyncPeriod              = 15 * time.Second
 	provisionerName           = "example.com/hostpath"
-	exponentialBackOffOnError = false
-	failedRetryThreshold      = 5
-	leasePeriod               = leaderelection.DefaultLeaseDuration
-	retryPeriod               = leaderelection.DefaultRetryPeriod
-	renewDeadline             = leaderelection.DefaultRenewDeadline
-	termLimit                 = leaderelection.DefaultTermLimit
 )
 ```
 ```go
@@ -166,7 +155,7 @@ func main() {
 
 	// Start the provision controller which will dynamically provision hostPath
 	// PVs
-	pc := controller.NewProvisionController(clientset, resyncPeriod, "example.com/hostpath", hostPathProvisioner, serverVersion.GitVersion, exponentialBackOffOnError, failedRetryThreshold, leasePeriod, renewDeadline, retryPeriod, termLimit)
+	pc := controller.NewProvisionController(clientset, "example.com/hostpath", hostPathProvisioner, serverVersion.GitVersion)
 	pc.Run(wait.NeverStop)
 }
 ```
