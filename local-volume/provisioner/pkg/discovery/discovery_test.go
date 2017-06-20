@@ -25,9 +25,9 @@ import (
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/util"
 
+	v1helper "github.com/kubernetes-incubator/external-storage/lib/helper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/api/v1"
-	v1helper "k8s.io/client-go/pkg/api/v1/helper"
 )
 
 const (

@@ -24,8 +24,8 @@ import (
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
 
+	v1helper "github.com/kubernetes-incubator/external-storage/lib/helper"
 	"k8s.io/client-go/pkg/api/v1"
-	v1helper "k8s.io/client-go/pkg/api/v1/helper"
 )
 
 // Discoverer finds available volumes and creates PVs for them
