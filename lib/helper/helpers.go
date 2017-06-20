@@ -45,13 +45,13 @@ func OpaqueIntResourceName(name string) v1.ResourceName {
 	return v1.ResourceName(fmt.Sprintf("%s%s", v1.ResourceOpaqueIntPrefix, name))
 }
 
-// this function aims to check if the service's ClusterIP is set or not
+// IsServiceIPSet this function aims to check if the service's ClusterIP is set or not
 // the objective is not to perform validation here
 func IsServiceIPSet(service *v1.Service) bool {
 	return service.Spec.ClusterIP != v1.ClusterIPNone && service.Spec.ClusterIP != ""
 }
 
-// this function aims to check if the service's cluster IP is requested or not
+// IsServiceIPRequested this function aims to check if the service's cluster IP is requested or not
 func IsServiceIPRequested(service *v1.Service) bool {
 	// ExternalName services are CNAME aliases to external ones. Ignore the IP.
 	if service.Spec.Type == v1.ServiceTypeExternalName {
@@ -77,7 +77,7 @@ func AddToNodeAddresses(addresses *[]v1.NodeAddress, addAddresses ...v1.NodeAddr
 	}
 }
 
-// TODO: make method on LoadBalancerStatus?
+// LoadBalancerStatusEqual TODO: make method on LoadBalancerStatus?
 func LoadBalancerStatusEqual(l, r *v1.LoadBalancerStatus) bool {
 	return ingressSliceEqual(l.Ingress, r.Ingress)
 }
@@ -104,7 +104,7 @@ func ingressEqual(lhs, rhs *v1.LoadBalancerIngress) bool {
 	return true
 }
 
-// TODO: make method on LoadBalancerStatus?
+// LoadBalancerStatusDeepCopy TODO: make method on LoadBalancerStatus?
 func LoadBalancerStatusDeepCopy(lb *v1.LoadBalancerStatus) *v1.LoadBalancerStatus {
 	c := &v1.LoadBalancerStatus{}
 	c.Ingress = make([]v1.LoadBalancerIngress, len(lb.Ingress))
@@ -131,7 +131,7 @@ func GetAccessModesAsString(modes []v1.PersistentVolumeAccessMode) string {
 	return strings.Join(modesStr, ",")
 }
 
-// GetAccessModesAsString returns an array of AccessModes from a string created by GetAccessModesAsString
+// GetAccessModesFromString GetAccessModesAsString returns an array of AccessModes from a string created by GetAccessModesAsString
 func GetAccessModesFromString(modes string) []v1.PersistentVolumeAccessMode {
 	strmodes := strings.Split(modes, ",")
 	accessModes := []v1.PersistentVolumeAccessMode{}
@@ -297,7 +297,7 @@ func DeleteTaint(taints []v1.Taint, taintToDelete *v1.Taint) ([]v1.Taint, bool) 
 	return newTaints, deleted
 }
 
-// Returns true and list of Tolerations matching all Taints if all are tolerated, or false otherwise.
+// GetMatchingTolerations Returns true and list of Tolerations matching all Taints if all are tolerated, or false otherwise.
 func GetMatchingTolerations(taints []v1.Taint, tolerations []v1.Toleration) (bool, []v1.Toleration) {
 	if len(taints) == 0 {
 		return true, []v1.Toleration{}
@@ -322,6 +322,7 @@ func GetMatchingTolerations(taints []v1.Taint, tolerations []v1.Toleration) (boo
 	return true, result
 }
 
+// GetAvoidPodsFromNodeAnnotations ...
 func GetAvoidPodsFromNodeAnnotations(annotations map[string]string) (v1.AvoidPods, error) {
 	var avoidPods v1.AvoidPods
 	if len(annotations) > 0 && annotations[v1.PreferAvoidPodsAnnotationKey] != "" {
@@ -381,7 +382,7 @@ func PodAnnotationsFromSysctls(sysctls []v1.Sysctl) string {
 	return strings.Join(kvs, ",")
 }
 
-// Tries to add a taint to annotations list. Returns a new copy of updated Node and true if something was updated
+// AddOrUpdateTaint Tries to add a taint to annotations list. Returns a new copy of updated Node and true if something was updated
 // false otherwise.
 func AddOrUpdateTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool, error) {
 	objCopy, err := api.Scheme.DeepCopy(node)
@@ -414,6 +415,7 @@ func AddOrUpdateTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool, error) {
 	return newNode, true, nil
 }
 
+// TaintExists ...
 func TaintExists(taints []v1.Taint, taintToFind *v1.Taint) bool {
 	for _, taint := range taints {
 		if taint.MatchTaint(taintToFind) {
@@ -423,7 +425,7 @@ func TaintExists(taints []v1.Taint, taintToFind *v1.Taint) bool {
 	return false
 }
 
-// Tries to remove a taint from annotations list. Returns a new copy of updated Node and true if something was updated
+// RemoveTaint Tries to remove a taint from annotations list. Returns a new copy of updated Node and true if something was updated
 // false otherwise.
 func RemoveTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool, error) {
 	objCopy, err := api.Scheme.DeepCopy(node)
@@ -514,7 +516,7 @@ func GetStorageNodeAffinityFromAnnotation(annotations map[string]string) (*v1.No
 	return nil, nil
 }
 
-// Converts NodeAffinity type to Alpha annotation for use in PersistentVolumes
+// StorageNodeAffinityToAlphaAnnotation Converts NodeAffinity type to Alpha annotation for use in PersistentVolumes
 // TODO: update when storage node affinity graduates to beta
 func StorageNodeAffinityToAlphaAnnotation(annotations map[string]string, affinity *v1.NodeAffinity) error {
 	json, err := json.Marshal(*affinity)
