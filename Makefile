@@ -134,9 +134,15 @@ push-glusterblock-provisioner:
 	make push
 .PHONY: push-glusterblock-provisioner
 
-push-local-volume:
-	@echo TODO
-.PHONY: push-local-volume
+push-local-volume-bootstrapper:
+	cd local-volume/bootstrapper; \
+	make push
+.PHONY: push-local-volume-bootstrapper
+
+push-local-volume-provisioner:
+	cd local-volume/provisioner; \
+	make push
+.PHONY: push-local-volume-provisioner
 
 push-nfs-client-provisioner: nfs-client
 	docker push $(REGISTRY)nfs-client-provisioner:$(VERSION)
