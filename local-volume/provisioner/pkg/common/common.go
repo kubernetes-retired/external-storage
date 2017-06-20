@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
 const (
@@ -34,7 +35,7 @@ const (
 	AnnProvisionedBy = "pv.kubernetes.io/provisioned-by"
 	// NodeLabelKey is the label key that this provisioner uses for PV node affinity
 	// hostname is not the best choice, but it's what pod and node affinity also use
-	NodeLabelKey = metav1.LabelHostname
+	NodeLabelKey = apis.LabelHostname
 
 	// DefaultHostDir is the default host dir to discover local volumes.
 	DefaultHostDir = "/mnt/disks"

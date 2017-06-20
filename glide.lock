@@ -1,5 +1,5 @@
-hash: 91981bebc9296d67eb99b79f5d3bbcf0084c943ef87e6edd5e20f6b163dcd177
-updated: 2017-06-20T15:15:14.215940512-04:00
+hash: 7abd73580d53b2584d9bc3916003ee95e65320a3cc941868b2cfda54b33769e0
+updated: 2017-06-20T17:13:19.297277777-04:00
 imports:
 - name: github.com/aws/aws-sdk-go
   version: 6669bce73b4e3bc922ff5ea3a3983ede26e02b39
@@ -311,8 +311,9 @@ imports:
   - util/integer
   - util/testing
 - name: k8s.io/kubernetes
-  version: fff5156092b56e6bd60fff75aad4dc9de6b6ef37
+  version: 606825eea47f41c72a3da1d4d2a769a340e1b69d
   subpackages:
+  - pkg/kubelet/apis
   - pkg/util/goroutinemap
   - pkg/util/goroutinemap/exponentialbackoff
   - pkg/util/version

@@ -44,7 +44,7 @@ import:
   - tools/clientcmd
   - tools/record
 - package: k8s.io/kubernetes
-  version: v1.6.0
+  version: 606825eea47f41c72a3da1d4d2a769a340e1b69d
   subpackages:
   - pkg/util/goroutinemap
   - pkg/util/version
