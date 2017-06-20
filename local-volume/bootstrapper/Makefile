@@ -1,5 +1,4 @@
-
-# Copyright 2016 The Kubernetes Authors.
+# Copyright 2017 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,18 +20,18 @@ ifeq ($(VERSION),)
 	VERSION = latest
 endif
 
-IMAGE = $(REGISTRY)/local-volume-provisioner:$(VERSION)
-MUTABLE_IMAGE = $(REGISTRY)/local-volume-provisioner:latest
+IMAGE = $(REGISTRY)/local-volume-provisioner-bootstrap:$(VERSION)
+MUTABLE_IMAGE = $(REGISTRY)/local-volume-provisioner-bootstrap:latest
 
 all build:
-	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o local-volume-provisioner ./cmd
+	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o local-volume-bootstrapper .
 .PHONY: all build
 
 container: build quick-container
 .PHONY: container
 
 quick-container:
-	cp local-volume-provisioner deployment/docker
+	cp local-volume-bootstrapper deployment/docker
 	docker build -t $(MUTABLE_IMAGE) deployment/docker
 	docker tag $(MUTABLE_IMAGE) $(IMAGE)
 .PHONY: quick-container
@@ -47,6 +46,6 @@ test:
 .PHONY: test
 
 clean:
-	rm -f local-volume-provisioner
-	rm -f deployment/docker/local-volume-provisioner
+	rm -f local-volume-bootstrapper
+	rm -f deployment/docker/local-volume-bootstrapper
 .PHONY: clean

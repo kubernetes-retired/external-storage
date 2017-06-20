@@ -58,7 +58,7 @@ func main() {
 	glog.Info("Starting controller\n")
 	controller.StartLocalController(client, &common.UserConfig{
 		Node:         node,
-		DiscoveryMap: createDiscoveryMap(),
+		DiscoveryMap: createDiscoveryMap(client),
 	})
 }
 
@@ -70,13 +70,12 @@ func getNode(client *kubernetes.Clientset, name string) *v1.Node {
 	return node
 }
 
-func createDiscoveryMap() map[string]common.MountConfig {
-	// Default setting
-	// TODO: change this to configurable settings.
-	m := make(map[string]common.MountConfig)
-	m["local-storage"] = common.MountConfig{
-		HostDir:  "/mnt/disks",
-		MountDir: "/local-disks",
+func createDiscoveryMap(client *kubernetes.Clientset) map[string]common.MountConfig {
+	config, err := common.GetVolumeConfigFromConfigMap(client, os.Getenv("MY_NAMESPACE"), os.Getenv("VOLUME_CONFIG_NAME"))
+	if err != nil {
+		glog.Infof("Could not get config map due to: %v, using default configmap", err)
+		config = common.GetDefaultVolumeConfig()
 	}
-	return m
+	glog.Infof("Running provisioner with config %+v\n", config)
+	return config
 }
