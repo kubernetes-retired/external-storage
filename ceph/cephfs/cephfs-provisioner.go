@@ -40,6 +40,7 @@ const (
 	provisionCmd     = "/usr/local/bin/cephfs_provisioner"
 	provisionerIDAnn = "cephFSProvisionerIdentity"
 	cephShareAnn     = "cephShare"
+	defaultNamespace = v1.NamespaceAll
 )
 
 type provisionOutput struct {
@@ -259,14 +260,20 @@ func (p *cephFSProvisioner) parsePVSecret(namespace, secretName string) (string,
 }
 
 var (
-	master     = flag.String("master", "", "Master URL")
-	kubeconfig = flag.String("kubeconfig", "", "Absolute path to the kubeconfig")
-	id         = flag.String("id", "", "Unique provisioner identity")
+	master       = flag.String("master", "", "Master URL")
+	kubeconfig   = flag.String("kubeconfig", "", "Absolute path to the kubeconfig")
+	id           = flag.String("id", "", "Unique provisioner identity")
+	pvcNamespace = flag.String("namespace", "", "PVC Namespace to watch")
 )
 
 func main() {
 	flag.Parse()
 	flag.Set("logtostderr", "true")
+
+	if pvcNamespace == nil || len(*pvcNamespace) == 0 {
+		glog.Infof("missing PVC namespace. Use all namespaces")
+		*pvcNamespace = defaultNamespace
+	}
 
 	var config *rest.Config
 	var err error
@@ -300,11 +307,12 @@ func main() {
 
 	// Start the provision controller which will dynamically provision cephFS
 	// PVs
-	pc := controller.NewProvisionController(
+	pc := controller.NewProvisionControllerWithPVCNamespace(
 		clientset,
 		provisionerName,
 		cephFSProvisioner,
 		serverVersion.GitVersion,
+		*pvcNamespace,
 	)
 
 	pc.Run(wait.NeverStop)

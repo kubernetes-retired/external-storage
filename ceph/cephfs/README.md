@@ -48,6 +48,17 @@ kubectl create -f claim.yaml
 kubectl create -f test-pod.yaml
 ```
 
+* Provision for claims in specific namespace
+
+If only provisioning for specific namespaces, start the provisioner with `-namespace=target_namespace`, e.g
+```bash
+docker run -ti -v /root/.kube:/kube -v /var/run/kubernetes:/var/run/kubernetes --privileged --net=host  cephfs-provisioner /usr/local/bin/cephfs-provisioner -master=http://127.0.0.1:8080 -kubeconfig=/kube/config -id=cephfs-provisioner-1 -namespace=myns
+```
+
+And test the claim:
+```bash
+kubectl create -f claim-ns.yaml
+```
 
 # Known limitations
 
