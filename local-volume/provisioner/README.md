@@ -1,10 +1,12 @@
 # local-volume-provisioner
 
-NOTE: provisioner is still in development and is not functional yet
+`quay.io/external-storage/local-volume-provisioner:1.0.0`
 
 local-volume-provisioner is an out-of-tree static provisioner for the Local volume plugin, which is a 1.7 alpha feature.
 
 It runs on each node in the cluster and monitors specified directories to look for new local file-based volumes.  The volumes can be a mount point or a directory in a shared filesystem.  It then statically creates a Local PersistentVolume for each local volume.  It also monitors when the PersistentVolumes have been released, and will clean up the volume, and recreate the PV.
+
+## [Changelog](CHANGELOG.md)
 
 ## Development
 Compile the provisioner
@@ -16,8 +18,6 @@ Make the container image and push to the registry
 ``` console
 make push
 ```
-
-TODO: add making a release and pushing to public image registry
 
 ## Design
 There is one provisioner instance on each node in the cluster.  Each instance is reponsible for monitoring and managing the local volumes on its node.
