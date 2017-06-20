@@ -85,9 +85,9 @@ type provisionerConfig struct {
 	userKey string
 
 	// Optional:  secret name, namespace.
-	secretNamespace string
-	secretName      string
-	secretValue     string
+	restSecretNamespace string
+	restSecretName      string
+	restSecretValue     string
 
 	// Optional:  Heketi clusterID from which the provisioner create the block volume
 	clusterID string
@@ -314,7 +314,7 @@ func (p *glusterBlockProvisioner) createVolume(volSizeInt int, blockVol string) 
 		}
 
 	case "heketi":
-		cli := gcli.NewClient(p.provConfig.url, p.provConfig.user, p.provConfig.secretValue)
+		cli := gcli.NewClient(p.provConfig.url, p.provConfig.user, p.provConfig.restSecretValue)
 		if cli == nil {
 			glog.Errorf("glusterblock: failed to create glusterblock rest client")
 			return nil, fmt.Errorf("glusterblock: failed to create glusterblock rest client, REST server authentication failed")
@@ -424,10 +424,10 @@ func parseClassParameters(params map[string]string, kubeclient kubernetes.Interf
 			cfg.user = v
 		case "restuserkey":
 			cfg.userKey = v
-		case "secretname":
-			cfg.secretName = v
-		case "secretnamespace":
-			cfg.secretNamespace = v
+		case "restsecretname":
+			cfg.restSecretName = v
+		case "restsecretnamespace":
+			cfg.restSecretNamespace = v
 		case "clusterids":
 			if len(v) != 0 {
 				cfg.clusterID = v
@@ -468,25 +468,25 @@ func parseClassParameters(params map[string]string, kubeclient kubernetes.Interf
 	if cfg.opMode == "heketi" {
 		if !authEnabled {
 			cfg.user = ""
-			cfg.secretName = ""
-			cfg.secretNamespace = ""
+			cfg.restSecretName = ""
+			cfg.restSecretNamespace = ""
 			cfg.userKey = ""
-			cfg.secretValue = ""
+			cfg.restSecretValue = ""
 		}
 
-		if len(cfg.secretName) != 0 || len(cfg.secretNamespace) != 0 {
-			// secretName + Namespace has precedence over userKey
-			if len(cfg.secretName) != 0 && len(cfg.secretNamespace) != 0 {
-				cfg.secretValue, err = parseSecret(cfg.secretNamespace, cfg.secretName, kubeclient)
+		if len(cfg.restSecretName) != 0 || len(cfg.restSecretNamespace) != 0 {
+			// restSecretName + Namespace has precedence over userKey
+			if len(cfg.restSecretName) != 0 && len(cfg.restSecretNamespace) != 0 {
+				cfg.restSecretValue, err = parseSecret(cfg.restSecretNamespace, cfg.restSecretName, kubeclient)
 				if err != nil {
 					return nil, err
 				}
 			} else {
-				return nil, fmt.Errorf("StorageClass for provisioner %q must have secretNamespace and secretName either both set or both empty", "glusterblock")
+				return nil, fmt.Errorf("StorageClass for provisioner %q must have restSecretNamespace and restSecretName either both set or both empty", "glusterblock")
 
 			}
 		} else {
-			cfg.secretValue = cfg.userKey
+			cfg.restSecretValue = cfg.userKey
 		}
 
 	}
@@ -564,8 +564,8 @@ func parseHeketiModeArgs(cfg *provisionerConfig) error {
 	cfg.heketiModeArgs["url"] = cfg.url
 	cfg.heketiModeArgs["user"] = cfg.user
 	cfg.heketiModeArgs["userkey"] = cfg.userKey
-	cfg.heketiModeArgs["secret"] = cfg.secretName
-	cfg.heketiModeArgs["secretnamespace"] = cfg.secretNamespace
+	cfg.heketiModeArgs["restsecretname"] = cfg.restSecretName
+	cfg.heketiModeArgs["restsecretnamespace"] = cfg.restSecretNamespace
 
 	return nil
 }
@@ -593,12 +593,12 @@ func parseSecret(namespace, secretName string, kubeClient kubernetes.Interface) 
 }
 
 // GetSecretForPV locates secret by name and namespace, verifies the secret type, and returns secret map
-func GetSecretForPV(secretNamespace, secretName, volumePluginName string, kubeClient kubernetes.Interface) (map[string]string, error) {
+func GetSecretForPV(restSecretNamespace, restSecretName, volumePluginName string, kubeClient kubernetes.Interface) (map[string]string, error) {
 	secret := make(map[string]string)
 	if kubeClient == nil {
 		return secret, fmt.Errorf("Cannot get kube client")
 	}
-	secrets, err := kubeClient.Core().Secrets(secretNamespace).Get(secretName, metav1.GetOptions{})
+	secrets, err := kubeClient.Core().Secrets(restSecretNamespace).Get(restSecretName, metav1.GetOptions{})
 	if err != nil {
 		return secret, err
 	}

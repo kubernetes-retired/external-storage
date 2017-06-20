@@ -37,8 +37,8 @@ The available storage class parameter are listed below:
 parameters:
     resturl: "http://127.0.0.1:8081"
     restuser: "admin"
-    secretnamespace: "default"
-    secretname: "heketi-secret"
+    restsecretnamespace: "default"
+    restsecretname: "heketi-secret"
     hacount: "3"
     chapauth: "true"
     opmode: "gluster-block"
@@ -68,7 +68,7 @@ If provisioner want to operate on `heketi` mode, below args can be  filled in st
 
 * `restuser` : Gluster REST service/Heketi user who has access to create volumes in the Gluster Trusted Pool.
 
-* `secretNamespace` + `secretName` : Identification of Secret instance that contains user password to use when talking to Gluster REST service. These parameters are optional, empty password will be used when both `secretNamespace` and `secretName` are omitted. The provided secret must have type "gluster.org/glusterblock".
+* `restsecretnamespace` + `restsecretname` : Identification of Secret instance that contains user password to use when talking to Gluster REST service. These parameters are optional, empty password will be used when both `restsecretnamespace` and `restsecretname` are omitted. The provided secret must have type "gluster.org/glusterblock".
 
 
 ### Gluster-Block Mode parameters:
