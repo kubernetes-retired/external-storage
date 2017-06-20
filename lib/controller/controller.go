@@ -263,12 +263,36 @@ func TermLimit(termLimit time.Duration) func(*ProvisionController) error {
 	}
 }
 
-// NewProvisionController creates a new provision controller
+// NewProvisionController creates a new provision controller that watch PVCs in all namespaces
 func NewProvisionController(
 	client kubernetes.Interface,
 	provisionerName string,
 	provisioner Provisioner,
 	kubeVersion string,
+	options ...func(*ProvisionController) error,
+) *ProvisionController {
+	return newProvisionController(client, provisionerName, provisioner, kubeVersion, v1.NamespaceAll, options...)
+}
+
+// NewProvisionControllerWithPVCNamespace creates a new provision controller that watch PVCs in all namespaces
+func NewProvisionControllerWithPVCNamespace(
+	client kubernetes.Interface,
+	provisionerName string,
+	provisioner Provisioner,
+	kubeVersion string,
+	namespaceToWatch string,
+	options ...func(*ProvisionController) error,
+) *ProvisionController {
+	return newProvisionController(client, provisionerName, provisioner, kubeVersion, namespaceToWatch, options...)
+}
+
+// newProvisionController creates a new provision controller
+func newProvisionController(
+	client kubernetes.Interface,
+	provisionerName string,
+	provisioner Provisioner,
+	kubeVersion string,
+	pvcNamespacetoWatch string,
 	options ...func(*ProvisionController) error,
 ) *ProvisionController {
 	identity := uuid.NewUUID()
@@ -315,10 +339,10 @@ func NewProvisionController(
 
 	controller.claimSource = &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			return client.Core().PersistentVolumeClaims(v1.NamespaceAll).List(options)
+			return client.Core().PersistentVolumeClaims(pvcNamespacetoWatch).List(options)
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			return client.Core().PersistentVolumeClaims(v1.NamespaceAll).Watch(options)
+			return client.Core().PersistentVolumeClaims(pvcNamespacetoWatch).Watch(options)
 		},
 	}
 	controller.claims, controller.claimController = cache.NewInformer(
