@@ -1,5 +1,5 @@
-hash: b4674885dc0f29504778de64f1c90c267f00ca6f39a93e0bba83302c7c6742fc
-updated: 2017-05-30T17:58:38.663162162-04:00
+hash: 7abd73580d53b2584d9bc3916003ee95e65320a3cc941868b2cfda54b33769e0
+updated: 2017-06-20T17:13:19.297277777-04:00
 imports:
 - name: github.com/aws/aws-sdk-go
   version: 6669bce73b4e3bc922ff5ea3a3983ede26e02b39
@@ -93,13 +93,13 @@ imports:
   - pkg/glusterfs/api
   - pkg/utils
 - name: github.com/howeyc/gopass
-  version: 3ca23474a7c7203e0a0a070fd33508f6efdb9b3d
+  version: bf9dde6d0d2c004a008c27aaee91170c786f6db8
 - name: github.com/imdario/mergo
   version: 6633656539c1639d9d78127b7d47c622b5d7b6dc
 - name: github.com/jmespath/go-jmespath
   version: 3433f3ea46d9f8019119e7dd41274e112a2359a9
 - name: github.com/juju/ratelimit
-  version: 77ed1c8a01217656d2080ad51981f6e99adaa177
+  version: 5b9ff866471762aa2ab2dced63c9fb6f53921342
 - name: github.com/lpabon/godbc
   version: 9577782540c1398b710ddae1b86268ba03a19b0c
 - name: github.com/mailru/easyjson
@@ -155,8 +155,9 @@ imports:
 - name: gopkg.in/yaml.v2
   version: 53feefa2559fb8dfa8d81baad31be332c97d6c77
 - name: k8s.io/apimachinery
-  version: 2de00c78cb6d6127fb51b9531c1b3def1cbcac8c
+  version: 47e2f36401b7a66b6d003f3df4b58f6769ccc34b
   subpackages:
+  - pkg/api/equality
   - pkg/api/errors
   - pkg/api/meta
   - pkg/api/resource
@@ -165,8 +166,10 @@ imports:
   - pkg/apimachinery/registered
   - pkg/apis/meta/v1
   - pkg/apis/meta/v1/unstructured
+  - pkg/apis/meta/v1alpha1
   - pkg/conversion
   - pkg/conversion/queryparams
+  - pkg/conversion/unstructured
   - pkg/fields
   - pkg/labels
   - pkg/openapi
@@ -203,13 +206,15 @@ imports:
   - third_party/forked/golang/json
   - third_party/forked/golang/reflect
 - name: k8s.io/client-go
-  version: 450baa5d60f8d6a251c7682cb6f86e939b750b2d
+  version: b3357e1e10805ee14c1ea5fa9c46a6f58e46392b
   subpackages:
   - discovery
   - discovery/fake
   - kubernetes
   - kubernetes/fake
   - kubernetes/scheme
+  - kubernetes/typed/admissionregistration/v1alpha1
+  - kubernetes/typed/admissionregistration/v1alpha1/fake
   - kubernetes/typed/apps/v1beta1
   - kubernetes/typed/apps/v1beta1/fake
   - kubernetes/typed/authentication/v1
@@ -234,6 +239,8 @@ imports:
   - kubernetes/typed/core/v1/fake
   - kubernetes/typed/extensions/v1beta1
   - kubernetes/typed/extensions/v1beta1/fake
+  - kubernetes/typed/networking/v1
+  - kubernetes/typed/networking/v1/fake
   - kubernetes/typed/policy/v1beta1
   - kubernetes/typed/policy/v1beta1/fake
   - kubernetes/typed/rbac/v1alpha1
@@ -247,8 +254,11 @@ imports:
   - kubernetes/typed/storage/v1beta1
   - kubernetes/typed/storage/v1beta1/fake
   - pkg/api
+  - pkg/api/helper
   - pkg/api/v1
   - pkg/api/v1/ref
+  - pkg/apis/admissionregistration
+  - pkg/apis/admissionregistration/v1alpha1
   - pkg/apis/apps
   - pkg/apis/apps/v1beta1
   - pkg/apis/authentication
@@ -267,6 +277,8 @@ imports:
   - pkg/apis/certificates/v1beta1
   - pkg/apis/extensions
   - pkg/apis/extensions/v1beta1
+  - pkg/apis/networking
+  - pkg/apis/networking/v1
   - pkg/apis/policy
   - pkg/apis/policy/v1beta1
   - pkg/apis/rbac
@@ -299,8 +311,9 @@ imports:
   - util/integer
   - util/testing
 - name: k8s.io/kubernetes
-  version: fff5156092b56e6bd60fff75aad4dc9de6b6ef37
+  version: 606825eea47f41c72a3da1d4d2a769a340e1b69d
   subpackages:
+  - pkg/kubelet/apis
   - pkg/util/goroutinemap
   - pkg/util/goroutinemap/exponentialbackoff
   - pkg/util/version
