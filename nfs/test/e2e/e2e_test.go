@@ -138,6 +138,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 	var c clientset.Interface
 	var ns string
 	var pod *v1.Pod
+	var volumePath string
 
 	BeforeEach(func() {
 		c = f.ClientSet
@@ -152,12 +153,19 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 			} else {
 				framework.Logf("Pod logs:\n%s", logs)
 			}
+			ganeshaLogs, err := ioutil.ReadFile(path.Join(volumePath, "ganesha.log"))
+			if err != nil {
+				framework.Logf("Error getting ganesha logs: %v", err)
+			} else {
+				framework.Logf("Ganesha logs:\n%s", string(ganeshaLogs))
+			}
 		})
 
 		It("should create and delete persistent volumes [Slow]", func() {
 			By("creating an out-of-tree dynamic provisioner pod")
 			pod = startProvisionerPod(c, ns)
 			defer c.Core().Pods(ns).Delete(pod.Name, nil)
+			volumePath = fmt.Sprintf("%s/pods/%s/volumes/kubernetes.io~empty-dir/%s", framework.TestContext.KubeVolumeDir, pod.UID, pod.Spec.Volumes[0].Name)
 
 			By("creating a StorageClass")
 			class := newStorageClass()
@@ -174,6 +182,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			testDynamicProvisioning(c, claim)
+
 		})
 		It("should survive a restart [Slow]", func() {
 			By("creating an out-of-tree dynamic provisioner deployment of 1 replica")
@@ -181,6 +190,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 			defer c.Extensions().Deployments(ns).Delete(deployment.Name, nil)
 			defer c.Core().Services(ns).Delete(service.Name, nil)
 			pod = getDeploymentPod(c, ns, labels.Set(deployment.Spec.Selector.MatchLabels).String())
+			volumePath = deployment.Spec.Template.Spec.Volumes[0].HostPath.Path
 
 			By("creating a StorageClass")
 			class := newStorageClass()
@@ -206,7 +216,6 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 			scaleDeployment(c, ns, deployment.Name, 0)
 			scaleDeployment(c, ns, deployment.Name, 1)
 			pod = getDeploymentPod(c, ns, labels.Set(deployment.Spec.Selector.MatchLabels).String())
-
 			testRead(c, claim)
 			testDelete(c, claim, pv)
 		})
