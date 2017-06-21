@@ -1,0 +1,23 @@
+---
+- hosts: nodes
+  tasks:
+  - name: Install iscsi-initiator-utils
+    yum: 
+      name: iscsi-initiator-utils
+      state: latest
+  - name: Enable iscsid Service
+    service:
+      name: iscsid
+      enabled: yes
+      state: started
+  - name: Write iscsi initiator name
+    lineinfile:
+      regexp: '^(InitiatorName=).*'
+      dest: /etc/iscsi/initiatorname.iscsi
+      line: '\1{{ iscsi_initiator_name }}'
+      state: present
+      backrefs: yes
+  - name: restart iscsid
+    service:
+      name: iscsid
+      state: restarted

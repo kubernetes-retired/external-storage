@@ -1,0 +1,27 @@
+---
+kind: StorageClass
+apiVersion: storage.k8s.io/v1beta1
+metadata:
+  name: iscsi
+{% if iscsi_provisioner_default_storage_class | bool %}
+  annotations:
+    storageclass.beta.kubernetes.io/is-default-class: "true"
+{% endif %}
+provisioner: iscsi
+parameters:
+# this id where the iscsi server is running
+ targetPortal: {{ hostvars[groups['targetd'][0]]['ansible_default_ipv4']['address'] }}:3260
+  
+# this is the iscsi server iqn  
+ iqn: {{ targetd_iscsi_target }}
+  
+# this is the iscsi interface to be used, the default is default
+ iscsiInterface: default
+
+# this must be on eof the volume groups condifgured in targed.yaml, the default is vg-targetd
+ volumeGroup: {{ targetd_lvm_volume_group }}
+
+# this is a comma separated list of initiators that will be give access to the created volumes, they must correspond to what you have configured in your nodes.
+ initiators: {% for host in groups['nodes'] %}{{ hostvars[host]['iscsi_initiator_name'] }},{% endfor %}
+   
+
