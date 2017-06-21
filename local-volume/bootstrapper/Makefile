@@ -20,8 +20,8 @@ ifeq ($(VERSION),)
 	VERSION = latest
 endif
 
-IMAGE = $(REGISTRY)/local-volume-provisioner-bootstrap:$(VERSION)
-MUTABLE_IMAGE = $(REGISTRY)/local-volume-provisioner-bootstrap:latest
+IMAGE = $(REGISTRY)local-volume-provisioner-bootstrap:$(VERSION)
+MUTABLE_IMAGE = $(REGISTRY)local-volume-provisioner-bootstrap:latest
 
 all build:
 	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o local-volume-bootstrapper .
