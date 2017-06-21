@@ -26,7 +26,7 @@ provisioners=(
 efs-provisioner
 cephfs-provisioner
 glusterblock-provisioner
-local-volume-bootstrapper
+local-volume-provisioner-bootstrap
 local-volume-provisioner
 nfs-client-provisioner
 nfs-provisioner
