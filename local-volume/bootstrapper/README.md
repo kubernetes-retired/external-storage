@@ -100,7 +100,3 @@ kubectl create -f deployment/kubernetes/example-config.yaml
 kubectl create -f deployment/kubernetes/admin-account.yaml
 kubectl create -f deployment/kubernetes/bootstrapper.yaml
 ```
-
-## TODO
-
-- Clean up resources upon error

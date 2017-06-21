@@ -101,11 +101,11 @@ func ensureVolumeConfig(client *kubernetes.Clientset, namespace string) (map[str
 		glog.Infof("No config is given, creating default configmap %v", *volumeConfigName)
 		config = common.GetDefaultVolumeConfig()
 		if err = createConfigMap(client, namespace, config); err != nil {
-			return nil, fmt.Errorf("unable to create configmap: %v\n", err)
+			return nil, fmt.Errorf("unable to create configmap: %v", err)
 		}
 	} else if err != nil {
 		// error exists, it might be that default configmap is damanged, fail fast.
-		return nil, fmt.Errorf("Could not get default config map: %v", err)
+		return nil, fmt.Errorf("could not get default config map: %v", err)
 	}
 	return config, nil
 }
@@ -328,14 +328,13 @@ func main() {
 	}
 
 	if ensureMountDir(config) {
-		if err := updateConfigMap(client, namespace, config); err != nil {
+		if err = updateConfigMap(client, namespace, config); err != nil {
 			glog.Fatalf("Could not update config map to use generated mountdir: %v", err)
 		}
 	}
 
 	glog.Infof("Running bootstrap pod with config %v: %+v\n", *volumeConfigName, config)
 
-	// TODO: check error and clean up resources.
 	if err = createServiceAccount(client, namespace); err != nil && !errors.IsAlreadyExists(err) {
 		glog.Fatalf("Unable to create service account: %v\n", err)
 	}
