@@ -19,4 +19,4 @@ deploy:
     script: ./deploy.sh
     on:
       tags: true
-      condition: $TEST_SUITE = everything-else
+      condition: $TEST_SUITE = local-volume

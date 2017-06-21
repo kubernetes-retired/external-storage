@@ -20,8 +20,8 @@ ifeq ($(VERSION),)
 	VERSION = latest
 endif
 
-IMAGE = $(REGISTRY)/local-volume-provisioner:$(VERSION)
-MUTABLE_IMAGE = $(REGISTRY)/local-volume-provisioner:latest
+IMAGE = $(REGISTRY)local-volume-provisioner:$(VERSION)
+MUTABLE_IMAGE = $(REGISTRY)local-volume-provisioner:latest
 
 all build:
 	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o local-volume-provisioner ./cmd
