@@ -24,5 +24,4 @@ kubectl create -f deployment/kubernetes/bootstrapper.yaml
 ## TODO
 
 - Clean up resources upon error
-- Volume config parameter `mountDir` can be auto-generated
 - Update local volume docs (document service account and rolebindings)

@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"hash/fnv"
 	"os"
+	"path"
+	"strings"
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
@@ -38,6 +40,7 @@ const (
 	defaultImageName          = "quay.io/external_storage/local-volume-provisioner"
 	defaultVolumeConfigName   = "local-volume-default-config"
 	defaultServiceAccountName = "local-storage-admin"
+	defaultMountRoot          = "/mnt/local-storage"
 
 	daemonSetName = "local-volume-provisioner"
 	containerName = "provisioner"
@@ -49,8 +52,9 @@ const (
 )
 
 var (
-	volumeConfigName   = flag.String("volume-config", defaultVolumeConfigName, "Name of the local volume configuration configmap, it must reside in the same namespace with bootstrapper")
 	imageName          = flag.String("image", defaultImageName, "Name of local volume provisioner image")
+	mountRoot          = flag.String("mount-root", defaultMountRoot, "Container root directory of volume mount path for discoverying local volumes. This is used only when mountDir is omitted in volume configmap, in which case hostDir will be normalized then concatenates with mountRoot")
+	volumeConfigName   = flag.String("volume-config", defaultVolumeConfigName, "Name of the local volume configuration configmap. The configmap must reside in the same namespace with bootstrapper.")
 	serviceAccountName = flag.String("serviceaccount", defaultServiceAccountName, "Name of the service accout for local volume provisioner")
 )
 
@@ -67,11 +71,46 @@ func setupClient() *kubernetes.Clientset {
 	return clientset
 }
 
-func generateMountName(hostDir, mountDir string) string {
+func generateMountName(mount *common.MountConfig) string {
 	h := fnv.New32a()
-	h.Write([]byte(hostDir))
-	h.Write([]byte(mountDir))
+	h.Write([]byte(mount.HostDir))
+	h.Write([]byte(mount.MountDir))
 	return fmt.Sprintf("mount-%x", h.Sum32())
+}
+
+// generateMountDir generates mount directory path in container, rule is to trim '/' prefix and
+// change "/" to "~", according to kubernetes convention, then concatenate with default root path.
+// E.g.
+//   "/mnt/ssds" -> "/mnt/local-storage/mnt~ssds"
+func generateMountDir(mount *common.MountConfig) string {
+	return path.Join(*mountRoot, strings.Replace(strings.TrimPrefix(mount.HostDir, "/"), "/", "~", -1))
+}
+
+func ensureMountDir(config map[string]common.MountConfig) bool {
+	needsUpdate := false
+	for class, mount := range config {
+		if mount.MountDir == "" {
+			newMoutConfig := mount
+			newMoutConfig.MountDir = generateMountDir(&mount)
+			config[class] = newMoutConfig
+			needsUpdate = true
+		}
+	}
+	return needsUpdate
+}
+
+func updateConfigMap(client *kubernetes.Clientset, name, namespace string, config map[string]common.MountConfig) error {
+	var err error
+	configMap, err := client.CoreV1().ConfigMaps(namespace).Get(name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	configMap.Data, err = common.VolumeConfigToConfigMapData(config)
+	if err != nil {
+		return err
+	}
+	_, err = client.CoreV1().ConfigMaps(namespace).Update(configMap)
+	return err
 }
 
 func createConfigMap(client *kubernetes.Clientset, namespace string, config map[string]common.MountConfig) error {
@@ -164,7 +203,7 @@ func createDaemonSet(client *kubernetes.Clientset, namespace string, config map[
 	volumes := []v1.Volume{}
 	volumeMounts := []v1.VolumeMount{}
 	for _, mount := range config {
-		name := generateMountName(mount.HostDir, mount.MountDir)
+		name := generateMountName(&mount)
 		volumes = append(volumes, v1.Volume{
 			Name: name,
 			VolumeSource: v1.VolumeSource{
@@ -264,6 +303,14 @@ func main() {
 	} else if err != nil {
 		// error exists, it might be that default configmap is damanged, fail fast.
 		glog.Fatalf("Could not get default config map: %v", err)
+	}
+
+	// Make sure mount directory is set for each storage class; if not, bootstrapper will
+	// automatically create it.
+	if ensureMountDir(config) {
+		if err := updateConfigMap(client, *volumeConfigName, namespace, config); err != nil {
+			glog.Fatalf("Could not update config map to use generated mountdir: %v", err)
+		}
 	}
 
 	glog.Infof("Running bootstrap pod with config %v: %+v\n", *volumeConfigName, config)
