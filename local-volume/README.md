@@ -66,16 +66,17 @@ gcloud alpha container node-pools create ... --local-ssd-count=<n>
 
 #### Option 3: Baremetal environments
 
-1. Partition and format the disks on each node according to your application's requirements.
-2. Mount all the filesystems under one directory per StorageClass. The directories are specified
-   in a configmap, see below. By default, the discovery directory is `/mnt/disks` and storage
-   class is `local-storage`.
+1. Partition and format the disks on each node according to your application's
+   requirements.
+2. Mount all the filesystems under one directory per StorageClass. The directories
+   are specified in a configmap, see below. By default, the discovery directory is
+   `/mnt/disks` and storage class is `local-storage`.
 3. Configure a Kubernetes cluster with the `PersistentLocalVolumes` feature gate.
 
 #### Option 4: Local test cluster
 
-1. Create `/mnt/disks` directory and mount several volumes into its subdirectories. The example
-   below uses three ram disks to simulate real local volumes:
+1. Create `/mnt/disks` directory and mount several volumes into its subdirectories.
+   The example below uses three ram disks to simulate real local volumes:
 ```console
 $ mkdir /mnt/disks
 $ for vol in vol1 vol2 vol3; do
@@ -89,10 +90,10 @@ done
 $ ALLOW_PRIVILEGED=true LOG_LEVEL=5 FEATURE_GATES=PersistentLocalVolumes=true hack/local-up-cluster.sh
 ```
 
-3. Continue with [Bootstrapping the external static provisioner](#bootstrapping-the-external-static-provisioner)
+3. Continue with [Creating local persistent volumes](#creating-local-persistent-volumes)
    below.
 
-### Step 2: Create local persistent volumes
+### Step 2: Creating local persistent volumes
 
 #### Option 1: Bootstrapping the external static provisioner
 
