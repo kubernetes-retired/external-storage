@@ -39,11 +39,12 @@ import (
 )
 
 const (
+	// JitterFactor is the factor to jitter the RetryPeriod by
 	JitterFactor = 1.2
 )
 
-// NewLeaderElector creates a LeaderElector from a LeaderElecitionConfig
-func NewLeaderElector(lec LeaderElectionConfig) (*LeaderElector, error) {
+// NewLeaderElector creates a LeaderElector from a Config
+func NewLeaderElector(lec Config) (*LeaderElector, error) {
 	if lec.LeaseDuration <= lec.RenewDeadline {
 		return nil, fmt.Errorf("leaseDuration must be greater than renewDeadline")
 	}
@@ -51,14 +52,15 @@ func NewLeaderElector(lec LeaderElectionConfig) (*LeaderElector, error) {
 		return nil, fmt.Errorf("renewDeadline must be greater than retryPeriod*JitterFactor")
 	}
 	if lec.Lock == nil {
-		return nil, fmt.Errorf("Lock must not be nil.")
+		return nil, fmt.Errorf("lock must not be nil")
 	}
 	return &LeaderElector{
 		config: lec,
 	}, nil
 }
 
-type LeaderElectionConfig struct {
+// Config is a configuration for leader election
+type Config struct {
 	// Lock is the resource that will be used for locking
 	Lock rl.Interface
 
@@ -104,7 +106,7 @@ type LeaderCallbacks struct {
 //  * (le *LeaderElector) IsLeader()
 //  * (le *LeaderElector) GetLeader()
 type LeaderElector struct {
-	config LeaderElectionConfig
+	config Config
 	// internal bookkeeping
 	observedRecord rl.LeaderElectionRecord
 	observedTime   time.Time
@@ -276,12 +278,12 @@ func (le *LeaderElector) tryAcquireOrRenew() bool {
 	return true
 }
 
-func (l *LeaderElector) maybeReportTransition() {
-	if l.observedRecord.HolderIdentity == l.reportedLeader {
+func (le *LeaderElector) maybeReportTransition() {
+	if le.observedRecord.HolderIdentity == le.reportedLeader {
 		return
 	}
-	l.reportedLeader = l.observedRecord.HolderIdentity
-	if l.config.Callbacks.OnNewLeader != nil {
-		go l.config.Callbacks.OnNewLeader(l.reportedLeader)
+	le.reportedLeader = le.observedRecord.HolderIdentity
+	if le.config.Callbacks.OnNewLeader != nil {
+		go le.config.Callbacks.OnNewLeader(le.reportedLeader)
 	}
 }

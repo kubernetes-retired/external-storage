@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: local-volume-bootstrapper
+  namespace: kube-system
+  labels:
+    app: local-volume-bootstrapper
+spec:
+  restartPolicy: Never
+  serviceAccountName: local-storage-bootstrapper
+  containers:
+  - name: bootstrapper
+    image: local-volume-bootstrapper:dev
+    env:
+    - name: MY_NAMESPACE
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.namespace
+    - name: VOLUME_CONFIG_NAME
+      value: local-volume-config

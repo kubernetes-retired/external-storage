@@ -1,5 +1,10 @@
 # CephFS Volume Provisioner for Kubernetes 1.5+
 
+[![Docker Repository on Quay](https://quay.io/repository/external_storage/cephfs-provisioner/status "Docker Repository on Quay")](https://quay.io/repository/external_storage/cephfs-provisioner)
+```
+quay.io/external_storage/cephfs-provisioner:v0.1.0
+```
+
 Using Ceph volume client
 
 # Test instruction
@@ -26,6 +31,11 @@ The following example uses `cephfs-provisioner-1` as the identity for the instan
 
 ```bash
 docker run -ti -v /root/.kube:/kube -v /var/run/kubernetes:/var/run/kubernetes --privileged --net=host  cephfs-provisioner /usr/local/bin/cephfs-provisioner -master=http://127.0.0.1:8080 -kubeconfig=/kube/config -id=cephfs-provisioner-1
+```
+Alternatively, start a deployment:
+
+```bash
+kubectl create -f deployment.yaml
 ```
 
 * Create a CephFS Storage Class

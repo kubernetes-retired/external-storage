@@ -32,7 +32,7 @@ type ProvisionPVCLock struct {
 	// object that the LeaderElector will attempt to lead.
 	PVCMeta    metav1.ObjectMeta
 	Client     clientset.Interface
-	LockConfig ResourceLockConfig
+	LockConfig Config
 	p          *v1.PersistentVolumeClaim
 }
 

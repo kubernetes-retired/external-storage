@@ -28,6 +28,7 @@ import (
 	"github.com/opencontainers/runc/libcontainer/selinux"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/kubernetes/pkg/api"
@@ -56,9 +57,9 @@ const StorageClassAnnotation = "volume.beta.kubernetes.io/storage-class"
 const (
 	pluginName = "example.com/nfs"
 	// Requested size of the volume
-	requestedSize = "1500Mi"
+	requestedSize = "100Mi"
 	// Expected size of the volume is the same, unlike cloud providers
-	expectedSize = "1500Mi"
+	expectedSize = "100Mi"
 )
 
 func testDynamicProvisioning(client clientset.Interface, claim *v1.PersistentVolumeClaim) {
@@ -69,7 +70,7 @@ func testDynamicProvisioning(client clientset.Interface, claim *v1.PersistentVol
 }
 
 func testCreate(client clientset.Interface, claim *v1.PersistentVolumeClaim) *v1.PersistentVolume {
-	err := framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, framework.Poll, framework.ClaimProvisionTimeout)
+	err := framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, framework.Poll, 1*time.Minute)
 	Expect(err).NotTo(HaveOccurred())
 
 	By("checking the claim")
@@ -136,6 +137,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 	// filled in BeforeEach
 	var c clientset.Interface
 	var ns string
+	var pod *v1.Pod
 
 	BeforeEach(func() {
 		c = f.ClientSet
@@ -143,9 +145,18 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 	})
 
 	framework.KubeDescribe("Out-of-tree DynamicProvisioner nfs-provisioner", func() {
+		AfterEach(func() {
+			logs, err := framework.GetPodLogs(c, ns, pod.Name, pod.Spec.Containers[0].Name)
+			if err != nil {
+				framework.Logf("Error getting pod logs: %v", err)
+			} else {
+				framework.Logf("Pod logs:\n%s", logs)
+			}
+		})
+
 		It("should create and delete persistent volumes [Slow]", func() {
 			By("creating an out-of-tree dynamic provisioner pod")
-			pod := startProvisionerPod(c, ns)
+			pod = startProvisionerPod(c, ns)
 			defer c.Core().Pods(ns).Delete(pod.Name, nil)
 
 			By("creating a StorageClass")
@@ -169,6 +180,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 			service, deployment := startProvisionerDeployment(c, ns)
 			defer c.Extensions().Deployments(ns).Delete(deployment.Name, nil)
 			defer c.Core().Services(ns).Delete(service.Name, nil)
+			pod = getDeploymentPod(c, ns, labels.Set(deployment.Spec.Selector.MatchLabels).String())
 
 			By("creating a StorageClass")
 			class := newStorageClass()
@@ -193,6 +205,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 			// Expect(err).NotTo(HaveOccurred())
 			scaleDeployment(c, ns, deployment.Name, 0)
 			scaleDeployment(c, ns, deployment.Name, 1)
+			pod = getDeploymentPod(c, ns, labels.Set(deployment.Spec.Selector.MatchLabels).String())
 
 			testRead(c, claim)
 			testDelete(c, claim, pv)
@@ -373,12 +386,12 @@ func startProvisionerDeployment(c clientset.Interface, ns string) (*v1.Service, 
 	tmpDir, err := ioutil.TempDir("", "nfs-provisioner-deployment")
 	Expect(err).NotTo(HaveOccurred())
 	if selinux.SelinuxEnabled() {
-		fcon, err := selinux.Getfilecon(tmpDir)
-		Expect(err).NotTo(HaveOccurred())
+		fcon, serr := selinux.Getfilecon(tmpDir)
+		Expect(serr).NotTo(HaveOccurred())
 		context := selinux.NewContext(fcon)
 		context["type"] = "svirt_sandbox_file_t"
-		err = selinux.Chcon(tmpDir, context.Get(), false)
-		Expect(err).NotTo(HaveOccurred())
+		serr = selinux.Chcon(tmpDir, context.Get(), false)
+		Expect(serr).NotTo(HaveOccurred())
 	}
 	deployment.Spec.Template.Spec.Volumes[0].HostPath.Path = tmpDir
 	deployment.Spec.Template.Spec.Containers[0].Image = "quay.io/kubernetes_incubator/nfs-provisioner:latest"
@@ -401,6 +414,13 @@ func startProvisionerDeployment(c clientset.Interface, ns string) (*v1.Service, 
 	return service, deployment
 }
 
+func getDeploymentPod(c clientset.Interface, ns, labelSelector string) *v1.Pod {
+	podList, err := c.CoreV1().Pods(ns).List(metav1.ListOptions{LabelSelector: labelSelector})
+	Expect(err).NotTo(HaveOccurred())
+	Expect(len(podList.Items)).Should(Equal(1))
+	return &podList.Items[0]
+}
+
 // svcFromManifest reads a .json/yaml file and returns the json of the desired
 func svcFromManifest(fileName string) *v1.Service {
 	var service v1.Service
@@ -412,7 +432,7 @@ func svcFromManifest(fileName string) *v1.Service {
 	var chunk []byte
 	for {
 		chunk = make([]byte, len(data))
-		_, err := decoder.Read(chunk)
+		_, err = decoder.Read(chunk)
 		chunk = bytes.Trim(chunk, "\x00")
 		Expect(err).NotTo(HaveOccurred())
 		if strings.Contains(string(chunk), "kind: Service") {
@@ -438,7 +458,7 @@ func deployFromManifest(fileName string) *extensions.Deployment {
 	var chunk []byte
 	for {
 		chunk = make([]byte, len(data))
-		_, err := decoder.Read(chunk)
+		_, err = decoder.Read(chunk)
 		chunk = bytes.Trim(chunk, "\x00")
 		Expect(err).NotTo(HaveOccurred())
 		if strings.Contains(string(chunk), "kind: Deployment") {

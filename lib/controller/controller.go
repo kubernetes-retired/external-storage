@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/kubernetes-incubator/external-storage/lib/helper"
 	"github.com/kubernetes-incubator/external-storage/lib/leaderelection"
 	rl "github.com/kubernetes-incubator/external-storage/lib/leaderelection/resourcelock"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,6 +37,7 @@ import (
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/pkg/api/v1/ref"
 	storage "k8s.io/client-go/pkg/apis/storage/v1"
 	storagebeta "k8s.io/client-go/pkg/apis/storage/v1beta1"
 	"k8s.io/client-go/tools/cache"
@@ -135,8 +137,8 @@ const (
 	defaultExponentialBackOffOnError     = true
 	defaultCreateProvisionedPVRetryCount = 5
 	defaultCreateProvisionedPVInterval   = 10 * time.Second
-	defaultFailedProvisionThreshold      = 5
-	defaultFailedDeleteThreshold         = 5
+	defaultFailedProvisionThreshold      = 15
+	defaultFailedDeleteThreshold         = 15
 	defaultLeaseDuration                 = 15 * time.Second
 	defaultRenewDeadline                 = 10 * time.Second
 	defaultRetryPeriod                   = 2 * time.Second
@@ -196,7 +198,7 @@ func CreateProvisionedPVInterval(createProvisionedPVInterval time.Duration) func
 }
 
 // FailedProvisionThreshold is the threshold for max number of retries on
-// failures of Provision. Defaults to 5.
+// failures of Provision. Defaults to 15.
 func FailedProvisionThreshold(failedProvisionThreshold int) func(*ProvisionController) error {
 	return func(c *ProvisionController) error {
 		c.SetFailedProvisionThreshold(failedProvisionThreshold)
@@ -205,7 +207,7 @@ func FailedProvisionThreshold(failedProvisionThreshold int) func(*ProvisionContr
 }
 
 // FailedDeleteThreshold is the threshold for max number of retries on failures
-// of Delete. Defaults to 5.
+// of Delete. Defaults to 15.
 func FailedDeleteThreshold(failedDeleteThreshold int) func(*ProvisionController) error {
 	return func(c *ProvisionController) error {
 		c.SetFailedDeleteThreshold(failedDeleteThreshold)
@@ -281,6 +283,9 @@ func NewProvisionController(
 	} else {
 		eventRecorder = broadcaster.NewRecorder(api.Scheme, v1.EventSource{Component: fmt.Sprintf("%s %s %s", provisionerName, strings.TrimSpace(string(out)), string(identity))})
 	}
+
+	// TODO: GetReference fails otherwise
+	v1.AddToScheme(api.Scheme)
 
 	controller := &ProvisionController{
 		client:                        client,
@@ -563,7 +568,7 @@ func (ctrl *ProvisionController) shouldProvision(claim *v1.PersistentVolumeClaim
 	}
 
 	// Kubernetes 1.4 provisioning, evaluating class.Provisioner
-	claimClass := v1.GetPersistentVolumeClaimClass(claim)
+	claimClass := helper.GetPersistentVolumeClaimClass(claim)
 	provisioner, _, err := ctrl.getStorageClassFields(claimClass)
 	if err != nil {
 		glog.Errorf("Error getting claim %q's StorageClass's fields: %v", claimToClaimKey(claim), err)
@@ -624,12 +629,12 @@ func (ctrl *ProvisionController) lockProvisionClaimOperation(claim *v1.Persisten
 	rl := rl.ProvisionPVCLock{
 		PVCMeta: claim.ObjectMeta,
 		Client:  ctrl.client,
-		LockConfig: rl.ResourceLockConfig{
+		LockConfig: rl.Config{
 			Identity:      string(ctrl.identity),
 			EventRecorder: ctrl.eventRecorder,
 		},
 	}
-	le, err := leaderelection.NewLeaderElector(leaderelection.LeaderElectionConfig{
+	le, err := leaderelection.NewLeaderElector(leaderelection.Config{
 		Lock:          &rl,
 		LeaseDuration: ctrl.leaseDuration,
 		RenewDeadline: ctrl.renewDeadline,
@@ -730,7 +735,7 @@ func (ctrl *ProvisionController) updateDeleteStats(volume *v1.PersistentVolume, 
 // the operation is deleted, else the operation may be retried with expbackoff.
 func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVolumeClaim) error {
 	// Most code here is identical to that found in controller.go of kube's PV controller...
-	claimClass := v1.GetPersistentVolumeClaimClass(claim)
+	claimClass := helper.GetPersistentVolumeClaimClass(claim)
 	glog.V(4).Infof("provisionClaimOperation [%s] started, class: %q", claimToClaimKey(claim), claimClass)
 
 	//  A previous doProvisionClaim may just have finished while we were waiting for
@@ -746,7 +751,7 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 
 	// Prepare a claimRef to the claim early (to fail before a volume is
 	// provisioned)
-	claimRef, err := v1.GetReference(api.Scheme, claim)
+	claimRef, err := ref.GetReference(api.Scheme, claim)
 	if err != nil {
 		glog.Errorf("Unexpected error getting claim reference to claim %q: %v", claimToClaimKey(claim), err)
 		return nil
@@ -1013,7 +1018,8 @@ func (ctrl *ProvisionController) deleteVolumeOperation(volume *v1.PersistentVolu
 		return nil
 	}
 
-	if err := ctrl.provisioner.Delete(volume); err != nil {
+	err = ctrl.provisioner.Delete(volume)
+	if err != nil {
 		if ierr, ok := err.(*IgnoredError); ok {
 			// Delete ignored, do nothing and hope another provisioner will delete it.
 			glog.Infof("deletion of volume %q ignored: %v", volume.Name, ierr)

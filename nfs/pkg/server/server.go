@@ -78,7 +78,7 @@ func Setup(ganeshaConfig string, gracePeriod uint) error {
 	// Start rpcbind if it is not started yet
 	cmd := exec.Command("/usr/sbin/rpcinfo", "127.0.0.1")
 	if err := cmd.Run(); err != nil {
-		cmd := exec.Command("/usr/sbin/rpcbind", "-w")
+		cmd = exec.Command("/usr/sbin/rpcbind", "-w")
 		if out, err := cmd.CombinedOutput(); err != nil {
 			return fmt.Errorf("Starting rpcbind failed with error: %v, output: %s", err, out)
 		}
@@ -101,7 +101,7 @@ func Setup(ganeshaConfig string, gracePeriod uint) error {
 	}
 
 	// Use defaultGaneshaConfigContents if the ganeshaConfig doesn't exist yet
-	if _, err := os.Stat(ganeshaConfig); os.IsNotExist(err) {
+	if _, err = os.Stat(ganeshaConfig); os.IsNotExist(err) {
 		err = ioutil.WriteFile(ganeshaConfig, defaultGaneshaConfigContents, 0600)
 		if err != nil {
 			return fmt.Errorf("error writing ganesha config %s: %v", ganeshaConfig, err)
@@ -205,9 +205,10 @@ func setGracePeriod(ganeshaConfig string, gracePeriod uint) error {
 
 	oldLine := re.Find(read)
 
+	var file *os.File
 	if oldLine == nil {
 		// Grace_Period line not there, append the whole NFSV4 block.
-		file, err := os.OpenFile(ganeshaConfig, os.O_APPEND|os.O_WRONLY, 0600)
+		file, err = os.OpenFile(ganeshaConfig, os.O_APPEND|os.O_WRONLY, 0600)
 		if err != nil {
 			return err
 		}

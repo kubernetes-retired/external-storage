@@ -4,7 +4,7 @@ This repository contains repository infrastructure tools for use in
 `kubernetes` and `kubernetes-incubator` repositories.  Examples:
 
 - Boilerplate verification
-- Gofmt verification
+- Go source code quality verification
 - Golang build infrastructure
 
 ---

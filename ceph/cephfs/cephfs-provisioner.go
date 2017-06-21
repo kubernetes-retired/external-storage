@@ -26,6 +26,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
+	"github.com/kubernetes-incubator/external-storage/lib/helper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -163,7 +164,7 @@ func (p *cephFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 		return errors.New("identity annotation not found on PV")
 	}
 	if ann != p.identity {
-		return &controller.IgnoredError{"identity annotation on PV does not match ours"}
+		return &controller.IgnoredError{Reason: "identity annotation on PV does not match ours"}
 	}
 	share, ok := volume.Annotations[cephShareAnn]
 	if !ok {
@@ -172,7 +173,7 @@ func (p *cephFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 	// delete CephFS
 	// TODO when beta is removed, have to check kube version and pick v1/beta
 	// accordingly: maybe the controller lib should offer a function for that
-	class, err := p.client.StorageV1beta1().StorageClasses().Get(v1.GetPersistentVolumeClass(volume), metav1.GetOptions{})
+	class, err := p.client.StorageV1beta1().StorageClasses().Get(helper.GetPersistentVolumeClass(volume), metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -275,9 +276,9 @@ func main() {
 	} else {
 		config, err = rest.InClusterConfig()
 	}
-	prId := string(uuid.NewUUID())
+	prID := string(uuid.NewUUID())
 	if *id != "" {
-		prId = *id
+		prID = *id
 	}
 	if err != nil {
 		glog.Fatalf("Failed to create config: %v", err)
@@ -296,7 +297,7 @@ func main() {
 
 	// Create the provisioner: it implements the Provisioner interface expected by
 	// the controller
-	cephFSProvisioner := newCephFSProvisioner(clientset, prId)
+	cephFSProvisioner := newCephFSProvisioner(clientset, prID)
 
 	// Start the provision controller which will dynamically provision cephFS
 	// PVs

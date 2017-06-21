@@ -18,4 +18,6 @@ MAINTAINER Humble Chirammal <hchiramm@redhat.com>
 
 ADD glusterblock-provisioner /usr/local/bin/glusterblock-provisioner
 
-ENTRYPOINT ["/usr/local/bin/glusterblock-provisioner"]
+CMD ["-master=http://127.0.0.1:8080", "-kubeconfig=/root/.kube/config", "-id=glusterblock-provisioner-1"]
+
+ENTRYPOINT ["/usr/local/bin/glusterblock-provisioner"] 

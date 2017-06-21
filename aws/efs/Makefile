@@ -12,9 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-IMAGE = quay.io/external_storage/efs-provisioner
-# TODO
-VERSION = latest
+ifeq ($(REGISTRY),)
+	REGISTRY = quay.io/external_storage/
+endif
+ifeq ($(VERSION),)
+	VERSION = latest
+endif
+IMAGE = $(REGISTRY)efs-provisioner:$(VERSION)
+MUTABLE_IMAGE = $(REGISTRY)efs-provisioner:latest
 
 all build:
 	@mkdir -p .go/src/github.com/kubernetes-incubator/external-storage/aws/efs/vendor
@@ -31,7 +36,7 @@ all build:
 		-v $$(pwd):/go/bin \
 		-v $$(pwd)/.go/stdlib:/usr/local/go/pkg/linux_amd64_asdf \
 		-w /go/src/github.com/kubernetes-incubator/external-storage/aws/efs \
-		golang:1.7.4-alpine \
+		golang:1.8.3-alpine \
 		go install -installsuffix "asdf" ./cmd/efs-provisioner
 .PHONY: all build
 
@@ -39,28 +44,18 @@ container: build quick-container
 .PHONY: container
 
 quick-container:
-	docker build -t $(IMAGE):$(VERSION) .
+	docker build -t $(MUTABLE_IMAGE) .
+	docker tag $(MUTABLE_IMAGE) $(IMAGE)
 .PHONY: quick-container
 
 push: container
-	docker push $(IMAGE):$(VERSION)
+	docker push $(IMAGE)
+	docker push $(MUTABLE_IMAGE)
 .PHONY: push
 
-test: verify
+test:
 	go test `go list ./... | grep -v 'vendor'`
 .PHONY: test
-
-verify:
-	@tput bold; echo Running gofmt:; tput sgr0
-	(gofmt -s -w -l `find . -type f -name "*.go" | grep -v vendor`) || exit 1
-	@tput bold; echo Running golint and go vet:; tput sgr0
-	for i in $$(find . -type f -name "*.go" | grep -v 'vendor\|minmax'); do \
-		golint --set_exit_status $$i || exit 1; \
-		go vet $$i; \
-	done
-	@tput bold; echo Running verify-boilerplate; tput sgr0
-	../../repo-infra/verify/verify-boilerplate.sh
-.PHONY: verify
 
 clean:
 	rm -rf .go

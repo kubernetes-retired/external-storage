@@ -17,7 +17,7 @@ import:
 - package: github.com/mitchellh/mapstructure
   version: db1efb5
 - package: k8s.io/apimachinery
-  version: c1c4a7f
+  version: 47e2f36401b7a66b6d003f3df4b58f6769ccc34b
   subpackages:
   - pkg/api/errors
   - pkg/api/resource
@@ -31,7 +31,7 @@ import:
   - pkg/util/wait
   - pkg/watch
 - package: k8s.io/client-go
-  version: 7615377
+  version: b3357e1e10805ee14c1ea5fa9c46a6f58e46392b
   subpackages:
   - kubernetes
   - kubernetes/typed/core/v1
@@ -44,7 +44,16 @@ import:
   - tools/clientcmd
   - tools/record
 - package: k8s.io/kubernetes
-  version: v1.6.0
+  version: 606825eea47f41c72a3da1d4d2a769a340e1b69d
   subpackages:
   - pkg/util/goroutinemap
   - pkg/util/version
+- package: github.com/heketi/heketi/client/api/go-client
+  version: 7bb2c5b
+- package: github.com/heketi/heketi/pkg/glusterfs/api
+  version: 7bb2c5b
+- package: github.com/heketi/heketi/pkg/utils
+  version: 7bb2c5b
+- package: github.com/lpabon/godbc
+  version: 9577782
+- package: github.com/dgrijalva/jwt-go

@@ -33,8 +33,8 @@ func (p *flexProvisioner) Delete(volume *v1.PersistentVolume) error {
 		return fmt.Errorf("error determining if this provisioner was the one to provision volume %q: %v", volume.Name, err)
 	}
 	if !provisioned {
-		strerr := fmt.Sprintf("this provisioner id %s didn't provision volume %q and so can't delete it; id %s did & can", p.identity, volume.Name, volume.Annotations[annProvisionerId])
-		return &controller.IgnoredError{strerr}
+		strerr := fmt.Sprintf("this provisioner id %s didn't provision volume %q and so can't delete it; id %s did & can", p.identity, volume.Name, volume.Annotations[annProvisionerID])
+		return &controller.IgnoredError{Reason: strerr}
 	}
 
 	cmd := exec.Command(p.execCommand, "delete")
@@ -47,10 +47,10 @@ func (p *flexProvisioner) Delete(volume *v1.PersistentVolume) error {
 }
 
 func (p *flexProvisioner) provisioned(volume *v1.PersistentVolume) (bool, error) {
-	provisionerId, ok := volume.Annotations[annProvisionerId]
+	provisionerID, ok := volume.Annotations[annProvisionerID]
 	if !ok {
-		return false, fmt.Errorf("PV doesn't have an annotation %s", annProvisionerId)
+		return false, fmt.Errorf("PV doesn't have an annotation %s", annProvisionerID)
 	}
 
-	return provisionerId == string(p.identity), nil
+	return provisionerID == string(p.identity), nil
 }

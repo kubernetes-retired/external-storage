@@ -12,20 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-IMAGE = quay.io/kubernetes_incubator/nfs-provisioner
-
-VERSION :=
-TAG := $(shell git describe --abbrev=0 --tags HEAD 2>/dev/null)
-COMMIT := $(shell git rev-parse HEAD)
-ifeq ($(TAG),)
-    VERSION := latest
-else
-    ifeq ($(COMMIT), $(shell git rev-list -n1 $(TAG)))
-        VERSION := $(TAG)
-    else
-        VERSION := latest
-    endif
+ifeq ($(REGISTRY),)
+	REGISTRY = quay.io/kubernetes_incubator/
 endif
+ifeq ($(VERSION),)
+	VERSION = latest
+endif
+IMAGE = $(REGISTRY)nfs-provisioner:$(VERSION)
+MUTABLE_IMAGE = $(REGISTRY)nfs-provisioner:latest
 
 all build:
 	GOOS=linux go install -v ./cmd/nfs-provisioner
@@ -37,35 +31,28 @@ container: build quick-container
 
 quick-container:
 	cp nfs-provisioner deploy/docker/nfs-provisioner
-	docker build -t $(IMAGE):$(VERSION) deploy/docker
+	docker build -t $(MUTABLE_IMAGE) deploy/docker
+	docker tag $(MUTABLE_IMAGE) $(IMAGE)
 .PHONY: quick-container
 
 push: container
-	docker push $(IMAGE):$(VERSION)
+	docker push $(IMAGE)
+	docker push $(MUTABLE_IMAGE)
 .PHONY: push
 
-test-integration: verify
+test: test-integration test-e2e
+
+test-integration:
 	go test `go list ./... | grep -v 'vendor\|test\|demo'`
 .PHONY: test-integration
 
-test-e2e: verify
+test-e2e:
 	cd ./test/e2e; glide install -v
 	go test ./test/e2e -v --kubeconfig=$(HOME)/.kube/config
 .PHONY: test-e2e
 
-verify:
-	@tput bold; echo Running gofmt:; tput sgr0
-	(gofmt -s -w -l `find . -type f -name "*.go" | grep -v vendor`) || exit 1
-	@tput bold; echo Running golint and go vet:; tput sgr0
-	for i in $$(find . -type f -name "*.go" | grep -v 'vendor\|framework'); do \
-		golint --set_exit_status $$i || exit 1; \
-		go vet $$i; \
-	done
-	@tput bold; echo Running verify-boilerplate; tput sgr0
-	../repo-infra/verify/verify-boilerplate.sh
-.PHONY: verify
-
 clean:
 	rm -f nfs-provisioner
 	rm -f deploy/docker/nfs-provisioner
+	rm -rf test/e2e/vendor
 .PHONY: clean

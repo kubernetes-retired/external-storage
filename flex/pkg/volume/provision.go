@@ -28,17 +28,15 @@ import (
 )
 
 const (
-	// Name of the file where an s3fsProvisioner will store its identity
-	identityFile = "flex-provisioner.identity"
-
 	// are we allowed to set this? else make up our own
 	annCreatedBy = "kubernetes.io/createdby"
 	createdBy    = "flex-dynamic-provisioner"
 
 	// A PV annotation for the identity of the s3fsProvisioner that provisioned it
-	annProvisionerId = "Provisioner_Id"
+	annProvisionerID = "Provisioner_Id"
 )
 
+// NewFlexProvisioner creates a new flex provisioner
 func NewFlexProvisioner(client kubernetes.Interface, execCommand string) controller.Provisioner {
 	return newFlexProvisionerInternal(client, execCommand)
 }
@@ -74,7 +72,7 @@ func (p *flexProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 	annotations := make(map[string]string)
 	annotations[annCreatedBy] = createdBy
 
-	annotations[annProvisionerId] = string(p.identity)
+	annotations[annProvisionerID] = string(p.identity)
 	/*
 		This PV won't work since there's nothing backing it.  the flex script
 		is in flex/flex/flex  (that many layers are required for the flex volume plugin)

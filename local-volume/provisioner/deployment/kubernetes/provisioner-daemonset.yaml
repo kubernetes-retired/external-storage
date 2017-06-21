@@ -1,0 +1,29 @@
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: local-volume-provisioner
+spec:
+  template:
+    metadata:
+      labels:
+        app: local-volume-provisioner
+    spec:
+      containers:
+      - name: provisioner
+        image: "quay.io/external_storage/local-volume-provisioner:latest"
+        imagePullPolicy: Always
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: discovery-vol
+          mountPath: "/local-disks"
+        env:
+        - name: MY_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+      volumes:
+      - name: discovery-vol
+        hostPath:
+          path: "/mnt/disks"
+      serviceAccount: local-storage-admin

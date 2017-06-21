@@ -166,11 +166,12 @@ func TestAllocateConflict(t *testing.T) {
 		t.Errorf("error creating new allocator: '%v'", err)
 	}
 
-	if ok, err := m.Allocate(offset); !ok {
+	ok, err := m.Allocate(offset)
+	if !ok {
 		t.Errorf("error allocate offset %v: %v", offset, err)
 	}
 
-	ok, err := m.Allocate(offset)
+	ok, err = m.Allocate(offset)
 	if ok {
 		t.Errorf("unexpected success")
 	}
@@ -208,7 +209,8 @@ func TestRelease(t *testing.T) {
 		t.Errorf("error creating new allocator: '%v'", err)
 	}
 
-	if ok, err := m.Allocate(offset); !ok {
+	ok, err := m.Allocate(offset)
+	if !ok {
 		t.Errorf("error allocate offset %v: %v", offset, err)
 	}
 

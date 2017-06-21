@@ -43,5 +43,13 @@ flycheck_*.el
 /nfs/deploy/docker/nfs-provisioner
 *.pyc
 
+# local-volume-provisioner binary
+/local-volume/provisioner/local-volume-provisioner
+/local-volume/provisioner/deployment/docker/local-volume-provisioner
+
+# local-volume-bootstrapper binary
+/local-volume/bootstrapper/local-volume-bootstrapper
+/local-volume/bootstrapper/deployment/docker/local-volume-bootstrapper
+
 .idea/
 /.project

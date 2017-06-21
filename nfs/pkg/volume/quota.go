@@ -75,16 +75,18 @@ func newXfsQuotaer(xfsPath string) (*xfsQuotaer, error) {
 		return nil, fmt.Errorf("xfs path %s was not mounted with pquota nor prjquota", xfsPath)
 	}
 
-	if _, err := exec.LookPath("xfs_quota"); err != nil {
+	_, err = exec.LookPath("xfs_quota")
+	if err != nil {
 		return nil, err
 	}
 
 	projectsFile := path.Join(xfsPath, "projects")
 	projectIDs := map[uint16]bool{}
-	if _, err := os.Stat(projectsFile); os.IsNotExist(err) {
-		file, err := os.Create(projectsFile)
-		if err != nil {
-			return nil, fmt.Errorf("error creating xfs projects file %s: %v", projectsFile, err)
+	_, err = os.Stat(projectsFile)
+	if os.IsNotExist(err) {
+		file, cerr := os.Create(projectsFile)
+		if cerr != nil {
+			return nil, fmt.Errorf("error creating xfs projects file %s: %v", projectsFile, cerr)
 		}
 		file.Close()
 	} else {

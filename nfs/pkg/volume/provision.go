@@ -79,11 +79,11 @@ const (
 // NewNFSProvisioner creates a Provisioner that provisions NFS PVs backed by
 // the given directory.
 func NewNFSProvisioner(exportDir string, client kubernetes.Interface, outOfCluster bool, useGanesha bool, ganeshaConfig string, enableXfsQuota bool, serverHostname string) controller.Provisioner {
-	var exporter exporter
+	var exp exporter
 	if useGanesha {
-		exporter = newGaneshaExporter(ganeshaConfig)
+		exp = newGaneshaExporter(ganeshaConfig)
 	} else {
-		exporter = newKernelExporter()
+		exp = newKernelExporter()
 	}
 	var quotaer quotaer
 	var err error
@@ -95,7 +95,7 @@ func NewNFSProvisioner(exportDir string, client kubernetes.Interface, outOfClust
 	} else {
 		quotaer = newDummyQuotaer()
 	}
-	return newNFSProvisionerInternal(exportDir, client, outOfCluster, exporter, quotaer, serverHostname)
+	return newNFSProvisionerInternal(exportDir, client, outOfCluster, exp, quotaer, serverHostname)
 }
 
 func newNFSProvisionerInternal(exportDir string, client kubernetes.Interface, outOfCluster bool, exporter exporter, quotaer quotaer, serverHostname string) *nfsProvisioner {
@@ -378,10 +378,10 @@ func (p *nfsProvisioner) getServer() (string, error) {
 		protocol v1.Protocol
 	}
 	expectedPorts := map[endpointPort]bool{
-		endpointPort{2049, v1.ProtocolTCP}:  true,
-		endpointPort{20048, v1.ProtocolTCP}: true,
-		endpointPort{111, v1.ProtocolUDP}:   true,
-		endpointPort{111, v1.ProtocolTCP}:   true,
+		{2049, v1.ProtocolTCP}:  true,
+		{20048, v1.ProtocolTCP}: true,
+		{111, v1.ProtocolUDP}:   true,
+		{111, v1.ProtocolTCP}:   true,
 	}
 	endpoints, err := p.client.Core().Endpoints(namespace).Get(serviceName, metav1.GetOptions{})
 	for _, subset := range endpoints.Subsets {
