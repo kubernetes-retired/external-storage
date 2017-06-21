@@ -133,16 +133,26 @@ type ProvisionController struct {
 }
 
 const (
-	defaultResyncPeriod                  = 15 * time.Second
-	defaultExponentialBackOffOnError     = true
-	defaultCreateProvisionedPVRetryCount = 5
-	defaultCreateProvisionedPVInterval   = 10 * time.Second
-	defaultFailedProvisionThreshold      = 15
-	defaultFailedDeleteThreshold         = 15
-	defaultLeaseDuration                 = 15 * time.Second
-	defaultRenewDeadline                 = 10 * time.Second
-	defaultRetryPeriod                   = 2 * time.Second
-	defaultTermLimit                     = 30 * time.Second
+	// DefaultResyncPeriod is used when option function ResyncPeriod is omitted
+	DefaultResyncPeriod = 15 * time.Second
+	// DefaultExponentialBackOffOnError is used when option function ExponentialBackOffOnError is omitted
+	DefaultExponentialBackOffOnError = true
+	// DefaultCreateProvisionedPVRetryCount is used when option function CreateProvisionedPVRetryCount is omitted
+	DefaultCreateProvisionedPVRetryCount = 5
+	// DefaultCreateProvisionedPVInterval is used when option function CreateProvisionedPVInterval is omitted
+	DefaultCreateProvisionedPVInterval = 10 * time.Second
+	// DefaultFailedProvisionThreshold is used when option function FailedProvisionThreshold is omitted
+	DefaultFailedProvisionThreshold = 15
+	// DefaultFailedDeleteThreshold is used when option function FailedDeleteThreshold is omitted
+	DefaultFailedDeleteThreshold = 15
+	// DefaultLeaseDuration is used when option function LeaseDuration is omitted
+	DefaultLeaseDuration = 15 * time.Second
+	// DefaultRenewDeadline is used when option function RenewDeadline is omitted
+	DefaultRenewDeadline = 10 * time.Second
+	// DefaultRetryPeriod is used when option function RetryPeriod is omitted
+	DefaultRetryPeriod = 2 * time.Second
+	// DefaultTermLimit is used when option function TermLimit is omitted
+	DefaultTermLimit = 30 * time.Second
 )
 
 var errRuntime = fmt.Errorf("cannot call option functions after controller has Run")
@@ -294,20 +304,20 @@ func NewProvisionController(
 		kubeVersion:                   utilversion.MustParseSemantic(kubeVersion),
 		identity:                      identity,
 		eventRecorder:                 eventRecorder,
-		resyncPeriod:                  defaultResyncPeriod,
-		runningOperations:             goroutinemap.NewGoRoutineMap(defaultExponentialBackOffOnError),
-		createProvisionedPVRetryCount: defaultCreateProvisionedPVRetryCount,
-		createProvisionedPVInterval:   defaultCreateProvisionedPVInterval,
-		failedProvisionThreshold:      defaultFailedProvisionThreshold,
-		failedDeleteThreshold:         defaultFailedDeleteThreshold,
+		resyncPeriod:                  DefaultResyncPeriod,
+		runningOperations:             goroutinemap.NewGoRoutineMap(DefaultExponentialBackOffOnError),
+		createProvisionedPVRetryCount: DefaultCreateProvisionedPVRetryCount,
+		createProvisionedPVInterval:   DefaultCreateProvisionedPVInterval,
+		failedProvisionThreshold:      DefaultFailedProvisionThreshold,
+		failedDeleteThreshold:         DefaultFailedDeleteThreshold,
 		failedProvisionStats:          make(map[types.UID]int),
 		failedDeleteStats:             make(map[types.UID]int),
 		failedProvisionStatsMutex:     &sync.Mutex{},
 		failedDeleteStatsMutex:        &sync.Mutex{},
-		leaseDuration:                 defaultLeaseDuration,
-		renewDeadline:                 defaultRenewDeadline,
-		retryPeriod:                   defaultRetryPeriod,
-		termLimit:                     defaultTermLimit,
+		leaseDuration:                 DefaultLeaseDuration,
+		renewDeadline:                 DefaultRenewDeadline,
+		retryPeriod:                   DefaultRetryPeriod,
+		termLimit:                     DefaultTermLimit,
 		leaderElectors:                make(map[types.UID]*leaderelection.LeaderElector),
 		leaderElectorsMutex:           &sync.Mutex{},
 		hasRun:                        false,
