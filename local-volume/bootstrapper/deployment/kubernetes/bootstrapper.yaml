@@ -16,5 +16,6 @@ spec:
       valueFrom:
         fieldRef:
           fieldPath: metadata.namespace
-    - name: VOLUME_CONFIG_NAME
-      value: local-volume-config
+    args:
+    - --image="quay.io/external_storage/local-volume-provisioner"
+    - --volume-config=local-volume-config

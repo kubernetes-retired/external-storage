@@ -35,17 +35,23 @@ import (
 )
 
 const (
-	defaultImage         = "local-volume-provisioner:dev"
-	defaultConfigMapName = "local-volume-config"
+	defaultImageName          = "quay.io/external_storage/local-volume-provisioner"
+	defaultVolumeConfigName   = "local-volume-default-config"
+	defaultServiceAccountName = "local-storage-admin"
 
-	provisionerDaemonSetName      = "local-volume-provisioner"
-	provisionerContainerName      = "provisioner"
-	provisionerServiceAccountName = "local-storage-admin"
+	daemonSetName = "local-volume-provisioner"
+	containerName = "provisioner"
 
-	provisionerPVBindingName   = "local-storage:provisioner-pv-binding"
-	provisionerNodeBindingName = "local-storage:provisioner-node-binding"
-	systemRoleNode             = "system:node"
-	systemRolePVProvisioner    = "system:persistent-volume-provisioner"
+	pvBindingName           = "local-storage:provisioner-pv-binding"
+	nodeBindingName         = "local-storage:provisioner-node-binding"
+	systemRoleNode          = "system:node"
+	systemRolePVProvisioner = "system:persistent-volume-provisioner"
+)
+
+var (
+	volumeConfigName   = flag.String("volume-config", defaultVolumeConfigName, "Name of the local volume configuration configmap, it must reside in the same namespace with bootstrapper")
+	imageName          = flag.String("image", defaultImageName, "Name of local volume provisioner image")
+	serviceAccountName = flag.String("serviceaccount", defaultServiceAccountName, "Name of the service accout for local volume provisioner")
 )
 
 func setupClient() *kubernetes.Clientset {
@@ -68,14 +74,6 @@ func generateMountName(hostDir, mountDir string) string {
 	return fmt.Sprintf("mount-%x", h.Sum32())
 }
 
-func getVolumeConfigName() string {
-	name := os.Getenv("VOLUME_CONFIG_NAME")
-	if name == "" {
-		return defaultConfigMapName
-	}
-	return name
-}
-
 func createConfigMap(client *kubernetes.Clientset, namespace string, config map[string]common.MountConfig) error {
 	data, err := common.VolumeConfigToConfigMapData(config)
 	if err != nil {
@@ -87,7 +85,7 @@ func createConfigMap(client *kubernetes.Clientset, namespace string, config map[
 			Kind:       "ConfigMap",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      getVolumeConfigName(),
+			Name:      *volumeConfigName,
 			Namespace: namespace,
 		},
 		Data: data,
@@ -103,7 +101,7 @@ func createServiceAccount(client *kubernetes.Clientset, namespace string) error 
 			Kind:       "ServiceAccount",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      provisionerServiceAccountName,
+			Name:      *serviceAccountName,
 			Namespace: namespace,
 		},
 	}
@@ -115,7 +113,7 @@ func createClusterRoleBinding(client *kubernetes.Clientset, namespace string) er
 	subjects := []rbacv1beta1.Subject{
 		{
 			Kind:      rbacv1beta1.ServiceAccountKind,
-			Name:      provisionerServiceAccountName,
+			Name:      *serviceAccountName,
 			Namespace: namespace,
 		},
 	}
@@ -126,7 +124,7 @@ func createClusterRoleBinding(client *kubernetes.Clientset, namespace string) er
 			Kind:       "ClusterRoleBinding",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: provisionerPVBindingName,
+			Name: pvBindingName,
 		},
 		RoleRef: rbacv1beta1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
@@ -141,7 +139,7 @@ func createClusterRoleBinding(client *kubernetes.Clientset, namespace string) er
 			Kind:       "ClusterRoleBinding",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: provisionerNodeBindingName,
+			Name: nodeBindingName,
 		},
 		RoleRef: rbacv1beta1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
@@ -200,38 +198,37 @@ func createDaemonSet(client *kubernetes.Clientset, namespace string, config map[
 		},
 		{
 			Name:  "VOLUME_CONFIG_NAME",
-			Value: os.Getenv("VOLUME_CONFIG_NAME"),
+			Value: *volumeConfigName,
 		},
 	}
 
 	containers := []v1.Container{
 		{
-			Name:         provisionerContainerName,
-			Image:        defaultImage,
+			Name:         containerName,
+			Image:        *imageName,
 			VolumeMounts: volumeMounts,
 			Env:          envVars,
 		},
 	}
 
-	// TODO: make daemonset configurable as well, using another configmap.
 	daemonSet := extv1beta1.DaemonSet{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "extensions/v1beta1",
 			Kind:       "DaemonSet",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      provisionerDaemonSetName,
+			Name:      daemonSetName,
 			Namespace: namespace,
 		},
 		Spec: extv1beta1.DaemonSetSpec{
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{"app": provisionerDaemonSetName},
+					Labels: map[string]string{"app": daemonSetName},
 				},
 				Spec: v1.PodSpec{
 					Volumes:            volumes,
 					Containers:         containers,
-					ServiceAccountName: provisionerServiceAccountName,
+					ServiceAccountName: *serviceAccountName,
 				},
 			},
 		},
@@ -249,16 +246,17 @@ func main() {
 	if namespace == "" {
 		glog.Fatalf("MY_NAMESPACE environment variable not set\n")
 	}
+
 	client := setupClient()
 
 	// Get config map from user or from a default configmap (if created before).
-	config, err := common.GetVolumeConfigFromConfigMap(client, namespace, getVolumeConfigName())
-	if err != nil && os.Getenv("VOLUME_CONFIG_NAME") != "" {
+	config, err := common.GetVolumeConfigFromConfigMap(client, namespace, *volumeConfigName)
+	if err != nil && *volumeConfigName != defaultVolumeConfigName {
 		// If configmap is provided by user but we have problem getting it, fail fast.
 		glog.Fatalf("Could not get config map: %v", err)
 	} else if err != nil && errors.IsNotFound(err) {
 		// configmap is not provided by user and default configmap doesn't exist, create one.
-		glog.Infof("No config is given, creating default configmap")
+		glog.Infof("No config is given, creating default configmap %v", *volumeConfigName)
 		config = common.GetDefaultVolumeConfig()
 		if err = createConfigMap(client, namespace, config); err != nil {
 			glog.Fatalf("Unable to create configmap: %v\n", err)
@@ -268,7 +266,7 @@ func main() {
 		glog.Fatalf("Could not get default config map: %v", err)
 	}
 
-	glog.Infof("Running bootstrap pod with config %+v\n", config)
+	glog.Infof("Running bootstrap pod with config %v: %+v\n", *volumeConfigName, config)
 
 	// TODO: check error and clean up resources.
 	if err := createServiceAccount(client, namespace); err != nil && !errors.IsAlreadyExists(err) {
