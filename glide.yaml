@@ -57,3 +57,6 @@ import:
 - package: github.com/lpabon/godbc
   version: 9577782
 - package: github.com/dgrijalva/jwt-go
+- package: github.com/spf13/cobra
+- package: github.com/spf13/pflag  
+- package: github.com/powerman/rpc-codec/jsonrpc2

@@ -288,7 +288,7 @@ oc create -f https://raw.githubusercontent.com/raffaelespazzoli/iscsi-controller
 
 If you have installed OpenShift using the ansible installer you can use a set of playbook to automate the above instructions.
 You can find more documentation on these playbooks [here](./ansible/README.md)
-before running the playbooks you need to annotate the inventory file with some additional variables and the nodes with the iscsi inititator name that you want to be created. Here is a summary of the variables
+before running the playbooks you need to annotate the inventory file with some additional variables and the nodes with the iscsi inititator name that you want to be created. Here is a summary of the variables:
 
 | Variable Name  | Description  |
 |---|---|
