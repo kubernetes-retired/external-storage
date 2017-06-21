@@ -9,6 +9,7 @@ It runs on each node in the cluster and monitors specified directories to look f
 ## [Changelog](CHANGELOG.md)
 
 ## Development
+
 Compile the provisioner
 ``` console
 make
@@ -24,9 +25,9 @@ There is one provisioner instance on each node in the cluster.  Each instance is
 
 The basic components of the provisioner are as follows:
 
-Discovery: The discovery routine periodically reads the configured discovery directories and looks for new mount points that don't have a PV, and creates a PV for it.  
+Discovery: The discovery routine periodically reads the configured discovery directories and looks for new mount points that don't have a PV, and creates a PV for it.
 
-Deleter: The deleter routine is invoked by the Informer when a PV phase changes.  If the phase is Released, then it cleans up the volume and deletes the PV API object.  
+Deleter: The deleter routine is invoked by the Informer when a PV phase changes.  If the phase is Released, then it cleans up the volume and deletes the PV API object.
 
 Cache: A central cache stores all the Local PersistentVolumes that the provisioner has created.  It is populated by a PV informer that filters out the PVs that belong to this node and have been created by this provisioner.  It is used by the Discovery and Deleter routines to get the existing PVs.
 
