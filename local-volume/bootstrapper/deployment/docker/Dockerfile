@@ -13,5 +13,5 @@
 # limitations under the License.
 
 FROM scratch
-ADD local-volume-bootstrapper  /local-volume-bootstrapper
-ENTRYPOINT ["/local-volume-bootstrapper"]
+ADD local-volume-provisioner-bootstrap  /local-volume-provisioner-bootstrap
+ENTRYPOINT ["/local-volume-provisioner-bootstrap"]

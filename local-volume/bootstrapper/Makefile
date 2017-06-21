@@ -24,14 +24,14 @@ IMAGE = $(REGISTRY)local-volume-provisioner-bootstrap:$(VERSION)
 MUTABLE_IMAGE = $(REGISTRY)local-volume-provisioner-bootstrap:latest
 
 all build:
-	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o local-volume-bootstrapper .
+	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o local-volume-provisioner-bootstrap .
 .PHONY: all build
 
 container: build quick-container
 .PHONY: container
 
 quick-container:
-	cp local-volume-bootstrapper deployment/docker
+	cp local-volume-provisioner-bootstrap deployment/docker
 	docker build -t $(MUTABLE_IMAGE) deployment/docker
 	docker tag $(MUTABLE_IMAGE) $(IMAGE)
 .PHONY: quick-container
@@ -46,6 +46,6 @@ test:
 .PHONY: test
 
 clean:
-	rm -f local-volume-bootstrapper
-	rm -f deployment/docker/local-volume-bootstrapper
+	rm -f local-volume-provisioner-bootstrap
+	rm -f deployment/docker/local-volume-provisioner-bootstrap
 .PHONY: clean
