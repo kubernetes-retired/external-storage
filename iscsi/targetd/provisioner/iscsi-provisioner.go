@@ -232,7 +232,7 @@ func getFirstAvailableLun(exportList exportList) (int32, error) {
 	}
 
 	var sluns sort.IntSlice
-	sluns = luns[0:len(luns)]
+	sluns = luns[0:]
 	sort.Sort(sluns)
 	log.Debug("sorted lun list: ", sluns)
 	lun := int32(-1)

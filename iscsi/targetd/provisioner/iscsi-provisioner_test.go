@@ -19,11 +19,11 @@ func TestZeroExports(t *testing.T) {
 }
 
 func TestFindGaps1Initiator(t *testing.T) {
-	exportListWithGap := []export{export{
+	exportListWithGap := []export{{
 		Lun: 0},
-		export{
+		{
 			Lun: 1},
-		export{
+		{
 			Lun: 3},
 	}
 	lun, err := getFirstAvailableLun(exportListWithGap)
@@ -36,17 +36,17 @@ func TestFindGaps1Initiator(t *testing.T) {
 }
 
 func TestFindGaps2Initiators(t *testing.T) {
-	exportListWithGap := []export{export{
+	exportListWithGap := []export{{
 		Lun: 0},
-		export{
+		{
 			Lun: 1},
-		export{
+		{
 			Lun: 3},
-		export{
+		{
 			Lun: 0},
-		export{
+		{
 			Lun: 1},
-		export{
+		{
 			Lun: 3},
 	}
 	lun, err := getFirstAvailableLun(exportListWithGap)
@@ -60,23 +60,23 @@ func TestFindGaps2Initiators(t *testing.T) {
 }
 
 func TestFindGaps3Initiators(t *testing.T) {
-	exportListWithGap := []export{export{
+	exportListWithGap := []export{{
 		Lun: 0},
-		export{
+		{
 			Lun: 1},
-		export{
+		{
 			Lun: 3},
-		export{
+		{
 			Lun: 0},
-		export{
+		{
 			Lun: 1},
-		export{
+		{
 			Lun: 3},
-		export{
+		{
 			Lun: 0},
-		export{
+		{
 			Lun: 1},
-		export{
+		{
 			Lun: 3},
 	}
 	lun, err := getFirstAvailableLun(exportListWithGap)
@@ -90,35 +90,35 @@ func TestFindGaps3Initiators(t *testing.T) {
 }
 
 func TestFindGaps5Initiators(t *testing.T) {
-	exportListWithGap := []export{export{
+	exportListWithGap := []export{{
 		Lun: 0},
-		export{
+		{
 			Lun: 1},
-		export{
+		{
 			Lun: 3},
-		export{
+		{
 			Lun: 0},
-		export{
+		{
 			Lun: 1},
-		export{
+		{
 			Lun: 3},
-		export{
+		{
 			Lun: 0},
-		export{
+		{
 			Lun: 1},
-		export{
+		{
 			Lun: 3},
-		export{
+		{
 			Lun: 0},
-		export{
+		{
 			Lun: 1},
-		export{
+		{
 			Lun: 3},
-		export{
+		{
 			Lun: 0},
-		export{
+		{
 			Lun: 1},
-		export{
+		{
 			Lun: 3},
 	}
 	lun, err := getFirstAvailableLun(exportListWithGap)
@@ -133,7 +133,7 @@ func TestFindGaps5Initiators(t *testing.T) {
 
 func Test255Luns(t *testing.T) {
 	exportList := make([]export, 255, 255)
-	for i, _ := range exportList {
+	for i := range exportList {
 		exportList[i] = export{
 			Lun: int32(i),
 		}
@@ -145,7 +145,7 @@ func Test255Luns(t *testing.T) {
 }
 func Test255Luns2Initiators(t *testing.T) {
 	exportList := make([]export, 510, 510)
-	for i, _ := range exportList {
+	for i := range exportList {
 		exportList[i] = export{
 			Lun: int32(i) << 1,
 		}
@@ -158,7 +158,7 @@ func Test255Luns2Initiators(t *testing.T) {
 
 func Test250Luns2Initiators(t *testing.T) {
 	exportList := make([]export, 500, 500)
-	for i, _ := range exportList {
+	for i := range exportList {
 		exportList[i] = export{
 			Lun: int32(i / 2),
 		}
