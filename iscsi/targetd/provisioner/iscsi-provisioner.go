@@ -17,28 +17,28 @@ import (
 
 var log = logrus.New()
 
-type vol_createArgs struct {
+type volCreateArgs struct {
 	Pool string `json:"pool"`
 	Name string `json:"name"`
 	Size int64  `json:"size"`
 }
 
-type vol_destroyArgs struct {
+type volDestroyArgs struct {
 	Pool string `json:"pool"`
 	Name string `json:"name"`
 }
 
-type export_createArgs struct {
-	Pool          string `json:"pool"`
-	Vol           string `json:"vol"`
-	Initiator_wwn string `json:"initiator_wwn"`
-	Lun           int32  `json:"lun"`
+type exportCreateArgs struct {
+	Pool         string `json:"pool"`
+	Vol          string `json:"vol"`
+	InitiatorWwn string `json:"InitiatorWwn"`
+	Lun          int32  `json:"lun"`
 }
 
-type export_destroyArgs struct {
-	Pool          string `json:"pool"`
-	Vol           string `json:"vol"`
-	Initiator_wwn string `json:"initiator_wwn"`
+type exportDestroyArgs struct {
+	Pool         string `json:"pool"`
+	Vol          string `json:"vol"`
+	InitiatorWwn string `json:"InitiatorWwn"`
 }
 
 type iscsiProvisioner struct {
@@ -46,18 +46,19 @@ type iscsiProvisioner struct {
 }
 
 type export struct {
-	Initiator_wwn string `json:"initiator_wwn"`
-	Lun           int32  `json:"lun"`
-	Vol_name      string `json:"vol_name"`
-	Vol_size      int    `json:"vol_size"`
-	Vol_uuid      string `json:"vol_uuid"`
-	Pool          string `json:"pool"`
+	InitiatorWwn string `json:"InitiatorWwn"`
+	Lun          int32  `json:"lun"`
+	VolName      string `json:"vol name"`
+	VolSize      int    `json:"vol_size"`
+	VolUUID      string `json:"vol_uuid"`
+	Pool         string `json:"pool"`
 }
 
 type exportList []export
 
 type result int
 
+//create new iscsi provisioner
 func NewiscsiProvisioner(url string) controller.Provisioner {
 
 	initLog()
@@ -124,7 +125,7 @@ func (p *iscsiProvisioner) Delete(volume *v1.PersistentVolume) error {
 	log.Debugln("volume deletion request received: ", volume.GetName())
 	for _, initiator := range strings.Split(volume.Annotations["initiators"], ",") {
 		log.Debugln("removing iscsi export: ", volume.Annotations["volume_name"], volume.Annotations["pool"], initiator)
-		err := p.export_destroy(volume.Annotations["volume_name"], volume.Annotations["pool"], initiator)
+		err := p.exportDestroy(volume.Annotations["volume_name"], volume.Annotations["pool"], initiator)
 		if err != nil {
 			log.Warnln(err)
 			return err
@@ -132,7 +133,7 @@ func (p *iscsiProvisioner) Delete(volume *v1.PersistentVolume) error {
 		log.Debugln("iscsi export removed: ", volume.Annotations["volume_name"], volume.Annotations["pool"], initiator)
 	}
 	log.Debugln("removing logical volume : ", volume.Annotations["volume_name"], volume.Annotations["pool"])
-	err := p.vol_destroy(volume.Annotations["volume_name"], volume.Annotations["pool"])
+	err := p.volDestroy(volume.Annotations["volume_name"], volume.Annotations["pool"])
 	if err != nil {
 		log.Warnln(err)
 		return err
@@ -156,7 +157,7 @@ func (p *iscsiProvisioner) createVolume(options controller.VolumeOptions) (vol s
 	pool = p.getVolumeGroup(options)
 	initiators := p.getInitiators(options)
 	log.Debugln("calling export_list")
-	exportList, err := p.export_list()
+	exportList, err := p.exportList()
 	if err != nil {
 		log.Warnln(err)
 		return "", 0, "", err
@@ -168,7 +169,7 @@ func (p *iscsiProvisioner) createVolume(options controller.VolumeOptions) (vol s
 		return "", 0, "", err
 	}
 	log.Debugln("creating volume name, size, pool: ", vol, size, pool)
-	err = p.vol_create(vol, size, pool)
+	err = p.volCreate(vol, size, pool)
 	if err != nil {
 		log.Warnln(err)
 		return "", 0, "", err
@@ -176,7 +177,7 @@ func (p *iscsiProvisioner) createVolume(options controller.VolumeOptions) (vol s
 	log.Debugln("created volume name, size, pool: ", vol, size, pool)
 	for _, initiator := range initiators {
 		log.Debugln("exporting volume name, lun, pool, initiatir: ", vol, lun, pool, initiator)
-		err = p.export_create(vol, lun, pool, initiator)
+		err = p.exportCreate(vol, lun, pool, initiator)
 		if err != nil {
 			log.Warnln(err)
 			return "", 0, "", err
@@ -212,16 +213,16 @@ func getFirstAvailableLun(exportList exportList) (int32, error) {
 	sort.Sort(exportList)
 	log.Debug("sorted export List: ", exportList)
 	//this is sloppy way to remove duplicates
-	unique_export := make(map[int32]export)
+	uniqueExport := make(map[int32]export)
 	for _, export := range exportList {
-		unique_export[export.Lun] = export
+		uniqueExport[export.Lun] = export
 	}
-	log.Debug("unique luns sorted export List: ", unique_export)
+	log.Debug("unique luns sorted export List: ", uniqueExport)
 
 	//this is a sloppy way to get the list of luns
-	luns := make([]int, len(unique_export), len(unique_export))
+	luns := make([]int, len(uniqueExport), len(uniqueExport))
 	i := 0
-	for _, export := range unique_export {
+	for _, export := range uniqueExport {
 		luns[i] = int(export.Lun)
 		i++
 	}
@@ -250,7 +251,7 @@ func getFirstAvailableLun(exportList exportList) (int32, error) {
 }
 
 ////// json rpc operations ////
-func (p *iscsiProvisioner) vol_destroy(vol string, pool string) error {
+func (p *iscsiProvisioner) volDestroy(vol string, pool string) error {
 	client, err := p.getConnection()
 	defer client.Close()
 	if err != nil {
@@ -259,7 +260,7 @@ func (p *iscsiProvisioner) vol_destroy(vol string, pool string) error {
 	}
 
 	//make arguments object
-	args := vol_destroyArgs{
+	args := volDestroyArgs{
 		Pool: pool,
 		Name: vol,
 	}
@@ -270,7 +271,7 @@ func (p *iscsiProvisioner) vol_destroy(vol string, pool string) error {
 	return err
 }
 
-func (p *iscsiProvisioner) export_destroy(vol string, pool string, initiator string) error {
+func (p *iscsiProvisioner) exportDestroy(vol string, pool string, initiator string) error {
 
 	client, err := p.getConnection()
 	defer client.Close()
@@ -280,10 +281,10 @@ func (p *iscsiProvisioner) export_destroy(vol string, pool string, initiator str
 	}
 
 	//make arguments object
-	args := export_destroyArgs{
-		Pool:          pool,
-		Vol:           vol,
-		Initiator_wwn: initiator,
+	args := exportDestroyArgs{
+		Pool:         pool,
+		Vol:          vol,
+		InitiatorWwn: initiator,
 	}
 	//this will store returned result
 	var result result
@@ -292,7 +293,7 @@ func (p *iscsiProvisioner) export_destroy(vol string, pool string, initiator str
 	return err
 }
 
-func (p *iscsiProvisioner) vol_create(name string, size int64, pool string) error {
+func (p *iscsiProvisioner) volCreate(name string, size int64, pool string) error {
 
 	client, err := p.getConnection()
 	defer client.Close()
@@ -302,7 +303,7 @@ func (p *iscsiProvisioner) vol_create(name string, size int64, pool string) erro
 	}
 
 	//make arguments object
-	args := vol_createArgs{
+	args := volCreateArgs{
 		Pool: pool,
 		Name: name,
 		Size: size,
@@ -314,7 +315,7 @@ func (p *iscsiProvisioner) vol_create(name string, size int64, pool string) erro
 	return err
 }
 
-func (p *iscsiProvisioner) export_create(vol string, lun int32, pool string, initiator string) error {
+func (p *iscsiProvisioner) exportCreate(vol string, lun int32, pool string, initiator string) error {
 
 	client, err := p.getConnection()
 	defer client.Close()
@@ -324,11 +325,11 @@ func (p *iscsiProvisioner) export_create(vol string, lun int32, pool string, ini
 	}
 
 	//make arguments object
-	args := export_createArgs{
-		Pool:          pool,
-		Vol:           vol,
-		Initiator_wwn: initiator,
-		Lun:           lun,
+	args := exportCreateArgs{
+		Pool:         pool,
+		Vol:          vol,
+		InitiatorWwn: initiator,
+		Lun:          lun,
 	}
 	//this will store returned result
 	var result result
@@ -337,7 +338,7 @@ func (p *iscsiProvisioner) export_create(vol string, lun int32, pool string, ini
 	return err
 }
 
-func (p *iscsiProvisioner) export_list() (exportList, error) {
+func (p *iscsiProvisioner) exportList() (exportList, error) {
 
 	client, err := p.getConnection()
 	defer client.Close()
