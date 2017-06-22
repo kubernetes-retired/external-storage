@@ -58,7 +58,7 @@ type exportList []export
 
 type result int
 
-//create new iscsi provisioner
+// NewiscsiProvisioner creates new iscsi provisioner
 func NewiscsiProvisioner(url string) controller.Provisioner {
 
 	initLog()
@@ -157,13 +157,13 @@ func (p *iscsiProvisioner) createVolume(options controller.VolumeOptions) (vol s
 	pool = p.getVolumeGroup(options)
 	initiators := p.getInitiators(options)
 	log.Debugln("calling export_list")
-	exportList, err := p.exportList()
+	exportList1, err := p.exportList()
 	if err != nil {
 		log.Warnln(err)
 		return "", 0, "", err
 	}
 	log.Debugln("export_list called")
-	lun, err = getFirstAvailableLun(exportList)
+	lun, err = getFirstAvailableLun(exportList1)
 	if err != nil {
 		log.Warnln(err)
 		return "", 0, "", err
@@ -265,9 +265,9 @@ func (p *iscsiProvisioner) volDestroy(vol string, pool string) error {
 		Name: vol,
 	}
 	//this will store returned result
-	var result result
+	var result1 result
 	//call remote procedure with args
-	err = client.Call("vol_destroy", args, &result)
+	err = client.Call("vol_destroy", args, &result1)
 	return err
 }
 
@@ -287,9 +287,9 @@ func (p *iscsiProvisioner) exportDestroy(vol string, pool string, initiator stri
 		InitiatorWwn: initiator,
 	}
 	//this will store returned result
-	var result result
+	var result1 result
 	//call remote procedure with args
-	err = client.Call("export_destroy", args, &result)
+	err = client.Call("export_destroy", args, &result1)
 	return err
 }
 
@@ -309,9 +309,9 @@ func (p *iscsiProvisioner) volCreate(name string, size int64, pool string) error
 		Size: size,
 	}
 	//this will store returned result
-	var result result
+	var result1 result
 	//call remote procedure with args
-	err = client.Call("vol_create", args, &result)
+	err = client.Call("vol_create", args, &result1)
 	return err
 }
 
@@ -332,9 +332,9 @@ func (p *iscsiProvisioner) exportCreate(vol string, lun int32, pool string, init
 		Lun:          lun,
 	}
 	//this will store returned result
-	var result result
+	var result1 result
 	//call remote procedure with args
-	err = client.Call("export_create", args, &result)
+	err = client.Call("export_create", args, &result1)
 	return err
 }
 
@@ -348,9 +348,9 @@ func (p *iscsiProvisioner) exportList() (exportList, error) {
 	}
 
 	//this will store returned result
-	var result exportList
+	var result1 exportList
 	//call remote procedure with args
-	err = client.Call("export_list", nil, &result)
+	err = client.Call("export_list", nil, &result1)
 	return result, err
 }
 
