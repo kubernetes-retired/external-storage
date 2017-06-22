@@ -1,5 +1,5 @@
-hash: 6da7074b04317af537fa9f59254db6e8a8b3676a0908f3bdad642a6bb4128f97
-updated: 2017-06-20T21:49:39.416192867-04:00
+hash: 91ea0e6e7e5c17803bc5cac3d5c4885e806660aa91b273cf708ee6781a6960f1
+updated: 2017-06-21T20:06:03.782295545-04:00
 imports:
 - name: github.com/aws/aws-sdk-go
   version: 6669bce73b4e3bc922ff5ea3a3983ede26e02b39
@@ -157,11 +157,11 @@ imports:
 - name: github.com/spf13/cast
   version: e31f36ffc91a2ba9ddb72a4b6a607ff9b3d3cb63
 - name: github.com/spf13/cobra
-  version: 99b5d838ca16c25cc4944e323684f8415e8b10ba
+  version: f62e98d28ab7ad31d707ba837a966378465c7b57
 - name: github.com/spf13/jwalterweatherman
   version: 33c24e77fb80341fe7130ee7c594256ff08ccc46
 - name: github.com/spf13/pflag
-  version: 9ff6c6923cfffbcd502984b8e0c80539a94968b7
+  version: 5ccb023bc27df288a957c5e994cd44fd19619465
 - name: github.com/spf13/viper
   version: c1de95864d73a5465492829d7cb2dd422b19ac96
 - name: github.com/ugorji/go

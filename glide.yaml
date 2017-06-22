@@ -58,5 +58,7 @@ import:
   version: 9577782
 - package: github.com/dgrijalva/jwt-go
 - package: github.com/spf13/cobra
-- package: github.com/spf13/pflag  
+  version: f62e98d28ab7ad31d707ba837a966378465c7b57
+- package: github.com/spf13/pflag
+  version: 5ccb023bc27df288a957c5e994cd44fd19619465
 - package: github.com/powerman/rpc-codec/jsonrpc2
