@@ -7,8 +7,8 @@ standard PVC interface in a simple and portable way.  The PV contains node
 affinity information that the system uses to schedule pods to the correct
 nodes.
 
-An external static provisioner and a related bootstrapper is available to
-help simplify local storage management once the local volumes are configured.
+An external static provisioner and a related bootstrapper are available to help
+simplify local storage management once the local volumes are configured.
 
 ## Feature Status
 
@@ -98,7 +98,8 @@ $ ALLOW_PRIVILEGED=true LOG_LEVEL=5 FEATURE_GATES=PersistentLocalVolumes=true ha
 #### Option 1: Bootstrapping the external static provisioner
 
 This is optional, only for automated creation and cleanup of local volumes. See
-`bootstrapper/` and `provisioner/` for details and sample configuration files.
+[bootstrapper/](./bootstrapper) and [provisioner/](./provisioner) for details and
+sample configuration files.
 
 1. Create an admin account with cluster admin priviledge:
 ``` console
@@ -126,7 +127,7 @@ kind: PersistentVolume
 metadata:
   name: example-local-pv
   annotations:
-    "volume.alpha.kubernetes.io/node-affinity": `{
+    "volume.alpha.kubernetes.io/node-affinity": '{
       "requiredDuringSchedulingIgnoredDuringExecution": {
         "nodeSelectorTerms": [
           { "matchExpressions": [
@@ -136,7 +137,7 @@ metadata:
             }
           ]}
          ]}
-        }`,
+        }',
 spec:
   capacity:
     storage: 5Gi

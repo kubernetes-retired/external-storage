@@ -13,7 +13,8 @@ of how the bootstrap process works:
 - creates two cluster role bindings for the service account, i.e. `system:persistent-volume-provisioner`
   and `system:node`. The role bindings are named `local-storage:provisioner-node-binding` and
   `local-storage:provisioner-pv-binding` respectively.
-- creates provisioner daemonset based on volume configmap, `-image` option, etc
+- creates provisioner daemonset based on the service account, volume configmap,
+  `-image` option, etc
 - exit
 
 ## Configuration
