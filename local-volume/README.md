@@ -48,7 +48,7 @@ Future features:
 ### Bringing up a cluster with local disks
 #### GCE
 ``` console
-KUBE_FEATURE_GATES=PersistentLocalVolumes NODE_LOCAL_SSDS=<n> kube-up.sh
+KUBE_FEATURE_GATES="PersistentLocalVolumes=true" NODE_LOCAL_SSDS=<n> cluster/kube-up.sh
 ```
 #### GKE (not available until 1.7)
 ``` console
@@ -82,6 +82,13 @@ $ ALLOW_PRIVILEGED=true LOG_LEVEL=5 FEATURE_GATES=PersistentLocalVolumes=true ha
 
 3. Continue with [Running the external static provisioner](#running-the-external-static-provisioner)
    below.
+
+
+#### GCE E2E Testing
+``` console
+KUBE_FEATURE_GATES="PersistentLocalVolumes=true" NODE_LOCAL_SSDS=1 go run hack/e2e.go -- -v --up
+go run hack/e2e.go -- -v --test --test_args="--ginkgo.focus=\[Feature:LocalPersistentVolumes\]"
+```
 
 ### Running the external static provisioner
 This is optional, only for automated creation and cleanup of local volumes.
