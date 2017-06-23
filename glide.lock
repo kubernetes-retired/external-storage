@@ -1,5 +1,5 @@
-hash: 7abd73580d53b2584d9bc3916003ee95e65320a3cc941868b2cfda54b33769e0
-updated: 2017-06-20T17:13:19.297277777-04:00
+hash: 8d9a39fb5f625cdbe907baef7e52a29c912f75b630d23d098db95c1cd733a11e
+updated: 2017-06-23T14:54:16.778088234-04:00
 imports:
 - name: github.com/aws/aws-sdk-go
   version: 6669bce73b4e3bc922ff5ea3a3983ede26e02b39
@@ -87,7 +87,7 @@ imports:
   subpackages:
   - simplelru
 - name: github.com/heketi/heketi
-  version: 7bb2c5b9e03985acb40da143be06f48c102e02b2
+  version: 0a8565633d885d4c519a009ee03d10517bd09655
   subpackages:
   - client/api/go-client
   - pkg/glusterfs/api
