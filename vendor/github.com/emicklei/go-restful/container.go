@@ -25,24 +25,24 @@ type Container struct {
 	ServeMux               *http.ServeMux
 	isRegisteredOnRoot     bool
 	containerFilters       []FilterFunction
-	doNotRecover           bool // default is true
+	doNotRecover           bool // default is false
 	recoverHandleFunc      RecoverHandleFunction
 	serviceErrorHandleFunc ServiceErrorHandleFunction
-	router                 RouteSelector // default is a CurlyRouter (RouterJSR311 is a slower alternative)
+	router                 RouteSelector // default is a RouterJSR311, CurlyRouter is the faster alternative
 	contentEncodingEnabled bool          // default is false
 }
 
-// NewContainer creates a new Container using a new ServeMux and default router (CurlyRouter)
+// NewContainer creates a new Container using a new ServeMux and default router (RouterJSR311)
 func NewContainer() *Container {
 	return &Container{
 		webServices:            []*WebService{},
 		ServeMux:               http.NewServeMux(),
 		isRegisteredOnRoot:     false,
 		containerFilters:       []FilterFunction{},
-		doNotRecover:           true,
+		doNotRecover:           false,
 		recoverHandleFunc:      logStackOnRecover,
 		serviceErrorHandleFunc: writeServiceError,
-		router:                 CurlyRouter{},
+		router:                 RouterJSR311{},
 		contentEncodingEnabled: false}
 }
 
@@ -69,12 +69,12 @@ func (c *Container) ServiceErrorHandler(handler ServiceErrorHandleFunction) {
 
 // DoNotRecover controls whether panics will be caught to return HTTP 500.
 // If set to true, Route functions are responsible for handling any error situation.
-// Default value is true.
+// Default value is false = recover from panics. This has performance implications.
 func (c *Container) DoNotRecover(doNot bool) {
 	c.doNotRecover = doNot
 }
 
-// Router changes the default Router (currently CurlyRouter)
+// Router changes the default Router (currently RouterJSR311)
 func (c *Container) Router(aRouter RouteSelector) {
 	c.router = aRouter
 }
@@ -189,17 +189,6 @@ func writeServiceError(err ServiceError, req *Request, resp *Response) {
 }
 
 // Dispatch the incoming Http Request to a matching WebService.
-func (c *Container) Dispatch(httpWriter http.ResponseWriter, httpRequest *http.Request) {
-	if httpWriter == nil {
-		panic("httpWriter cannot be nil")
-	}
-	if httpRequest == nil {
-		panic("httpRequest cannot be nil")
-	}
-	c.dispatch(httpWriter, httpRequest)
-}
-
-// Dispatch the incoming Http Request to a matching WebService.
 func (c *Container) dispatch(httpWriter http.ResponseWriter, httpRequest *http.Request) {
 	writer := httpWriter
 
@@ -219,6 +208,12 @@ func (c *Container) dispatch(httpWriter http.ResponseWriter, httpRequest *http.R
 			}
 		}()
 	}
+	// Install closing the request body (if any)
+	defer func() {
+		if nil != httpRequest.Body {
+			httpRequest.Body.Close()
+		}
+	}()
 
 	// Detect if compression is needed
 	// assume without compression, test for override
