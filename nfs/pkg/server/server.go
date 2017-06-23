@@ -116,7 +116,7 @@ func Setup(ganeshaConfig string, gracePeriod uint, ganeshav4old, ganeshav4recov 
 		return fmt.Errorf("error setting fsid device to ganesha config: %v", err)
 	}
 
-	// Symlink v4old and v4recov
+	/*// Symlink v4old and v4recov
 	if err := os.MkdirAll("/var/lib/nfs/ganesha", 0755); err != nil {
 		return err
 	}
@@ -132,6 +132,7 @@ func Setup(ganeshaConfig string, gracePeriod uint, ganeshav4old, ganeshav4recov 
 	if err := os.Symlink(ganeshav4recov, "/var/lib/nfs/ganesha/v4recov"); err != nil {
 		return err
 	}
+	*/
 
 	return nil
 }
