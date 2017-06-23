@@ -410,7 +410,7 @@ func startProvisionerDeployment(c clientset.Interface, ns string) (*v1.Service, 
 	deployment.Spec.Template.Spec.Containers[0].Image = "quay.io/kubernetes_incubator/nfs-provisioner:latest"
 	deployment.Spec.Template.Spec.Containers[0].Args = []string{
 		fmt.Sprintf("-provisioner=%s", pluginName),
-		"-grace-period=10",
+		"-grace-period=60",
 	}
 	deployment.Spec.Template.Spec.Containers[0].Env = append(deployment.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "GANESHA_LOG_LEVEL", Value: "NIV_DEBUG"})
 
