@@ -84,9 +84,8 @@ $ ALLOW_PRIVILEGED=true LOG_LEVEL=5 FEATURE_GATES=PersistentLocalVolumes=true ha
    below.
 
 
-#### GCE E2E Testing
+#### Executing E2E Tests
 ``` console
-KUBE_FEATURE_GATES="PersistentLocalVolumes=true" NODE_LOCAL_SSDS=1 go run hack/e2e.go -- -v --up
 go run hack/e2e.go -- -v --test --test_args="--ginkgo.focus=\[Feature:LocalPersistentVolumes\]"
 ```
 
