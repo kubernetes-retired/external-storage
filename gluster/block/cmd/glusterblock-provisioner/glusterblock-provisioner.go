@@ -52,7 +52,7 @@ const (
 	provisionerVersion = "v0.9"
 	chapType           = "kubernetes.io/iscsi-chap"
 	heketiAnn          = "heketi-dynamic-provisioner"
-	volPrefix          = "blockvol-"
+	blockVolPrefix     = "blockvol_"
 	defaultIqn         = "iqn.2016-12.org.gluster-block:aafea465-9167-4880-b37c-2c36db8562ea"
 	defaultPortal      = "192.168.1.11"
 )
@@ -146,9 +146,9 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 
 	glog.V(4).Infof("glusterblock: VolumeOptions %v", options)
 
-	cfg, err := parseClassParameters(options.Parameters, p.client)
-	if err != nil {
-		return nil, fmt.Errorf("glusterblock: failed to parse class parameters: %v", err)
+	cfg, parseErr := parseClassParameters(options.Parameters, p.client)
+	if parseErr != nil {
+		return nil, fmt.Errorf("glusterblock: failed to parse class parameters: %v", parseErr)
 	}
 	p.provConfig = *cfg
 
@@ -160,28 +160,28 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 	volszInt := int(util.RoundUpSize(volSizeBytes, 1024*1024*1024))
 
 	// Create Volume
-	blockVolName := volPrefix + string(uuid.NewUUID())
-	vol, err := p.createVolume(volszInt, blockVolName)
+	blockVolName := blockVolPrefix + string(uuid.NewUUID())
+	blockVol, createErr := p.createVolume(volszInt, blockVolName)
 
-	if err != nil {
-		return nil, fmt.Errorf("glusterblock: failed to create volume: %v", err)
+	if createErr != nil {
+		return nil, fmt.Errorf("glusterblock: failed to create volume: %v", createErr)
 	}
 
 	//Sort Target Portal from portal.
-	sortErr := p.sortTargetPortal(vol)
+	sortErr := p.sortTargetPortal(blockVol)
 	if sortErr != nil {
-		return nil, fmt.Errorf("glusterblock: failed to fetch Target Portal: %v", err)
+		return nil, fmt.Errorf("glusterblock: failed to fetch Target Portal: %v", sortErr)
 	}
 
-	if vol.TargetPortal == "" || vol.Iqn == "" {
+	if blockVol.TargetPortal == "" || blockVol.Iqn == "" {
 		return nil, fmt.Errorf("glusterblock: Target portal/IQN is nil")
 	}
 
-	glog.V(1).Infof("glusterblock: Volume configuration : %+v", vol)
+	glog.V(1).Infof("glusterblock: Volume configuration : %+v", blockVol)
 
 	nameSpace := options.PVC.Namespace
-	user := vol.User
-	password := vol.AuthKey
+	user := blockVol.User
+	password := blockVol.AuthKey
 	secretName := "glusterblk-" + user + "-secret"
 	secretRef := &v1.LocalObjectReference{}
 
@@ -191,7 +191,7 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 			glog.Errorf("glusterblock: failed to create credentials for pv")
 			return nil, fmt.Errorf("glusterblock: failed to create credentials for pv")
 		}
-		vol.SessionCHAPAuth = p.provConfig.chapAuthEnabled
+		blockVol.SessionCHAPAuth = p.provConfig.chapAuthEnabled
 	} else {
 		glog.V(1).Infof("glusterblock: authentication is nil")
 	}
@@ -216,25 +216,24 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 			},
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				ISCSI: &v1.ISCSIVolumeSource{
-					TargetPortal:    vol.TargetPortal,
-					Portals:         vol.Portals,
-					IQN:             vol.Iqn,
+					TargetPortal:    blockVol.TargetPortal,
+					Portals:         blockVol.Portals,
+					IQN:             blockVol.Iqn,
 					Lun:             0,
 					FSType:          "ext4",
 					ReadOnly:        false,
-					SessionCHAPAuth: vol.SessionCHAPAuth,
+					SessionCHAPAuth: blockVol.SessionCHAPAuth,
 					SecretRef:       secretRef,
 				},
 			},
 		},
 	}
-	glog.Infof("successfully created Gluster Block volume %+v", pv.Spec.PersistentVolumeSource.ISCSI)
+	glog.V(1).Infof("successfully created Gluster Block volume %+v", pv.Spec.PersistentVolumeSource.ISCSI)
 	return pv, nil
 }
 
 func (p *glusterBlockProvisioner) createSecretRef(nameSpace string, secretName string, user string, password string) (*v1.LocalObjectReference, error) {
 	var err error
-
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: nameSpace,
@@ -281,7 +280,7 @@ func (p *glusterBlockProvisioner) createVolume(volSizeInt int, blockVol string) 
 
 	// An experimental/Test Mode:
 	case "gluster-block":
-
+		// Execute gluster-block command.
 		cmd := exec.Command(
 			p.provConfig.opMode, "create", p.provConfig.blockModeArgs["glustervol"]+"/"+blockVol,
 			"ha", haCountStr, p.provConfig.blockModeArgs["hosts"], sizeStr, "--json")
