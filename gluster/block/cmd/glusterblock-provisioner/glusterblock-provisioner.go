@@ -116,7 +116,7 @@ type glusterBlockVolume struct {
 	User              string   `json:"USERNAME"`
 	AuthKey           string   `json:"PASSWORD"`
 	Paths             int      `json:"HA"`
-	Lun               int32
+	Lun               int
 	FSType            string
 	ISCSIInterface    string
 	DiscoveryCHAPAuth bool
@@ -313,6 +313,7 @@ func (p *glusterBlockProvisioner) createVolume(volSizeInt int, blockVol string) 
 		}
 
 	case "heketi":
+		var clusterIDs []string
 		cli := gcli.NewClient(p.provConfig.url, p.provConfig.user, p.provConfig.restSecretValue)
 		if cli == nil {
 			glog.Errorf("glusterblock: failed to create glusterblock rest client")
@@ -320,6 +321,11 @@ func (p *glusterBlockProvisioner) createVolume(volSizeInt int, blockVol string) 
 		}
 		// TODO: call blockvolcreate
 		volumeReq := &gapi.VolumeCreateRequest{Size: volSizeInt}
+		if p.provConfig.clusterID != "" {
+			clusterIDs = dstrings.Split(p.provConfig.clusterID, ",")
+			glog.V(4).Infof("glusterblock: provided clusterIDs: %v", clusterIDs)
+		}
+
 		_, err := cli.VolumeCreate(volumeReq)
 		if err != nil {
 			glog.Errorf("glusterblock: error creating volume %v ", err)
