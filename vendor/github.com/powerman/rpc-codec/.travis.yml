@@ -1,0 +1,16 @@
+language: go
+
+go:
+  - 1.8
+  - tip
+
+before_install:
+  - go get github.com/axw/gocov/gocov
+  - go get github.com/mattn/goveralls
+  - go get golang.org/x/tools/cmd/cover
+
+script:
+  - go test -v -race ./...
+
+after_success:
+  - test "$TRAVIS_GO_VERSION" = "1.8" && cd jsonrpc2 && goveralls -service=travis-ci

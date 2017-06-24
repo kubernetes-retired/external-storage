@@ -367,7 +367,7 @@ func (p *iscsiProvisioner) exportList() (exportList, error) {
 	var result1 exportList
 	//call remote procedure with args
 	err = client.Call("export_list", nil, &result1)
-	return result, err
+	return result1, err
 }
 
 func (slice exportList) Len() int {

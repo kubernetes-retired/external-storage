@@ -1,5 +1,5 @@
-hash: 91ea0e6e7e5c17803bc5cac3d5c4885e806660aa91b273cf708ee6781a6960f1
-updated: 2017-06-21T20:06:03.782295545-04:00
+hash: a8d6f0927ddcb5038314d93bd20ac53f915eaf3df01c72656725ad8b7bd32aa7
+updated: 2017-06-24T09:02:18.279623257-04:00
 imports:
 - name: github.com/aws/aws-sdk-go
   version: 6669bce73b4e3bc922ff5ea3a3983ede26e02b39
@@ -184,7 +184,7 @@ imports:
   - idna
   - lex/httplex
 - name: golang.org/x/sys
-  version: fb4cac33e3196ff7f507ab9b2d2a44b0142f5b5a
+  version: c23410a886927bab8ca5e80b08af6a56faeb330d
   subpackages:
   - unix
 - name: golang.org/x/text

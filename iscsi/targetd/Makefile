@@ -1,4 +1,4 @@
-# Copyright 2016 The Kubernetes Authors.
+# Copyright 2017 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,41 +12,53 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-IMAGE = raffaelespazzoli/iscsi-controller
-
-VERSION :=
-TAG := $(shell git describe --abbrev=0 --tags HEAD 2>/dev/null)
-COMMIT := $(shell git rev-parse HEAD)
-ifeq ($(TAG),)
-    VERSION := latest
-else
-    ifeq ($(COMMIT), $(shell git rev-list -n1 $(TAG)))
-        VERSION := $(TAG)
-    else
-        VERSION := latest
-    endif
+ifeq ($(REGISTRY),)
+	REGISTRY = quay.io/external_storage/
 endif
+ifeq ($(VERSION),)
+	VERSION = latest
+endif
+IMAGE = $(REGISTRY)iscsi-controller:$(VERSION)
+MUTABLE_IMAGE = $(REGISTRY)iscsi-controller:latest
 
 all build:
-	GOOS=linux go install -v ./
-	GOOS=linux go build -a --ldflags '-extldflags "-static"' -tags netgo -installsuffix netgo -o iscsi-controller
+	@mkdir -p .go/src/github.com/kubernetes-incubator/external-storage/iscsi/targetd/vendor
+	@mkdir -p .go/bin
+	@mkdir -p .go/stdlib
+	docker run \
+		--rm  \
+		-e "CGO_ENABLED=0" \
+		-u $$(id -u):$$(id -g) \
+		-v $$(pwd)/.go:/go \
+		-v $$(pwd):/go/src/github.com/kubernetes-incubator/external-storage/iscsi/targetd \
+		-v "$${PWD%/*/*}/vendor":/go/src/github.com/kubernetes-incubator/external-storage/vendor \
+		-v "$${PWD%/*/*}/lib":/go/src/github.com/kubernetes-incubator/external-storage/lib \
+		-v $$(pwd):/go/bin \
+		-v $$(pwd)/.go/stdlib:/usr/local/go/pkg/linux_amd64_asdf \
+		-w /go/src/github.com/kubernetes-incubator/external-storage/iscsi/targetd \
+		golang:1.8.3-alpine \
+		go install -installsuffix "asdf" .
 .PHONY: all build
 
 container: build quick-container
 .PHONY: container
 
 quick-container:
-	docker build -t $(IMAGE):$(VERSION) .
+	mv targetd iscsi-controller
+	docker build -t $(MUTABLE_IMAGE) .
+	docker tag $(MUTABLE_IMAGE) $(IMAGE)
 .PHONY: quick-container
 
 push: container
-	docker push $(IMAGE):$(VERSION)
+	docker push $(IMAGE)
+	docker push $(MUTABLE_IMAGE)
 .PHONY: push
 
-clean:
-	rm -f iscsi-controller
-.PHONY: clean
-
-test: verify
-	go test ./provisiner
+test:
+	go test `go list ./... | grep -v 'vendor'`
 .PHONY: test
+
+clean:
+	rm -rf .go
+	rm -f glusterblock-provisioner
+.PHONY: clean
