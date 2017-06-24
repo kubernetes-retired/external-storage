@@ -37,7 +37,7 @@ import (
 )
 
 const (
-	defaultImageName          = "quay.io/external_storage/local-volume-provisioner"
+	defaultImageName          = "quay.io/external_storage/local-volume-provisioner:latest"
 	defaultVolumeConfigName   = "local-volume-default-config"
 	defaultServiceAccountName = "local-storage-admin"
 	defaultMountRoot          = "/mnt/local-storage"

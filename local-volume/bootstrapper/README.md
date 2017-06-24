@@ -76,10 +76,6 @@ list of important options:
   must reside in the same namespace with bootstrapper. (default "local-volume-default-config")
 - `-serviceaccount`: Name of the service accout for local volume provisioner
   (default "local-storage-admin")
-- `-mount-root`: Container root directory of volume mount path for discoverying
-  local volumes. This is used only when mountDir is omitted in volume configmap,
-  in which case hostDir will be normalized then concatenates with mountRoot
-  (default "/mnt/local-storage")
 
 ## Development
 
@@ -101,3 +97,17 @@ kubectl create -f deployment/kubernetes/example-config.yaml
 kubectl create -f deployment/kubernetes/admin-account.yaml
 kubectl create -f deployment/kubernetes/bootstrapper.yaml
 ```
+
+## Future improvements
+
+- Right now, bootstrapper is bound to cluster-admin role and provisioner is bound
+  to system:node, system:persistent-volume-provisioner, these roles have more
+  more privileges than we need. As a future enhancemnet, we can look into using
+  different roles with fewer permissions.
+- Bootstrapper will update user-created configmap if `MountDir` is omitted from
+  user. We choose to update the confimap instead of auto-generating a new one
+  because 1. the config will be shared between bootstrapper and provisioner; 2.
+  the config only has settings for volumes so it won't mis-configure any other
+  settings. We can revisit this when we have more settings in this configmap.
+- Auto-generated `MountDir` doesn't take path length into consideration. If user
+  provides a very long `HostPath`, bootstrapper will fail to create `MountDir`.
