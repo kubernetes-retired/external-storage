@@ -456,7 +456,7 @@ func parseClassParameters(params map[string]string, kubeclient kubernetes.Interf
 	} else {
 		parseErr := parseOpmodeArgs(parseOpmode, &cfg, blkmodeArgs)
 		if parseErr != nil {
-			return nil, fmt.Errorf("glusterblock: parsing failed :%v", parseErr)
+			return nil, fmt.Errorf("glusterblock: parsing failed, error [%v]", parseErr)
 		}
 	}
 
@@ -499,17 +499,17 @@ func parseOpmodeArgs(parseOpmode string, cfg *provisionerConfig, blkmodeArgs str
 	case "gluster-block":
 		cfg.opMode = "gluster-block"
 		if len(blkmodeArgs) == 0 {
-			return fmt.Errorf("'blockmodeargs' has to be set if 'gluster-block' opmode is set")
+			return fmt.Errorf("[gluster-block] arg:[%s] has to be set if 'gluster-block' opmode is set", "blockmodeargs")
 		}
 		parseOpmodeInfo := dstrings.Split(blkmodeArgs, "=")
 		if len(parseOpmodeInfo) >= 2 {
 			argsDict, err := parseBlockModeArgs(cfg.opMode, blkmodeArgs)
 			if err != nil {
-				return fmt.Errorf("Failed to parse gluster-block arguments: %v", err)
+				return fmt.Errorf("[gluster-block] failed to parse arguments, error [%v]", err)
 			}
 			cfg.blockModeArgs = *argsDict
 		} else {
-			return fmt.Errorf("StorageClass for provisioner %s contains wrong number of arguments for %s", "glusterblock", parseOpmode)
+			return fmt.Errorf("[gluster-block] wrong number of arguments for opmode [%s]", parseOpmode)
 		}
 
 		// Heketi Opmode
@@ -517,10 +517,10 @@ func parseOpmodeArgs(parseOpmode string, cfg *provisionerConfig, blkmodeArgs str
 		cfg.opMode = "heketi"
 		err := parseHeketiModeArgs(cfg)
 		if err != nil {
-			return fmt.Errorf("Failed to parse gluster-block arguments: %v", err)
+			return fmt.Errorf("[heketi] failed to parse arguments, error [%v] ", err)
 		}
 	default:
-		return fmt.Errorf("StorageClass for provisioner %s contains unknown [%v] parameter", "glusterblock", parseOpmode)
+		return fmt.Errorf("StorageClass for provisioner [%s] contains unknown [%v] parameter", "glusterblock", parseOpmode)
 	}
 	return nil
 }
@@ -536,17 +536,17 @@ func parseBlockModeArgs(mode string, inArgs string) (*map[string]string, error) 
 			if volName != "" {
 				modeArgs["glustervol"] = volName
 			} else {
-				return nil, fmt.Errorf("StorageClass for provisioner %s must contain valid parameter for %v ", "glusterblock", "glustervol")
+				return nil, fmt.Errorf("invalid parameter for [%v] ", "glustervol")
 			}
 		case "hosts":
 			blockHosts := dstrings.Split(v, "=")[1]
 			if blockHosts != "" {
 				modeArgs["hosts"] = blockHosts
 			} else {
-				return nil, fmt.Errorf("StorageClass for provisioner %s must contain valid  parameter for %v", "glusterblock", "hosts")
+				return nil, fmt.Errorf("invalid  parameter for [%v]", "hosts")
 			}
 		default:
-			return nil, fmt.Errorf("parseBlockModeArgs: StorageClass for provisioner %s must contain valid parameter for %v", "glusterblock", mode)
+			return nil, fmt.Errorf("invalid parameter for [%v]", mode)
 		}
 	}
 	return &modeArgs, nil
