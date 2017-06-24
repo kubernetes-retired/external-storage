@@ -23,7 +23,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"k8s.io/kubernetes/pkg/client/restclient"
+	restclient "k8s.io/client-go/rest"
 )
 
 type Config struct {

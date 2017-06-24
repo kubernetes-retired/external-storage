@@ -100,7 +100,7 @@ imports:
   - json/scanner
   - json/token
 - name: github.com/heketi/heketi
-  version: 7bb2c5b9e03985acb40da143be06f48c102e02b2
+  version: 0a8565633d885d4c519a009ee03d10517bd09655
   subpackages:
   - client/api/go-client
   - pkg/glusterfs/api
