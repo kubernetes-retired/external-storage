@@ -52,7 +52,7 @@ spec:
       containers:
         - name: iscsi-provisioner
           imagePullPolicy: Always
-          image: raffaelespazzoli/iscsi-controller:0.0.1
+          image: quay.io/external_storage/iscsi-controller:latest
           args:
             - "start"
           env:
