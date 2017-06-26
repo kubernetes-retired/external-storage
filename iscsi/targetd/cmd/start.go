@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"time"
 )
 
 var log = logrus.New()
@@ -83,6 +82,14 @@ to quickly create a Cobra application.`,
 		//		pc := controller.NewProvisionController(kubernetesClientSet, viper.GetDuration("resync-period"), viper.GetString("provisioner-name"), iscsiProvisioner, serverVersion.GitVersion,
 		//			viper.GetBool("exponential-backoff-on-error"), viper.GetInt("fail-retry-threshold"), viper.GetDuration("lease-period"),
 		//			viper.GetDuration("renew-deadline"), viper.GetDuration("retry-priod"), viper.GetDuration("term-limit"))
+		controller.ResyncPeriod(viper.GetDuration("resync-period"))
+		controller.ExponentialBackOffOnError(viper.GetBool("exponential-backoff-on-error"))
+		controller.FailedProvisionThreshold(viper.GetInt("fail-retry-threshold"))
+		controller.FailedDeleteThreshold(viper.GetInt("fail-retry-threshold"))
+		controller.LeaseDuration(viper.GetDuration("lease-period"))
+		controller.RenewDeadline(viper.GetDuration("renew-deadline"))
+		controller.TermLimit(viper.GetDuration("term-limit"))
+		controller.RetryPeriod(viper.GetDuration("retry-period"))
 		log.Debugln("iscsi controller created, running forever...")
 		pc.Run(wait.NeverStop)
 	},
@@ -92,18 +99,18 @@ func init() {
 	RootCmd.AddCommand(startcontrollerCmd)
 	startcontrollerCmd.Flags().String("provisioner-name", "iscsi-provisioner", "name of this provisioner, must match what is passed int the storage class annotation")
 	viper.BindPFlag("provisioner-name", startcontrollerCmd.Flags().Lookup("provisioner-name"))
-	startcontrollerCmd.Flags().Duration("resync-period", 15*time.Second, "how often to poll the master API for updates")
+	startcontrollerCmd.Flags().Duration("resync-period", controller.DefaultResyncPeriod, "how often to poll the master API for updates")
 	viper.BindPFlag("resync-period", startcontrollerCmd.Flags().Lookup("resync-period"))
-	startcontrollerCmd.Flags().Bool("exponential-backoff-on-error", true, "exponential-backoff-on-error doubles the retry-period everytime there is an error")
+	startcontrollerCmd.Flags().Bool("exponential-backoff-on-error", controller.DefaultExponentialBackOffOnError, "exponential-backoff-on-error doubles the retry-period everytime there is an error")
 	viper.BindPFlag("exponential-backoff-on-error", startcontrollerCmd.Flags().Lookup("exponential-backoff-on-error"))
-	startcontrollerCmd.Flags().Int("fail-retry-threshold", 10, "Threshold for max number of retries on failure of provisioner")
+	startcontrollerCmd.Flags().Int("fail-retry-threshold", controller.DefaultFailedProvisionThreshold, "Threshold for max number of retries on failure of provisioner")
 	viper.BindPFlag("fail-retry-threshold", startcontrollerCmd.Flags().Lookup("fail-retry-threshold"))
 	startcontrollerCmd.Flags().Duration("lease-period", controller.DefaultLeaseDuration, "LeaseDuration is the duration that non-leader candidates will wait to force acquire leadership. This is measured against time of last observed ack")
 	viper.BindPFlag("lease-period", startcontrollerCmd.Flags().Lookup("lease-period"))
 	startcontrollerCmd.Flags().Duration("renew-deadline", controller.DefaultRenewDeadline, "RenewDeadline is the duration that the acting master will retry refreshing leadership before giving up")
 	viper.BindPFlag("renew-deadline", startcontrollerCmd.Flags().Lookup("renew-deadline"))
-	startcontrollerCmd.Flags().Duration("retry-priod", controller.DefaultRetryPeriod, "RetryPeriod is the duration the LeaderElector clients should wait between tries of actions")
-	viper.BindPFlag("retry-priod", startcontrollerCmd.Flags().Lookup("retry-priod"))
+	startcontrollerCmd.Flags().Duration("retry-period", controller.DefaultRetryPeriod, "RetryPeriod is the duration the LeaderElector clients should wait between tries of actions")
+	viper.BindPFlag("retry-period", startcontrollerCmd.Flags().Lookup("retry-period"))
 	startcontrollerCmd.Flags().Duration("term-limit", controller.DefaultTermLimit, "TermLimit is the maximum duration that a leader may remain the leader to complete the task before it must give up its leadership. 0 for forever or indefinite.")
 	viper.BindPFlag("term-limit", startcontrollerCmd.Flags().Lookup("term-limit"))
 	startcontrollerCmd.Flags().String("targetd-scheme", "http", "scheme of the targetd connection, can be http or https")
