@@ -332,7 +332,7 @@ func (p *glusterBlockProvisioner) createVolume(volSizeInt int, blockVol string) 
 		}
 
 		// Fill the block configuration.
-		execBlockRes := blockRes.glusterBlockExecVolRes
+		execBlockRes := &blockRes.glusterBlockExecVolRes
 		json.Unmarshal([]byte(out), execBlockRes)
 
 		if config.chapAuthEnabled {
@@ -347,7 +347,11 @@ func (p *glusterBlockProvisioner) createVolume(volSizeInt int, blockVol string) 
 			}
 			json.Unmarshal([]byte(out), execBlockRes)
 
-			if execBlockRes.User == "" || execBlockRes.AuthKey == "" {
+			if *execBlockRes == nil {
+				return nil, fmt.Errorf("glusterblock: failed to decode gluster-block response")
+			}
+
+			if config.chapAuthEnabled && (**execBlockRes).User == "" || (**execBlockRes).AuthKey == "" {
 				return nil, fmt.Errorf("glusterblock: missing CHAP - invalid volume creation ")
 			}
 
