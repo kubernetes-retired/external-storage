@@ -45,7 +45,7 @@ clean-aws/efs:
 	make clean
 .PHONY: clean-aws/efs
 
-ceph/cephfs: 
+ceph/cephfs:
 	cd ceph/cephfs; \
 	go build cephfs-provisioner.go; \
 	docker build -t $(REGISTRY)cephfs-provisioner:latest .
@@ -77,6 +77,17 @@ clean-gluster/block:
 	make clean
 .PHONY: clean-gluster/block
 
+local-volume: local-volume/provisioner local-volume/bootstrapper
+.PHONY: local-volume
+
+test-local-volume:
+	cd local-volume; \
+	make test
+.PHONY: test-local-volume
+
+clean-local-volume: clean-local-volume/provisioner clean-local-volume/bootstrapper
+.PHONY: clean-local-volume
+
 local-volume/provisioner:
 	cd local-volume/provisioner; \
 	make container
@@ -84,13 +95,23 @@ local-volume/provisioner:
 
 test-local-volume/provisioner:
 	cd local-volume/provisioner; \
-	go test ./...
+	make test
 .PHONY: test-local-volume/provisioner
 
 clean-local-volume/provisioner:
 	cd local-volume/provisioner; \
 	make clean
 .PHONY: clean-local-volume/provisioner
+
+local-volume/bootstrapper:
+	cd local-volume/bootstrapper; \
+	make container
+.PHONY: local-volume/bootstrapper
+
+clean-local-volume/bootstrapper:
+	cd local-volume/bootstrapper; \
+	make clean
+.PHONY: clean-local-volume/bootstrapper
 
 nfs-client:
 	cd nfs-client; \
@@ -104,12 +125,12 @@ clean-nfs-client:
 	rm -f nfs-client-provisioner
 .PHONY: clean-nfs-client
 
-nfs: 
+nfs:
 	cd nfs; \
 	make container
 .PHONY: nfs
 
-test-nfs: 
+test-nfs:
 	cd nfs; \
 	make test
 .PHONY: test-nfs
