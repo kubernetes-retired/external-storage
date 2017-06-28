@@ -39,6 +39,10 @@ targetd.  There is a bug filed:
 https://bugzilla.redhat.com/show_bug.cgi?id=1451139 Until this bug is
 resolve, SELinux must be set to permissive mode on Fedora 25+.
 
+For RHEL and Centos make sure you install targetd >= 0.8.6-1 as in 
+previous versions there a bug that prevented exposing a volume to more 
+than one initiator 
+
 ### A note about names
 
 In various places, iSCSI Qualified Names (IQNs) need to be created.
