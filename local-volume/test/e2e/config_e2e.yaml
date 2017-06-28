@@ -1,0 +1,9 @@
+kind: ConfigMap
+metadata:
+  name: local-volume-config
+  namespace: kube-system
+data:
+  "local-storage": |
+    {
+      "hostDir": "/tmp/local-disks"
+    }
