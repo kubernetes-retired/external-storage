@@ -190,44 +190,54 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 		return nil, fmt.Errorf("glusterblock: failed to create volume: %v", createErr)
 	}
 
+	iscsiVol := &iscsiSpec{}
+	if blockVol != nil {
+		blockVol.iscsiSpec = iscsiVol
+	}
+
 	//Store fields from response to iscsiSpec struct
-	if p.provConfig.opMode == "heketi" && blockVol.heketiBlockVolRes != nil {
-		blockVol.iscsiSpec.Portals = blockVol.heketiBlockVolRes.Portals
-		blockVol.iscsiSpec.Iqn = blockVol.heketiBlockVolRes.Iqn
-		blockVol.iscsiSpec.User = blockVol.heketiBlockVolRes.User
-		blockVol.iscsiSpec.AuthKey = blockVol.heketiBlockVolRes.AuthKey
+	if p.provConfig.opMode == "heketi" && (*blockVol).heketiBlockVolRes != nil {
+		iscsiVol.Portals = (*blockVol).heketiBlockVolRes.Portals
+		iscsiVol.Iqn = (*blockVol).heketiBlockVolRes.Iqn
+		iscsiVol.User = (*blockVol).heketiBlockVolRes.User
+		iscsiVol.AuthKey = (*blockVol).heketiBlockVolRes.AuthKey
+	} else if p.provConfig.opMode == "gluster-block" && (*blockVol).glusterBlockExecVolRes != nil {
+		iscsiVol.Portals = (*blockVol).glusterBlockExecVolRes.Portals
+		iscsiVol.Iqn = (*blockVol).glusterBlockExecVolRes.Iqn
+		iscsiVol.User = (*blockVol).glusterBlockExecVolRes.User
+		iscsiVol.AuthKey = (*blockVol).glusterBlockExecVolRes.AuthKey
 	} else {
-		blockVol.iscsiSpec.Portals = blockVol.glusterBlockExecVolRes.Portals
-		blockVol.iscsiSpec.Iqn = blockVol.glusterBlockExecVolRes.Iqn
-		blockVol.iscsiSpec.User = blockVol.glusterBlockExecVolRes.User
-		blockVol.iscsiSpec.AuthKey = blockVol.glusterBlockExecVolRes.AuthKey
+		return nil, fmt.Errorf("glusterblock: failed to parse %v", *blockVol)
 	}
 
 	//Sort Target Portal from portal.
-	sortErr := p.sortTargetPortal(blockVol.iscsiSpec)
+	sortErr := p.sortTargetPortal(iscsiVol)
 	if sortErr != nil {
 		return nil, fmt.Errorf("glusterblock: failed to fetch Target Portal: %v", sortErr)
 	}
 
-	if blockVol.iscsiSpec.TargetPortal == "" || blockVol.iscsiSpec.Iqn == "" {
+	if iscsiVol.TargetPortal == "" || iscsiVol.Iqn == "" {
 		return nil, fmt.Errorf("glusterblock: Target portal/IQN is nil")
 	}
 
 	glog.V(1).Infof("glusterblock: Volume configuration : %+v", blockVol)
 
 	nameSpace := options.PVC.Namespace
-	user := blockVol.iscsiSpec.User
-	password := blockVol.iscsiSpec.AuthKey
+	user := iscsiVol.User
+	password := iscsiVol.AuthKey
 	secretName := "glusterblk-" + user + "-secret"
 	secretRef := &v1.LocalObjectReference{}
 
+	glog.Errorf("User:%v , Password:%v, SecretName: %v,", user, password, secretName)
 	if p.provConfig.chapAuthEnabled && user != "" && password != "" {
 		secretRef, err = p.createSecretRef(nameSpace, secretName, user, password)
+
+		glog.Errorf("FROM PROVISIONER:%+v", secretRef)
 		if err != nil {
 			glog.Errorf("glusterblock: failed to create credentials for pv")
 			return nil, fmt.Errorf("glusterblock: failed to create credentials for pv")
 		}
-		blockVol.iscsiSpec.SessionCHAPAuth = p.provConfig.chapAuthEnabled
+		iscsiVol.SessionCHAPAuth = p.provConfig.chapAuthEnabled
 	} else {
 		glog.V(1).Infof("glusterblock: authentication is nil")
 	}
@@ -252,13 +262,13 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 			},
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				ISCSI: &v1.ISCSIVolumeSource{
-					TargetPortal:    blockVol.iscsiSpec.TargetPortal,
-					Portals:         blockVol.iscsiSpec.Portals,
-					IQN:             blockVol.iscsiSpec.Iqn,
+					TargetPortal:    iscsiVol.TargetPortal,
+					Portals:         iscsiVol.Portals,
+					IQN:             iscsiVol.Iqn,
 					Lun:             0,
 					FSType:          "ext4",
 					ReadOnly:        false,
-					SessionCHAPAuth: blockVol.iscsiSpec.SessionCHAPAuth,
+					SessionCHAPAuth: iscsiVol.SessionCHAPAuth,
 					SecretRef:       secretRef,
 				},
 			},
@@ -286,6 +296,7 @@ func (p *glusterBlockProvisioner) createSecretRef(nameSpace string, secretName s
 	p.volConfig.BlockSecret = secretName
 	secretRef := &v1.LocalObjectReference{}
 	p.volConfig.BlockSecretNs = nameSpace
+	glog.Errorf("P VOLCONFIG:%+v", p.volConfig)
 	if secret != nil {
 		_, err = p.client.Core().Secrets(nameSpace).Create(secret)
 		if err != nil {
@@ -300,6 +311,7 @@ func (p *glusterBlockProvisioner) createSecretRef(nameSpace string, secretName s
 		return nil, fmt.Errorf("glusterblock: secret is nil")
 
 	}
+	glog.Errorf("SECRETREF:%+v", secretRef)
 	return secretRef, nil
 }
 
@@ -332,9 +344,11 @@ func (p *glusterBlockProvisioner) createVolume(volSizeInt int, blockVol string) 
 		}
 
 		// Fill the block configuration.
-		execBlockRes := blockRes.glusterBlockExecVolRes
-		json.Unmarshal([]byte(out), execBlockRes)
-
+		execBlockRes := &blockRes.glusterBlockExecVolRes
+		unmarshErr := json.Unmarshal([]byte(out), execBlockRes)
+		if unmarshErr != nil {
+			return nil, fmt.Errorf("failed to unmarshal the response")
+		}
 		if config.chapAuthEnabled {
 			cmd := exec.Command(
 				config.opMode, "modify", config.blockModeArgs["glustervol"]+"/"+blockVol,
@@ -345,9 +359,15 @@ func (p *glusterBlockProvisioner) createVolume(volSizeInt int, blockVol string) 
 				glog.Errorf("glusterblock: error [%v] when running command %v", cmdErr, cmd)
 				return nil, cmdErr
 			}
-			json.Unmarshal([]byte(out), execBlockRes)
+			unmarshErr = json.Unmarshal([]byte(out), execBlockRes)
+			if unmarshErr != nil {
+				return nil, fmt.Errorf("failed to unmarshal auth response")
+			}
+			if *execBlockRes == nil {
+				return nil, fmt.Errorf("glusterblock: failed to decode gluster-block response")
+			}
 
-			if execBlockRes.User == "" || execBlockRes.AuthKey == "" {
+			if config.chapAuthEnabled && (**execBlockRes).User == "" || (**execBlockRes).AuthKey == "" {
 				return nil, fmt.Errorf("glusterblock: missing CHAP - invalid volume creation ")
 			}
 
