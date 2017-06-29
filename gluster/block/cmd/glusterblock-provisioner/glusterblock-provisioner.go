@@ -145,6 +145,7 @@ type iscsiSpec struct {
 	ReadOnly          bool
 	BlockSecret       string
 	BlockSecretNs     string
+	BlockVolName      string
 }
 
 //NewGlusterBlockProvisioner create a new provisioner.
@@ -183,7 +184,10 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 	volszInt := int(util.RoundUpSize(volSizeBytes, 1024*1024*1024))
 
 	// Create Volume
-	blockVolName := blockVolPrefix + string(uuid.NewUUID())
+	blockVolName := ""
+	if p.provConfig.opMode == "gluster-block" {
+		blockVolName = blockVolPrefix + string(uuid.NewUUID())
+	}
 	blockVol, createErr := p.createVolume(volszInt, blockVolName)
 
 	if createErr != nil {
@@ -206,6 +210,7 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 		iscsiVol.Iqn = (*blockVol).glusterBlockExecVolRes.Iqn
 		iscsiVol.User = (*blockVol).glusterBlockExecVolRes.User
 		iscsiVol.AuthKey = (*blockVol).glusterBlockExecVolRes.AuthKey
+		iscsiVol.BlockVolName = blockVolName
 	} else {
 		return nil, fmt.Errorf("glusterblock: failed to parse %v", *blockVol)
 	}
@@ -228,11 +233,9 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 	secretName := "glusterblk-" + user + "-secret"
 	secretRef := &v1.LocalObjectReference{}
 
-	glog.Errorf("User:%v , Password:%v, SecretName: %v,", user, password, secretName)
 	if p.provConfig.chapAuthEnabled && user != "" && password != "" {
 		secretRef, err = p.createSecretRef(nameSpace, secretName, user, password)
 
-		glog.Errorf("FROM PROVISIONER:%+v", secretRef)
 		if err != nil {
 			glog.Errorf("glusterblock: failed to create credentials for pv")
 			return nil, fmt.Errorf("glusterblock: failed to create credentials for pv")
@@ -248,7 +251,7 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 			Annotations: map[string]string{
 				provisionerIDAnn:   p.identity,
 				provisionerVersion: provisionerVersion,
-				shareIDAnn:         blockVolName,
+				shareIDAnn:         iscsiVol.BlockVolName,
 				creatorAnn:         heketiAnn,
 				volumeTypeAnn:      "block",
 				"Description":      descAnn,
@@ -296,7 +299,7 @@ func (p *glusterBlockProvisioner) createSecretRef(nameSpace string, secretName s
 	p.volConfig.BlockSecret = secretName
 	secretRef := &v1.LocalObjectReference{}
 	p.volConfig.BlockSecretNs = nameSpace
-	glog.Errorf("P VOLCONFIG:%+v", p.volConfig)
+
 	if secret != nil {
 		_, err = p.client.Core().Secrets(nameSpace).Create(secret)
 		if err != nil {
@@ -311,7 +314,6 @@ func (p *glusterBlockProvisioner) createSecretRef(nameSpace string, secretName s
 		return nil, fmt.Errorf("glusterblock: secret is nil")
 
 	}
-	glog.Errorf("SECRETREF:%+v", secretRef)
 	return secretRef, nil
 }
 
