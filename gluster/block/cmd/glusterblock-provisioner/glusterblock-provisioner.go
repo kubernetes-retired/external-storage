@@ -425,7 +425,8 @@ func (p *glusterBlockProvisioner) createVolume(volSizeInt int, blockVol string, 
 // Delete removes the storage asset that was created by Provision represented
 // by the given PV.
 func (p *glusterBlockProvisioner) Delete(volume *v1.PersistentVolume) error {
-	config := &p.provConfig
+	config := &provisionerConfig{}
+	config.blockModeArgs = make(map[string]string)
 	ann, ok := volume.Annotations[provisionerIDAnn]
 	if !ok {
 		return errors.New("glusterblock: identity annotation not found on PV")
@@ -437,6 +438,17 @@ func (p *glusterBlockProvisioner) Delete(volume *v1.PersistentVolume) error {
 	delBlockVolName, ok := volume.Annotations[shareIDAnn]
 	if !ok {
 		return errors.New("glusterblock: share annotation not found on PV")
+	}
+
+	delBlockString, ok := volume.Annotations["Blockstring"]
+	delBlockStrSlice := dstrings.Split(delBlockString, ",")
+
+	config.opMode = volume.Annotations[creatorAnn]
+	for _, v := range delBlockStrSlice {
+		if v != "" {
+			s := dstrings.Split(v, ":")
+			config.blockModeArgs[s[0]] = s[1]
+		}
 	}
 
 	// Delete this blockVol
