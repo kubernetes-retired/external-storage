@@ -51,8 +51,8 @@ const (
 	descAnn            = "Gluster-external: Dynamically provisioned PV"
 	provisionerVersion = "v0.9"
 	chapType           = "kubernetes.io/iscsi-chap"
-	heketiAnn          = "heketi-dynamic-provisioner"
-	blockVolPrefix     = "blockvol_"
+	//heketiAnn          = "heketi-dynamic-provisioner"
+	blockVolPrefix = "blockvol_"
 )
 
 type glusterBlockProvisioner struct {
@@ -185,10 +185,10 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 
 	// Create Volume
 	blockVolName := ""
-	if p.provConfig.opMode == "gluster-block" {
+	if (*cfg).opMode == "gluster-block" {
 		blockVolName = blockVolPrefix + string(uuid.NewUUID())
 	}
-	blockVol, createErr := p.createVolume(volszInt, blockVolName)
+	blockVol, createErr := p.createVolume(volszInt, blockVolName, cfg)
 
 	if createErr != nil {
 		return nil, fmt.Errorf("glusterblock: failed to create volume: %v", createErr)
@@ -200,12 +200,12 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 	}
 
 	//Store fields from response to iscsiSpec struct
-	if p.provConfig.opMode == "heketi" && (*blockVol).heketiBlockVolRes != nil {
+	if (*cfg).opMode == "heketi" && (*blockVol).heketiBlockVolRes != nil {
 		iscsiVol.Portals = (*blockVol).heketiBlockVolRes.Portals
 		iscsiVol.Iqn = (*blockVol).heketiBlockVolRes.Iqn
 		iscsiVol.User = (*blockVol).heketiBlockVolRes.User
 		iscsiVol.AuthKey = (*blockVol).heketiBlockVolRes.AuthKey
-	} else if p.provConfig.opMode == "gluster-block" && (*blockVol).glusterBlockExecVolRes != nil {
+	} else if (*cfg).opMode == "gluster-block" && (*blockVol).glusterBlockExecVolRes != nil {
 		iscsiVol.Portals = (*blockVol).glusterBlockExecVolRes.Portals
 		iscsiVol.Iqn = (*blockVol).glusterBlockExecVolRes.Iqn
 		iscsiVol.User = (*blockVol).glusterBlockExecVolRes.User
@@ -233,7 +233,7 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 	secretName := "glusterblk-" + user + "-secret"
 	secretRef := &v1.LocalObjectReference{}
 
-	if p.provConfig.chapAuthEnabled && user != "" && password != "" {
+	if (*cfg).chapAuthEnabled && user != "" && password != "" {
 		secretRef, err = p.createSecretRef(nameSpace, secretName, user, password)
 
 		if err != nil {
@@ -244,6 +244,22 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 	} else {
 		glog.V(1).Infof("glusterblock: authentication is nil")
 	}
+	var blockString []string
+	var heketiString []string
+	modeAnn := ""
+	if (*cfg).opMode == "gluster-block" {
+		heketiString = nil
+		for k, v := range (*cfg).blockModeArgs {
+			blockString = append(blockString, k+":"+v)
+			modeAnn = dstrings.Join(blockString, ",")
+		}
+	} else {
+		blockString = nil
+		for k, v := range (*cfg).heketiModeArgs {
+			heketiString = append(heketiString, k+":"+v)
+			modeAnn = dstrings.Join(heketiString, ",")
+		}
+	}
 
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
@@ -252,9 +268,10 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 				provisionerIDAnn:   p.identity,
 				provisionerVersion: provisionerVersion,
 				shareIDAnn:         iscsiVol.BlockVolName,
-				creatorAnn:         heketiAnn,
+				creatorAnn:         (*cfg).opMode,
 				volumeTypeAnn:      "block",
 				"Description":      descAnn,
+				"Blockstring":      modeAnn,
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{
@@ -318,8 +335,8 @@ func (p *glusterBlockProvisioner) createSecretRef(nameSpace string, secretName s
 }
 
 // createVolume creates a gluster block volume i.e. the storage asset.
-func (p *glusterBlockProvisioner) createVolume(volSizeInt int, blockVol string) (*glusterBlockVolume, error) {
-	config := &p.provConfig
+func (p *glusterBlockProvisioner) createVolume(volSizeInt int, blockVol string, config *provisionerConfig) (*glusterBlockVolume, error) {
+
 	blockRes := &p.volConfig
 	// Convert sizeStr and hacount to string
 	sizeStr := strconv.Itoa(volSizeInt)
@@ -351,6 +368,8 @@ func (p *glusterBlockProvisioner) createVolume(volSizeInt int, blockVol string) 
 		if unmarshErr != nil {
 			return nil, fmt.Errorf("failed to unmarshal the response")
 		}
+
+		//TODO: Do volume check before modify
 		if config.chapAuthEnabled {
 			cmd := exec.Command(
 				config.opMode, "modify", config.blockModeArgs["glustervol"]+"/"+blockVol,
