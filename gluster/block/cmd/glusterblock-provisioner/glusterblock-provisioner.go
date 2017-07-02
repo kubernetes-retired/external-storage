@@ -18,7 +18,6 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -31,6 +30,7 @@ import (
 	gapi "github.com/heketi/heketi/pkg/glusterfs/api"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	"github.com/kubernetes-incubator/external-storage/lib/util"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -51,8 +51,7 @@ const (
 	descAnn            = "Gluster-external: Dynamically provisioned PV"
 	provisionerVersion = "v0.9"
 	chapType           = "kubernetes.io/iscsi-chap"
-	//heketiAnn          = "heketi-dynamic-provisioner"
-	blockVolPrefix = "blockvol_"
+	blockVolPrefix     = "blockvol_"
 )
 
 type glusterBlockProvisioner struct {
@@ -62,12 +61,6 @@ type glusterBlockProvisioner struct {
 	// Identity of this glusterBlockProvisioner, generated. Used to identify "this"
 	// provisioner's PVs.
 	identity string
-
-	// Configuration of gluster block provisioner
-	provConfig provisionerConfig
-
-	// Configuration of block volume
-	volConfig glusterBlockVolume
 
 	options controller.VolumeOptions
 }
@@ -98,9 +91,6 @@ type provisionerConfig struct {
 
 	// Optional: Gluster Block command Args.
 	blockModeArgs map[string]string
-
-	// Optional: Heketi Service parameters.
-	heketiModeArgs map[string]string
 
 	// Optional: Chap Auth Enable
 	chapAuthEnabled bool
@@ -174,9 +164,7 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 		return nil, fmt.Errorf("glusterblock: failed to parse class parameters: %v", parseErr)
 	}
 
-	p.provConfig = *cfg
-
-	glog.V(4).Infof("glusterblock: creating volume with configuration %+v", p.provConfig)
+	glog.V(4).Infof("glusterblock: creating volume with configuration %+v", *cfg)
 
 	// Calculate the size
 	volSize := options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
@@ -205,6 +193,7 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 		iscsiVol.Iqn = (*blockVol).heketiBlockVolRes.Iqn
 		iscsiVol.User = (*blockVol).heketiBlockVolRes.User
 		iscsiVol.AuthKey = (*blockVol).heketiBlockVolRes.AuthKey
+		iscsiVol.BlockVolName = blockVolPrefix + (*blockVol).heketiBlockVolRes.ID
 	} else if (*cfg).opMode == "gluster-block" && (*blockVol).glusterBlockExecVolRes != nil {
 		iscsiVol.Portals = (*blockVol).glusterBlockExecVolRes.Portals
 		iscsiVol.Iqn = (*blockVol).glusterBlockExecVolRes.Iqn
@@ -240,25 +229,22 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 			glog.Errorf("glusterblock: failed to create credentials for pv")
 			return nil, fmt.Errorf("glusterblock: failed to create credentials for pv")
 		}
-		iscsiVol.SessionCHAPAuth = p.provConfig.chapAuthEnabled
+		iscsiVol.SessionCHAPAuth = (*cfg).chapAuthEnabled
+		iscsiVol.BlockSecret = secretName
+		iscsiVol.BlockSecretNs = nameSpace
 	} else {
 		glog.V(1).Infof("glusterblock: authentication is nil")
 	}
 	var blockString []string
-	var heketiString []string
 	modeAnn := ""
 	if (*cfg).opMode == "gluster-block" {
-		heketiString = nil
 		for k, v := range (*cfg).blockModeArgs {
 			blockString = append(blockString, k+":"+v)
 			modeAnn = dstrings.Join(blockString, ",")
 		}
 	} else {
 		blockString = nil
-		for k, v := range (*cfg).heketiModeArgs {
-			heketiString = append(heketiString, k+":"+v)
-			modeAnn = dstrings.Join(heketiString, ",")
-		}
+		modeAnn = "url:" + (*cfg).url + "," + "user:" + (*cfg).user + "," + "userkey:" + (*cfg).restSecretValue
 	}
 
 	pv := &v1.PersistentVolume{
@@ -272,6 +258,8 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 				volumeTypeAnn:      "block",
 				"Description":      descAnn,
 				"Blockstring":      modeAnn,
+				"AccessKey":        iscsiVol.BlockSecret,
+				"AccessKeyNs":      iscsiVol.BlockSecretNs,
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{
@@ -313,12 +301,14 @@ func (p *glusterBlockProvisioner) createSecretRef(nameSpace string, secretName s
 		Type: chapType,
 	}
 
-	p.volConfig.BlockSecret = secretName
 	secretRef := &v1.LocalObjectReference{}
-	p.volConfig.BlockSecretNs = nameSpace
-
 	if secret != nil {
 		_, err = p.client.Core().Secrets(nameSpace).Create(secret)
+		if err != nil && errors.IsAlreadyExists(err) {
+
+			glog.V(1).Infof("glusterblock: secret [%s] already exist in namespace [%s]", secret, nameSpace)
+			err = nil
+		}
 		if err != nil {
 			return nil, fmt.Errorf("glusterblock: failed to create secret, error %v", err)
 		}
@@ -337,7 +327,7 @@ func (p *glusterBlockProvisioner) createSecretRef(nameSpace string, secretName s
 // createVolume creates a gluster block volume i.e. the storage asset.
 func (p *glusterBlockProvisioner) createVolume(volSizeInt int, blockVol string, config *provisionerConfig) (*glusterBlockVolume, error) {
 
-	blockRes := &p.volConfig
+	blockRes := &glusterBlockVolume{}
 	// Convert sizeStr and hacount to string
 	sizeStr := strconv.Itoa(volSizeInt)
 	haCountStr := strconv.Itoa(config.haCount)
@@ -427,9 +417,10 @@ func (p *glusterBlockProvisioner) createVolume(volSizeInt int, blockVol string, 
 func (p *glusterBlockProvisioner) Delete(volume *v1.PersistentVolume) error {
 	config := &provisionerConfig{}
 	config.blockModeArgs = make(map[string]string)
+	heketiModeArgs := make(map[string]string)
 	ann, ok := volume.Annotations[provisionerIDAnn]
 	if !ok {
-		return errors.New("glusterblock: identity annotation not found on PV")
+		return fmt.Errorf("glusterblock: identity annotation not found on PV")
 	}
 	if ann != p.identity {
 		return &controller.IgnoredError{Reason: "identity annotation on PV does not match this provisioners identity"}
@@ -437,7 +428,7 @@ func (p *glusterBlockProvisioner) Delete(volume *v1.PersistentVolume) error {
 
 	delBlockVolName, ok := volume.Annotations[shareIDAnn]
 	if !ok {
-		return errors.New("glusterblock: share annotation not found on PV")
+		return fmt.Errorf("glusterblock: share annotation not found on PV")
 	}
 
 	delBlockString, ok := volume.Annotations["Blockstring"]
@@ -447,7 +438,16 @@ func (p *glusterBlockProvisioner) Delete(volume *v1.PersistentVolume) error {
 	for _, v := range delBlockStrSlice {
 		if v != "" {
 			s := dstrings.Split(v, ":")
-			config.blockModeArgs[s[0]] = s[1]
+			if config.opMode == "gluster-block" {
+				config.blockModeArgs[s[0]] = s[1]
+			} else {
+				if s[0] == "url" {
+					heketiModeArgs[s[0]] = dstrings.Join(s[1:], ":")
+				} else {
+					heketiModeArgs[s[0]] = s[1]
+				}
+
+			}
 		}
 	}
 
@@ -479,9 +479,15 @@ func (p *glusterBlockProvisioner) Delete(volume *v1.PersistentVolume) error {
 
 	}
 
-	deleteSecErr := p.client.Core().Secrets(p.volConfig.BlockSecretNs).Delete(p.volConfig.BlockSecret, nil)
+	deleteSecErr := p.client.Core().Secrets(volume.Annotations["AccessKeyNs"]).Delete(volume.Annotations["AccessKey"], nil)
+
+	if deleteSecErr != nil && errors.IsNotFound(deleteSecErr) {
+		glog.V(1).Infof("glusterblock: secret [%s] does not exist in namespace [%s]", volume.Annotations["AccessKey"], volume.Annotations["AccessKeyNs"])
+		deleteSecErr = nil
+	}
 	if deleteSecErr != nil {
-		return fmt.Errorf("glusterblock: failed to delete secret, error %v", deleteSecErr)
+		glog.Errorf("glusterfs: failed to delete secret: %v", deleteSecErr)
+		return fmt.Errorf("error deleting secret: %v", deleteSecErr)
 	}
 	return nil
 }
@@ -622,11 +628,6 @@ func parseOpmodeArgs(parseOpmode string, cfg *provisionerConfig, blkmodeArgs str
 	// Heketi Opmode
 	case "heketi":
 		cfg.opMode = "heketi"
-		err := parseHeketiModeArgs(cfg)
-		if err != nil {
-			return fmt.Errorf("[heketi] failed to parse arguments, error [%v] ", err)
-		}
-
 	default:
 		return fmt.Errorf("StorageClass for provisioner [%s] contains unknown [%v] parameter", "glusterblock", parseOpmode)
 	}
@@ -659,23 +660,6 @@ func parseBlockModeArgs(mode string, inArgs string) (*map[string]string, error) 
 		}
 	}
 	return &modeArgs, nil
-}
-
-func parseHeketiModeArgs(cfg *provisionerConfig) error {
-
-	if cfg == nil {
-		return fmt.Errorf("Provisiner config is nil")
-	}
-
-	//Store args to heketimodeargs dict.
-	cfg.heketiModeArgs = make(map[string]string)
-	cfg.heketiModeArgs["url"] = cfg.url
-	cfg.heketiModeArgs["user"] = cfg.user
-	cfg.heketiModeArgs["userkey"] = cfg.userKey
-	cfg.heketiModeArgs["restsecretname"] = cfg.restSecretName
-	cfg.heketiModeArgs["restsecretnamespace"] = cfg.restSecretNamespace
-
-	return nil
 }
 
 // parseSecret finds a given Secret instance and reads user password from it.
