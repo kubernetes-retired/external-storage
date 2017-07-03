@@ -54,7 +54,7 @@ Future features:
 #### Option 1: GCE
 
 ``` console
-KUBE_FEATURE_GATES="PersistentLocalVolumes=true" NODE_LOCAL_SSDS=<n> cluster/kube-up.sh
+KUBE_FEATURE_GATES="PersistentLocalVolumes=true,AffinityInAnnotations=true" NODE_LOCAL_SSDS=<n> cluster/kube-up.sh
 ```
 
 #### Option 2: GKE (not available until 1.7)
