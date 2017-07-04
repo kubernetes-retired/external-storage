@@ -137,7 +137,7 @@ metadata:
             }
           ]}
          ]}
-        }',
+        }'
 spec:
   capacity:
     storage: 5Gi
