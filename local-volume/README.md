@@ -54,7 +54,7 @@ Future features:
 #### Option 1: GCE
 
 ``` console
-KUBE_FEATURE_GATES="PersistentLocalVolumes=true,AffinityInAnnotations=true" NODE_LOCAL_SSDS=<n> cluster/kube-up.sh
+KUBE_FEATURE_GATES="PersistentLocalVolumes=true" NODE_LOCAL_SSDS=<n> cluster/kube-up.sh
 ```
 
 #### Option 2: GKE (not available until 1.7)
@@ -71,7 +71,7 @@ gcloud alpha container node-pools create ... --local-ssd-count=<n>
 2. Mount all the filesystems under one directory per StorageClass. The directories
    are specified in a configmap, see below. By default, the discovery directory is
    `/mnt/disks` and storage class is `local-storage`.
-3. Configure the Kubernetes API Server with the `PersistentLocalVolumes` & `AffinityInAnnotations` feature gates.
+3. Configure the Kubernetes API Server with the `PersistentLocalVolumes` feature gate.
 
 #### Option 4: Local test cluster
 
