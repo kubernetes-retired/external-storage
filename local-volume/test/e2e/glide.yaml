@@ -1,0 +1,40 @@
+package: github.com/kubernetes-incubator/external-storage/local-volume/test/e2e
+testImport:
+- package: github.com/onsi/ginkgo
+  version: 67b9df7f55fe1165fd9ad49aca7754cce01a42b8
+- package: github.com/onsi/gomega
+  version: d59fa0ac68bb5dd932ee8d24eed631cdd519efc3
+- package: k8s.io/apimachinery
+  version: 47e2f36401b7a66b6d003f3df4b58f6769ccc34b
+  subpackages:
+  - pkg/api/errors
+  - pkg/api/resource
+  - pkg/apis/meta/v1
+  - pkg/runtime
+  - pkg/types
+  - pkg/util/runtime
+  - pkg/util/uuid
+  - pkg/util/validation
+  - pkg/util/validation/field
+  - pkg/util/wait
+  - pkg/watch
+- package: k8s.io/client-go
+  version: b3357e1e10805ee14c1ea5fa9c46a6f58e46392b
+  subpackages:
+  - kubernetes
+  - kubernetes/typed/core/v1
+  - pkg/api
+  - pkg/api/v1
+  - pkg/apis/storage/v1
+  - pkg/apis/storage/v1beta1
+  - rest
+  - tools/cache
+  - tools/clientcmd
+  - tools/record
+- package: k8s.io/kubernetes
+  version: 606825eea47f41c72a3da1d4d2a769a340e1b69d
+  subpackages:
+  - pkg/util/goroutinemap
+  - pkg/util/version
+  - pkg/client/clientset_generated/clientset
+  - test/e2e/framework
