@@ -3,7 +3,7 @@ excludeDirs:
 - nfs/test/e2e
 import:
 - package: github.com/aws/aws-sdk-go
-  version: v1.7.3
+  version: ^1.7.3
   subpackages:
   - aws
   - aws/session
