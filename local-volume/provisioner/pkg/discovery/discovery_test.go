@@ -24,10 +24,9 @@ import (
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/cache"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/util"
-
-	v1helper "github.com/kubernetes-incubator/external-storage/lib/helper"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/api/v1/helper"
 )
 
 const (
@@ -259,7 +258,7 @@ func findSCName(t *testing.T, targetDir string, test *testConfig) string {
 }
 
 func verifyNodeAffinity(t *testing.T, pv *v1.PersistentVolume) {
-	affinity, err := v1helper.GetStorageNodeAffinityFromAnnotation(pv.Annotations)
+	affinity, err := helper.GetStorageNodeAffinityFromAnnotation(pv.Annotations)
 	if err != nil {
 		t.Errorf("Could not get node affinity from annotation: %v", err)
 		return

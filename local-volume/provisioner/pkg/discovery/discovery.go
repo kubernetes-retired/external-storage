@@ -24,8 +24,8 @@ import (
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
 
-	v1helper "github.com/kubernetes-incubator/external-storage/lib/helper"
-	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/api/core/v1"
+	"k8s.io/kubernetes/pkg/api/v1/helper"
 )
 
 // Discoverer finds available volumes and creates PVs for them
@@ -43,7 +43,7 @@ func NewDiscoverer(config *common.RuntimeConfig) (*Discoverer, error) {
 		return nil, fmt.Errorf("Failed to generate node affinity: %v", err)
 	}
 	tmpAnnotations := map[string]string{}
-	err = v1helper.StorageNodeAffinityToAlphaAnnotation(tmpAnnotations, affinity)
+	err = helper.StorageNodeAffinityToAlphaAnnotation(tmpAnnotations, affinity)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to convert node affinity to alpha annotation: %v", err)
 	}
