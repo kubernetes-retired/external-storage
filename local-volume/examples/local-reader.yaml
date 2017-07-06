@@ -24,4 +24,4 @@ spec:
       volumes:
       - name: local-vol
         persistentVolumeClaim: 
-          claimName: "example-local-claim"
+          claimName: "local-vol-local-test-0"
