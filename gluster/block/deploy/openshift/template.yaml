@@ -1,0 +1,47 @@
+---
+kind: Template
+apiVersion: v1
+metadata:
+  name: glusterblock-provisioner
+  labels:
+    glusterfs: glusterblock-template
+  annotations:
+    description: Gluster Block Provisioner Deployment Template
+    tags: glusterfs
+labels:
+  template: glusterblock-provisioner
+objects:
+- kind: DeploymentConfig
+  apiVersion: v1
+  metadata:
+    name: glusterblock-provisioner
+    labels:
+      glusterfs: glusterblock-provisioner-dc
+    annotations:
+      description: Defines how to deploy Gluster Block Provisioner Pod.
+  spec:
+    replicas: 1
+    selector:
+      glusterfs: glusterblock-provisioner-pod
+    triggers:
+    - type: ConfigChange
+    strategy:
+      type: Recreate
+    template:
+      metadata:
+        name: glusterblock-provisioner
+        labels:
+          glusterfs: glusterblock-provisioner-pod
+      spec:
+        serviceAccountName: glusterblock-provisioner
+        containers:
+        - name: glusterblock-provisioner
+          image: quay.io/external_storage/glusterblock-provisioner:latest
+          imagePullPolicy: IfNotPresent
+          env:
+          - name: PROVISIONER_NAME
+            valueFrom: 
+                configMapKeyRef:
+                  key: provisioner.name
+                  name: glusterblock-provisioner
+
