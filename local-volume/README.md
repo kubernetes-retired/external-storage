@@ -71,7 +71,7 @@ gcloud alpha container node-pools create ... --local-ssd-count=<n>
 2. Mount all the filesystems under one directory per StorageClass. The directories
    are specified in a configmap, see below. By default, the discovery directory is
    `/mnt/disks` and storage class is `local-storage`.
-3. Configure a Kubernetes cluster with the `PersistentLocalVolumes` feature gate.
+3. Configure the Kubernetes API Server with the `PersistentLocalVolumes` feature gate.
 
 #### Option 4: Local test cluster
 
