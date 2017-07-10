@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
@@ -41,6 +42,9 @@ const (
 	DefaultHostDir = "/mnt/disks"
 	// DefaultMountDir is the container mount point for the default host dir.
 	DefaultMountDir = "/local-disks"
+
+	// EventVolumeFailedDelete copied from k8s.io/kubernetes/pkg/controller/volume/events
+	EventVolumeFailedDelete = "VolumeFailedDelete"
 )
 
 // UserConfig stores all the user-defined parameters to the provisioner
@@ -72,6 +76,8 @@ type RuntimeConfig struct {
 	APIUtil util.APIUtil
 	// Volume util layer
 	VolUtil util.VolumeUtil
+	// Recorder is used to record events in the API server
+	Recorder record.EventRecorder
 }
 
 // LocalPVConfig defines the parameters for creating a local PV

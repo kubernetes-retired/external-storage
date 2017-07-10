@@ -25,6 +25,7 @@ import (
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/util"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/client-go/tools/record"
 )
 
 const (
@@ -179,11 +180,13 @@ func testSetup(t *testing.T, config *testConfig) *Deleter {
 			},
 		},
 	}
+	fakeRecorder := &record.FakeRecorder{}
 	runtimeConfig := &common.RuntimeConfig{
 		UserConfig: userConfig,
 		Cache:      config.cache,
 		VolUtil:    config.volUtil,
 		APIUtil:    config.apiUtil,
+		Recorder:   fakeRecorder,
 	}
 	return NewDeleter(runtimeConfig)
 }

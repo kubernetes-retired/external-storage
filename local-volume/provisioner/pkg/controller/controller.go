@@ -29,12 +29,22 @@ import (
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/populator"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/util"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/tools/record"
 )
 
 // StartLocalController starts the sync loop for the local PV discovery and deleter
 func StartLocalController(client *kubernetes.Clientset, config *common.UserConfig) {
 	glog.Info("Initializing volume cache\n")
+
+	provisionerName := fmt.Sprintf("local-volume-provisioner-%v-%v", config.Node.Name, config.Node.UID)
+
+	broadcaster := record.NewBroadcaster()
+	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(client.Core().RESTClient()).Events("")})
+	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: provisionerName})
 
 	runtimeConfig := &common.RuntimeConfig{
 		UserConfig: config,
@@ -42,7 +52,8 @@ func StartLocalController(client *kubernetes.Clientset, config *common.UserConfi
 		VolUtil:    util.NewVolumeUtil(),
 		APIUtil:    util.NewAPIUtil(client),
 		Client:     client,
-		Name:       fmt.Sprintf("local-volume-provisioner-%v-%v", config.Node.Name, config.Node.UID),
+		Name:       provisionerName,
+		Recorder:   recorder,
 	}
 
 	populator := populator.NewPopulator(runtimeConfig)
