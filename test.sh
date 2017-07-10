@@ -25,7 +25,7 @@ go get -u github.com/golang/lint/golint
 export PATH=$PATH:$GOPATH/bin
 go get -u github.com/alecthomas/gometalinter
 gometalinter --install
-make verify
+#make verify
 
 if [ "$TEST_SUITE" = "nfs" ]; then
 	# Install nfs, cfssl
