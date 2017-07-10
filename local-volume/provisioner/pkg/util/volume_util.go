@@ -21,9 +21,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"golang.org/x/sys/unix"
-
 	"github.com/golang/glog"
+
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 // VolumeUtil is an interface for local filesystem operations
@@ -106,14 +106,10 @@ func (u *volumeUtil) DeleteContents(fullPath string) error {
 
 // GetFsAvailableByte returns available capacity in byte about a mounted filesystem.
 // fullPath is the pathname of any file within the mounted filesystem. Capacity
-// returned here is total capacity available to non-root users, and does not include
-// fs reserved space.
+// returned here is total capacity available.
 func (u *volumeUtil) GetFsAvailableByte(fullPath string) (uint64, error) {
-	var s unix.Statfs_t
-	if err := unix.Statfs(fullPath, &s); err != nil {
-		return 0, err
-	}
-	return uint64(s.Frsize) * (s.Blocks - s.Bfree + s.Bavail), nil
+	available, _, _, _, _, _, err := util.FsInfo(fullPath)
+	return uint64(available), err
 }
 
 var _ VolumeUtil = &FakeVolumeUtil{}
