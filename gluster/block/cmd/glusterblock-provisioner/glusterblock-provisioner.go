@@ -274,7 +274,7 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 					Portals:         iscsiVol.Portals,
 					IQN:             iscsiVol.Iqn,
 					Lun:             0,
-					FSType:          "ext4",
+					FSType:          "xfs",
 					ReadOnly:        false,
 					SessionCHAPAuth: iscsiVol.SessionCHAPAuth,
 					SecretRef:       secretRef,
@@ -479,15 +479,17 @@ func (p *glusterBlockProvisioner) Delete(volume *v1.PersistentVolume) error {
 
 	}
 
-	deleteSecErr := p.client.Core().Secrets(volume.Annotations["AccessKeyNs"]).Delete(volume.Annotations["AccessKey"], nil)
+	if volume.Annotations["AccessKey"] != "" && volume.Annotations["AccessKeyNs"] != "" {
+		deleteSecErr := p.client.Core().Secrets(volume.Annotations["AccessKeyNs"]).Delete(volume.Annotations["AccessKey"], nil)
 
-	if deleteSecErr != nil && errors.IsNotFound(deleteSecErr) {
-		glog.V(1).Infof("glusterblock: secret [%s] does not exist in namespace [%s]", volume.Annotations["AccessKey"], volume.Annotations["AccessKeyNs"])
-		deleteSecErr = nil
-	}
-	if deleteSecErr != nil {
-		glog.Errorf("glusterfs: failed to delete secret: %v", deleteSecErr)
-		return fmt.Errorf("error deleting secret: %v", deleteSecErr)
+		if deleteSecErr != nil && errors.IsNotFound(deleteSecErr) {
+			glog.V(1).Infof("glusterblock: secret [%s] does not exist in namespace [%s]", volume.Annotations["AccessKey"], volume.Annotations["AccessKeyNs"])
+			deleteSecErr = nil
+		}
+		if deleteSecErr != nil {
+			glog.Errorf("glusterfs: failed to delete secret: %v", deleteSecErr)
+			return fmt.Errorf("error deleting secret: %v", deleteSecErr)
+		}
 	}
 	return nil
 }
