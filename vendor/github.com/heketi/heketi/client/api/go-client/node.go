@@ -15,11 +15,10 @@ package client
 import (
 	"bytes"
 	"encoding/json"
-	"net/http"
-	"time"
-
 	"github.com/heketi/heketi/pkg/glusterfs/api"
 	"github.com/heketi/heketi/pkg/utils"
+	"net/http"
+	"time"
 )
 
 func (c *Client) NodeAdd(request *api.NodeAddRequest) (*api.NodeInfoResponse, error) {
@@ -168,18 +167,8 @@ func (c *Client) NodeState(id string, request *api.StateRequest) error {
 	if err != nil {
 		return err
 	}
-	if r.StatusCode != http.StatusAccepted {
+	if r.StatusCode != http.StatusOK {
 		return utils.GetErrorFromResponse(r)
 	}
-
-	// Wait for response
-	r, err = c.waitForResponseWithTimer(r, time.Second)
-	if err != nil {
-		return err
-	}
-	if r.StatusCode != http.StatusNoContent {
-		return utils.GetErrorFromResponse(r)
-	}
-
 	return nil
 }

@@ -15,11 +15,10 @@ package client
 import (
 	"bytes"
 	"encoding/json"
-	"net/http"
-	"time"
-
 	"github.com/heketi/heketi/pkg/glusterfs/api"
 	"github.com/heketi/heketi/pkg/utils"
+	"net/http"
+	"time"
 )
 
 func (c *Client) DeviceAdd(request *api.DeviceAddRequest) error {
@@ -132,6 +131,42 @@ func (c *Client) DeviceDelete(id string) error {
 	return nil
 }
 
+func (c *Client) DeviceRemove(id string) error {
+
+	// Create a request
+	req, err := http.NewRequest("POST",
+		c.host+"/devices/"+id+"/remove",
+		nil)
+	if err != nil {
+		return err
+	}
+
+	// Set token
+	err = c.setToken(req)
+	if err != nil {
+		return err
+	}
+
+	// Send request
+	r, err := c.do(req)
+	if err != nil {
+		return err
+	}
+	if r.StatusCode != http.StatusAccepted {
+		return utils.GetErrorFromResponse(r)
+	}
+
+	// Wait for response
+	r, err = c.waitForResponseWithTimer(r, time.Second)
+	if err != nil {
+		return err
+	}
+	if r.StatusCode != http.StatusNoContent {
+		return utils.GetErrorFromResponse(r)
+	}
+
+	return nil
+}
 func (c *Client) DeviceState(id string,
 	request *api.StateRequest) error {
 
@@ -161,18 +196,8 @@ func (c *Client) DeviceState(id string,
 	if err != nil {
 		return err
 	}
-	if r.StatusCode != http.StatusAccepted {
+	if r.StatusCode != http.StatusOK {
 		return utils.GetErrorFromResponse(r)
 	}
-
-	// Wait for response
-	r, err = c.waitForResponseWithTimer(r, time.Second)
-	if err != nil {
-		return err
-	}
-	if r.StatusCode != http.StatusNoContent {
-		return utils.GetErrorFromResponse(r)
-	}
-
 	return nil
 }
