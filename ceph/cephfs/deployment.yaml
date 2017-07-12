@@ -22,3 +22,7 @@ spec:
                   name: cephfs-provisioner
           image: "quay.io/external_storage/cephfs-provisioner:latest"
           name: cephfs-provisioner
+          command:
+            - "/usr/local/bin/cephfs-provisioner"
+          args:
+            - "-id=cephfs-provisioner-1"
