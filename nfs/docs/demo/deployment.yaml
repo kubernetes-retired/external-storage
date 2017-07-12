@@ -51,7 +51,7 @@ spec:
                 - SYS_RESOURCE
           args:
             - "-provisioner=example.com/nfs"
-            - "-grace-period=10"
+            - "-grace-period=10" # TODO: -lease-lifetime
           env:
             - name: POD_IP
               valueFrom:

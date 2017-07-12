@@ -192,6 +192,9 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 			pod = getDeploymentPod(c, ns, labels.Set(deployment.Spec.Selector.MatchLabels).String())
 			volumePath = deployment.Spec.Template.Spec.Volumes[0].HostPath.Path
 
+			By("sleeping for grace period")
+			time.Sleep(60 * time.Second)
+
 			By("creating a StorageClass")
 			class := newStorageClass()
 			_, err := c.Storage().StorageClasses().Create(class)
@@ -215,6 +218,10 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 			// Expect(err).NotTo(HaveOccurred())
 			scaleDeployment(c, ns, deployment.Name, 0)
 			scaleDeployment(c, ns, deployment.Name, 1)
+
+			By("sleeping for grace period")
+			time.Sleep(60 * time.Second)
+
 			pod = getDeploymentPod(c, ns, labels.Set(deployment.Spec.Selector.MatchLabels).String())
 			testRead(c, claim)
 			testDelete(c, claim, pv)

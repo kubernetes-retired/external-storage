@@ -69,6 +69,7 @@ NFS_Core_Param
 NFSV4
 {
 	Grace_Period = 90;
+	Lease_Lifetime = 60;
 }
 `)
 
@@ -115,24 +116,6 @@ func Setup(ganeshaConfig string, gracePeriod uint, ganeshav4old, ganeshav4recov 
 	if err != nil {
 		return fmt.Errorf("error setting fsid device to ganesha config: %v", err)
 	}
-
-	/*// Symlink v4old and v4recov
-	if err := os.MkdirAll("/var/lib/nfs/ganesha", 0755); err != nil {
-		return err
-	}
-	if err := os.MkdirAll(ganeshav4old, 0755); err != nil {
-		return err
-	}
-	if err := os.Symlink(ganeshav4old, "/var/lib/nfs/ganesha/v4old"); err != nil {
-		return err
-	}
-	if err := os.MkdirAll(ganeshav4recov, 0755); err != nil {
-		return err
-	}
-	if err := os.Symlink(ganeshav4recov, "/var/lib/nfs/ganesha/v4recov"); err != nil {
-		return err
-	}
-	*/
 
 	return nil
 }
