@@ -4,10 +4,6 @@ metadata:
   name: glusterblock
 provisioner: gluster.org/glusterblock
 parameters:
-    resturl: "http://127.0.0.1:8081"
-    restuser: "admin"
-    restsecretnamespace: "default"
-    restsecretname: "heketi-secret"
     opmode: "gluster-block"
     blockmodeargs: "glustervol=blockmaster1,hosts=10.67.116.108"
     hacount: "3"
