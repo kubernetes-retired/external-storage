@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # Modified from https://github.com/rootfs/nfs-ganesha-docker by Huamin Chen
-FROM fedora:rawhide
+FROM fedora:26
 
 RUN dnf install -y nfs-ganesha-vfs dbus-x11 rpcbind hostname nfs-utils xfsprogs && dnf clean all
 
