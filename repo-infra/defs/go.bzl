@@ -1,5 +1,3 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_env_attrs")
-
 go_filetype = ["*.go"]
 
 def _compute_genrule_variables(resolved_srcs, resolved_outs):
@@ -25,8 +23,6 @@ go_sources_aspect = aspect(
 def _compute_genrule_command(ctx):
   cmd = [
       'set -e',
-      # setup GOROOT
-      'export GOROOT=$$(pwd)/' + ctx.file.go_tool.dirname + '/..',
       # setup main GOPATH
       'export GOPATH=/tmp/gopath',
       'export GO_WORKSPACE=$${GOPATH}/src/' + ctx.attr.go_prefix.go_prefix,
@@ -46,7 +42,7 @@ def _compute_genrule_command(ctx):
   return '\n'.join(cmd)
 
 def _go_genrule_impl(ctx):
-  all_srcs = set(ctx.files.go_src)
+  all_srcs = set(ctx.attr._go_toolchain.stdlib)
   label_dict = {}
 
   for dep in ctx.attr.go_deps:
@@ -70,7 +66,7 @@ def _go_genrule_impl(ctx):
   ctx.action(
       inputs = list(all_srcs) + resolved_inputs,
       outputs = ctx.outputs.outs,
-      env = ctx.configuration.default_shell_env,
+      env = ctx.configuration.default_shell_env + ctx.attr._go_toolchain.env,
       command = argv,
       progress_message = "%s %s" % (ctx.attr.message, ctx),
       mnemonic = "GoGenrule",
@@ -81,7 +77,7 @@ def _go_genrule_impl(ctx):
 # some amount transitive go src of dependencies. This go_genrule enables
 # the creation of these sandboxes.
 go_genrule = rule(
-    attrs = go_env_attrs + {
+    attrs = {
         "srcs": attr.label_list(allow_files = True),
         "tools": attr.label_list(
             cfg = "host",
@@ -94,6 +90,21 @@ go_genrule = rule(
         ),
         "message": attr.string(),
         "executable": attr.bool(default = False),
+        # Next two rules copied from bazelbuild/rules_go@a9df110cf04e167b33f10473c7e904d780d921e6
+        # and then modified a bit.
+        # These will likely break at some point in the future, pending Bazel toolchain changes.
+        "_go_toolchain": attr.label(
+            default = Label("@io_bazel_rules_go_toolchain//:go_toolchain"),
+        ),
+        "go_prefix": attr.label(
+            providers = ["go_prefix"],
+            default = Label(
+                "//:go_prefix",
+                relative_to_caller_repository = True,
+            ),
+            allow_files = False,
+            cfg = "host",
+        ),
     },
     output_to_genfiles = True,
     implementation = _go_genrule_impl,
