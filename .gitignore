@@ -38,6 +38,10 @@ flycheck_*.el
 # projectiles files
 .projectile
 
+# glusterfs-simple-provisioner binary
+/gluster/glusterfs/glusterfs-simple-provisioner
+/gluster/glusterfs/deploy/docker/glusterfs-simple-provisioner
+
 # nfs-provisioner binary
 /nfs/nfs-provisioner
 /nfs/deploy/docker/nfs-provisioner

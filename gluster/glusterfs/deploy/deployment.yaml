@@ -1,0 +1,16 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: glusterfs-simple-provisioner
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: glusterfs-simple-provisioner
+    spec:
+      containers:
+        - image: "quay.io/external_storage/glusterfs-simple-provisioner:latest"
+          name: glusterfs-simple-provisioner
