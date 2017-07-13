@@ -133,6 +133,7 @@ func (p *rbdProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 	}
 	// use default access modes if missing
 	if len(pv.Spec.AccessModes) == 0 {
+		glog.Warningf("no access modes specified, use default: %v", p.getAccessModes())
 		pv.Spec.AccessModes = p.getAccessModes()
 	}
 

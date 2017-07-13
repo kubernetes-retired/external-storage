@@ -19,4 +19,4 @@ if [[ "$KUBECONFIG" == "" ]]; then
 	KUBECONFIG=/root/.kube/config
 fi
 
-rbd-provisioner -master=http://127.0.0.1:8080 -kubeconfig=${KUBECONFIG} -logtostderr
+rbd-provisioner -id=rbd-provisioner-1 -master=http://127.0.0.1:8080 -kubeconfig=${KUBECONFIG} -logtostderr
