@@ -19,7 +19,7 @@ limitations under the License.
 
 package provision
 
-import "k8s.io/client-go/pkg/api/v1"
+import "k8s.io/api/core/v1"
 
 // AccessModesContains returns whether the requested mode is contained by modes
 func AccessModesContains(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAccessMode) bool {
