@@ -84,6 +84,7 @@ elif [ "$TEST_SUITE" = "everything-else" ]; then
 	make aws/efs
 	make test-aws/efs
 	make ceph/cephfs
+	make ceph/rbd
 	make flex
 	make gluster/block
 	make nfs-client
