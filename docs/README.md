@@ -36,7 +36,7 @@ Obviously the external provisioner library is there. So too are client-go and ap
 Run `glide init` to populate a glide.yaml. When asked about using a release of external-storage answer Yes! But when asked about client-go or apimachinery, answer **No**! The reason you say No here is because external-storage depends on specific versions of these repos, and glide is not smart enough to always make the correct recommendation here.
 
 ```
-[INFO]	The package github.com/kubernetes-incubator/external-storage appears to have Semantic Version releases (http://semver.org). 
+[INFO]	The package github.com/kubernetes-incubator/external-storage appears to have Semantic Version releases (http://semver.org).
 [INFO]	The latest release is v2.0.0. You are currently not using a release. Would you like
 [INFO]	to use this release? Yes (Y) or No (N)
 ```
@@ -70,7 +70,7 @@ After you have edited your glide.yaml to your satisfaction, run `glide install -
 
 Finally you'll want to build your program. You can write some sort of containerized build or stick to a `go build` invocation. In order for a `go build .` or variation thereof to work, you must
 * be working in your `GOPATH`, your code has to be somewhere under "$GOPATH/src". This is a requirement (even) when using vendored dependencies
-* have go version 1.7 or greater installed
+* have go version 1.8 or greater installed
 The binary produced can then be e.g. used to make a Docker image.
 
 ## Authorizing provisioners for RBAC or OpenShift
