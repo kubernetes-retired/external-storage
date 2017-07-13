@@ -1,8 +1,8 @@
-hash: 8d9a39fb5f625cdbe907baef7e52a29c912f75b630d23d098db95c1cd733a11e
-updated: 2017-06-23T14:54:16.778088234-04:00
+hash: fa3b948864aff6df0d39177e9177629bfebff28a32be982df0e68851581ff1cc
+updated: 2017-07-10T12:10:27.306691443-07:00
 imports:
 - name: github.com/aws/aws-sdk-go
-  version: 6669bce73b4e3bc922ff5ea3a3983ede26e02b39
+  version: b1a7b51924b90a6ecdbaeb17e96418740ff07a1e
   subpackages:
   - aws
   - aws/awserr
@@ -20,6 +20,7 @@ imports:
   - aws/request
   - aws/session
   - aws/signer/v4
+  - internal/shareddefaults
   - private/protocol
   - private/protocol/json/jsonutil
   - private/protocol/jsonrpc
@@ -54,7 +55,7 @@ imports:
 - name: github.com/ghodss/yaml
   version: 73d445a93680fa1a78ae23a5839bad48f32ba1ee
 - name: github.com/go-ini/ini
-  version: 2e44421e256d82ebbf3d4d4fcabe8930b905eff3
+  version: 3d73f4b845efdf9989fffd4b4e562727744a34ba
 - name: github.com/go-openapi/analysis
   version: b44dc874b601d9e4e2f6e19140e794ba24bead3b
 - name: github.com/go-openapi/jsonpointer
@@ -73,7 +74,7 @@ imports:
   - proto
   - sortkeys
 - name: github.com/golang/glog
-  version: 44145f04b68cf362d9c4df2182967c2275eaefed
+  version: 23def4e6c14b4da8ac2ed8007337bc5eb5007998
 - name: github.com/golang/groupcache
   version: 02826c3e79038b59d737d3b1c0a1d937f71a4433
   subpackages:
@@ -134,7 +135,7 @@ imports:
   - idna
   - lex/httplex
 - name: golang.org/x/sys
-  version: 8f0908ab3b2457e2e15403d3697c9ef5cb4b57a9
+  version: abf9c25f54453410d0c6668e519582a9e1115027
   subpackages:
   - unix
 - name: golang.org/x/text
