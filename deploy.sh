@@ -30,6 +30,7 @@ local-volume-provisioner-bootstrap
 local-volume-provisioner
 nfs-client-provisioner
 nfs-provisioner
+rbd-provisioner
 )
 
 regex="^($(IFS=\|; echo "${provisioners[*]}"))-(v[0-9]\.[0-9]\.[0-9])$"

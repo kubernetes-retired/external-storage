@@ -144,7 +144,7 @@ push-cephfs-provisioner: ceph/cephfs
 push-rbd-provisioner: ceph/rbd
 	docker push $(REGISTRY)rbd-provisioner:$(VERSION)
 	docker push $(REGISTRY)rbd-provisioner:latest
-.PHONY: push-nfs-client-provisioner
+.PHONY: push-rbd-provisioner
 
 push-efs-provisioner:
 	cd aws/efs; \
