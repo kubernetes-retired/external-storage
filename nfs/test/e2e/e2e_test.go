@@ -161,29 +161,6 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 			}
 		})
 
-		It("should create and delete persistent volumes [Slow]", func() {
-			By("creating an out-of-tree dynamic provisioner pod")
-			pod = startProvisionerPod(c, ns)
-			defer c.Core().Pods(ns).Delete(pod.Name, nil)
-			volumePath = fmt.Sprintf("%s/pods/%s/volumes/kubernetes.io~empty-dir/%s", framework.TestContext.KubeVolumeDir, pod.UID, pod.Spec.Volumes[0].Name)
-
-			By("creating a StorageClass")
-			class := newStorageClass()
-			_, err := c.Storage().StorageClasses().Create(class)
-			defer c.Storage().StorageClasses().Delete(class.Name, nil)
-			Expect(err).NotTo(HaveOccurred())
-
-			By("creating a claim with a dynamic provisioning annotation")
-			claim := newClaim(ns)
-			defer func() {
-				c.Core().PersistentVolumeClaims(ns).Delete(claim.Name, nil)
-			}()
-			claim, err = c.Core().PersistentVolumeClaims(ns).Create(claim)
-			Expect(err).NotTo(HaveOccurred())
-
-			testDynamicProvisioning(c, claim)
-
-		})
 		It("should survive a restart [Slow]", func() {
 			By("creating an out-of-tree dynamic provisioner deployment of 1 replica")
 			service, deployment := startProvisionerDeployment(c, ns)
@@ -191,9 +168,6 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 			defer c.Core().Services(ns).Delete(service.Name, nil)
 			pod = getDeploymentPod(c, ns, labels.Set(deployment.Spec.Selector.MatchLabels).String())
 			volumePath = deployment.Spec.Template.Spec.Volumes[0].HostPath.Path
-
-			By("sleeping for grace period")
-			time.Sleep(60 * time.Second)
 
 			By("creating a StorageClass")
 			class := newStorageClass()
@@ -218,9 +192,6 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 			// Expect(err).NotTo(HaveOccurred())
 			scaleDeployment(c, ns, deployment.Name, 0)
 			scaleDeployment(c, ns, deployment.Name, 1)
-
-			By("sleeping for grace period")
-			time.Sleep(60 * time.Second)
 
 			pod = getDeploymentPod(c, ns, labels.Set(deployment.Spec.Selector.MatchLabels).String())
 			testRead(c, claim)
@@ -417,7 +388,6 @@ func startProvisionerDeployment(c clientset.Interface, ns string) (*v1.Service, 
 	deployment.Spec.Template.Spec.Containers[0].Image = "quay.io/kubernetes_incubator/nfs-provisioner:latest"
 	deployment.Spec.Template.Spec.Containers[0].Args = []string{
 		fmt.Sprintf("-provisioner=%s", pluginName),
-		"-grace-period=60",
 	}
 	deployment.Spec.Template.Spec.Containers[0].Env = append(deployment.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "GANESHA_LOG_LEVEL", Value: "NIV_DEBUG"})
 
