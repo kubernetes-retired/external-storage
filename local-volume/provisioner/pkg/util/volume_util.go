@@ -192,6 +192,7 @@ func (u *FakeVolumeUtil) IsDir(fullPath string) (bool, error) {
 	return false, fmt.Errorf("File %q not found", fullPath)
 }
 
+// IsBlock checks if the given path is a block device
 func (u *FakeVolumeUtil) IsBlock(fullPath string) (bool, error) {
 	return false, nil
 }
@@ -234,7 +235,7 @@ func (u *FakeVolumeUtil) GetFsCapacityByte(fullPath string) (int64, error) {
 	return 0, fmt.Errorf("File %q not found", fullPath)
 }
 
-//
+// GetBlockSpaceByte returns the space in the specified block device.
 func (u *FakeVolumeUtil) GetBlockSpaceByte(fullPath string) (uint64, error) {
 	return 0, nil
 }

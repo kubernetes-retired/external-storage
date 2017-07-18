@@ -70,7 +70,7 @@ type MountConfig struct {
 	// The mount point of the hostpath volume
 	MountDir string `json:"mountDir"`
 	// The volumeType "block" or "file". If nil, the type defaults to "file"
-	VolumeType string `json:"volumeType""`
+	VolumeType string `json:"volumeType"`
 }
 
 // RuntimeConfig stores all the objects that the provisioner needs to run
@@ -141,8 +141,8 @@ func GetVolumeConfigFromConfigMap(client *kubernetes.Clientset, namespace, name 
 func GetDefaultVolumeConfig() map[string]MountConfig {
 	return map[string]MountConfig{
 		"local-storage": {
-			HostDir:  DefaultHostDir,
-			MountDir: DefaultMountDir,
+			HostDir:    DefaultHostDir,
+			MountDir:   DefaultMountDir,
 			VolumeType: DefaultVolumeType,
 		},
 	}

@@ -100,16 +100,17 @@ func (d *Discoverer) discoverVolumesAtPath(class string, config common.MountConf
 			continue
 		}
 		filePath := filepath.Join(config.MountDir, file)
-		var capacityByte uint64;
+		var capacityByte uint64
 		if config.VolumeType == common.VolumeTypeBlock {
-			ret, err := d.VolUtil.IsBlock(filePath)
+			var ret bool
+			ret, err = d.VolUtil.IsBlock(filePath)
 			if err != nil {
 				glog.Errorf("Block device check for %q failed: %v", filePath, err)
 				continue
 			}
 
 			if !ret {
-				glog.Errorf("%q is not Block device: %v", filePath)
+				glog.Errorf("%q is not Block device", filePath)
 				continue
 			}
 
