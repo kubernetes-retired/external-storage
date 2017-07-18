@@ -201,7 +201,7 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 		iscsiVol.AuthKey = (*blockVol).glusterBlockExecVolRes.AuthKey
 		iscsiVol.BlockVolName = blockVolName
 	} else {
-		return nil, fmt.Errorf("glusterblock: failed to parse %v", *blockVol)
+		return nil, fmt.Errorf("glusterblock: failed to parse blockvol : [%v]", *blockVol)
 	}
 
 	//Sort Target Portal from portal.
@@ -224,7 +224,6 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 
 	if (*cfg).chapAuthEnabled && user != "" && password != "" {
 		secretRef, err = p.createSecretRef(nameSpace, secretName, user, password)
-
 		if err != nil {
 			glog.Errorf("glusterblock: failed to create credentials for pv")
 			return nil, fmt.Errorf("glusterblock: failed to create credentials for pv")
@@ -235,6 +234,7 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 	} else {
 		glog.V(1).Infof("glusterblock: authentication is nil")
 	}
+
 	var blockString []string
 	modeAnn := ""
 	if (*cfg).opMode == "gluster-block" {
