@@ -29,6 +29,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/kubelet/apis"
+	"strings"
 )
 
 const (
@@ -37,6 +38,10 @@ const (
 	// NodeLabelKey is the label key that this provisioner uses for PV node affinity
 	// hostname is not the best choice, but it's what pod and node affinity also use
 	NodeLabelKey = apis.LabelHostname
+	// VolumeTypeFile represents file type volumes
+	VolumeTypeFile = "file"
+	// VolumeTypeBlock represents block type volumes
+	VolumeTypeBlock = "block"
 
 	// DefaultHostDir is the default host dir to discover local volumes.
 	DefaultHostDir = "/mnt/disks"
@@ -45,6 +50,9 @@ const (
 
 	// EventVolumeFailedDelete copied from k8s.io/kubernetes/pkg/controller/volume/events
 	EventVolumeFailedDelete = "VolumeFailedDelete"
+
+	// DefaultVolumeType is default type of volume being discovered in the specified host dir.
+	DefaultVolumeType = VolumeTypeFile
 )
 
 // UserConfig stores all the user-defined parameters to the provisioner
@@ -61,6 +69,8 @@ type MountConfig struct {
 	HostDir string `json:"hostDir"`
 	// The mount point of the hostpath volume
 	MountDir string `json:"mountDir"`
+	// The volumeType "block" or "file". If nil, the type defaults to "file"
+	VolumeType string `json:"volumeType""`
 }
 
 // RuntimeConfig stores all the objects that the provisioner needs to run
@@ -133,6 +143,7 @@ func GetDefaultVolumeConfig() map[string]MountConfig {
 		"local-storage": {
 			HostDir:  DefaultHostDir,
 			MountDir: DefaultMountDir,
+			VolumeType: DefaultVolumeType,
 		},
 	}
 }
@@ -158,6 +169,17 @@ func ConfigMapDataToVolumeConfig(data map[string]string) (map[string]MountConfig
 		config := MountConfig{}
 		if err := json.Unmarshal([]byte(val), &config); err != nil {
 			return nil, fmt.Errorf("unable to unmarshal config for class %v: %v", class, err)
+		}
+		if config.VolumeType != "" {
+			config.VolumeType = strings.ToLower(config.VolumeType)
+		} else {
+			config.VolumeType = DefaultVolumeType
+		}
+		switch config.VolumeType {
+		case VolumeTypeFile:
+		case VolumeTypeBlock:
+		default:
+			return nil, fmt.Errorf("Invalid volume type %v for class %v", config.VolumeType, class)
 		}
 		mountConfig[class] = config
 	}

@@ -100,15 +100,35 @@ func (d *Discoverer) discoverVolumesAtPath(class string, config common.MountConf
 			continue
 		}
 		filePath := filepath.Join(config.MountDir, file)
-		err = d.validateFile(filePath)
-		if err != nil {
-			glog.Errorf("Mount path %q validation failed: %v", filePath, err)
-			continue
-		}
-		capacityByte, err := d.VolUtil.GetFsCapacityByte(filePath)
-		if err != nil {
-			glog.Errorf("Path %q fs stats error: %v", filePath, err)
-			continue
+		var capacityByte uint64;
+		if config.VolumeType == common.VolumeTypeBlock {
+			ret, err := d.VolUtil.IsBlock(filePath)
+			if err != nil {
+				glog.Errorf("Block device check for %q failed: %v", filePath, err)
+				continue
+			}
+
+			if !ret {
+				glog.Errorf("%q is not Block device: %v", filePath)
+				continue
+			}
+
+			capacityByte, err = d.VolUtil.GetBlockSpaceByte(filePath)
+			if err != nil {
+				glog.Errorf("Path %q block stats error: %v", filePath, err)
+				continue
+			}
+		} else {
+			err = d.validateFile(filePath)
+			if err != nil {
+				glog.Errorf("Mount path %q validation failed: %v", filePath, err)
+				continue
+			}
+			capacityByte, err = d.VolUtil.GetFsCapacityByte(filePath)
+			if err != nil {
+				glog.Errorf("Path %q fs stats error: %v", filePath, err)
+				continue
+			}
 		}
 		d.createPV(file, class, config, capacityByte)
 	}
@@ -138,7 +158,10 @@ func (d *Discoverer) createPV(file, class string, config common.MountConfig, cap
 	pvName := generatePVName(file, d.Node.Name, class)
 	outsidePath := filepath.Join(config.HostDir, file)
 
-	glog.Infof("Found new volume at host path %q with capacity %d, creating Local PV %q", outsidePath, capacityByte, pvName)
+	glog.Infof("Found new volume of volumeType %q at host path %q with capacity %d, creating Local PV %q",
+		config.VolumeType, outsidePath, capacityByte, pvName)
+
+	// TODO: Set block volumeType when the API is ready.
 	pvSpec := common.CreateLocalPVSpec(&common.LocalPVConfig{
 		Name:            pvName,
 		HostPath:        outsidePath,

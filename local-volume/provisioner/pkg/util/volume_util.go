@@ -24,12 +24,16 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/volume/util"
+	"unsafe"
 )
 
 // VolumeUtil is an interface for local filesystem operations
 type VolumeUtil interface {
 	// IsDir checks if the given path is a directory
 	IsDir(fullPath string) (bool, error)
+
+	// IsBlock checks if the given path is a directory
+	IsBlock(fullPath string) (bool, error)
 
 	// ReadDir returns a list of files under the specified directory
 	ReadDir(fullPath string) ([]string, error)
@@ -39,6 +43,9 @@ type VolumeUtil interface {
 
 	// Get capacity for fs on full path
 	GetFsCapacityByte(fullPath string) (int64, error)
+
+	// Get capacity of the block device
+	GetBlockSpaceByte(fullPath string) (uint64, error)
 }
 
 var _ VolumeUtil = &volumeUtil{}
@@ -64,6 +71,18 @@ func (u *volumeUtil) IsDir(fullPath string) (bool, error) {
 	}
 
 	return stat.IsDir(), nil
+}
+
+// IsBlock checks if the given path is a block device
+func (u *volumeUtil) IsBlock(fullPath string) (bool, error) {
+	var st unix.Stat_t
+	err := unix.Stat(fullPath, &st)
+	if err != nil {
+		return false, err
+	}
+
+	return (st.Mode & unix.S_IFMT) == unix.S_IFBLK, err
+
 }
 
 // ReadDir returns a list all the files under the given directory
@@ -112,6 +131,23 @@ func (u *volumeUtil) GetFsCapacityByte(fullPath string) (int64, error) {
 	return capacity, err
 }
 
+// GetBlockSpaceByte returns  capacity in bytes of a block device.
+// fullPath is the pathname of block device.
+func (u *volumeUtil) GetBlockSpaceByte(fullPath string) (uint64, error) {
+	file, err := os.OpenFile(fullPath, os.O_RDWR, 0)
+	if err != nil {
+		return 0, err
+	}
+	defer file.Close()
+
+	var size int64
+	if _, _, err := unix.Syscall(unix.SYS_IOCTL, file.Fd(), unix.BLKGETSIZE64, uintptr(unsafe.Pointer(&size))); err != 0 {
+		return 0, err
+	}
+
+	return uint64(size), err
+}
+
 var _ VolumeUtil = &FakeVolumeUtil{}
 
 // FakeVolumeUtil is a stub interface for unit testing
@@ -156,6 +192,10 @@ func (u *FakeVolumeUtil) IsDir(fullPath string) (bool, error) {
 	return false, fmt.Errorf("File %q not found", fullPath)
 }
 
+func (u *FakeVolumeUtil) IsBlock(fullPath string) (bool, error) {
+	return false, nil
+}
+
 // ReadDir returns the list of all files under the given directory
 func (u *FakeVolumeUtil) ReadDir(fullPath string) ([]string, error) {
 	fileNames := []string{}
@@ -192,6 +232,11 @@ func (u *FakeVolumeUtil) GetFsCapacityByte(fullPath string) (int64, error) {
 		}
 	}
 	return 0, fmt.Errorf("File %q not found", fullPath)
+}
+
+//
+func (u *FakeVolumeUtil) GetBlockSpaceByte(fullPath string) (uint64, error) {
+	return 0, nil
 }
 
 // AddNewFiles adds the given files to the current directory listing
