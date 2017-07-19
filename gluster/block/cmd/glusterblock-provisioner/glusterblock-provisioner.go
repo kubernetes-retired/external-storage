@@ -52,6 +52,8 @@ const (
 	provisionerVersion = "v0.9"
 	chapType           = "kubernetes.io/iscsi-chap"
 	blockVolPrefix     = "blockvol_"
+	heketiOpmode       = "heketi"
+	glusterBlockOpmode = "gluster-block"
 )
 
 type glusterBlockProvisioner struct {
@@ -173,11 +175,10 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 
 	// Create Volume
 	blockVolName := ""
-	if (*cfg).opMode == "gluster-block" {
+	if (*cfg).opMode == glusterBlockOpmode {
 		blockVolName = blockVolPrefix + string(uuid.NewUUID())
 	}
 	blockVol, createErr := p.createVolume(volszInt, blockVolName, cfg)
-
 	if createErr != nil {
 		return nil, fmt.Errorf("glusterblock: failed to create volume: %v", createErr)
 	}
@@ -188,13 +189,13 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 	}
 
 	//Store fields from response to iscsiSpec struct
-	if (*cfg).opMode == "heketi" && (*blockVol).heketiBlockVolRes != nil {
+	if (*cfg).opMode == heketiOpmode && (*blockVol).heketiBlockVolRes != nil {
 		iscsiVol.Portals = (*blockVol).heketiBlockVolRes.Portals
 		iscsiVol.Iqn = (*blockVol).heketiBlockVolRes.Iqn
 		iscsiVol.User = (*blockVol).heketiBlockVolRes.User
 		iscsiVol.AuthKey = (*blockVol).heketiBlockVolRes.AuthKey
 		iscsiVol.BlockVolName = blockVolPrefix + (*blockVol).heketiBlockVolRes.ID
-	} else if (*cfg).opMode == "gluster-block" && (*blockVol).glusterBlockExecVolRes != nil {
+	} else if (*cfg).opMode == glusterBlockOpmode && (*blockVol).glusterBlockExecVolRes != nil {
 		iscsiVol.Portals = (*blockVol).glusterBlockExecVolRes.Portals
 		iscsiVol.Iqn = (*blockVol).glusterBlockExecVolRes.Iqn
 		iscsiVol.User = (*blockVol).glusterBlockExecVolRes.User
@@ -231,13 +232,13 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 		iscsiVol.SessionCHAPAuth = (*cfg).chapAuthEnabled
 		iscsiVol.BlockSecret = secretName
 		iscsiVol.BlockSecretNs = nameSpace
-	} else {
-		glog.V(1).Infof("glusterblock: authentication is nil")
+	} else if !((*cfg).chapAuthEnabled) {
+		glog.V(1).Infof("glusterblock: authentication requested is nil")
 	}
 
 	var blockString []string
 	modeAnn := ""
-	if (*cfg).opMode == "gluster-block" {
+	if (*cfg).opMode == glusterBlockOpmode {
 		for k, v := range (*cfg).blockModeArgs {
 			blockString = append(blockString, k+":"+v)
 			modeAnn = dstrings.Join(blockString, ",")
@@ -338,7 +339,7 @@ func (p *glusterBlockProvisioner) createVolume(volSizeInt int, blockVol string, 
 	switch config.opMode {
 
 	// An experimental/Test Mode:
-	case "gluster-block":
+	case glusterBlockOpmode:
 		blockRes.heketiBlockVolRes = nil
 
 		// Execute gluster-block command.
@@ -385,7 +386,7 @@ func (p *glusterBlockProvisioner) createVolume(volSizeInt int, blockVol string, 
 		}
 
 	// Heketi Opmode
-	case "heketi":
+	case heketiOpmode:
 		var clusterIDs []string
 		blockRes.glusterBlockExecVolRes = nil
 		cli := gcli.NewClient(config.url, config.user, config.restSecretValue)
@@ -438,7 +439,7 @@ func (p *glusterBlockProvisioner) Delete(volume *v1.PersistentVolume) error {
 	for _, v := range delBlockStrSlice {
 		if v != "" {
 			s := dstrings.Split(v, ":")
-			if config.opMode == "gluster-block" {
+			if config.opMode == glusterBlockOpmode {
 				config.blockModeArgs[s[0]] = s[1]
 			} else {
 				if s[0] == "url" {
@@ -458,7 +459,7 @@ func (p *glusterBlockProvisioner) Delete(volume *v1.PersistentVolume) error {
 	switch config.opMode {
 
 	//gluster-block Opmode
-	case "gluster-block":
+	case glusterBlockOpmode:
 		glog.V(1).Infof("glusterblock: Deleting Volume %v ", delBlockVolName)
 		deleteCmd := exec.Command(
 			config.opMode, "delete",
@@ -471,7 +472,7 @@ func (p *glusterBlockProvisioner) Delete(volume *v1.PersistentVolume) error {
 		glog.V(1).Infof("glusterblock: successfully deleted Volume %v ", delBlockVolName)
 
 	// Heketi Opmode
-	case "heketi":
+	case heketiOpmode:
 		glog.V(1).Infof("glusterblock: opmode[heketi]: deleting Volume %v", delBlockVolName)
 
 	default:
@@ -566,7 +567,7 @@ func parseClassParameters(params map[string]string, kubeclient kubernetes.Interf
 	}
 
 	if len(parseOpmode) == 0 {
-		cfg.opMode = "gluster-block"
+		cfg.opMode = glusterBlockOpmode
 	} else {
 		parseErr := parseOpmodeArgs(parseOpmode, &cfg, blkmodeArgs)
 		if parseErr != nil {
@@ -574,11 +575,11 @@ func parseClassParameters(params map[string]string, kubeclient kubernetes.Interf
 		}
 	}
 
-	if len(cfg.url) == 0 && cfg.opMode == "heketi" {
+	if len(cfg.url) == 0 && cfg.opMode == heketiOpmode {
 		return nil, fmt.Errorf("StorageClass for provisioner %s must contain 'resturl' parameter", "glusterblock")
 	}
 
-	if cfg.opMode == "heketi" {
+	if cfg.opMode == heketiOpmode {
 		if !authEnabled {
 			cfg.user = ""
 			cfg.restSecretName = ""
@@ -611,8 +612,8 @@ func parseOpmodeArgs(parseOpmode string, cfg *provisionerConfig, blkmodeArgs str
 	switch parseOpmode {
 
 	// Gluster Block opmode
-	case "gluster-block":
-		cfg.opMode = "gluster-block"
+	case glusterBlockOpmode:
+		cfg.opMode = glusterBlockOpmode
 		if len(blkmodeArgs) == 0 {
 			return fmt.Errorf("[gluster-block] arg:[%s] has to be set if 'gluster-block' opmode is set", "blockmodeargs")
 		}
@@ -628,8 +629,8 @@ func parseOpmodeArgs(parseOpmode string, cfg *provisionerConfig, blkmodeArgs str
 		}
 
 	// Heketi Opmode
-	case "heketi":
-		cfg.opMode = "heketi"
+	case heketiOpmode:
+		cfg.opMode = heketiOpmode
 	default:
 		return fmt.Errorf("StorageClass for provisioner [%s] contains unknown [%v] parameter", "glusterblock", parseOpmode)
 	}
