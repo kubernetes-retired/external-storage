@@ -74,8 +74,8 @@ type provisionerConfig struct {
 	// Optional: Rest user who is capable of creating gluster block volumes.
 	user string
 
-	// Optional: Rest user key for above RestUser.
-	userKey string
+	// Optional: Rest Auth Enable.
+	restAuthEnabled bool
 
 	// Optional:  secret name, namespace.
 	restSecretNamespace string
@@ -245,7 +245,7 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 		}
 	} else {
 		blockString = nil
-		modeAnn = "url:" + (*cfg).url + "," + "user:" + (*cfg).user + "," + "userkey:" + (*cfg).restSecretValue
+		modeAnn = "url:" + (*cfg).url + "," + "user:" + (*cfg).user + "," + "secret:" + (*cfg).restSecretName + "," + "secretnamespace:" + (*cfg).restSecretNamespace
 	}
 
 	pv := &v1.PersistentVolume{
@@ -379,7 +379,7 @@ func (p *glusterBlockProvisioner) createVolume(volSizeInt int, blockVol string, 
 				return nil, fmt.Errorf("glusterblock: failed to decode gluster-block response")
 			}
 
-			if config.chapAuthEnabled && (**execBlockRes).User == "" || (**execBlockRes).AuthKey == "" {
+			if config.chapAuthEnabled && ((**execBlockRes).User == "" || (**execBlockRes).AuthKey == "") {
 				return nil, fmt.Errorf("glusterblock: missing CHAP - invalid volume creation ")
 			}
 
@@ -536,8 +536,6 @@ func parseClassParameters(params map[string]string, kubeclient kubernetes.Interf
 			cfg.url = v
 		case "restuser":
 			cfg.user = v
-		case "restuserkey":
-			cfg.userKey = v
 		case "restsecretname":
 			cfg.restSecretName = v
 		case "restsecretnamespace":
@@ -560,7 +558,7 @@ func parseClassParameters(params map[string]string, kubeclient kubernetes.Interf
 			blkmodeArgs = v
 		case "chapauth":
 			chapAuthEnabled = dstrings.ToLower(v) == "true"
-			cfg.chapAuthEnabled = chapAuthEnabled
+
 		default:
 			return nil, fmt.Errorf("glusterblock: invalid option %q for volume plugin %s", k, "glusterblock")
 		}
@@ -584,12 +582,10 @@ func parseClassParameters(params map[string]string, kubeclient kubernetes.Interf
 			cfg.user = ""
 			cfg.restSecretName = ""
 			cfg.restSecretNamespace = ""
-			cfg.userKey = ""
 			cfg.restSecretValue = ""
 		}
 
 		if len(cfg.restSecretName) != 0 || len(cfg.restSecretNamespace) != 0 {
-			// restSecretName + Namespace has precedence over userKey
 			if len(cfg.restSecretName) != 0 && len(cfg.restSecretNamespace) != 0 {
 				cfg.restSecretValue, err = parseSecret(cfg.restSecretNamespace, cfg.restSecretName, kubeclient)
 				if err != nil {
@@ -599,12 +595,16 @@ func parseClassParameters(params map[string]string, kubeclient kubernetes.Interf
 				return nil, fmt.Errorf("StorageClass for provisioner %q must have restSecretNamespace and restSecretName either both set or both empty", "glusterblock")
 
 			}
+		} else if authEnabled {
+			return nil, fmt.Errorf("`restauthenabled` should be set to false if `restsecret` and `restsecretnamespace` is nil")
 		} else {
-			cfg.restSecretValue = cfg.userKey
+			glog.V(1).Infof("glusterblock: rest authentication is not enabled")
 		}
 
 	}
 
+	cfg.restAuthEnabled = authEnabled
+	cfg.chapAuthEnabled = chapAuthEnabled
 	return &cfg, nil
 }
 
