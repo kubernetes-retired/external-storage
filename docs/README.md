@@ -106,6 +106,9 @@ Now, actually giving provisioners identities and effectively making them pets ma
 
 This repository is structured such that each external provisioner gets its own directory for its code, docs, examples, yamls, etc. What they don't get is individual "vendor" directories for their respective dependencies, they must depend on the shared top-level vendor and lib directories. This helps reduce the size of the repo and forces all parts of it to stay updated, but introduces some complications for contributors.
 
+### Conventions
+[Kubernetes project](https://github.com/kubernetes/kubernetes/) conventions are followed if not otherwise stated.
+
 ### Adding a provisioner
 
 Basically you create a directory to house everything you want to check in, add build and/or test invocations to [travis](../.travis.yml), and add dependencies to the top-level vendor directory.
@@ -121,3 +124,15 @@ Any breaking update to a vendor dependency requires an update to every external 
 Generally, breaking vendor dependency updates won't happen often (at least every time kubernetes/client-go updates, maybe) and all the provisioners can be updated with ease, without requiring explicit approval from their respective OWNERS, unless the change is big enough or they've asked that it be required.
 
 As the contributor of a dependency/library update, you're usually responsible for updating the dependents so travis CI passes, as it shouldn't be harder than a find/replace. Otherwise, if it's decided that you don't need to be responsible, some other solution will be worked out to make sure everything stays in a buildable state.
+
+### Using Persistent Volume annotations
+External provisioners may need to store custom data in Persistent Volume annotations. An annotation should have the below format:
+```
+annotations:
+  <provisioner-type>.external-storage.incubator.kubernetes.io/<variable> : <value>
+```
+A usage example:
+```
+annotations:
+  "manila.external-storage.incubator.kubernetes.io/ID": "de64eb77-05cb-4502-a6e5-7e8552c352f3"
+```
