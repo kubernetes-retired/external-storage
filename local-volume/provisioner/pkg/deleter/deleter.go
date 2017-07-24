@@ -35,7 +35,9 @@ type Deleter struct {
 // NewDeleter creates a Deleter object to handle the cleanup and deletion of local PVs
 // allocated by this provisioner
 func NewDeleter(config *common.RuntimeConfig) *Deleter {
-	return &Deleter{RuntimeConfig: config}
+	return &Deleter{
+		RuntimeConfig: config,
+	}
 }
 
 // DeletePVs will scan through all the existing PVs that are released, and cleanup and
@@ -49,17 +51,17 @@ func (d *Deleter) DeletePVs() {
 			// Cleanup volume
 			err := d.cleanupPV(pv)
 			if err != nil {
-				// TODO: Log event on PV
-				glog.Errorf("Error cleaning PV %q: %v", name, err.Error())
+				cleaningLocalPVErr := fmt.Errorf("Error cleaning PV %q: %v", name, err.Error())
+				d.RuntimeConfig.Recorder.Eventf(pv, v1.EventTypeWarning, common.EventVolumeFailedDelete, cleaningLocalPVErr.Error())
 				continue
 			}
 
 			// Remove API object
 			err = d.APIUtil.DeletePV(name)
 			if err != nil {
-				// TODO: Log event on PV
 				// TODO: Does delete return an error if object has already been deleted?
-				glog.Errorf("Error deleting PV %q: %v", name, err.Error())
+				deletingLocalPVErr := fmt.Errorf("Error deleting PV %q: %v", name, err.Error())
+				d.RuntimeConfig.Recorder.Eventf(pv, v1.EventTypeWarning, common.EventVolumeFailedDelete, deletingLocalPVErr.Error())
 				continue
 			}
 			glog.Infof("Deleted PV %q", name)
