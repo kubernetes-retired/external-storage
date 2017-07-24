@@ -116,12 +116,8 @@ func (p *cephFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 
 	_, err = p.client.Core().Secrets(nameSpace).Create(secret)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create secret")
-	}
-
-	if err != nil {
 		glog.Errorf("Cephfs Provisioner: create volume failed, err: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to create secret")
 	}
 
 	pv := &v1.PersistentVolume{
