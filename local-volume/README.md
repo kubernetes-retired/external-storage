@@ -57,11 +57,11 @@ Future features:
 KUBE_FEATURE_GATES="PersistentLocalVolumes=true" NODE_LOCAL_SSDS=<n> cluster/kube-up.sh
 ```
 
-#### Option 2: GKE (not available until 1.7)
+#### Option 2: GKE
 
 ``` console
-gcloud alpha container cluster create ... --local-ssd-count=<n>
-gcloud alpha container node-pools create ... --local-ssd-count=<n>
+gcloud container cluster create ... --local-ssd-count=<n> --enable-kubernetes-alpha --cluster-version=1.7.1
+gcloud container node-pools create ... --local-ssd-count=<n>
 ```
 
 #### Option 3: Baremetal environments
