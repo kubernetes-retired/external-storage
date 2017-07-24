@@ -106,6 +106,9 @@ Now, actually giving provisioners identities and effectively making them pets ma
 
 This repository is structured such that each external provisioner gets its own directory for its code, docs, examples, yamls, etc. What they don't get is individual "vendor" directories for their respective dependencies, they must depend on the shared top-level vendor and lib directories. This helps reduce the size of the repo and forces all parts of it to stay updated, but introduces some complications for contributors.
 
+### Conventions
+[Kubernetes project](https://github.com/kubernetes/kubernetes/) conventions are followed if not otherwise stated.
+
 ### Adding a provisioner
 
 Basically you create a directory to house everything you want to check in, add build and/or test invocations to [travis](../.travis.yml), and add dependencies to the top-level vendor directory.
