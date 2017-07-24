@@ -105,12 +105,12 @@ func (d *Discoverer) discoverVolumesAtPath(class string, config common.MountConf
 			glog.Errorf("Mount path %q validation failed: %v", filePath, err)
 			continue
 		}
-		availByte, err := d.VolUtil.GetFsAvailableByte(filePath)
+		capacityByte, err := d.VolUtil.GetFsCapacityByte(filePath)
 		if err != nil {
 			glog.Errorf("Path %q fs stats error: %v", filePath, err)
 			continue
 		}
-		d.createPV(file, class, config, availByte)
+		d.createPV(file, class, config, capacityByte)
 	}
 }
 
@@ -134,15 +134,15 @@ func generatePVName(file, node, class string) string {
 	return fmt.Sprintf("local-pv-%x", h.Sum32())
 }
 
-func (d *Discoverer) createPV(file, class string, config common.MountConfig, availByte uint64) {
+func (d *Discoverer) createPV(file, class string, config common.MountConfig, capacityByte int64) {
 	pvName := generatePVName(file, d.Node.Name, class)
 	outsidePath := filepath.Join(config.HostDir, file)
 
-	glog.Infof("Found new volume at host path %q with capacity %d, creating Local PV %q", outsidePath, availByte, pvName)
+	glog.Infof("Found new volume at host path %q with capacity %d, creating Local PV %q", outsidePath, capacityByte, pvName)
 	pvSpec := common.CreateLocalPVSpec(&common.LocalPVConfig{
 		Name:            pvName,
 		HostPath:        outsidePath,
-		Capacity:        availByte,
+		Capacity:        capacityByte,
 		StorageClass:    class,
 		ProvisionerName: d.Name,
 		AffinityAnn:     d.nodeAffinityAnn,

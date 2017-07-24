@@ -324,7 +324,7 @@ func verifyCapacity(t *testing.T, createdPV *v1.PersistentVolume, expectedPV *te
 	if !ok {
 		t.Errorf("Unable to convert resource storage into int64")
 	}
-	if uint64(capacityInt) != expectedPV.capacity {
+	if capacityInt != expectedPV.capacity {
 		t.Errorf("Expected capacity %d, got %d", expectedPV.capacity, capacityInt)
 	}
 }
@@ -333,7 +333,7 @@ func verifyCapacity(t *testing.T, createdPV *v1.PersistentVolume, expectedPV *te
 type testPVInfo struct {
 	pvName       string
 	path         string
-	capacity     uint64
+	capacity     int64
 	storageClass string
 }
 

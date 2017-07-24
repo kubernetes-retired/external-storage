@@ -84,7 +84,7 @@ type RuntimeConfig struct {
 type LocalPVConfig struct {
 	Name            string
 	HostPath        string
-	Capacity        uint64
+	Capacity        int64
 	StorageClass    string
 	ProvisionerName string
 	AffinityAnn     string
