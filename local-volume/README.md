@@ -1,14 +1,17 @@
 # Local Persistent Storage User Guide
+
 ## Overview
+
 Local persistent volumes allows users to access local storage through the
 standard PVC interface in a simple and portable way.  The PV contains node
 affinity information that the system uses to schedule pods to the correct
 nodes.
 
-An external static provisioner is available to help simplify local storage
-management once the local volumes are configured.
+An external static provisioner and a related bootstrapper are available to help
+simplify local storage management once the local volumes are configured.
 
 ## Feature Status
+
 Current status: 1.7 - Alpha
 
 What works:
@@ -45,28 +48,35 @@ Future features:
 * Dynamic provisioning for shared local persistent storage
 
 ## User Guide
-### Bringing up a cluster with local disks
-#### GCE
+
+### Step 1: Bringing up a cluster with local disks
+
+#### Option 1: GCE
+
 ``` console
 KUBE_FEATURE_GATES="PersistentLocalVolumes=true" NODE_LOCAL_SSDS=<n> cluster/kube-up.sh
 ```
-#### GKE (not available until 1.7)
+
+#### Option 2: GKE (not available until 1.7)
+
 ``` console
 gcloud alpha container cluster create ... --local-ssd-count=<n>
 gcloud alpha container node-pools create ... --local-ssd-count=<n>
 ```
 
-#### Baremetal environments
-1. Partition and format the disks on each node according to your application's requirements.
-2. Mount all the filesystems under one directory per StorageClass. The directory is currently
-   specified in the daemonset pod definition (`/mnt/disks` by default) and may be more
-   configurable in the future.
-3. Configure a Kubernetes cluster with the `PersistentLocalVolumes` feature gate.
+#### Option 3: Baremetal environments
 
-#### Local test cluster
+1. Partition and format the disks on each node according to your application's
+   requirements.
+2. Mount all the filesystems under one directory per StorageClass. The directories
+   are specified in a configmap, see below. By default, the discovery directory is
+   `/mnt/disks` and storage class is `local-storage`.
+3. Configure the Kubernetes API Server, controller-manager, scheduler, and all kubelets with the `PersistentLocalVolumes` feature gate.
 
-1. Create `/mnt/disks` directory and mount several volumes into its subdirectories. The example
-   below uses three ram disks to simulate real local volumes:
+#### Option 4: Local test cluster
+
+1. Create `/mnt/disks` directory and mount several volumes into its subdirectories.
+   The example below uses three ram disks to simulate real local volumes:
 ```console
 $ mkdir /mnt/disks
 $ for vol in vol1 vol2 vol3; do
@@ -80,33 +90,34 @@ done
 $ ALLOW_PRIVILEGED=true LOG_LEVEL=5 FEATURE_GATES=PersistentLocalVolumes=true hack/local-up-cluster.sh
 ```
 
-3. Continue with [Running the external static provisioner](#running-the-external-static-provisioner)
+3. Continue with [Creating local persistent volumes](#creating-local-persistent-volumes)
    below.
 
+### Step 2: Creating local persistent volumes
 
-#### Executing E2E Tests
+#### Option 1: Bootstrapping the external static provisioner
+
+This is optional, only for automated creation and cleanup of local volumes. See
+[bootstrapper/](./bootstrapper) and [provisioner/](./provisioner) for details and
+sample configuration files.
+
+1. Create an admin account with cluster admin priviledge:
 ``` console
-go run hack/e2e.go -- -v --test --test_args="--ginkgo.focus=\[Feature:LocalPersistentVolumes\]"
+$ kubectl create -f bootstrapper/deployment/kubernetes/admin-account.yaml
 ```
 
-### Running the external static provisioner
-This is optional, only for automated creation and cleanup of local volumes.
-See `provisioner/` for details and sample configuration files.
-
-1. Create an admin account with persistentvolume provisioner and node system privileges.
-``` console
-$ kubectl create -f provisioner/deployment/kubernetes/admin_account.yaml
-```
-2. Create a ConfigMap with your local storage configuration details. There is nothing to configure at this
-point, the default StorageClass is hardcoded to `local-storage`.
-TBD: fill in the details and examples as the provisioner becomes more configurable.
-
-3. Launch the DaemonSet
-``` console
-$ kubectl create -f provisioner/deployment/kubernetes/provisioner-daemonset.yaml
+2. Create a ConfigMap with your local storage configuration details:
+```console
+$ kubectl create -f bootstrapper/deployment/kubernetes/example-config.yaml
 ```
 
-### Specifying local PV
+3. Launch the bootstrapper, which in turn creates static provisioner daemonset:
+``` console
+$ kubectl create -f bootstrapper/deployment/kubernetes/bootstrapper.yaml
+```
+
+#### Option 2: Manually create local persistent volume
+
 If you don't use the external provisioner, then you have to create the local PVs
 manually. Example PV:
 
@@ -116,29 +127,30 @@ kind: PersistentVolume
 metadata:
   name: example-local-pv
   annotations:
-        "volume.alpha.kubernetes.io/node-affinity": `{
-            "requiredDuringSchedulingIgnoredDuringExecution": {
-                "nodeSelectorTerms": [
-                    { "matchExpressions": [
-                        { "key": "kubernetes.io/hostname",
-                          "operator": "In",
-                          "values": ["my-node"]
-                        }
-                    ]}
-                 ]}
-              }`,
+    "volume.alpha.kubernetes.io/node-affinity": '{
+      "requiredDuringSchedulingIgnoredDuringExecution": {
+        "nodeSelectorTerms": [
+          { "matchExpressions": [
+            { "key": "kubernetes.io/hostname",
+              "operator": "In",
+              "values": ["my-node"]
+            }
+          ]}
+         ]}
+        }'
 spec:
-    capacity:
-      storage: 5Gi
-    accessModes:
-    - ReadWriteOnce
-    persistentVolumeReclaimPolicy: Delete
-    storageClassName: local-storage
-    local:
-      path: /mnt/disks/ssd1
+  capacity:
+    storage: 5Gi
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: local-storage
+  local:
+    path: /mnt/disks/ssd1
 ```
 
-### Specifying local PVC
+### Step 3: Create local persistent volume claim
+
 In the PVC, specify the StorageClass of your local PVs.
 
 ``` yaml
@@ -155,7 +167,14 @@ spec:
   storageClassName: local-storage
 ```
 
+## Executing E2E Tests
+
+``` console
+go run hack/e2e.go -- -v --test --test_args="--ginkgo.focus=\[Feature:LocalPersistentVolumes\]"
+```
+
 ## Best Practices
+
 * For IO isolation, a whole disk per volume is recommended
 * For capacity isolation, separate partitions per volume is recommended
 * Avoid recreating nodes with the same node name while there are still old PVs
@@ -163,10 +182,10 @@ spec:
   the new node contains the old PVs.
 
 ### Deleting/removing the underlying volume
+
 When you want to decommission the local volume, here is a possible workflow.
 1. Stop the pods that are using the volume
 2. Remove the local volume from the node (ie unmounting, pulling out the disk, etc)
 3. Delete the PVC
 4. The provisioner will try to cleanup the volume, but will fail since the volume no longer exists
 5. Manually delete the PV object
-

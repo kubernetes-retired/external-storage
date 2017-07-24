@@ -19,7 +19,7 @@ ifeq ($(VERSION),)
 	VERSION = latest
 endif
 
-clean: clean-aws/efs clean-ceph/cephfs clean-flex clean-gluster/block clean-local-volume/provisioner clean-nfs-client clean-nfs
+clean: clean-aws/efs clean-ceph/cephfs clean-ceph/rbd clean-flex clean-gluster/block clean-local-volume/provisioner clean-local-volume/bootstrapper clean-nfs-client clean-nfs
 .PHONY: clean
 
 test: test-aws/efs test-local-volume/provisioner test-nfs
@@ -57,6 +57,18 @@ clean-ceph/cephfs:
 	rm -f cephfs-provisioner
 .PHONY: clean-ceph/cephfs
 
+ceph/rbd:
+	cd ceph/rbd; \
+	go build -o rbd-provisioner cmd/rbd-provisioner/main.go; \
+	docker build -t $(REGISTRY)rbd-provisioner:latest .
+	docker tag $(REGISTRY)rbd-provisioner:latest $(REGISTRY)rbd-provisioner:$(VERSION)
+.PHONY: ceph/rbd
+
+clean-ceph/rbd:
+	cd ceph/rbd; \
+	rm -f rbd-provisioner
+.PHONY: clean-ceph/rbd
+
 flex:
 	cd flex; \
 	make container
@@ -92,6 +104,11 @@ clean-local-volume/provisioner:
 	make clean
 .PHONY: clean-local-volume/provisioner
 
+clean-local-volume/bootstrapper:
+	cd local-volume/bootstrapper; \
+	make clean
+.PHONY: clean-local-volume/bootstrapper
+
 nfs-client:
 	cd nfs-client; \
 	./build.sh; \
@@ -122,7 +139,12 @@ clean-nfs:
 push-cephfs-provisioner: ceph/cephfs
 	docker push $(REGISTRY)cephfs-provisioner:$(VERSION)
 	docker push $(REGISTRY)cephfs-provisioner:latest
-.PHONY: push-nfs-client-provisioner
+.PHONY: push-cephfs-provisioner
+
+push-rbd-provisioner: ceph/rbd
+	docker push $(REGISTRY)rbd-provisioner:$(VERSION)
+	docker push $(REGISTRY)rbd-provisioner:latest
+.PHONY: push-rbd-provisioner
 
 push-efs-provisioner:
 	cd aws/efs; \
@@ -134,10 +156,10 @@ push-glusterblock-provisioner:
 	make push
 .PHONY: push-glusterblock-provisioner
 
-push-local-volume-bootstrapper:
+push-local-volume-provisioner-bootstrap:
 	cd local-volume/bootstrapper; \
 	make push
-.PHONY: push-local-volume-bootstrapper
+.PHONY: push-local-volume-provisioner-bootstrap
 
 push-local-volume-provisioner:
 	cd local-volume/provisioner; \

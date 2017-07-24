@@ -47,9 +47,9 @@ flycheck_*.el
 /local-volume/provisioner/local-volume-provisioner
 /local-volume/provisioner/deployment/docker/local-volume-provisioner
 
-# local-volume-bootstrapper binary
-/local-volume/bootstrapper/local-volume-bootstrapper
-/local-volume/bootstrapper/deployment/docker/local-volume-bootstrapper
+# local-volume-provisioner-bootstrap binary
+/local-volume/bootstrapper/local-volume-provisioner-bootstrap
+/local-volume/bootstrapper/deployment/docker/local-volume-provisioner-bootstrap
 
 .idea/
 /.project

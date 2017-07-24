@@ -11,7 +11,6 @@ BRANCH := $(subst /,-,$(shell git rev-parse --abbrev-ref HEAD))
 VER := $(shell git describe)
 ARCH := $(shell go env GOARCH)
 GOOS := $(shell go env GOOS)
-GLIDEPATH := $(shell command -v glide 2> /dev/null)
 DIR=.
 
 ifdef APP_SUFFIX
@@ -52,37 +51,17 @@ name:
 package:
 	@echo $(PACKAGE)
 
-heketi: glide.lock vendor
-	go build $(LDFLAGS) -o $(APP_NAME)
+server:
+	godep go build $(LDFLAGS) -o $(APP_NAME)
 
-server: heketi
-
-vendor:
-ifndef GLIDEPATH
-	$(info Please install glide.)
-	$(info Install it using your package manager or)
-	$(info by running: curl https://glide.sh/get | sh.)
-	$(info )
-	$(error glide is required to continue)
-endif
-	echo "Installing vendor directory"
-	glide install -v
-
-	echo "Building dependencies to make builds faster"
-	go install github.com/heketi/heketi
-
-glide.lock: glide.yaml
-	echo "Glide.yaml has changed, updating glide.lock"
-	glide update -v
-
-client: glide.lock vendor
+client:
 	@$(MAKE) -C client/cli/go
 
 run: server
 	./$(APP_NAME)
 
-test: glide.lock vendor
-	go test $(GOFILES)
+test:
+	godep go test $(GOFILES)
 
 clean:
 	@echo Cleaning Workspace...

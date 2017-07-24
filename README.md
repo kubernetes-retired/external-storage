@@ -22,6 +22,9 @@ Note that because your provisioner needs to depend also on [client-go](https://g
 
 [For all documentation, including a full guide on how to write an external provisioner using the library that demonstrates the above, see here](./docs).
 
+### `client-go` integration strategy
+This library is integrated with `client-go` `master` branch. As soon as the `client-go` `master` branch contains a new version of `client-go` vendor dependencies, dependencies of this library shall be updated to the tip of the `client-go` `master` branch.
+
 ## Roadmap
 
 February

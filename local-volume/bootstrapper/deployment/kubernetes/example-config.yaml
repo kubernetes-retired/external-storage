@@ -15,3 +15,7 @@ data:
       "hostDir": "/mnt/hdds",
       "mountDir": "/local-hdds"
     }
+  "local-storage": |
+    {
+      "hostDir": "/mnt/disks"
+    }

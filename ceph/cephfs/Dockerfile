@@ -18,4 +18,4 @@ RUN yum install -y epel-release
 RUN yum install -y ceph-common python-cephfs
 ADD cephfs-provisioner /usr/local/bin/cephfs-provisioner
 ADD cephfs_provisioner/cephfs_provisioner.py /usr/local/bin/cephfs_provisioner
-CMD chmod x+o /usr/local/bin/cephfs_provisioner
+CMD chmod o+x /usr/local/bin/cephfs_provisioner

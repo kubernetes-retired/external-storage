@@ -26,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/client-go/rest"
 )
 ```
@@ -36,7 +36,7 @@ Obviously the external provisioner library is there. So too are client-go and ap
 Run `glide init` to populate a glide.yaml. When asked about using a release of external-storage answer Yes! But when asked about client-go or apimachinery, answer **No**! The reason you say No here is because external-storage depends on specific versions of these repos, and glide is not smart enough to always make the correct recommendation here.
 
 ```
-[INFO]	The package github.com/kubernetes-incubator/external-storage appears to have Semantic Version releases (http://semver.org). 
+[INFO]	The package github.com/kubernetes-incubator/external-storage appears to have Semantic Version releases (http://semver.org).
 [INFO]	The latest release is v2.0.0. You are currently not using a release. Would you like
 [INFO]	to use this release? Yes (Y) or No (N)
 ```
@@ -70,7 +70,7 @@ After you have edited your glide.yaml to your satisfaction, run `glide install -
 
 Finally you'll want to build your program. You can write some sort of containerized build or stick to a `go build` invocation. In order for a `go build .` or variation thereof to work, you must
 * be working in your `GOPATH`, your code has to be somewhere under "$GOPATH/src". This is a requirement (even) when using vendored dependencies
-* have go version 1.7 or greater installed
+* have go version 1.8 or greater installed
 The binary produced can then be e.g. used to make a Docker image.
 
 ## Authorizing provisioners for RBAC or OpenShift
@@ -106,6 +106,9 @@ Now, actually giving provisioners identities and effectively making them pets ma
 
 This repository is structured such that each external provisioner gets its own directory for its code, docs, examples, yamls, etc. What they don't get is individual "vendor" directories for their respective dependencies, they must depend on the shared top-level vendor and lib directories. This helps reduce the size of the repo and forces all parts of it to stay updated, but introduces some complications for contributors.
 
+### Conventions
+[Kubernetes project](https://github.com/kubernetes/kubernetes/) conventions are followed if not otherwise stated.
+
 ### Adding a provisioner
 
 Basically you create a directory to house everything you want to check in, add build and/or test invocations to [travis](../.travis.yml), and add dependencies to the top-level vendor directory.
@@ -121,3 +124,15 @@ Any breaking update to a vendor dependency requires an update to every external 
 Generally, breaking vendor dependency updates won't happen often (at least every time kubernetes/client-go updates, maybe) and all the provisioners can be updated with ease, without requiring explicit approval from their respective OWNERS, unless the change is big enough or they've asked that it be required.
 
 As the contributor of a dependency/library update, you're usually responsible for updating the dependents so travis CI passes, as it shouldn't be harder than a find/replace. Otherwise, if it's decided that you don't need to be responsible, some other solution will be worked out to make sure everything stays in a buildable state.
+
+### Using Persistent Volume annotations
+External provisioners may need to store custom data in Persistent Volume annotations. An annotation should have the below format:
+```
+annotations:
+  <provisioner-type>.external-storage.incubator.kubernetes.io/<variable> : <value>
+```
+A usage example:
+```
+annotations:
+  "manila.external-storage.incubator.kubernetes.io/ID": "de64eb77-05cb-4502-a6e5-7e8552c352f3"
+```

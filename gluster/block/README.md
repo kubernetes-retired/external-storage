@@ -1,4 +1,4 @@
-# glusterblock Volume Provisioner for Kubernetes 1.5+
+# Glusterblock Volume Provisioner for Kubernetes 1.5+
 
 
 [![Docker Repository on Quay](https://quay.io/repository/external_storage/glusterblock-provisioner/status "Docker Repository on Quay")](https://quay.io/repository/external_storage/glusterblock-provisioner)
@@ -6,28 +6,51 @@
 quay.io/external_storage/glusterblock-provisioner:latest
 ```
 
+[TOC]
+
+## What is Gluster Block Provisioner ?
+
+Gluster Block Provisioner is an external provisioner which dynamically provision gluster block volumes ( ISCSI volumes ) on demand. The persistent Volume Claim which has been requested with this external provisioner's identity ( for eg# `gluster.org/glusterblock`)  will be served by this provisioner. This provisioner is capable of operating on couple of modes ( `gluster-block` and `heketi`).
+
+`gluster-block` mode :  This is an experimental or test mode on which the provisioner will directly talk to `gluster-block` utility or command line interface of gluster-block. 
+
+`heketi` mode : This is the recommended/supported mode on which the provisioner will talk to `heketi's` Block API to provision gluster block volumes.  
+
+Additional Reference:
+[gluster-block](https://github.com/gluster/gluster-block)
+[heketi](https://github.com/heketi/heketi)
+[gluster-kubernetes](https://github.com/gluster/gluster-kubernetes)
+
+
 ## Build Gluster Block Provisioner and container image
 
+If you want to build the container from source instead of pulling the docker image, please follow below steps:
 
-```bash
+ Step 1: Build the provisioner binary
+```
 [root@localhost]# go build glusterblock-provisioner.go
+```
+
+Step 2:  Build docker container image
+```
 [root@localhost]# docker build -t glusterblock-provisioner .
 ```
 
-## Start Kubernetes local cluster
+## Start Kubernetes Cluster
 
 ## Start glusterblock provisioner
 
-The following example uses `glusterblock-provisioner-1` as the identity for the instance and assumes kubeconfig is at `/root/.kube`. The identity should remain the same if the provisioner restarts. If there are multiple provisioners, each should have a different identity.
+The following example uses `gluster.org/glusterblock` as the identity for the instance and assumes kubeconfig is at `/root/.kube`. The identity should remain the same if the provisioner restarts. If there are multiple provisioners, each should have a different identity.
 
-```bash
-docker run -ti -v /root/.kube:/kube -v /var/run/kubernetes:/var/run/kubernetes --privileged --net=host  glusterblock-provisioner /usr/local/bin/glusterblock-provisioner -master=http://127.0.0.1:8080 -kubeconfig=/kube/config -id=glusterblock-provisioner-1
 ```
+[root@localhost] docker run -ti -v /root/.kube:/kube -v /var/run/kubernetes:/var/run/kubernetes --privileged --net=host  glusterblock-provisioner /usr/local/bin/glusterblock-provisioner -master=http://127.0.0.1:8080 -kubeconfig=/kube/config -id=gluster.org/glusterblock
+```
+
 
 ## Create a glusterblock Storage Class
 
-```bash
-kubectl create -f glusterblock-class.yaml
+```
+[root@localhost] kubectl create -f glusterblock-class.yaml
 ```
 
 The available storage class parameter are listed below:
@@ -45,10 +68,7 @@ parameters:
     blockmodeargs: "glustervol=blockmaster1,hosts=10.67.116.108"
 
 ```
-Gluster Block Provisioner can operate on below modes:
-`heketi` and `gluster-block`.
 
-`gluster-block` is an experimental mode which can be used for dev/test environment. Heketi will be the default or recommended operation mode.
 
 ### Global parameters applicable for both modes:
 
@@ -84,11 +104,11 @@ in storage class parameter.
 "glustervol=blockmaster1,hosts=10.67.116.108"
 ```
 
-# How to test:
+## How to test:
 
-## Create a claim
+### Create a claim
 
-```bash
+```
 [root@localhost]# kubectl create -f glusterblock-claim1.yaml
 persistentvolumeclaim "claim1" created
 
@@ -106,3 +126,4 @@ pvc/claim1   Bound     pvc-b7045edf-3a26-11e7-af53-c85b7636c232   1Gi        RWX
 NAME                                          CAPACITY   ACCESSMODES   RECLAIMPOLICY   STATUS    CLAIM            STORAGECLASS   REASON    AGE
 pv/pvc-b7045edf-3a26-11e7-af53-c85b7636c232   1Gi        RWX           Delete          Bound     default/claim1   glusterblock             1m
 ```
+

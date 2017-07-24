@@ -21,33 +21,44 @@ import (
 	"fmt"
 	"hash/fnv"
 	"os"
+	"path"
+	"strings"
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
 
+	"k8s.io/api/core/v1"
+	extv1beta1 "k8s.io/api/extensions/v1beta1"
+	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api/v1"
-	extv1beta1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
-	rbacv1beta1 "k8s.io/client-go/pkg/apis/rbac/v1beta1"
 	"k8s.io/client-go/rest"
 )
 
 const (
-	defaultImage         = "local-volume-provisioner:dev"
-	defaultConfigMapName = "local-volume-config"
+	defaultImageName          = "quay.io/external_storage/local-volume-provisioner:latest"
+	defaultVolumeConfigName   = "local-volume-default-config"
+	defaultServiceAccountName = "local-storage-admin"
+	defaultMountRoot          = "/mnt/local-storage"
 
-	provisionerDaemonSetName      = "local-volume-provisioner"
-	provisionerContainerName      = "provisioner"
-	provisionerServiceAccountName = "local-storage-admin"
+	daemonSetName = "local-volume-provisioner"
+	containerName = "provisioner"
 
-	provisionerPVBindingName   = "local-storage:provisioner-pv-binding"
-	provisionerNodeBindingName = "local-storage:provisioner-node-binding"
-	systemRoleNode             = "system:node"
-	systemRolePVProvisioner    = "system:persistent-volume-provisioner"
+	pvBindingName           = "local-storage:provisioner-pv-binding"
+	nodeBindingName         = "local-storage:provisioner-node-binding"
+	systemRoleNode          = "system:node"
+	systemRolePVProvisioner = "system:persistent-volume-provisioner"
 )
 
+var (
+	imageName          = flag.String("image", defaultImageName, "Name of local volume provisioner image")
+	mountRoot          = flag.String("mount-root", defaultMountRoot, "Container root directory of volume mount path for discoverying local volumes. This is used only when mountDir is omitted in volume configmap, in which case hostDir will be normalized then concatenates with mountRoot")
+	volumeConfigName   = flag.String("volume-config", defaultVolumeConfigName, "Name of the local volume configuration configmap. The configmap must reside in the same namespace with bootstrapper.")
+	serviceAccountName = flag.String("serviceaccount", defaultServiceAccountName, "Name of the service accout for local volume provisioner")
+)
+
+// setupClient creates an in cluster kubernetes client.
 func setupClient() *kubernetes.Clientset {
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -61,21 +72,75 @@ func setupClient() *kubernetes.Clientset {
 	return clientset
 }
 
-func generateMountName(hostDir, mountDir string) string {
+// generateMountName generates a volumeMount.name for pod spec, based on volume configuration.
+func generateMountName(mount *common.MountConfig) string {
 	h := fnv.New32a()
-	h.Write([]byte(hostDir))
-	h.Write([]byte(mountDir))
+	h.Write([]byte(mount.HostDir))
+	h.Write([]byte(mount.MountDir))
 	return fmt.Sprintf("mount-%x", h.Sum32())
 }
 
-func getVolumeConfigName() string {
-	name := os.Getenv("VOLUME_CONFIG_NAME")
-	if name == "" {
-		return defaultConfigMapName
-	}
-	return name
+// generateMountDir generates mount directory path in container. The rule is to trim '/' prefix
+// and change "/" to "~" (based on kubernetes convention), then concatenate with root path, e.g,
+// if mountRoot == /mnt/local-storage, then:
+//   "/mnt/ssds" -> "/mnt/local-storage/mnt~ssds"
+func generateMountDir(mount *common.MountConfig) string {
+	return path.Join(*mountRoot, strings.Replace(strings.TrimPrefix(mount.HostDir, "/"), "/", "~", -1))
 }
 
+// ensureVolumeConfig reads volume configurations from given configmap, and create a default one
+// if not already exist.
+func ensureVolumeConfig(client *kubernetes.Clientset, namespace string) (map[string]common.MountConfig, error) {
+	// Get config map from user or from a default configmap (if created before).
+	config, err := common.GetVolumeConfigFromConfigMap(client, namespace, *volumeConfigName)
+	if err != nil && *volumeConfigName != defaultVolumeConfigName {
+		// If configmap is provided by user but we have problem getting it, fail fast.
+		return nil, fmt.Errorf("could not get config map: %v", err)
+	} else if err != nil && errors.IsNotFound(err) {
+		// configmap is not provided by user and default configmap doesn't exist, create one.
+		glog.Infof("No config is given, creating default configmap %v", *volumeConfigName)
+		config = common.GetDefaultVolumeConfig()
+		if err = createConfigMap(client, namespace, config); err != nil {
+			return nil, fmt.Errorf("unable to create configmap: %v", err)
+		}
+	} else if err != nil {
+		// error exists, it might be that default configmap is damanged, fail fast.
+		return nil, fmt.Errorf("could not get default config map: %v", err)
+	}
+	return config, nil
+}
+
+// ensureMountDir checks if each storageclass's mount config has 'MountDir' set; if not, it will
+// automatically generate one and informs an update on configmap is required.
+func ensureMountDir(config map[string]common.MountConfig) bool {
+	needsUpdate := false
+	for class, mount := range config {
+		if mount.MountDir == "" {
+			newMoutConfig := mount
+			newMoutConfig.MountDir = generateMountDir(&mount)
+			config[class] = newMoutConfig
+			needsUpdate = true
+		}
+	}
+	return needsUpdate
+}
+
+// updateConfigMap ...
+func updateConfigMap(client *kubernetes.Clientset, namespace string, config map[string]common.MountConfig) error {
+	var err error
+	configMap, err := client.CoreV1().ConfigMaps(namespace).Get(*volumeConfigName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	configMap.Data, err = common.VolumeConfigToConfigMapData(config)
+	if err != nil {
+		return err
+	}
+	_, err = client.CoreV1().ConfigMaps(namespace).Update(configMap)
+	return err
+}
+
+// createConfigMap ...
 func createConfigMap(client *kubernetes.Clientset, namespace string, config map[string]common.MountConfig) error {
 	data, err := common.VolumeConfigToConfigMapData(config)
 	if err != nil {
@@ -87,7 +152,7 @@ func createConfigMap(client *kubernetes.Clientset, namespace string, config map[
 			Kind:       "ConfigMap",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      getVolumeConfigName(),
+			Name:      *volumeConfigName,
 			Namespace: namespace,
 		},
 		Data: data,
@@ -96,6 +161,7 @@ func createConfigMap(client *kubernetes.Clientset, namespace string, config map[
 	return err
 }
 
+// createServiceAccount ...
 func createServiceAccount(client *kubernetes.Clientset, namespace string) error {
 	serviceAccount := v1.ServiceAccount{
 		TypeMeta: metav1.TypeMeta{
@@ -103,7 +169,7 @@ func createServiceAccount(client *kubernetes.Clientset, namespace string) error 
 			Kind:       "ServiceAccount",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      provisionerServiceAccountName,
+			Name:      *serviceAccountName,
 			Namespace: namespace,
 		},
 	}
@@ -111,11 +177,14 @@ func createServiceAccount(client *kubernetes.Clientset, namespace string) error 
 	return err
 }
 
+// createClusterRoleBinding creates two cluster role bindings for local volume provisioner's
+// service account: systemRoleNode and systemRolePVProvisioner. These are required for
+// provisioner to get node information and create persistent volumes.
 func createClusterRoleBinding(client *kubernetes.Clientset, namespace string) error {
 	subjects := []rbacv1beta1.Subject{
 		{
 			Kind:      rbacv1beta1.ServiceAccountKind,
-			Name:      provisionerServiceAccountName,
+			Name:      *serviceAccountName,
 			Namespace: namespace,
 		},
 	}
@@ -126,7 +195,7 @@ func createClusterRoleBinding(client *kubernetes.Clientset, namespace string) er
 			Kind:       "ClusterRoleBinding",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: provisionerPVBindingName,
+			Name: pvBindingName,
 		},
 		RoleRef: rbacv1beta1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
@@ -141,7 +210,7 @@ func createClusterRoleBinding(client *kubernetes.Clientset, namespace string) er
 			Kind:       "ClusterRoleBinding",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: provisionerNodeBindingName,
+			Name: nodeBindingName,
 		},
 		RoleRef: rbacv1beta1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
@@ -162,11 +231,12 @@ func createClusterRoleBinding(client *kubernetes.Clientset, namespace string) er
 	return nil
 }
 
+// createDaemonSet ...
 func createDaemonSet(client *kubernetes.Clientset, namespace string, config map[string]common.MountConfig) error {
 	volumes := []v1.Volume{}
 	volumeMounts := []v1.VolumeMount{}
 	for _, mount := range config {
-		name := generateMountName(mount.HostDir, mount.MountDir)
+		name := generateMountName(&mount)
 		volumes = append(volumes, v1.Volume{
 			Name: name,
 			VolumeSource: v1.VolumeSource{
@@ -200,38 +270,37 @@ func createDaemonSet(client *kubernetes.Clientset, namespace string, config map[
 		},
 		{
 			Name:  "VOLUME_CONFIG_NAME",
-			Value: os.Getenv("VOLUME_CONFIG_NAME"),
+			Value: *volumeConfigName,
 		},
 	}
 
 	containers := []v1.Container{
 		{
-			Name:         provisionerContainerName,
-			Image:        defaultImage,
+			Name:         containerName,
+			Image:        *imageName,
 			VolumeMounts: volumeMounts,
 			Env:          envVars,
 		},
 	}
 
-	// TODO: make daemonset configurable as well, using another configmap.
 	daemonSet := extv1beta1.DaemonSet{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "extensions/v1beta1",
 			Kind:       "DaemonSet",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      provisionerDaemonSetName,
+			Name:      daemonSetName,
 			Namespace: namespace,
 		},
 		Spec: extv1beta1.DaemonSetSpec{
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{"app": provisionerDaemonSetName},
+					Labels: map[string]string{"app": daemonSetName},
 				},
 				Spec: v1.PodSpec{
 					Volumes:            volumes,
 					Containers:         containers,
-					ServiceAccountName: provisionerServiceAccountName,
+					ServiceAccountName: *serviceAccountName,
 				},
 			},
 		},
@@ -249,35 +318,30 @@ func main() {
 	if namespace == "" {
 		glog.Fatalf("MY_NAMESPACE environment variable not set\n")
 	}
+
 	client := setupClient()
 
-	// Get config map from user or from a default configmap (if created before).
-	config, err := common.GetVolumeConfigFromConfigMap(client, namespace, getVolumeConfigName())
-	if err != nil && os.Getenv("VOLUME_CONFIG_NAME") != "" {
-		// If configmap is provided by user but we have problem getting it, fail fast.
-		glog.Fatalf("Could not get config map: %v", err)
-	} else if err != nil && errors.IsNotFound(err) {
-		// configmap is not provided by user and default configmap doesn't exist, create one.
-		glog.Infof("No config is given, creating default configmap")
-		config = common.GetDefaultVolumeConfig()
-		if err = createConfigMap(client, namespace, config); err != nil {
-			glog.Fatalf("Unable to create configmap: %v\n", err)
-		}
-	} else if err != nil {
-		// error exists, it might be that default configmap is damanged, fail fast.
-		glog.Fatalf("Could not get default config map: %v", err)
+	var err error
+	var config map[string]common.MountConfig
+	if config, err = ensureVolumeConfig(client, namespace); err != nil {
+		glog.Fatalf("Unable to ensure volume config: %v", err)
 	}
 
-	glog.Infof("Running bootstrap pod with config %+v\n", config)
+	if ensureMountDir(config) {
+		if err = updateConfigMap(client, namespace, config); err != nil {
+			glog.Fatalf("Could not update config map to use generated mountdir: %v", err)
+		}
+	}
 
-	// TODO: check error and clean up resources.
-	if err := createServiceAccount(client, namespace); err != nil && !errors.IsAlreadyExists(err) {
+	glog.Infof("Running bootstrap pod with config %v: %+v\n", *volumeConfigName, config)
+
+	if err = createServiceAccount(client, namespace); err != nil && !errors.IsAlreadyExists(err) {
 		glog.Fatalf("Unable to create service account: %v\n", err)
 	}
-	if err := createClusterRoleBinding(client, namespace); err != nil && !errors.IsAlreadyExists(err) {
+	if err = createClusterRoleBinding(client, namespace); err != nil && !errors.IsAlreadyExists(err) {
 		glog.Fatalf("Unable to create cluster role bindings: %v\n", err)
 	}
-	if err := createDaemonSet(client, namespace, config); err != nil {
+	if err = createDaemonSet(client, namespace, config); err != nil {
 		glog.Fatalf("Unable to create daemonset: %v\n", err)
 	}
 

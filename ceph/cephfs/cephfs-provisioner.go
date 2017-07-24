@@ -26,14 +26,14 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
-	"github.com/kubernetes-incubator/external-storage/lib/helper"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/kubernetes/pkg/api/v1/helper"
 )
 
 const (
@@ -116,12 +116,8 @@ func (p *cephFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 
 	_, err = p.client.Core().Secrets(nameSpace).Create(secret)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create secret")
-	}
-
-	if err != nil {
 		glog.Errorf("Cephfs Provisioner: create volume failed, err: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to create secret")
 	}
 
 	pv := &v1.PersistentVolume{

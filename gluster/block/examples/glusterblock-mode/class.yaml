@@ -1,0 +1,10 @@
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: glusterblock
+provisioner: gluster.org/glusterblock
+parameters:
+    opmode: "gluster-block"
+    blockmodeargs: "glustervol=blockmaster1,hosts=10.67.116.108"
+    hacount: "3"
+
