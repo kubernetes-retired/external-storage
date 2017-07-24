@@ -37,8 +37,8 @@ type VolumeUtil interface {
 	// Delete all the contents under the given path, but not the path itself
 	DeleteContents(fullPath string) error
 
-	// Get available capacity for fs on full path
-	GetFsAvailableByte(fullPath string) (uint64, error)
+	// Get capacity for fs on full path
+	GetFsCapacityByte(fullPath string) (int64, error)
 }
 
 var _ VolumeUtil = &volumeUtil{}
@@ -104,12 +104,12 @@ func (u *volumeUtil) DeleteContents(fullPath string) error {
 	return nil
 }
 
-// GetFsAvailableByte returns available capacity in byte about a mounted filesystem.
+// GetFsCapacityByte returns capacity in bytes about a mounted filesystem.
 // fullPath is the pathname of any file within the mounted filesystem. Capacity
-// returned here is total capacity available.
-func (u *volumeUtil) GetFsAvailableByte(fullPath string) (uint64, error) {
-	available, _, _, _, _, _, err := util.FsInfo(fullPath)
-	return uint64(available), err
+// returned here is total capacity.
+func (u *volumeUtil) GetFsCapacityByte(fullPath string) (int64, error) {
+	_, capacity, _, _, _, _, err := util.FsInfo(fullPath)
+	return capacity, err
 }
 
 var _ VolumeUtil = &FakeVolumeUtil{}
@@ -128,7 +128,7 @@ type FakeFile struct {
 	IsNotDir bool
 	// Expected hash value of the PV name
 	Hash     uint32
-	Capacity uint64
+	Capacity int64
 }
 
 // NewFakeVolumeUtil returns a VolumeUtil object for use in unit testing
@@ -177,8 +177,8 @@ func (u *FakeVolumeUtil) DeleteContents(fullPath string) error {
 	return nil
 }
 
-// GetFsAvailableByte returns available capacity in byte about a mounted filesystem.
-func (u *FakeVolumeUtil) GetFsAvailableByte(fullPath string) (uint64, error) {
+// GetFsCapacityByte returns capacity in byte about a mounted filesystem.
+func (u *FakeVolumeUtil) GetFsCapacityByte(fullPath string) (int64, error) {
 	dir, file := filepath.Split(fullPath)
 	dir = filepath.Clean(dir)
 	files, found := u.directoryFiles[dir]
