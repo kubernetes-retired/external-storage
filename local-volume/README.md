@@ -148,10 +148,15 @@ spec:
   local:
     path: /mnt/disks/ssd1
 ```
-
+Please replace the following elements to reflect your configuration:
+  * "my-node" with the name of kubernetes node which is hosting this
+    local storage disk
+  * "5Gi" with the required size of storage volume, same as specified in PVC
+  * "local-storage" with the name of storage class which should be used
+     for local volumes
+  * "/mnt/disks/ssd1" with the path to the mount point of local volumes
+ 
 ### Step 3: Create local persistent volume claim
-
-In the PVC, specify the StorageClass of your local PVs.
 
 ``` yaml
 kind: PersistentVolumeClaim
@@ -166,6 +171,10 @@ spec:
       storage: 5Gi
   storageClassName: local-storage
 ```
+Please replace the following elements to reflect your configuration:
+  * "5Gi" with required size of storage volume
+  * "local-storage" with the name of storage class which should be used
+     for local PVs
 
 ## Executing E2E Tests
 
