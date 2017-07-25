@@ -34,6 +34,7 @@ objects:
           glusterfs: glusterblock-provisioner-pod
       spec:
         serviceAccountName: glusterblock-provisioner
+        hostNetwork: true
         containers:
         - name: glusterblock-provisioner
           image: quay.io/external_storage/glusterblock-provisioner:latest
