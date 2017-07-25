@@ -10,6 +10,6 @@ parameters:
     restsecretname: "heketi-secret"
     opmode: "heketi"
     hacount: "1"
-    chapauth: "true"
+    chapauthenabled: "true"
     #clusterids: "454811fcedbec6316bc10e591a57b472"
 

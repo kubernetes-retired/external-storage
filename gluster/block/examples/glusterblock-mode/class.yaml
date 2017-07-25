@@ -7,4 +7,5 @@ parameters:
     opmode: "gluster-block"
     blockmodeargs: "glustervol=blockmaster1,hosts=10.67.116.108"
     hacount: "3"
+    chapauthenabled: "true"
 
