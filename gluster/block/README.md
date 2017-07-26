@@ -63,7 +63,7 @@ parameters:
     restsecretnamespace: "default"
     restsecretname: "heketi-secret"
     hacount: "3"
-    chapauth: "true"
+    chapauthenabled: "true"
     opmode: "gluster-block"
     blockmodeargs: "glustervol=blockmaster1,hosts=10.67.116.108"
 
@@ -74,7 +74,7 @@ parameters:
 
 * `opmode`: This value decide in which mode gluster block provisioner has to work.
 
-* `chapauth`: This value has to be set to `true` if we want provision block volume with CHAP authentication enabled. This is an optional parameter.
+* `chapauthenabled`: This value has to be set to `true` if we want to provision block volume with CHAP authentication enabled. This is an optional parameter.
 
 * `hacount`: This is the count of number of paths to the block target server. This provide high availability via multipathing capability of iscsi. If there is a path failure, the I/Os will not be disturbed and will be served via another available paths.
 

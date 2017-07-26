@@ -234,6 +234,8 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 		iscsiVol.BlockSecretNs = nameSpace
 	} else if !((*cfg).chapAuthEnabled) {
 		glog.V(1).Infof("glusterblock: authentication requested is nil")
+		iscsiVol.SessionCHAPAuth = false
+		secretRef = nil
 	}
 
 	var blockString []string
@@ -556,7 +558,7 @@ func parseClassParameters(params map[string]string, kubeclient kubernetes.Interf
 			parseOpmode = v
 		case "blockmodeargs":
 			blkmodeArgs = v
-		case "chapauth":
+		case "chapauthenabled":
 			chapAuthEnabled = dstrings.ToLower(v) == "true"
 
 		default:
