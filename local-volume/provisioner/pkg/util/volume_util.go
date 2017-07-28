@@ -134,7 +134,7 @@ func (u *volumeUtil) GetFsCapacityByte(fullPath string) (int64, error) {
 // GetBlockSpaceByte returns  capacity in bytes of a block device.
 // fullPath is the pathname of block device.
 func (u *volumeUtil) GetBlockSpaceByte(fullPath string) (uint64, error) {
-	file, err := os.OpenFile(fullPath, os.O_RDWR, 0)
+	file, err := os.OpenFile(fullPath, os.O_RDONLY, 0)
 	if err != nil {
 		return 0, err
 	}

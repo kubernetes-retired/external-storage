@@ -175,9 +175,8 @@ func testSetup(t *testing.T, config *testConfig) *Deleter {
 	userConfig := &common.UserConfig{
 		DiscoveryMap: map[string]common.MountConfig{
 			"sc1": {
-				HostDir:    testHostDir + "/test-dir",
-				MountDir:   testMountDir + "/test-dir",
-				VolumeType: common.VolumeTypeFile,
+				HostDir:  testHostDir + "/test-dir",
+				MountDir: testMountDir + "/test-dir",
 			},
 		},
 	}

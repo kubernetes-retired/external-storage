@@ -29,7 +29,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/kubelet/apis"
-	"strings"
 )
 
 const (
@@ -51,8 +50,6 @@ const (
 	// EventVolumeFailedDelete copied from k8s.io/kubernetes/pkg/controller/volume/events
 	EventVolumeFailedDelete = "VolumeFailedDelete"
 
-	// DefaultVolumeType is default type of volume being discovered in the specified host dir.
-	DefaultVolumeType = VolumeTypeFile
 )
 
 // UserConfig stores all the user-defined parameters to the provisioner
@@ -69,8 +66,6 @@ type MountConfig struct {
 	HostDir string `json:"hostDir"`
 	// The mount point of the hostpath volume
 	MountDir string `json:"mountDir"`
-	// The volumeType "block" or "file". If nil, the type defaults to "file"
-	VolumeType string `json:"volumeType"`
 }
 
 // RuntimeConfig stores all the objects that the provisioner needs to run
@@ -141,9 +136,8 @@ func GetVolumeConfigFromConfigMap(client *kubernetes.Clientset, namespace, name 
 func GetDefaultVolumeConfig() map[string]MountConfig {
 	return map[string]MountConfig{
 		"local-storage": {
-			HostDir:    DefaultHostDir,
-			MountDir:   DefaultMountDir,
-			VolumeType: DefaultVolumeType,
+			HostDir:  DefaultHostDir,
+			MountDir: DefaultMountDir,
 		},
 	}
 }
@@ -169,17 +163,6 @@ func ConfigMapDataToVolumeConfig(data map[string]string) (map[string]MountConfig
 		config := MountConfig{}
 		if err := json.Unmarshal([]byte(val), &config); err != nil {
 			return nil, fmt.Errorf("unable to unmarshal config for class %v: %v", class, err)
-		}
-		if config.VolumeType != "" {
-			config.VolumeType = strings.ToLower(config.VolumeType)
-		} else {
-			config.VolumeType = DefaultVolumeType
-		}
-		switch config.VolumeType {
-		case VolumeTypeFile:
-		case VolumeTypeBlock:
-		default:
-			return nil, fmt.Errorf("Invalid volume type %v for class %v", config.VolumeType, class)
 		}
 		mountConfig[class] = config
 	}

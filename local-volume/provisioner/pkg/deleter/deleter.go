@@ -79,20 +79,28 @@ func (d *Deleter) cleanupPV(pv *v1.PersistentVolume) error {
 		return fmt.Errorf("Unknown storage class name %v", pv.Spec.StorageClassName)
 	}
 
-	if config.VolumeType == common.VolumeTypeFile {
-		specPath := pv.Spec.Local.Path
-		relativePath, err := filepath.Rel(config.HostDir, specPath)
-		if err != nil {
-			return fmt.Errorf("Could not get relative path: %v", err)
-		}
+	// TODO: Get volType from PV.
+	volType := common.VolumeTypeFile
+	switch volType {
+	case common.VolumeTypeFile:
+		return d.cleanupFileVolume(pv, config)
+	case common.VolumeTypeBlock:
+		return fmt.Errorf("Not yet implemented")
+	default:
+		return fmt.Errorf("Unexpected volume type %q for deleting path %q", volType, pv.Spec.Local.Path)
+	}
+}
 
-		mountPath := filepath.Join(config.MountDir, relativePath)
-
-		glog.Infof("Deleting PV %q contents at hostpath %q, mountpath %q", pv.Name, specPath, mountPath)
-		err = d.VolUtil.DeleteContents(mountPath)
-		return err
+func (d *Deleter) cleanupFileVolume(pv *v1.PersistentVolume, config common.MountConfig) error {
+	specPath := pv.Spec.Local.Path
+	relativePath, err := filepath.Rel(config.HostDir, specPath)
+	if err != nil {
+		return fmt.Errorf("Could not get relative path: %v", err)
 	}
 
-	// TODO: block device
-	return nil
+	mountPath := filepath.Join(config.MountDir, relativePath)
+
+	glog.Infof("Deleting PV %q contents at hostpath %q, mountpath %q", pv.Name, specPath, mountPath)
+	err = d.VolUtil.DeleteContents(mountPath)
+	return err
 }
