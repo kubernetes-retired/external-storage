@@ -336,20 +336,19 @@ func getAvailableDiskBytes(directory string) (int64, error) {
 	zeroSizeMeansUnlimited := runtime.GOOS == "linux" && stat.Blocks == 0 && isStatsZeroIfUnlimited(stat)
 	if zeroSizeMeansUnlimited {
 		return math.MaxInt64, nil
-	} else {
-		return int64(stat.Bavail) * int64(stat.Bsize), nil
 	}
+	return int64(stat.Bavail) * int64(stat.Bsize), nil
 }
 
-const TMPFS_MAGIC = 0x01021994
-const HUGETLBFS_MAGIC = 0x958458f6
-const RAMFS_MAGIC = 0x858458f6
+const TmpfsMagic = 0x01021994
+const HugetlbfsMagic = 0x958458f6
+const RamfsMagic = 0x858458f6
 
 func isStatsZeroIfUnlimited(stat syscall.Statfs_t) bool {
 	switch stat.Type {
-	case TMPFS_MAGIC:
-	case HUGETLBFS_MAGIC:
-	case RAMFS_MAGIC:
+	case TmpfsMagic:
+	case HugetlbfsMagic:
+	case RamfsMagic:
 		return true
 	}
 	return false
