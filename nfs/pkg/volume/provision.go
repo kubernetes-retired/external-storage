@@ -340,15 +340,15 @@ func getAvailableDiskBytes(directory string) (int64, error) {
 	return int64(stat.Bavail) * int64(stat.Bsize), nil
 }
 
-const TmpfsMagic = 0x01021994
-const HugetlbfsMagic = 0x958458f6
-const RamfsMagic = 0x858458f6
+const tmpfsMagic = 0x01021994
+const hugetlbfsMagic = 0x958458f6
+const ramfsMagic = 0x858458f6
 
 func isStatsZeroIfUnlimited(stat syscall.Statfs_t) bool {
 	switch stat.Type {
-	case TmpfsMagic:
-	case HugetlbfsMagic:
-	case RamfsMagic:
+	case tmpfsMagic:
+	case hugetlbfsMagic:
+	case ramfsMagic:
 		return true
 	}
 	return false
