@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package gce is an implementation of Interface, LoadBalancer
 // and Instances for Google Compute Engine.
-package gce // import "github.com/rootfs/snapshot/pkg/cloudprovider/providers/gce"
+package gce // import "github.com/kubernetes-incubator/external-storage/snapshot/pkg/cloudprovider/providers/gce"

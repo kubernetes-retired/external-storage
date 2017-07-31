@@ -30,26 +30,25 @@ import (
 
 	"gopkg.in/gcfg.v1"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/flowcontrol"
-	"k8s.io/kubernetes/pkg/api/v1"
 	apiservice "k8s.io/kubernetes/pkg/api/v1/service"
 	netsets "k8s.io/kubernetes/pkg/util/net/sets"
 	"k8s.io/kubernetes/pkg/volume"
 
 	"cloud.google.com/go/compute/metadata"
 	"github.com/golang/glog"
+	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/cloudprovider"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	compute "google.golang.org/api/compute/v1"
 	container "google.golang.org/api/container/v1"
 	"google.golang.org/api/googleapi"
-
-	"github.com/rootfs/snapshot/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
 const (
@@ -2585,8 +2584,8 @@ func (gce *GCECloud) GetAutoLabelsForPD(name string, zone string) (map[string]st
 	}
 
 	labels := make(map[string]string)
-	labels[metav1.LabelZoneFailureDomain] = zone
-	labels[metav1.LabelZoneRegion] = region
+	labels[apis.LabelZoneFailureDomain] = zone
+	labels[apis.LabelZoneRegion] = region
 
 	return labels, nil
 }

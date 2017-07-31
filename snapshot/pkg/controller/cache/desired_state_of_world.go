@@ -26,7 +26,7 @@ import (
 
 	"github.com/golang/glog"
 
-	crdv1 "github.com/rootfs/snapshot/pkg/apis/crd/v1"
+	crdv1 "github.com/kubernetes-incubator/external-storage/snapshot/pkg/apis/crd/v1"
 )
 
 type DesiredStateOfWorld interface {

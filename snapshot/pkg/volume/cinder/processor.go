@@ -21,14 +21,14 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/api/core/v1"
 
 	"github.com/golang/glog"
 
-	crdv1 "github.com/rootfs/snapshot/pkg/apis/crd/v1"
-	"github.com/rootfs/snapshot/pkg/cloudprovider"
-	"github.com/rootfs/snapshot/pkg/cloudprovider/providers/openstack"
-	"github.com/rootfs/snapshot/pkg/volume"
+	crdv1 "github.com/kubernetes-incubator/external-storage/snapshot/pkg/apis/crd/v1"
+	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/cloudprovider"
+	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/cloudprovider/providers/openstack"
+	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume"
 	k8sVol "k8s.io/kubernetes/pkg/volume"
 )
 

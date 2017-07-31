@@ -39,9 +39,9 @@ import (
 	neutronports "github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
 	"github.com/gophercloud/gophercloud/pagination"
 
-	"github.com/rootfs/snapshot/pkg/cloudprovider"
+	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/cloudprovider"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/api/v1/service"
 )
 
