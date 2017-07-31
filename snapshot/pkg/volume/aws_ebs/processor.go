@@ -21,15 +21,15 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	kvol "k8s.io/kubernetes/pkg/volume"
 
 	"github.com/golang/glog"
 
-	crdv1 "github.com/rootfs/snapshot/pkg/apis/crd/v1"
-	"github.com/rootfs/snapshot/pkg/cloudprovider"
-	"github.com/rootfs/snapshot/pkg/cloudprovider/providers/aws"
-	"github.com/rootfs/snapshot/pkg/volume"
+	crdv1 "github.com/kubernetes-incubator/external-storage/snapshot/pkg/apis/crd/v1"
+	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/cloudprovider"
+	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/cloudprovider/providers/aws"
+	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume"
 )
 
 type awsEBSPlugin struct {

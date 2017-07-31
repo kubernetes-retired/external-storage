@@ -26,14 +26,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/kubernetes"
-	v1 "k8s.io/client-go/pkg/api/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
 
-	crdv1 "github.com/rootfs/snapshot/pkg/apis/crd/v1"
-	"github.com/rootfs/snapshot/pkg/controller/cache"
-	"github.com/rootfs/snapshot/pkg/volume"
+	crdv1 "github.com/kubernetes-incubator/external-storage/snapshot/pkg/apis/crd/v1"
+	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/controller/cache"
+	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume"
 )
 
 const (

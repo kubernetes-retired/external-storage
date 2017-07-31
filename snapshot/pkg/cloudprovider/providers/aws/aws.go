@@ -41,14 +41,14 @@ import (
 	"github.com/aws/aws-sdk-go/service/elb"
 	"github.com/golang/glog"
 
-	"github.com/rootfs/snapshot/pkg/cloudprovider"
+	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/cloudprovider"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/v1/service"
+	"k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -965,8 +965,6 @@ func (c *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 			return nil, err
 		}
 		addresses = append(addresses, v1.NodeAddress{Type: v1.NodeInternalIP, Address: internalIP})
-		// Legacy compatibility: the private ip was the legacy host ip
-		addresses = append(addresses, v1.NodeAddress{Type: v1.NodeLegacyHostIP, Address: internalIP})
 
 		externalIP, err := c.metadata.GetMetadata("public-ipv4")
 		if err != nil {
@@ -1011,9 +1009,6 @@ func (c *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 			return nil, fmt.Errorf("EC2 instance had invalid private address: %s (%s)", orEmpty(instance.InstanceId), ipAddress)
 		}
 		addresses = append(addresses, v1.NodeAddress{Type: v1.NodeInternalIP, Address: ip.String()})
-
-		// Legacy compatibility: the private ip was the legacy host ip
-		addresses = append(addresses, v1.NodeAddress{Type: v1.NodeLegacyHostIP, Address: ip.String()})
 	}
 
 	// TODO: Other IP addresses (multiple ips)?
@@ -1786,12 +1781,12 @@ func (c *Cloud) GetVolumeLabels(volumeName KubernetesVolumeID) (map[string]strin
 		return nil, fmt.Errorf("volume did not have AZ information: %q", info.VolumeId)
 	}
 
-	labels[metav1.LabelZoneFailureDomain] = az
+	labels[apis.LabelZoneFailureDomain] = az
 	region, err := azToRegion(az)
 	if err != nil {
 		return nil, err
 	}
-	labels[metav1.LabelZoneRegion] = region
+	labels[apis.LabelZoneRegion] = region
 
 	return labels, nil
 }

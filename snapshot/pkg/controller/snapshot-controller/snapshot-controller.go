@@ -25,20 +25,20 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"k8s.io/client-go/kubernetes"
-	apiv1 "k8s.io/client-go/pkg/api/v1"
+	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/rest"
 	kcache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 
 	"k8s.io/kubernetes/pkg/api"
 
-	crdv1 "github.com/rootfs/snapshot/pkg/apis/crd/v1"
-	"github.com/rootfs/snapshot/pkg/controller/cache"
-	"github.com/rootfs/snapshot/pkg/controller/reconciler"
-	"github.com/rootfs/snapshot/pkg/controller/snapshotter"
-	"github.com/rootfs/snapshot/pkg/volume"
+	crdv1 "github.com/kubernetes-incubator/external-storage/snapshot/pkg/apis/crd/v1"
+	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/controller/cache"
+	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/controller/reconciler"
+	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/controller/snapshotter"
+	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume"
 
-	"github.com/rootfs/snapshot/pkg/controller/populator"
+	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/controller/populator"
 )
 
 const (
