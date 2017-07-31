@@ -56,3 +56,8 @@ import:
 - package: github.com/lpabon/godbc
   version: 9577782540c1398b710ddae1b86268ba03a19b0c
 - package: github.com/dgrijalva/jwt-go
+- package: github.com/spf13/cobra
+  version: f62e98d28ab7ad31d707ba837a966378465c7b57
+- package: github.com/spf13/pflag
+  version: 5ccb023bc27df288a957c5e994cd44fd19619465
+- package: github.com/powerman/rpc-codec/jsonrpc2

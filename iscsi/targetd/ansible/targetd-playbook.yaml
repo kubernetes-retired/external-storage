@@ -1,0 +1,53 @@
+---
+- hosts: targetd
+  tasks:
+  - name: Install lvm2
+    yum: 
+      name: lvm2
+      state: latest
+  - name: Install targetd
+    yum: 
+      name: targetd
+      state: latest
+  - name: Install targetcli
+    yum:
+      name: targetcli
+      state: latest
+  - name: Install Firewalld 
+    yum:
+      name: firewalld
+      state: latest
+  - name: Ensure firewalld is running
+    service:
+      name: firewalld
+      state: started
+      enabled: yes
+  - name: Firewalld allow iscsi traffic
+    firewalld: 
+      service: iscsi-target
+      permanent: true 
+      state: enabled
+  - name: Firewalld allow targetd traffic
+    firewalld: 
+      port: 18700/tcp
+      permanent: true 
+      state: enabled
+  - name: Create Volume Group
+    lvg:
+      vg: "{{ targetd_lvm_volume_group }}"
+      pvs:  "{{ targetd_lvm_physical_volume }}"
+  - name: Enable target Service
+    service:
+      name: target
+      enabled: yes
+      state: started
+  - name: Write targetd.yaml file
+    template:
+      src:  targetd.yaml.j2
+      dest: /etc/target/targetd.yaml
+      mode: 0644
+  - name: Enable targetd Service
+    service:
+      name: targetd
+      enabled: yes
+      state: started

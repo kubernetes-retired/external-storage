@@ -1,0 +1,6 @@
+#!/bin/bash
+
+set -e
+
+./build
+docker build -t raffaelespazzoli/iscsi-controller:0.0.1 .

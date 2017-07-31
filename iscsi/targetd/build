@@ -1,0 +1,9 @@
+#!/bin/bash
+
+set -e
+
+GOOS=linux go build \
+  -a --ldflags '-extldflags "-static"' \
+  -tags netgo \
+  -installsuffix netgo \
+  -o iscsi-controller  .

@@ -1,0 +1,8 @@
+#!/bin/bash
+
+set -e
+
+./build-container
+docker tag raffaelespazzoli/iscsi-controller:0.0.1 docker-registry-default.192.168.99.100.nip.io:443/iscsi-provisioner/iscsi-controller:0.0.1
+docker login -u admin -p `oc whoami -t` http://docker-registry-default.192.168.99.100.nip.io:80
+docker push docker-registry-default.192.168.99.100.nip.io:80/iscsi-provisioner/iscsi-controller:0.0.1

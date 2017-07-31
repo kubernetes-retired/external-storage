@@ -52,3 +52,4 @@ flycheck_*.el
 /local-volume/bootstrapper/deployment/docker/local-volume-provisioner-bootstrap
 
 .idea/
+/.project

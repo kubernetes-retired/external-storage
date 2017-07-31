@@ -1,0 +1,120 @@
+---
+- hosts: masters[0],targetd
+  tasks: 
+  - name: gather facts for targetd
+    setup:
+    when: inventory_hostname in groups['targetd']
+  - block:
+     - name: Determine if iscsi-provisioner project exists
+       command: >
+         /usr/bin/oc --config=/etc/origin/master/admin.kubeconfig
+         get projects iscsi-provisioner -o json
+       failed_when: false
+       changed_when: false
+       register: project_test
+     
+     - name: Create iscsi-provisioner project
+       command: >
+         /usr/bin/oc adm --config=/etc/origin/master/admin.kubeconfig
+         new-project iscsi-provisioner
+       when: project_test.rc == 1
+     
+     - name: test if iscsi-provisioner service account exists
+       command: >
+           /usr/bin/oc --config=/etc/origin/master/admin.kubeconfig 
+           get sa iscsi-provisioner -n iscsi-provisioner
+       failed_when: false
+       changed_when: false
+       register: account_test
+     
+     - name: create the service account
+       shell: >
+           /usr/bin/oc --config=/etc/origin/master/admin.kubeconfig 
+           create sa iscsi-provisioner
+           -n iscsi-provisioner
+       when: account_test.rc != 0
+   
+     - name: Determine if targetd-account secret exists
+       command: >
+         /usr/bin/oc --config=/etc/origin/master/admin.kubeconfig
+         get secret targetd-account -o json
+         -n iscsi-provisioner
+       failed_when: false
+       changed_when: false
+       register: secret_test 
+   
+     - name: Create targetd-account secret 
+       command: >
+         /usr/bin/oc --config=/etc/origin/master/admin.kubeconfig
+         secret new-basicauth targetd-account --username={{ targetd_user }} 
+         --password={{ targetd_password }} -n iscsi-provisioner
+       when: secret_test.rc == 1
+   
+     - name: Add cluster-reader role to service account
+       command: >
+         /usr/bin/oc adm --config=/etc/origin/master/admin.kubeconfig
+         policy add-cluster-role-to-user cluster-reader system:serviceaccount:iscsi-provisioner:iscsi-provisioner
+   
+     - name: Add pv-provisioner-controller role to service account
+       command: >
+         /usr/bin/oc adm --config=/etc/origin/master/admin.kubeconfig
+         policy add-cluster-role-to-user system:pv-provisioner-controller system:serviceaccount:iscsi-provisioner:iscsi-provisioner
+   
+     - name: Add pv-binder-controller role to service account
+       command: >
+         /usr/bin/oc adm --config=/etc/origin/master/admin.kubeconfig
+         policy add-cluster-role-to-user system:pv-binder-controller system:serviceaccount:iscsi-provisioner:iscsi-provisioner
+   
+     - name: Add pv-recycler-controller role to service account
+       command: >
+         /usr/bin/oc adm --config=/etc/origin/master/admin.kubeconfig
+         policy add-cluster-role-to-user system:pv-recycler-controller system:serviceaccount:iscsi-provisioner:iscsi-provisioner
+   
+     - name: create iscsi class template
+       template: 
+         src: ./iscsi-provisioner-class.yaml.j2
+         dest:  /tmp/iscsi-provisioner-class.yaml
+   
+     - name: HACK trim final comma from initiator list
+       lineinfile:
+         dest:  /tmp/iscsi-provisioner-class.yaml
+         regexp: '^(.*), *$'
+         line: '\1'
+         backrefs: yes
+         state: present
+
+     - name: test if iscsi storage class exists
+       command: >
+           /usr/bin/oc --config=/etc/origin/master/admin.kubeconfig 
+           get StorageClass iscsi -n iscsi-provisioner
+       failed_when: false
+       changed_when: false
+       register: class_test 
+     
+     - name: create the iscsi storage class 
+       shell: >
+           /usr/bin/oc --config=/etc/origin/master/admin.kubeconfig 
+           create -f /tmp/iscsi-provisioner-class.yaml
+           -n iscsi-provisioner
+       when: class_test.rc != 0
+   
+     - name: create iscsi provisioner deployment config template
+       template: 
+         src: ./iscsi-provisioner-dc.yaml.j2
+         dest:  /tmp/iscsi-provisioner-dc.yaml
+
+     - name: test if iscsi provisioner deployment config exists
+       command: >
+           /usr/bin/oc --config=/etc/origin/master/admin.kubeconfig 
+           get dc iscsi-provisioner -n iscsi-provisioner
+       failed_when: false
+       changed_when: false
+       register: dc_test 
+     
+     - name: create the iscsi provisioner deployment config
+       shell: >
+           /usr/bin/oc --config=/etc/origin/master/admin.kubeconfig 
+           create -f /tmp/iscsi-provisioner-dc.yaml
+           -n iscsi-provisioner
+       when: dc_test.rc != 0
+    when: inventory_hostname in groups['masters']
