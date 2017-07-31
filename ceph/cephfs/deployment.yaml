@@ -12,17 +12,15 @@ spec:
         app: cephfs-provisioner
     spec:
       containers:
-        -
-          env:
-            -
-              name: PROVISIONER_NAME
-              valueFrom:
-                configMapKeyRef:
-                  key: provisioner.name
-                  name: cephfs-provisioner
-          image: "quay.io/external_storage/cephfs-provisioner:latest"
-          name: cephfs-provisioner
-          command:
-            - "/usr/local/bin/cephfs-provisioner"
-          args:
-            - "-id=cephfs-provisioner-1"
+      - name: cephfs-provisioner
+        image: "quay.io/external_storage/cephfs-provisioner:latest"
+        env:
+        - name: PROVISIONER_NAME
+          valueFrom:
+            configMapKeyRef:
+              key: provisioner.name
+              name: cephfs-provisioner
+        command:
+          - "/usr/local/bin/cephfs-provisioner"
+        args:
+          - "-id=cephfs-provisioner-1"
