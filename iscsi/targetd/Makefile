@@ -60,5 +60,6 @@ test:
 
 clean:
 	rm -rf .go
-	rm -f glusterblock-provisioner
+	rm -f targetd
+	rm -f iscsi-controller
 .PHONY: clean

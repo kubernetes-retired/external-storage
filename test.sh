@@ -87,6 +87,8 @@ elif [ "$TEST_SUITE" = "everything-else" ]; then
 	make ceph/rbd
 	make flex
 	make gluster/block
+	make iscsi/targetd
+	make test-iscsi/targetd
 	make nfs-client
 elif [ "$TEST_SUITE" = "local-volume" ]; then
 	make local-volume/provisioner
