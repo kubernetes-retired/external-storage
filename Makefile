@@ -19,7 +19,7 @@ ifeq ($(VERSION),)
 	VERSION = latest
 endif
 
-clean: clean-aws/efs clean-ceph/cephfs clean-ceph/rbd clean-flex clean-gluster/block clean-local-volume/provisioner clean-local-volume/bootstrapper clean-nfs-client clean-nfs
+clean: clean-aws/efs clean-ceph/cephfs clean-ceph/rbd clean-flex clean-gluster/block clean-iscsi/targetd clean-local-volume/provisioner clean-local-volume/bootstrapper clean-nfs-client clean-nfs
 .PHONY: clean
 
 test: test-aws/efs test-local-volume/provisioner test-nfs
@@ -89,6 +89,21 @@ clean-gluster/block:
 	make clean
 .PHONY: clean-gluster/block
 
+iscsi/targetd:
+	cd iscsi/targetd; \
+	make container
+.PHONY: iscsi/targetd
+
+test-iscsi/targetd:
+	cd iscsi/targetd; \
+	go test ./...
+.PHONY: test-iscsi/targetd
+
+clean-iscsi/targetd:
+	cd iscsi/targetd; \
+	make clean
+.PHONY: clean-iscsi/targetd
+
 local-volume/provisioner:
 	cd local-volume/provisioner; \
 	make container
@@ -155,6 +170,11 @@ push-glusterblock-provisioner:
 	cd gluster/block; \
 	make push
 .PHONY: push-glusterblock-provisioner
+
+push-iscsi-controller:
+	cd iscsi/targetd; \
+	make push
+.PHONY: push-iscsi-controller
 
 push-local-volume-provisioner-bootstrap:
 	cd local-volume/bootstrapper; \
