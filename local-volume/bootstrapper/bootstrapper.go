@@ -274,12 +274,18 @@ func createDaemonSet(client *kubernetes.Clientset, namespace string, config map[
 		},
 	}
 
+	var priv = true
+	securityContext := &v1.SecurityContext{
+		Privileged: &priv,
+	}
+
 	containers := []v1.Container{
 		{
-			Name:         containerName,
-			Image:        *imageName,
-			VolumeMounts: volumeMounts,
-			Env:          envVars,
+			Name:            containerName,
+			Image:           *imageName,
+			VolumeMounts:    volumeMounts,
+			Env:             envVars,
+			SecurityContext: securityContext,
 		},
 	}
 

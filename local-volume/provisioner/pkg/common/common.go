@@ -49,7 +49,6 @@ const (
 
 	// EventVolumeFailedDelete copied from k8s.io/kubernetes/pkg/controller/volume/events
 	EventVolumeFailedDelete = "VolumeFailedDelete"
-
 )
 
 // UserConfig stores all the user-defined parameters to the provisioner

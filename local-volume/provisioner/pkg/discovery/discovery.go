@@ -107,10 +107,10 @@ func (d *Discoverer) discoverVolumesAtPath(class string, config common.MountConf
 			continue
 		}
 
-		var availByte uint64
+		var capacityByte int64
 		switch volType {
 		case common.VolumeTypeBlock:
-			availByte, err = d.VolUtil.GetBlockSpaceByte(filePath)
+			capacityByte, err = d.VolUtil.GetBlockCapacityByte(filePath)
 			if err != nil {
 				glog.Errorf("Path %q block stats error: %v", filePath, err)
 				continue
@@ -131,22 +131,16 @@ func (d *Discoverer) discoverVolumesAtPath(class string, config common.MountConf
 }
 
 func (d *Discoverer) getVolumeType(fullPath string) (string, error) {
-	isDir, err := d.VolUtil.IsDir(fullPath)
-	if err != nil {
-		return "", fmt.Errorf("Error getting path info for %q: %v", fullPath, err)
-	}
-	if isDir {
+	isdir, errdir := d.VolUtil.IsDir(fullPath)
+	if isdir {
 		return common.VolumeTypeFile, nil
 	}
-	isBlk, err := d.VolUtil.IsBlock(fullPath)
-	if err != nil {
-		return "", fmt.Errorf("Block device check for %q failed: %v", fullPath, err)
-	}
-	if isBlk {
+	isblk, errblk := d.VolUtil.IsBlock(fullPath)
+	if isblk {
 		return common.VolumeTypeBlock, nil
 	}
 
-	return "", fmt.Errorf("Volume type unknown for path %q", fullPath)
+	return "", fmt.Errorf("Block device check for %q failed: DirErr - %v BlkErr - %v", fullPath, errdir, errblk)
 
 }
 

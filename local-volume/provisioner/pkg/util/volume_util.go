@@ -18,6 +18,7 @@ package util
 
 import (
 	"fmt"
+	"golang.org/x/sys/unix"
 	"os"
 	"path/filepath"
 
@@ -45,7 +46,7 @@ type VolumeUtil interface {
 	GetFsCapacityByte(fullPath string) (int64, error)
 
 	// Get capacity of the block device
-	GetBlockSpaceByte(fullPath string) (uint64, error)
+	GetBlockCapacityByte(fullPath string) (int64, error)
 }
 
 var _ VolumeUtil = &volumeUtil{}
@@ -81,8 +82,7 @@ func (u *volumeUtil) IsBlock(fullPath string) (bool, error) {
 		return false, err
 	}
 
-	return (st.Mode & unix.S_IFMT) == unix.S_IFBLK, err
-
+	return (st.Mode & unix.S_IFMT) == unix.S_IFBLK, nil
 }
 
 // ReadDir returns a list all the files under the given directory
@@ -131,9 +131,9 @@ func (u *volumeUtil) GetFsCapacityByte(fullPath string) (int64, error) {
 	return capacity, err
 }
 
-// GetBlockSpaceByte returns  capacity in bytes of a block device.
+// GetBlockCapacityByte returns  capacity in bytes of a block device.
 // fullPath is the pathname of block device.
-func (u *volumeUtil) GetBlockSpaceByte(fullPath string) (uint64, error) {
+func (u *volumeUtil) GetBlockCapacityByte(fullPath string) (int64, error) {
 	file, err := os.OpenFile(fullPath, os.O_RDONLY, 0)
 	if err != nil {
 		return 0, err
@@ -141,11 +141,13 @@ func (u *volumeUtil) GetBlockSpaceByte(fullPath string) (uint64, error) {
 	defer file.Close()
 
 	var size int64
+	// Get size of block device into 64 bit int.
+	// Ref: http://www.microhowto.info/howto/get_the_size_of_a_linux_block_special_device_in_c.html
 	if _, _, err := unix.Syscall(unix.SYS_IOCTL, file.Fd(), unix.BLKGETSIZE64, uintptr(unsafe.Pointer(&size))); err != 0 {
 		return 0, err
 	}
 
-	return uint64(size), err
+	return size, err
 }
 
 var _ VolumeUtil = &FakeVolumeUtil{}
@@ -153,15 +155,24 @@ var _ VolumeUtil = &FakeVolumeUtil{}
 // FakeVolumeUtil is a stub interface for unit testing
 type FakeVolumeUtil struct {
 	// List of files underneath the given path
-	directoryFiles map[string][]*FakeFile
+	directoryFiles map[string][]*FakeDirEntry
 	// True if DeleteContents should fail
 	deleteShouldFail bool
 }
 
-// FakeFile contains a representation of a file under a directory
-type FakeFile struct {
-	Name     string
-	IsNotDir bool
+const (
+	// FakeEntryFile is mock dir entry of type file.
+	FakeEntryFile = "file"
+	// FakeEntryBlock is mock dir entry of type block.
+	FakeEntryBlock = "block"
+	// FakeEntryUnknown is mock dir entry of type unknown.
+	FakeEntryUnknown = "unknown"
+)
+
+// FakeDirEntry contains a representation of a file under a directory
+type FakeDirEntry struct {
+	Name       string
+	VolumeType string
 	// Expected hash value of the PV name
 	Hash     uint32
 	Capacity int64
@@ -170,7 +181,7 @@ type FakeFile struct {
 // NewFakeVolumeUtil returns a VolumeUtil object for use in unit testing
 func NewFakeVolumeUtil(deleteShouldFail bool) *FakeVolumeUtil {
 	return &FakeVolumeUtil{
-		directoryFiles:   map[string][]*FakeFile{},
+		directoryFiles:   map[string][]*FakeDirEntry{},
 		deleteShouldFail: deleteShouldFail,
 	}
 }
@@ -186,15 +197,31 @@ func (u *FakeVolumeUtil) IsDir(fullPath string) (bool, error) {
 
 	for _, f := range files {
 		if file == f.Name {
-			return !f.IsNotDir, nil
+			if f.VolumeType != FakeEntryFile {
+				// Accurately simulate how a check on a non file returns error with actual OS call.
+				return false, fmt.Errorf("%q not a file or directory", fullPath)
+			}
+			return true, nil
 		}
 	}
-	return false, fmt.Errorf("File %q not found", fullPath)
+	return false, fmt.Errorf("Directory entry %q not found", fullPath)
 }
 
 // IsBlock checks if the given path is a block device
 func (u *FakeVolumeUtil) IsBlock(fullPath string) (bool, error) {
-	return false, nil
+	dir, file := filepath.Split(fullPath)
+	dir = filepath.Clean(dir)
+	files, found := u.directoryFiles[dir]
+	if !found {
+		return false, fmt.Errorf("Directory %q not found", dir)
+	}
+
+	for _, f := range files {
+		if file == f.Name {
+			return f.VolumeType == FakeEntryBlock, nil
+		}
+	}
+	return false, fmt.Errorf("Directory entry %q not found", fullPath)
 }
 
 // ReadDir returns the list of all files under the given directory
@@ -220,6 +247,15 @@ func (u *FakeVolumeUtil) DeleteContents(fullPath string) error {
 
 // GetFsCapacityByte returns capacity in byte about a mounted filesystem.
 func (u *FakeVolumeUtil) GetFsCapacityByte(fullPath string) (int64, error) {
+	return u.getDirEntryCapacity(fullPath, FakeEntryFile)
+}
+
+// GetBlockCapacityByte returns the space in the specified block device.
+func (u *FakeVolumeUtil) GetBlockCapacityByte(fullPath string) (int64, error) {
+	return u.getDirEntryCapacity(fullPath, FakeEntryBlock)
+}
+
+func (u *FakeVolumeUtil) getDirEntryCapacity(fullPath string, entryType string) (int64, error) {
 	dir, file := filepath.Split(fullPath)
 	dir = filepath.Clean(dir)
 	files, found := u.directoryFiles[dir]
@@ -229,25 +265,23 @@ func (u *FakeVolumeUtil) GetFsCapacityByte(fullPath string) (int64, error) {
 
 	for _, f := range files {
 		if file == f.Name {
+			if f.VolumeType != entryType {
+				return 0, fmt.Errorf("Directory entry %q is not a %q", f, entryType)
+			}
 			return f.Capacity, nil
 		}
 	}
-	return 0, fmt.Errorf("File %q not found", fullPath)
+	return 0, fmt.Errorf("Directory entry %q not found", fullPath)
 }
 
-// GetBlockSpaceByte returns the space in the specified block device.
-func (u *FakeVolumeUtil) GetBlockSpaceByte(fullPath string) (uint64, error) {
-	return 0, nil
-}
-
-// AddNewFiles adds the given files to the current directory listing
+// AddNewDirEntries adds the given files to the current directory listing
 // This is only for testing
-func (u *FakeVolumeUtil) AddNewFiles(mountDir string, dirFiles map[string][]*FakeFile) {
+func (u *FakeVolumeUtil) AddNewDirEntries(mountDir string, dirFiles map[string][]*FakeDirEntry) {
 	for dir, files := range dirFiles {
 		mountedPath := filepath.Join(mountDir, dir)
 		curFiles := u.directoryFiles[mountedPath]
 		if curFiles == nil {
-			curFiles = []*FakeFile{}
+			curFiles = []*FakeDirEntry{}
 		}
 		glog.Infof("Adding to directory %q: files %v\n", dir, files)
 		u.directoryFiles[mountedPath] = append(curFiles, files...)

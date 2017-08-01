@@ -101,6 +101,5 @@ func (d *Deleter) cleanupFileVolume(pv *v1.PersistentVolume, config common.Mount
 	mountPath := filepath.Join(config.MountDir, relativePath)
 
 	glog.Infof("Deleting PV %q contents at hostpath %q, mountpath %q", pv.Name, specPath, mountPath)
-	err = d.VolUtil.DeleteContents(mountPath)
-	return err
+	return d.VolUtil.DeleteContents(mountPath)
 }
