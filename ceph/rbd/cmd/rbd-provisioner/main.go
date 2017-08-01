@@ -18,11 +18,11 @@ package main
 
 import (
 	"flag"
+	"os"
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/ceph/rbd/pkg/provision"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
-	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -33,6 +33,10 @@ var (
 	master     = flag.String("master", "", "Master URL")
 	kubeconfig = flag.String("kubeconfig", "", "Absolute path to the kubeconfig")
 	id         = flag.String("id", "", "Unique provisioner identity")
+)
+
+const (
+	provisionerNameKey = "PROVISIONER_NAME"
 )
 
 func main() {
@@ -46,16 +50,26 @@ func main() {
 	} else {
 		config, err = rest.InClusterConfig()
 	}
-	prID := string(uuid.NewUUID())
-	if *id != "" {
-		prID = *id
-	}
 	if err != nil {
 		glog.Fatalf("Failed to create config: %v", err)
 	}
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		glog.Fatalf("Failed to create client: %v", err)
+	}
+
+	prName := provision.ProvisionerName
+	prNameFromEnv := os.Getenv(provisionerNameKey)
+	if prNameFromEnv != "" {
+		prName = prNameFromEnv
+	}
+
+	// By default, we use provision name as provisioner identity.
+	// User may specify their own identity with `-id` flag to distinguish each
+	// others, if they deploy more than one RBD provisioners under same provisioner name.
+	prID := prName
+	if *id != "" {
+		prID = *id
 	}
 
 	// The controller needs to know what the server version is because out-of-tree
@@ -74,7 +88,7 @@ func main() {
 	// PVs
 	pc := controller.NewProvisionController(
 		clientset,
-		provision.ProvisionerName,
+		prName,
 		rbdProvisioner,
 		serverVersion.GitVersion,
 	)
