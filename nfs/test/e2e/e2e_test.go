@@ -138,6 +138,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 	var c clientset.Interface
 	var ns string
 	var pod *v1.Pod
+	var volumePath string
 
 	BeforeEach(func() {
 		c = f.ClientSet
@@ -152,35 +153,21 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 			} else {
 				framework.Logf("Pod logs:\n%s", logs)
 			}
+			ganeshaLogs, err := ioutil.ReadFile(path.Join(volumePath, "ganesha.log"))
+			if err != nil {
+				framework.Logf("Error getting ganesha logs: %v", err)
+			} else {
+				framework.Logf("Ganesha logs:\n%s", string(ganeshaLogs))
+			}
 		})
 
-		It("should create and delete persistent volumes [Slow]", func() {
-			By("creating an out-of-tree dynamic provisioner pod")
-			pod = startProvisionerPod(c, ns)
-			defer c.Core().Pods(ns).Delete(pod.Name, nil)
-
-			By("creating a StorageClass")
-			class := newStorageClass()
-			_, err := c.Storage().StorageClasses().Create(class)
-			defer c.Storage().StorageClasses().Delete(class.Name, nil)
-			Expect(err).NotTo(HaveOccurred())
-
-			By("creating a claim with a dynamic provisioning annotation")
-			claim := newClaim(ns)
-			defer func() {
-				c.Core().PersistentVolumeClaims(ns).Delete(claim.Name, nil)
-			}()
-			claim, err = c.Core().PersistentVolumeClaims(ns).Create(claim)
-			Expect(err).NotTo(HaveOccurred())
-
-			testDynamicProvisioning(c, claim)
-		})
 		It("should survive a restart [Slow]", func() {
 			By("creating an out-of-tree dynamic provisioner deployment of 1 replica")
 			service, deployment := startProvisionerDeployment(c, ns)
 			defer c.Extensions().Deployments(ns).Delete(deployment.Name, nil)
 			defer c.Core().Services(ns).Delete(service.Name, nil)
 			pod = getDeploymentPod(c, ns, labels.Set(deployment.Spec.Selector.MatchLabels).String())
+			volumePath = deployment.Spec.Template.Spec.Volumes[0].HostPath.Path
 
 			By("creating a StorageClass")
 			class := newStorageClass()
@@ -205,8 +192,8 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 			// Expect(err).NotTo(HaveOccurred())
 			scaleDeployment(c, ns, deployment.Name, 0)
 			scaleDeployment(c, ns, deployment.Name, 1)
-			pod = getDeploymentPod(c, ns, labels.Set(deployment.Spec.Selector.MatchLabels).String())
 
+			pod = getDeploymentPod(c, ns, labels.Set(deployment.Spec.Selector.MatchLabels).String())
 			testRead(c, claim)
 			testDelete(c, claim, pv)
 		})
@@ -342,6 +329,10 @@ func startProvisionerPod(c clientset.Interface, ns string) *v1.Pod {
 								},
 							},
 						},
+						{
+							Name:  "GANESHA_LOG_LEVEL",
+							Value: "NIV_DEBUG",
+						},
 					},
 					ImagePullPolicy: v1.PullIfNotPresent,
 					VolumeMounts: []v1.VolumeMount{
@@ -397,8 +388,8 @@ func startProvisionerDeployment(c clientset.Interface, ns string) (*v1.Service, 
 	deployment.Spec.Template.Spec.Containers[0].Image = "quay.io/kubernetes_incubator/nfs-provisioner:latest"
 	deployment.Spec.Template.Spec.Containers[0].Args = []string{
 		fmt.Sprintf("-provisioner=%s", pluginName),
-		"-grace-period=10",
 	}
+	deployment.Spec.Template.Spec.Containers[0].Env = append(deployment.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "GANESHA_LOG_LEVEL", Value: "NIV_DEBUG"})
 
 	service, err = c.Core().Services(ns).Create(service)
 	framework.ExpectNoError(err, "Failed to create %s service: %v", service.Name, err)

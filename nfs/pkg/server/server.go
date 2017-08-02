@@ -69,12 +69,13 @@ NFS_Core_Param
 NFSV4
 {
 	Grace_Period = 90;
+	Lease_Lifetime = 60;
 }
 `)
 
 // Setup sets up various prerequisites and settings for the server. If an error
 // is encountered at any point it returns it instantly
-func Setup(ganeshaConfig string, gracePeriod uint) error {
+func Setup(ganeshaConfig string, gracePeriod uint, ganeshav4old, ganeshav4recov string) error {
 	// Start rpcbind if it is not started yet
 	cmd := exec.Command("/usr/sbin/rpcinfo", "127.0.0.1")
 	if err := cmd.Run(); err != nil {
@@ -123,6 +124,9 @@ func Setup(ganeshaConfig string, gracePeriod uint) error {
 func Start(ganeshaLog, ganeshaPid, ganeshaConfig string) error {
 	// Start ganesha.nfsd
 	cmd := exec.Command("ganesha.nfsd", "-L", ganeshaLog, "-p", ganeshaPid, "-f", ganeshaConfig)
+	if os.Getenv("GANESHA_LOG_LEVEL") != "" {
+		cmd.Args = append(cmd.Args, "-N", os.Getenv("GANESHA_LOG_LEVEL"))
+	}
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("ganesha.nfsd failed with error: %v, output: %s", err, out)
 	}
