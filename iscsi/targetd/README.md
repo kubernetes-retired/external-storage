@@ -221,8 +221,8 @@ This set of command will install iSCSI-targetd provisioner in the `default` name
 ```
 export NS=default 
 kubectl create secret generic targetd-account --from-literal=username=admin --from-literal=password=ciao -n $NS
-kubectl apply -f https://raw.githubusercontent.com/raffaelespazzoli/iscsi-controller/master/kubernetes/iscsi-provisioner-d.yaml -n $NS
-kubectl apply -f https://raw.githubusercontent.com/raffaelespazzoli/iscsi-controller/master/kubernetes/iscsi-provisioner-pvc.yaml -n $NS
+kubectl apply -f https://raw.githubusercontent.com/kubernetes-incubator/external-storage/master/iscsi/targetd/kubernetes/iscsi-provisioner-d.yaml -n $NS
+kubectl apply -f https://raw.githubusercontent.com/kubernetes-incubator/external-storage/master/iscsi/targetd/kubernetes/iscsi-provisioner-pvc.yaml -n $NS
 ```
 
 ### Install the iscsi provisioner pod in Openshift
@@ -236,7 +236,7 @@ oc adm policy add-cluster-role-to-user system:pv-provisioner-controller system:s
 oc adm policy add-cluster-role-to-user system:pv-binder-controller system:serviceaccount:iscsi-provisioner:iscsi-provisioner
 oc adm policy add-cluster-role-to-user system:pv-recycler-controller system:serviceaccount:iscsi-provisioner:iscsi-provisioner
 oc secret new-basicauth targetd-account --username=admin --password=ciao
-oc create -f https://raw.githubusercontent.com/raffaelespazzoli/iscsi-controller/master/openshift/iscsi-provisioner-dc.yaml
+oc create -f https://raw.githubusercontent.com/kubernetes-incubator/external-storage/master/iscsi/targetd/openshift/iscsi-provisioner-dc.yaml
 ```
 ### Create a storage class
 storage classes should look like the following
@@ -265,16 +265,16 @@ parameters:
 you can create one with the following command in kubernetes
 
 ```
-oc create -f https://raw.githubusercontent.com/raffaelespazzoli/iscsi-controller/master/kubernetes/iscsi-provisioner-class.yaml
+oc create -f https://raw.githubusercontent.com/kubernetes-incubator/external-storage/master/iscsi/targetd/kubernetes/iscsi-provisioner-class.yaml
 ```
 or this command in openshift
 ```
-oc create -f https://raw.githubusercontent.com/raffaelespazzoli/iscsi-controller/master/openshift/iscsi-provisioner-class.yaml
+oc create -f https://raw.githubusercontent.com/kubernetes-incubator/external-storage/master/iscsi/targetd/openshift/iscsi-provisioner-class.yaml
 ```
 ### Test iscsi provisioner
 Create a pvc
 ```
-oc create -f https://raw.githubusercontent.com/raffaelespazzoli/iscsi-controller/master/openshift/iscsi-provisioner-pvc.yaml
+oc create -f https://raw.githubusercontent.com/kubernetes-incubator/external-storage/master/iscsi/targetd/openshift/iscsi-provisioner-pvc.yaml
 ```
 verify that the pv has been created
 ```
@@ -286,7 +286,7 @@ targetcli ls
 ```
 deploy a pod that uses the pvc
 ```
-oc create -f https://raw.githubusercontent.com/raffaelespazzoli/iscsi-controller/master/openshift/iscsi-test-pod.yaml
+oc create -f https://raw.githubusercontent.com/kubernetes-incubator/external-storage/master/iscsi/targetd/openshift/iscsi-test-pod.yaml
 ```
 ## Installing iSCSI provisioner using ansible
 

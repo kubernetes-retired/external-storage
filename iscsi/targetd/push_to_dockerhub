@@ -1,7 +1,0 @@
-#!/bin/bash
-
-set -e
-
-./build-container
-docker login -u raffaelespazzoli -p $DOCKER_PWD
-docker push raffaelespazzoli/iscsi-controller:0.0.1
