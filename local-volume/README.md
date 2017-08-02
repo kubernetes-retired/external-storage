@@ -119,7 +119,8 @@ $ kubectl create -f bootstrapper/deployment/kubernetes/bootstrapper.yaml
 #### Option 2: Manually create local persistent volume
 
 If you don't use the external provisioner, then you have to create the local PVs
-manually. Example PV:
+manually. Note that with manual PV creation, the volume has to be manually
+reclaimed when deleted. Example PV:
 
 ``` yaml
 apiVersion: v1
