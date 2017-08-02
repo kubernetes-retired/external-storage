@@ -64,7 +64,7 @@ func main() {
 		prName = prNameFromEnv
 	}
 
-	// By default, we use provision name as provisioner identity.
+	// By default, we use provisioner name as provisioner identity.
 	// User may specify their own identity with `-id` flag to distinguish each
 	// others, if they deploy more than one RBD provisioners under same provisioner name.
 	prID := prName
@@ -81,7 +81,7 @@ func main() {
 
 	// Create the provisioner: it implements the Provisioner interface expected by
 	// the controller
-	glog.Infof("Creating RBD provisioner with identity: %s", prID)
+	glog.Infof("Creating RBD provisioner %s with identity: %s", prName, prID)
 	rbdProvisioner := provision.NewRBDProvisioner(clientset, prID)
 
 	// Start the provision controller which will dynamically provision rbd

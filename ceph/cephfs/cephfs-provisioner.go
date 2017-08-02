@@ -21,6 +21,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -37,10 +38,11 @@ import (
 )
 
 const (
-	provisionerName  = "ceph.com/cephfs"
-	provisionCmd     = "/usr/local/bin/cephfs_provisioner"
-	provisionerIDAnn = "cephFSProvisionerIdentity"
-	cephShareAnn     = "cephShare"
+	provisionerName    = "ceph.com/cephfs"
+	provisionCmd       = "/usr/local/bin/cephfs_provisioner"
+	provisionerIDAnn   = "cephFSProvisionerIdentity"
+	cephShareAnn       = "cephShare"
+	provisionerNameKey = "PROVISIONER_NAME"
 )
 
 type provisionOutput struct {
@@ -272,16 +274,26 @@ func main() {
 	} else {
 		config, err = rest.InClusterConfig()
 	}
-	prID := string(uuid.NewUUID())
-	if *id != "" {
-		prID = *id
-	}
 	if err != nil {
 		glog.Fatalf("Failed to create config: %v", err)
 	}
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		glog.Fatalf("Failed to create client: %v", err)
+	}
+
+	prName := provisionerName
+	prNameFromEnv := os.Getenv(provisionerNameKey)
+	if prNameFromEnv != "" {
+		prName = prNameFromEnv
+	}
+
+	// By default, we use provisioner name as provisioner identity.
+	// User may specify their own identity with `-id` flag to distinguish each
+	// others, if they deploy more than one CephFS provisioners under same provisioner name.
+	prID := prName
+	if *id != "" {
+		prID = *id
 	}
 
 	// The controller needs to know what the server version is because out-of-tree
@@ -293,13 +305,14 @@ func main() {
 
 	// Create the provisioner: it implements the Provisioner interface expected by
 	// the controller
+	glog.Infof("Creating CephFS provisioner %s with identity: %s", prName, prID)
 	cephFSProvisioner := newCephFSProvisioner(clientset, prID)
 
 	// Start the provision controller which will dynamically provision cephFS
 	// PVs
 	pc := controller.NewProvisionController(
 		clientset,
-		provisionerName,
+		prName,
 		cephFSProvisioner,
 		serverVersion.GitVersion,
 	)
