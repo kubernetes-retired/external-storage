@@ -59,10 +59,10 @@ var scMapping = map[string]common.MountConfig{
 type testConfig struct {
 	// The directory layout for the test
 	// Key = directory, Value = list of volumes under that directory
-	dirLayout map[string][]*util.FakeFile
+	dirLayout map[string][]*util.FakeDirEntry
 	// The volumes that are expected to be created as PVs
 	// Key = directory, Value = list of volumes under that directory
-	expectedVolumes map[string][]*util.FakeFile
+	expectedVolumes map[string][]*util.FakeDirEntry
 	// True if testing api failure
 	apiShouldFail bool
 	// The rest are set during setup
@@ -72,14 +72,14 @@ type testConfig struct {
 }
 
 func TestDiscoverVolumes_Basic(t *testing.T) {
-	vols := map[string][]*util.FakeFile{
+	vols := map[string][]*util.FakeDirEntry{
 		"dir1": {
-			{Name: "mount1", Hash: 0xaaaafef5, Capacity: 100 * 1024},
-			{Name: "mount2", Hash: 0x79412c38, Capacity: 100 * 1024 * 1024},
+			{Name: "mount1", Hash: 0xaaaafef5, VolumeType: util.FakeEntryFile, Capacity: 100 * 1024},
+			{Name: "mount2", Hash: 0x79412c38, VolumeType: util.FakeEntryBlock, Capacity: 100 * 1024 * 1024},
 		},
 		"dir2": {
-			{Name: "mount1", Hash: 0xa7aafa3c},
-			{Name: "mount2", Hash: 0x7c4130f1},
+			{Name: "mount1", Hash: 0xa7aafa3c, VolumeType: util.FakeEntryFile},
+			{Name: "mount2", Hash: 0x7c4130f1, VolumeType: util.FakeEntryBlock},
 		},
 	}
 	test := &testConfig{
@@ -93,14 +93,14 @@ func TestDiscoverVolumes_Basic(t *testing.T) {
 }
 
 func TestDiscoverVolumes_BasicTwice(t *testing.T) {
-	vols := map[string][]*util.FakeFile{
+	vols := map[string][]*util.FakeDirEntry{
 		"dir1": {
-			{Name: "mount1", Hash: 0xaaaafef5},
-			{Name: "mount2", Hash: 0x79412c38},
+			{Name: "mount1", Hash: 0xaaaafef5, VolumeType: util.FakeEntryFile},
+			{Name: "mount2", Hash: 0x79412c38, VolumeType: util.FakeEntryBlock},
 		},
 		"dir2": {
-			{Name: "mount1", Hash: 0xa7aafa3c},
-			{Name: "mount2", Hash: 0x7c4130f1},
+			{Name: "mount1", Hash: 0xa7aafa3c, VolumeType: util.FakeEntryFile},
+			{Name: "mount2", Hash: 0x7c4130f1, VolumeType: util.FakeEntryBlock},
 		},
 	}
 	test := &testConfig{
@@ -113,13 +113,13 @@ func TestDiscoverVolumes_BasicTwice(t *testing.T) {
 	verifyCreatedPVs(t, test)
 
 	// Second time should not create any new volumes
-	test.expectedVolumes = map[string][]*util.FakeFile{}
+	test.expectedVolumes = map[string][]*util.FakeDirEntry{}
 	d.DiscoverLocalVolumes()
 	verifyCreatedPVs(t, test)
 }
 
 func TestDiscoverVolumes_NoDir(t *testing.T) {
-	vols := map[string][]*util.FakeFile{}
+	vols := map[string][]*util.FakeDirEntry{}
 	test := &testConfig{
 		dirLayout:       vols,
 		expectedVolumes: vols,
@@ -131,7 +131,7 @@ func TestDiscoverVolumes_NoDir(t *testing.T) {
 }
 
 func TestDiscoverVolumes_EmptyDir(t *testing.T) {
-	vols := map[string][]*util.FakeFile{
+	vols := map[string][]*util.FakeDirEntry{
 		"dir1": {},
 	}
 	test := &testConfig{
@@ -145,14 +145,14 @@ func TestDiscoverVolumes_EmptyDir(t *testing.T) {
 }
 
 func TestDiscoverVolumes_NewVolumesLater(t *testing.T) {
-	vols := map[string][]*util.FakeFile{
+	vols := map[string][]*util.FakeDirEntry{
 		"dir1": {
-			{Name: "mount1", Hash: 0xaaaafef5},
-			{Name: "mount2", Hash: 0x79412c38},
+			{Name: "mount1", Hash: 0xaaaafef5, VolumeType: util.FakeEntryFile},
+			{Name: "mount2", Hash: 0x79412c38, VolumeType: util.FakeEntryBlock},
 		},
 		"dir2": {
-			{Name: "mount1", Hash: 0xa7aafa3c},
-			{Name: "mount2", Hash: 0x7c4130f1},
+			{Name: "mount1", Hash: 0xa7aafa3c, VolumeType: util.FakeEntryFile},
+			{Name: "mount2", Hash: 0x7c4130f1, VolumeType: util.FakeEntryBlock},
 		},
 	}
 	test := &testConfig{
@@ -166,13 +166,13 @@ func TestDiscoverVolumes_NewVolumesLater(t *testing.T) {
 	verifyCreatedPVs(t, test)
 
 	// Some new mount points show up
-	newVols := map[string][]*util.FakeFile{
+	newVols := map[string][]*util.FakeDirEntry{
 		"dir1": {
-			{Name: "mount3", Hash: 0xf34b8003},
-			{Name: "mount4", Hash: 0x144e29de},
+			{Name: "mount3", Hash: 0xf34b8003, VolumeType: util.FakeEntryFile},
+			{Name: "mount4", Hash: 0x144e29de, VolumeType: util.FakeEntryBlock},
 		},
 	}
-	test.volUtil.AddNewFiles(testMountDir, newVols)
+	test.volUtil.AddNewDirEntries(testMountDir, newVols)
 	test.expectedVolumes = newVols
 
 	d.DiscoverLocalVolumes()
@@ -181,20 +181,20 @@ func TestDiscoverVolumes_NewVolumesLater(t *testing.T) {
 }
 
 func TestDiscoverVolumes_CreatePVFails(t *testing.T) {
-	vols := map[string][]*util.FakeFile{
+	vols := map[string][]*util.FakeDirEntry{
 		"dir1": {
-			{Name: "mount1", Hash: 0xaaaafef5},
-			{Name: "mount2", Hash: 0x79412c38},
+			{Name: "mount1", Hash: 0xaaaafef5, VolumeType: util.FakeEntryFile},
+			{Name: "mount2", Hash: 0x79412c38, VolumeType: util.FakeEntryFile},
 		},
 		"dir2": {
-			{Name: "mount1", Hash: 0xa7aafa3c},
-			{Name: "mount2", Hash: 0x7c4130f1},
+			{Name: "mount1", Hash: 0xa7aafa3c, VolumeType: util.FakeEntryFile},
+			{Name: "mount2", Hash: 0x7c4130f1, VolumeType: util.FakeEntryFile},
 		},
 	}
 	test := &testConfig{
 		apiShouldFail:   true,
 		dirLayout:       vols,
-		expectedVolumes: map[string][]*util.FakeFile{},
+		expectedVolumes: map[string][]*util.FakeDirEntry{},
 	}
 	d := testSetup(t, test)
 
@@ -205,14 +205,14 @@ func TestDiscoverVolumes_CreatePVFails(t *testing.T) {
 }
 
 func TestDiscoverVolumes_BadVolume(t *testing.T) {
-	vols := map[string][]*util.FakeFile{
+	vols := map[string][]*util.FakeDirEntry{
 		"dir1": {
-			{Name: "mount1", IsNotDir: true},
+			{Name: "mount1", VolumeType: util.FakeEntryUnknown},
 		},
 	}
 	test := &testConfig{
 		dirLayout:       vols,
-		expectedVolumes: map[string][]*util.FakeFile{},
+		expectedVolumes: map[string][]*util.FakeDirEntry{},
 	}
 	d := testSetup(t, test)
 
@@ -225,7 +225,7 @@ func TestDiscoverVolumes_BadVolume(t *testing.T) {
 func testSetup(t *testing.T, test *testConfig) *Discoverer {
 	test.cache = cache.NewVolumeCache()
 	test.volUtil = util.NewFakeVolumeUtil(false)
-	test.volUtil.AddNewFiles(testMountDir, test.dirLayout)
+	test.volUtil.AddNewDirEntries(testMountDir, test.dirLayout)
 	test.apiUtil = util.NewFakeAPIUtil(test.apiShouldFail, test.cache)
 
 	userConfig := &common.UserConfig{
@@ -378,6 +378,7 @@ func verifyCreatedPVs(t *testing.T, test *testConfig) {
 		verifyProvisionerName(t, createdPV)
 		verifyNodeAffinity(t, createdPV)
 		verifyCapacity(t, createdPV, expectedPV)
+		// TODO: Verify volume type once that is supported in the API.
 	}
 }
 

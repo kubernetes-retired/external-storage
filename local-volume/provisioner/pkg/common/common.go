@@ -37,6 +37,10 @@ const (
 	// NodeLabelKey is the label key that this provisioner uses for PV node affinity
 	// hostname is not the best choice, but it's what pod and node affinity also use
 	NodeLabelKey = apis.LabelHostname
+	// VolumeTypeFile represents file type volumes
+	VolumeTypeFile = "file"
+	// VolumeTypeBlock represents block type volumes
+	VolumeTypeBlock = "block"
 
 	// DefaultHostDir is the default host dir to discover local volumes.
 	DefaultHostDir = "/mnt/disks"

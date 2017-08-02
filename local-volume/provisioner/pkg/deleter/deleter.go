@@ -76,9 +76,22 @@ func (d *Deleter) cleanupPV(pv *v1.PersistentVolume) error {
 
 	config, ok := d.DiscoveryMap[pv.Spec.StorageClassName]
 	if !ok {
-		return fmt.Errorf("Unkonwn storage class name %v", pv.Spec.StorageClassName)
+		return fmt.Errorf("Unknown storage class name %v", pv.Spec.StorageClassName)
 	}
 
+	// TODO: Get volType from PV.
+	volType := common.VolumeTypeFile
+	switch volType {
+	case common.VolumeTypeFile:
+		return d.cleanupFileVolume(pv, config)
+	case common.VolumeTypeBlock:
+		return fmt.Errorf("Not yet implemented")
+	default:
+		return fmt.Errorf("Unexpected volume type %q for deleting path %q", volType, pv.Spec.Local.Path)
+	}
+}
+
+func (d *Deleter) cleanupFileVolume(pv *v1.PersistentVolume, config common.MountConfig) error {
 	specPath := pv.Spec.Local.Path
 	relativePath, err := filepath.Rel(config.HostDir, specPath)
 	if err != nil {

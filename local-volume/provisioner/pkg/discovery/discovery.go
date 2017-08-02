@@ -99,30 +99,49 @@ func (d *Discoverer) discoverVolumesAtPath(class string, config common.MountConf
 		if exists {
 			continue
 		}
+
 		filePath := filepath.Join(config.MountDir, file)
-		err = d.validateFile(filePath)
+		volType, err := d.getVolumeType(filePath)
 		if err != nil {
-			glog.Errorf("Mount path %q validation failed: %v", filePath, err)
+			glog.Error(err)
 			continue
 		}
-		capacityByte, err := d.VolUtil.GetFsCapacityByte(filePath)
-		if err != nil {
-			glog.Errorf("Path %q fs stats error: %v", filePath, err)
+
+		var capacityByte int64
+		switch volType {
+		case common.VolumeTypeBlock:
+			capacityByte, err = d.VolUtil.GetBlockCapacityByte(filePath)
+			if err != nil {
+				glog.Errorf("Path %q block stats error: %v", filePath, err)
+				continue
+			}
+		case common.VolumeTypeFile:
+			capacityByte, err = d.VolUtil.GetFsCapacityByte(filePath)
+			if err != nil {
+				glog.Errorf("Path %q fs stats error: %v", filePath, err)
+				continue
+			}
+		default:
+			glog.Errorf("Path %q has unexpected volume type %q", filePath, volType)
 			continue
 		}
-		d.createPV(file, class, config, capacityByte)
+
+		d.createPV(file, class, config, capacityByte, volType)
 	}
 }
 
-func (d *Discoverer) validateFile(fullPath string) error {
-	isDir, err := d.VolUtil.IsDir(fullPath)
-	if err != nil {
-		return fmt.Errorf("Error getting path info: %v", err)
+func (d *Discoverer) getVolumeType(fullPath string) (string, error) {
+	isdir, errdir := d.VolUtil.IsDir(fullPath)
+	if isdir {
+		return common.VolumeTypeFile, nil
 	}
-	if !isDir {
-		return fmt.Errorf("Path is not a directory")
+	isblk, errblk := d.VolUtil.IsBlock(fullPath)
+	if isblk {
+		return common.VolumeTypeBlock, nil
 	}
-	return nil
+
+	return "", fmt.Errorf("Block device check for %q failed: DirErr - %v BlkErr - %v", fullPath, errdir, errblk)
+
 }
 
 func generatePVName(file, node, class string) string {
@@ -134,11 +153,14 @@ func generatePVName(file, node, class string) string {
 	return fmt.Sprintf("local-pv-%x", h.Sum32())
 }
 
-func (d *Discoverer) createPV(file, class string, config common.MountConfig, capacityByte int64) {
+func (d *Discoverer) createPV(file, class string, config common.MountConfig, capacityByte int64, volType string) {
 	pvName := generatePVName(file, d.Node.Name, class)
 	outsidePath := filepath.Join(config.HostDir, file)
 
-	glog.Infof("Found new volume at host path %q with capacity %d, creating Local PV %q", outsidePath, capacityByte, pvName)
+	glog.Infof("Found new volume of volumeType %q at host path %q with capacity %d, creating Local PV %q",
+		volType, outsidePath, capacityByte, pvName)
+
+	// TODO: Set block volumeType when the API is ready.
 	pvSpec := common.CreateLocalPVSpec(&common.LocalPVConfig{
 		Name:            pvName,
 		HostPath:        outsidePath,
