@@ -119,10 +119,15 @@ func Setup(ganeshaConfig string, gracePeriod uint) error {
 	return nil
 }
 
-// Start starts the NFS server.
-func Start(ganeshaLog, ganeshaPid, ganeshaConfig string) error {
+// Run : run the NFS server in the foreground until it exits
+// Ideally, it should never exit when run in foreground mode
+// We force foreground to allow the provisioner process to restart
+// the server if it crashes - daemonization prevents us from using Wait()
+// for this purpose
+func Run(ganeshaLog, ganeshaPid, ganeshaConfig string) error {
 	// Start ganesha.nfsd
-	cmd := exec.Command("ganesha.nfsd", "-L", ganeshaLog, "-p", ganeshaPid, "-f", ganeshaConfig)
+	glog.Infof("Running NFS server!")
+	cmd := exec.Command("ganesha.nfsd", "-F", "-L", ganeshaLog, "-p", ganeshaPid, "-f", ganeshaConfig)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("ganesha.nfsd failed with error: %v, output: %s", err, out)
 	}
