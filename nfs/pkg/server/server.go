@@ -119,7 +119,7 @@ func Setup(ganeshaConfig string, gracePeriod uint) error {
 	return nil
 }
 
-// Runs the NFS server in the foreground until it exits
+// Run : run the NFS server in the foreground until it exits
 // Ideally, it should never exit when run in foreground mode
 // We force foreground to allow the provisioner process to restart
 // the server if it crashes - daemonization prevents us from using Wait()
