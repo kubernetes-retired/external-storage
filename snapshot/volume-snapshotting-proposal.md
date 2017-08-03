@@ -222,7 +222,11 @@ type VolumeSnapshotConditionType string
 
 // These are valid conditions of a volume snapshot.
 const (
-	// VolumeSnapshotReady is added when the snapshot has been successfully created and is ready to be used.
+	// VolumeSnapshotConditionCreated is present and set to ConditionTrue when the snapshot has been successfully created
+	// The snapshot might not be ready to use yet: there are still some pending operations that don't need the
+	// original volume being snapshotted (eg. the snapshot data need to be uploaded to a dedicated storage)
+	VolumeSnapshotConditionCreated VolumeSnapshotConditionType = "Created"
+	// VolumeSnapshotConditionReady is present and set to ConditionTrue when the snapshot is ready to be used
 	VolumeSnapshotConditionReady VolumeSnapshotConditionType = "Ready"
 )
 
