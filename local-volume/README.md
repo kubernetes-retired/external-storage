@@ -144,7 +144,7 @@ spec:
     storage: 5Gi
   accessModes:
   - ReadWriteOnce
-  persistentVolumeReclaimPolicy: Delete
+  persistentVolumeReclaimPolicy: Retain
   storageClassName: local-storage
   local:
     path: /mnt/disks/ssd1
@@ -177,11 +177,16 @@ Please replace the following elements to reflect your configuration:
   * "local-storage" with the name of storage class which should be used
      for local PVs
 
-## Executing E2E Tests
+## E2E Tests
 
+### Running
 ``` console
 go run hack/e2e.go -- -v --test --test_args="--ginkgo.focus=\[Feature:LocalPersistentVolumes\]"
 ```
+
+### View CI Results
+[GCE Alpha](https://k8s-testgrid.appspot.com/sig-storage#gce-alpha)
+[GCE GCI Alpha](https://k8s-testgrid.appspot.com/sig-storage#gci-gce-alpha)
 
 ## Best Practices
 
