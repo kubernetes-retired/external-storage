@@ -126,9 +126,7 @@ clean-local-volume/bootstrapper:
 
 nfs-client:
 	cd nfs-client; \
-	./build.sh; \
-	docker build -t $(REGISTRY)nfs-client-provisioner:latest .
-	docker tag $(REGISTRY)nfs-client-provisioner:latest $(REGISTRY)nfs-client-provisioner:$(VERSION)
+	make container
 .PHONY: nfs-client
 
 clean-nfs-client:
@@ -187,8 +185,8 @@ push-local-volume-provisioner:
 .PHONY: push-local-volume-provisioner
 
 push-nfs-client-provisioner: nfs-client
-	docker push $(REGISTRY)nfs-client-provisioner:$(VERSION)
-	docker push $(REGISTRY)nfs-client-provisioner:latest
+	cd nfs-client; \
+	make push
 .PHONY: push-nfs-client-provisioner
 
 push-nfs-provisioner:
