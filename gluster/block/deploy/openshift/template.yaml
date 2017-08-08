@@ -41,8 +41,5 @@ objects:
           imagePullPolicy: IfNotPresent
           env:
           - name: PROVISIONER_NAME
-            valueFrom: 
-                configMapKeyRef:
-                  key: provisioner.name
-                  name: glusterblock-provisioner
+            value: gluster.org/glusterblock
 
