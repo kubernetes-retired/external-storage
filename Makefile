@@ -151,6 +151,16 @@ clean-nfs:
 	make clean
 .PHONY: clean-nfs
 
+openebs:
+	cd openebs; \
+	make build
+.PHONY: openebs
+
+clean-openebs:
+	cd openebs; \
+	make clean
+.PHONY: clean-openebs
+
 push-cephfs-provisioner: ceph/cephfs
 	docker push $(REGISTRY)cephfs-provisioner:$(VERSION)
 	docker push $(REGISTRY)cephfs-provisioner:latest
@@ -195,3 +205,12 @@ push-nfs-provisioner:
 	cd nfs; \
 	make push
 .PHONY: push-nfs-provisioner
+
+push-openebs-provisioner:
+	cd openebs; \
+	make push
+.PHONY: push-openebs-provisioner
+
+deploy-openebs-provisioner:
+	cd openebs; \
+	make deploy

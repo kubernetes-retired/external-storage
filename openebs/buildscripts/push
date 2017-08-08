@@ -1,0 +1,22 @@
+#!/bin/bash
+set -e
+
+IMAGEID=$( sudo docker images -q ${DIMAGE}:latest )
+
+if [ ! -z "${DNAME}" ] && [ ! -z "${DPASS}" ]; 
+then 
+  sudo docker login -u "${DNAME}" -p "${DPASS}"; 
+  sudo docker push ${DIMAGE}:latest ; 
+  if [ ! -z "${TRAVIS_TAG}" ] ; 
+  then
+    #Push the release tag image to docker hub repository
+    #When a git hub is tagged with a release, the travis will 
+    #hold the release tag in env TRAVIS_TAG
+    sudo docker tag ${IMAGEID} ${DIMAGE}:${TRAVIS_TAG}
+    sudo docker push ${DIMAGE}:${TRAVIS_TAG}; 
+    sudo docker tag ${IMAGEID} ${DIMAGE}:latest
+    sudo docker push ${DIMAGE}:latest; 
+  fi;
+else
+  echo "No docker credentials provided. Skip uploading ${DIMAGE}:ci to docker hub"; 
+fi;
