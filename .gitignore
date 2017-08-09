@@ -8,6 +8,9 @@ auto-save-list
 tramp
 .\#*
 
+# Vscode files
+.vscode
+
 # Org-mode
 .org-id-locations
 *_archive
