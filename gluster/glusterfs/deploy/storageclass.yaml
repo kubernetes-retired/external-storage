@@ -1,0 +1,8 @@
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: glusterfs-simple
+provisioner: gluster.org/glusterfs-simple
+parameters:
+  forceCreate: "true"
+  brickrootPaths: "192.168.1.124:/tmp/,192.168.1.125:/tmp"

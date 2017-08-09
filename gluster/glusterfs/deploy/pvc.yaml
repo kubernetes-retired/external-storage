@@ -1,0 +1,12 @@
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: gluster-simple-claim
+  annotations:
+    volume.beta.kubernetes.io/storage-class: "glusterfs-simple"
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
