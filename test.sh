@@ -75,6 +75,7 @@ if [ "$TEST_SUITE" = "nfs" ]; then
 elif [ "$TEST_SUITE" = "everything-else" ]; then
 	pushd ./lib
 	go test ./controller
+	go test ./allocator
 	popd
 	# Test building hostpath-provisioner demo
 	pushd ./docs/demo/hostpath-provisioner
