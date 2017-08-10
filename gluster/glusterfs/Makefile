@@ -12,9 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-IMAGE = external_storage/glusterfs-simple-provisioner
-
-VERSION := latest
+ifeq ($(REGISTRY),)
+	REGISTRY = quay.io/external_storage/
+endif
+ifeq ($(VERSION),)
+	VERSION = latest
+endif
+IMAGE = $(REGISTRY)glusterfs-simple-provisioner:$(VERSION)
+MUTABLE_IMAGE = $(REGISTRY)glusterfs-simple-provisioner:latest
 
 all build:
 	GOOS=linux go install -v ./cmd/glusterfs-simple-provisioner
@@ -31,11 +36,13 @@ container: build quick-container
 
 quick-container:
 	cp glusterfs-simple-provisioner deploy/docker/glusterfs-simple-provisioner
-	docker build -t $(IMAGE):$(VERSION) deploy/docker
+	docker build -t $(MUTABLE_IMAGE) deploy/docker
+	docker tag $(MUTABLE_IMAGE) $(IMAGE)
 .PHONY: quick-container
 
 push: container
-	docker push $(IMAGE):$(VERSION)
+	docker push $(IMAGE)
+	docker push $(MUTABLE_IMAGE)
 .PHONY: push
 
 clean:

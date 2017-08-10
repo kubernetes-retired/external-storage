@@ -88,6 +88,7 @@ elif [ "$TEST_SUITE" = "everything-else" ]; then
 	make ceph/rbd
 	make flex
 	make gluster/block
+	make gluster/glusterfs
 	make iscsi/targetd
 	make test-iscsi/targetd
 	make nfs-client
