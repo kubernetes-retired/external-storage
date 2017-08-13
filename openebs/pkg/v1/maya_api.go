@@ -1,3 +1,19 @@
+/*
+Copyright 2016-2017 The Kubernetes Authors.
+Copyright 2016-2017 The OpenEBS Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 package v1
 
 import (
@@ -20,8 +36,23 @@ const (
 	timeout = 60 * time.Second
 )
 
+//OpenEBSVolumeInterface Interface to bind methods
+type OpenEBSVolumeInterface interface {
+	CreateVsm(string, string) (string, error)
+	ListVsm(string, interface{}) error
+	DeleteVsm(string) error
+}
+
+//MayaInterface interface to hold maya specific methods
+type MayaInterface interface {
+	GetMayaClusterIP(kubernetes.Interface) (string, error)
+}
+
+//OpenEBSVolume struct
+type OpenEBSVolume struct{}
+
 //GetMayaClusterIP returns maya-apiserver IP address
-func GetMayaClusterIP(client kubernetes.Interface) string {
+func (v OpenEBSVolume) GetMayaClusterIP(client kubernetes.Interface) (string, error) {
 	clusterIP := "127.0.0.1"
 
 	//Fetch the Maya ClusterIP using the Maya API Server Service
@@ -33,11 +64,11 @@ func GetMayaClusterIP(client kubernetes.Interface) string {
 	clusterIP = sc.Spec.ClusterIP
 	glog.Infof("Maya Cluster IP: %v", clusterIP)
 
-	return clusterIP
+	return clusterIP, err
 }
 
 // CreateVsm to create the Vsm through a API call to m-apiserver
-func CreateVsm(vname string, size string) error {
+func (v OpenEBSVolume) CreateVsm(vname string, size string) (string, error) {
 
 	var vs mayav1.VsmSpec
 
@@ -45,7 +76,7 @@ func CreateVsm(vname string, size string) error {
 	if addr == "" {
 		err := errors.New("MAPI_ADDR environment variable not set")
 		glog.Fatalf("Error getting maya-api-server IP Address: %v", err)
-		return err
+		return "Error getting maya-api-server IP Address", err
 	}
 	url := addr + "/latest/volumes/"
 
@@ -69,28 +100,28 @@ func CreateVsm(vname string, size string) error {
 	resp, err := c.Do(req)
 	if err != nil {
 		glog.Fatalf("http.Do() error: : %v", err)
-		return err
+		return "Could not connect to maya-api-server", err
 	}
 	defer resp.Body.Close()
 
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		glog.Fatalf("ioutil.ReadAll() error: : %v", err)
-		return err
+		return "Unable to read response from maya-api-server", err
 	}
 
 	code := resp.StatusCode
 	if code != http.StatusOK {
 		glog.Fatalf("Status error: %v\n", http.StatusText(code))
-		return err
+		return "HTTP Status error from maya-api-server", err
 	}
 
 	glog.Infof("VSM Successfully Created:\n%v\n", string(data))
-	return nil
+	return "VSM Successfully Created", nil
 }
 
 // ListVsm to get the info of Vsm through a API call to m-apiserver
-func ListVsm(vname string, obj interface{}) error {
+func (v OpenEBSVolume) ListVsm(vname string, obj interface{}) error {
 
 	addr := os.Getenv("MAPI_ADDR")
 	if addr == "" {
@@ -123,7 +154,7 @@ func ListVsm(vname string, obj interface{}) error {
 }
 
 // DeleteVsm to get delete Vsm through a API call to m-apiserver
-func DeleteVsm(vname string) error {
+func (v OpenEBSVolume) DeleteVsm(vname string) error {
 
 	addr := os.Getenv("MAPI_ADDR")
 	if addr == "" {

@@ -63,8 +63,16 @@ func NewOpenEBSProvisioner(client kubernetes.Interface) controller.Provisioner {
 	if nodeName == "" {
 		glog.Fatal("env variable NODE_NAME must be set so that this provisioner can identify itself")
 	}
+	var openebsObj mApiv1.OpenEBSVolume
 
-	mayaServiceURI := "http://" + mApiv1.GetMayaClusterIP(client) + ":5656"
+	addr, err := openebsObj.GetMayaClusterIP(client)
+
+	if err != nil {
+		glog.Fatal("env variable NODE_NAME must be set so that this provisioner can identify itself")
+		return nil
+	}
+	mayaServiceURI := "http://" + addr + ":5656"
+
 	os.Setenv("MAPI_ADDR", mayaServiceURI)
 
 	return &openEBSProvisioner{
@@ -80,16 +88,17 @@ func (p *openEBSProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 
 	//Issue a request to Maya API Server to create a volume
 	var volume mayav1.Volume
+	var openebsVol mApiv1.OpenEBSVolume
 
 	volSize := options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 
-	err := mApiv1.CreateVsm(options.PVName, volSize.String())
+	_, err := openebsVol.CreateVsm(options.PVName, volSize.String())
 	if err != nil {
 		glog.Fatalf("Error creating volume: %v", err)
 		return nil, err
 	}
 
-	err = mApiv1.ListVsm(options.PVName, &volume)
+	err = openebsVol.ListVsm(options.PVName, &volume)
 	if err != nil {
 		glog.Fatalf("Error getting volume details: %v", err)
 		return nil, err
@@ -140,6 +149,9 @@ func (p *openEBSProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 // Delete removes the storage asset that was created by Provision represented
 // by the given PV.
 func (p *openEBSProvisioner) Delete(volume *v1.PersistentVolume) error {
+
+	var openebsVol mApiv1.OpenEBSVolume
+
 	ann, ok := volume.Annotations["openEBSProvisionerIdentity"]
 	if !ok {
 		return errors.New("identity annotation not found on PV")
@@ -149,7 +161,7 @@ func (p *openEBSProvisioner) Delete(volume *v1.PersistentVolume) error {
 	}
 
 	// Issue a delete request to Maya API Server
-	mApiv1.DeleteVsm(volume.Name)
+	openebsVol.DeleteVsm(volume.Name)
 
 	return nil
 }
@@ -181,14 +193,18 @@ func main() {
 	// Create the provisioner: it implements the Provisioner interface expected by
 	// the controller
 	openEBSProvisioner := NewOpenEBSProvisioner(clientset)
+	if openEBSProvisioner != nil {
+		// Start the provision controller which will dynamically provision OpenEBS VSM
+		// PVs
+		pc := controller.NewProvisionController(
+			clientset,
+			provisionerName,
+			openEBSProvisioner,
+			serverVersion.GitVersion)
 
-	// Start the provision controller which will dynamically provision OpenEBS VSM
-	// PVs
-	pc := controller.NewProvisionController(
-		clientset,
-		provisionerName,
-		openEBSProvisioner,
-		serverVersion.GitVersion)
+		pc.Run(wait.NeverStop)
+	} else {
+		os.Exit(1) //Exit if provisioner not created.
+	}
 
-	pc.Run(wait.NeverStop)
 }
