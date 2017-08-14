@@ -47,14 +47,14 @@ type volDestroyArgs struct {
 type exportCreateArgs struct {
 	Pool         string `json:"pool"`
 	Vol          string `json:"vol"`
-	InitiatorWwn string `json:"InitiatorWwn"`
+	InitiatorWwn string `json:"initiator_wwn"`
 	Lun          int32  `json:"lun"`
 }
 
 type exportDestroyArgs struct {
 	Pool         string `json:"pool"`
 	Vol          string `json:"vol"`
-	InitiatorWwn string `json:"InitiatorWwn"`
+	InitiatorWwn string `json:"initiator_wwn"`
 }
 
 type iscsiProvisioner struct {
@@ -62,9 +62,9 @@ type iscsiProvisioner struct {
 }
 
 type export struct {
-	InitiatorWwn string `json:"InitiatorWwn"`
+	InitiatorWwn string `json:"initiator_wwn"`
 	Lun          int32  `json:"lun"`
-	VolName      string `json:"vol name"`
+	VolName      string `json:"vol_name"`
 	VolSize      int    `json:"vol_size"`
 	VolUUID      string `json:"vol_uuid"`
 	Pool         string `json:"pool"`
