@@ -22,11 +22,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions"
-
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
@@ -40,6 +38,7 @@ import (
 const (
 	provisionerName  = "openstack.org/cinder-baremetal"
 	provisionerIDAnn = "cinderBaremetalProvisionerIdentity"
+	cinderVolumeId = "cinderVolumeId"
 )
 
 type cinderProvisioner struct {
@@ -102,43 +101,20 @@ func (p *cinderProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 		return nil, err
 	}
 	glog.Infof("Successfully created cinder volume %s", volumeId)
-	cClient, err := p.cloud.NewBlockStorageV2()
+
+	connInfo, err := p.connectVolume(volumeId)
 	if err != nil {
-		glog.Infof("failed to get cinder client: %v", err)
-	} else {
-		opt := volumeactions.InitializeConnectionOpts{
-			Host:      "localhost",
-			IP:        "127.0.0.1",
-			Initiator: "com.example:www.test.com",
-		}
-		connectionInfo, err := volumeactions.InitializeConnection(cClient, volumeId, &opt).Extract()
-		if err == nil {
-			glog.Infof("connection info: %+v", connectionInfo)
-		} else {
-			glog.Infof("failed to initialize connection :%v", err)
-		}
-	}
-	pv := &v1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: options.PVName,
-			Annotations: map[string]string{
-				provisionerIDAnn: p.identity,
-			},
-		},
-		Spec: v1.PersistentVolumeSpec{
-			PersistentVolumeReclaimPolicy: options.PersistentVolumeReclaimPolicy,
-			AccessModes:                   options.PVC.Spec.AccessModes,
-			Capacity: v1.ResourceList{
-				v1.ResourceName(v1.ResourceStorage): options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)],
-			},
-			PersistentVolumeSource: v1.PersistentVolumeSource{
-				Cinder: &v1.CinderVolumeSource{
-					VolumeID: volumeId,
-				},
-			},
-		},
+		// TODO: remove the volume or fail permanently so we don't
+		//       continue to recreate the volume each iteration.
+		glog.Errorf("Failed to establish volume connection: %v", err)
+		return nil, err
 	}
 
+	pv, err := p.buildPersistentVolume(options, connInfo)
+	if err != nil {
+		glog.Errorf("Failed to create PV for volume: %v", err)
+		return nil, err
+	}
 	return pv, nil
 }
 
@@ -154,6 +130,33 @@ func (p *cinderProvisioner) Delete(volume *v1.PersistentVolume) error {
 	}
 	// TODO when beta is removed, have to check kube version and pick v1/beta
 	// accordingly: maybe the controller lib should offer a function for that
+
+	// Remove the CHAP secret
+	// TODO: Split this out into type-specific logic
+	if volume.Spec.ISCSI != nil {
+		secretName := volume.Spec.ISCSI.SecretRef.Name
+		secretNamespace := volume.Spec.ClaimRef.Namespace
+		err := p.client.CoreV1().Secrets(secretNamespace).Delete(secretName, nil)
+		if err != nil {
+			glog.Errorf("Failed to remove secret: %s, %v", secretName, err)
+		} else{
+			glog.Infof("Successfully deleted secret %s", secretName)
+		}
+	}
+
+	volumeId, ok := volume.Annotations[cinderVolumeId]
+	if !ok {
+		return errors.New("cinder volume id annotation not found on PV")
+	}
+	p.disconnectVolume(volumeId)
+
+	err := p.cloud.DeleteVolume(volumeId)
+	if err != nil {
+		glog.Errorf("Error deleting cinder volume: %v", err)
+		return err
+	}
+	glog.Infof("Successfully deleted cinder volume %s", volumeId)
+
 	return nil
 }
 
