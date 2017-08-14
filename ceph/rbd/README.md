@@ -10,11 +10,14 @@ or [this blog post](http://blog.kubernetes.io/2016/10/dynamic-provisioning-and-s
 
 ## Test instruction
 
-* Build rbd-provisioner and container image
+Compile the provisioner
+``` console
+make
+```
 
-```bash
-go build -o rbd-provisioner cmd/rbd-provisioner/main.go
-docker build -t rbd-provisioner .
+Make the container image and push to the registry
+``` console
+make push
 ```
 
 * Start Kubernetes local cluster
