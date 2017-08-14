@@ -175,7 +175,7 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 
 	// Create Volume
 	blockVolName := ""
-	if (*cfg).opMode == glusterBlockOpmode {
+	if cfg.opMode == glusterBlockOpmode {
 		blockVolName = blockVolPrefix + string(uuid.NewUUID())
 	}
 	blockVol, createErr := p.createVolume(volszInt, blockVolName, cfg)
@@ -189,17 +189,17 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 	}
 
 	//Store fields from response to iscsiSpec struct
-	if (*cfg).opMode == heketiOpmode && (*blockVol).heketiBlockVolRes != nil {
-		iscsiVol.Portals = (*blockVol).heketiBlockVolRes.Portals
-		iscsiVol.Iqn = (*blockVol).heketiBlockVolRes.Iqn
-		iscsiVol.User = (*blockVol).heketiBlockVolRes.User
-		iscsiVol.AuthKey = (*blockVol).heketiBlockVolRes.AuthKey
-		iscsiVol.BlockVolName = blockVolPrefix + (*blockVol).heketiBlockVolRes.ID
-	} else if (*cfg).opMode == glusterBlockOpmode && (*blockVol).glusterBlockExecVolRes != nil {
-		iscsiVol.Portals = (*blockVol).glusterBlockExecVolRes.Portals
-		iscsiVol.Iqn = (*blockVol).glusterBlockExecVolRes.Iqn
-		iscsiVol.User = (*blockVol).glusterBlockExecVolRes.User
-		iscsiVol.AuthKey = (*blockVol).glusterBlockExecVolRes.AuthKey
+	if cfg.opMode == heketiOpmode && blockVol.heketiBlockVolRes != nil {
+		iscsiVol.Portals = blockVol.heketiBlockVolRes.Portals
+		iscsiVol.Iqn = blockVol.heketiBlockVolRes.Iqn
+		iscsiVol.User = blockVol.heketiBlockVolRes.User
+		iscsiVol.AuthKey = blockVol.heketiBlockVolRes.AuthKey
+		iscsiVol.BlockVolName = blockVolPrefix + blockVol.heketiBlockVolRes.ID
+	} else if cfg.opMode == glusterBlockOpmode && blockVol.glusterBlockExecVolRes != nil {
+		iscsiVol.Portals = blockVol.glusterBlockExecVolRes.Portals
+		iscsiVol.Iqn = blockVol.glusterBlockExecVolRes.Iqn
+		iscsiVol.User = blockVol.glusterBlockExecVolRes.User
+		iscsiVol.AuthKey = blockVol.glusterBlockExecVolRes.AuthKey
 		iscsiVol.BlockVolName = blockVolName
 	} else {
 		return nil, fmt.Errorf("glusterblock: failed to parse blockvol : [%v]", *blockVol)
@@ -223,16 +223,16 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 	secretName := "glusterblk-" + user + "-secret"
 	secretRef := &v1.LocalObjectReference{}
 
-	if (*cfg).chapAuthEnabled && user != "" && password != "" {
+	if cfg.chapAuthEnabled && user != "" && password != "" {
 		secretRef, err = p.createSecretRef(nameSpace, secretName, user, password)
 		if err != nil {
 			glog.Errorf("glusterblock: failed to create credentials for pv")
 			return nil, fmt.Errorf("glusterblock: failed to create credentials for pv")
 		}
-		iscsiVol.SessionCHAPAuth = (*cfg).chapAuthEnabled
+		iscsiVol.SessionCHAPAuth = cfg.chapAuthEnabled
 		iscsiVol.BlockSecret = secretName
 		iscsiVol.BlockSecretNs = nameSpace
-	} else if !((*cfg).chapAuthEnabled) {
+	} else if !(cfg.chapAuthEnabled) {
 		glog.V(1).Infof("glusterblock: authentication requested is nil")
 		iscsiVol.SessionCHAPAuth = false
 		secretRef = nil
@@ -240,14 +240,14 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 
 	var blockString []string
 	modeAnn := ""
-	if (*cfg).opMode == glusterBlockOpmode {
-		for k, v := range (*cfg).blockModeArgs {
+	if cfg.opMode == glusterBlockOpmode {
+		for k, v := range cfg.blockModeArgs {
 			blockString = append(blockString, k+":"+v)
 			modeAnn = dstrings.Join(blockString, ",")
 		}
 	} else {
 		blockString = nil
-		modeAnn = "url:" + (*cfg).url + "," + "user:" + (*cfg).user + "," + "secret:" + (*cfg).restSecretName + "," + "secretnamespace:" + (*cfg).restSecretNamespace
+		modeAnn = "url:" + cfg.url + "," + "user:" + cfg.user + "," + "secret:" + cfg.restSecretName + "," + "secretnamespace:" + cfg.restSecretNamespace
 	}
 
 	pv := &v1.PersistentVolume{
@@ -257,7 +257,7 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 				provisionerIDAnn:   p.identity,
 				provisionerVersion: provisionerVersion,
 				shareIDAnn:         iscsiVol.BlockVolName,
-				creatorAnn:         (*cfg).opMode,
+				creatorAnn:         cfg.opMode,
 				volumeTypeAnn:      "block",
 				"Description":      descAnn,
 				"Blockstring":      modeAnn,
