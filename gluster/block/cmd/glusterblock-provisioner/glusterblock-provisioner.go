@@ -173,7 +173,7 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 	volSizeBytes := volSize.Value()
 	volszInt := int(util.RoundUpSize(volSizeBytes, 1024*1024*1024))
 
-	// Create Volume
+	// Create gluster block Volume
 	blockVolName := ""
 	if cfg.opMode == glusterBlockOpmode {
 		blockVolName = blockVolPrefix + string(uuid.NewUUID())
@@ -211,20 +211,19 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 		return nil, fmt.Errorf("glusterblock: failed to fetch Target Portal: %v", sortErr)
 	}
 
+	// Target Portal and IQN should not be null
 	if iscsiVol.TargetPortal == "" || iscsiVol.Iqn == "" {
-		return nil, fmt.Errorf("glusterblock: Target portal/IQN is nil")
+		return nil, fmt.Errorf("glusterblock: failed to create volume: Target portal/IQN is nil")
 	}
 
 	glog.V(1).Infof("glusterblock: Volume configuration : %+v", blockVol)
 
-	nameSpace := options.PVC.Namespace
-	user := iscsiVol.User
-	password := iscsiVol.AuthKey
-	secretName := "glusterblk-" + user + "-secret"
 	secretRef := &v1.LocalObjectReference{}
 
-	if cfg.chapAuthEnabled && user != "" && password != "" {
-		secretRef, err = p.createSecretRef(nameSpace, secretName, user, password)
+	if cfg.chapAuthEnabled && iscsiVol.User != "" && iscsiVol.AuthKey != "" {
+		nameSpace := options.PVC.Namespace
+		secretName := "glusterblk-" + iscsiVol.User + "-secret"
+		secretRef, err = p.createSecretRef(nameSpace, secretName, iscsiVol.User, iscsiVol.AuthKey)
 		if err != nil {
 			glog.Errorf("glusterblock: failed to create credentials for pv")
 			return nil, fmt.Errorf("glusterblock: failed to create credentials for pv")
@@ -236,6 +235,9 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 		glog.V(1).Infof("glusterblock: authentication requested is nil")
 		iscsiVol.SessionCHAPAuth = false
 		secretRef = nil
+	} else {
+		glog.Errorf("glusterblock: chapauth enabled - failed to fill user and password")
+		return nil, fmt.Errorf("glusterblock: chapauth enabled - failed to fill user and password")
 	}
 
 	var blockString []string
