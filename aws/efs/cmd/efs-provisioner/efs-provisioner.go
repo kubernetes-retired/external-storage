@@ -109,7 +109,11 @@ func getMount(dnsName string) (string, string, error) {
 		}
 	}
 
-	return "", "", fmt.Errorf("no mount entry found for %s", dnsName)
+	entriesStr := ""
+	for _, e := range entries {
+		entriesStr += e.Source + ":" + e.Mountpoint + ", "
+	}
+	return "", "", fmt.Errorf("no mount entry found for %s among entries %s", dnsName, entriesStr)
 }
 
 var _ controller.Provisioner = &efsProvisioner{}
