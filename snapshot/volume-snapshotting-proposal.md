@@ -50,7 +50,7 @@ The features that are not planned for the first version of the API bus should be
 
     * Scheduled and periodic snapshots
 
-    * Aplication initiated on-demand snapshot creation
+    * Application initiated on-demand snapshot creation
 
     * Support snapshot per PVC, pod or StatefulSet
 
@@ -100,7 +100,7 @@ The features that are not planned for the first version of the API bus should be
 
     * The data consistency would be best-effort only: e.g., call fsfreeze prior the snapshot on filesystems that support it.
 
-    * There are several proposed solutions that would enable the users to specify the action to perform prior/after the
+    * There are several proposed solutions that would enable the users to specify the action to perform prior to/after the
     snapshots: e.g. use pod annotations.
 
 * Snapshot failure
@@ -117,9 +117,9 @@ The features that are not planned for the first version of the API bus should be
 
 There are a few uniqueness related to snapshots:
 
-* Both users and admins might create snapshots. Users should only get access to the snapshots belong to their namespaces. For this aspect, snapshot objects should be in user namespace. Admins might to choose expose the snapshots they created to some users who have access to those volumes.
+* Both users and admins might create snapshots. Users should only get access to the snapshots belonging to their namespaces. For this aspect, snapshot objects should be in user namespace. Admins might want to choose to expose the snapshots they created to some users who have access to those volumes.
 
-* After snapshots are taken, users might use them to create new volumes or restore the existing volumes back the time when the snapshot is taken.
+* After snapshots are taken, users might use them to create new volumes or restore the existing volumes back to the time when the snapshot is taken.
 
 * There are use cases that data from snapshots taken from one namespace need to be accessible by users in another namespace.
 
@@ -230,7 +230,7 @@ const (
 	VolumeSnapshotConditionReady VolumeSnapshotConditionType = "Ready"
 )
 
-// VolumeSnapshot Condition describes the state of a volume snapshot  at a certain point.
+// VolumeSnapshot Condition describes the state of a volume snapshot at a certain point.
 type VolumeSnapshotCondition struct {
 	// Type of replication controller condition.
 	Type VolumeSnapshotConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=VolumeSnapshotConditionType"`
