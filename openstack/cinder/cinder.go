@@ -20,7 +20,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"strings"
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
@@ -75,53 +74,47 @@ func (p *cinderProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 		return nil, fmt.Errorf("claim Selector is not supported")
 	}
 
-	capacity := options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-	volSizeBytes := capacity.Value()
-	// Cinder works with gigabytes, convert to GiB with rounding up
-	volSizeGB := int((volSizeBytes + 1024*1024*1024 - 1) / (1024 * 1024 * 1024))
-	name := fmt.Sprintf("cinder-dynamic-pvc-%s", uuid.NewUUID())
-	vtype := ""
-	availability := "nova"
-	// Apply ProvisionerParameters (case-insensitive). We leave validation of
-	// the values to the cloud provider.
-	for k, v := range options.Parameters {
-		switch strings.ToLower(k) {
-		case "type":
-			vtype = v
-		case "availability":
-			availability = v
-		default:
-			return nil, fmt.Errorf("invalid option %q", k)
-		}
-	}
-	//TODO udpate kubernetes vendor and fix AZ
-	volumeId, _, err := p.cloud.CreateVolume(name, volSizeGB, vtype, availability, nil)
+	vol, err := createCinderVolume(p.cloud, options)
 	if err != nil {
-		glog.Infof("Error creating cinder volume: %v", err)
-		return nil, err
-	}
-	glog.Infof("Successfully created cinder volume %s", volumeId)
-
-	connInfo, err := p.connectVolume(volumeId)
-	if err != nil {
-		// TODO: remove the volume or fail permanently so we don't
-		//       continue to recreate the volume each iteration.
-		glog.Errorf("Failed to establish volume connection: %v", err)
+		glog.Errorf("Failed to create volume")
 		return nil, err
 	}
 
-	pv, err := p.buildPersistentVolume(options, connInfo)
+	connection, err := vol.connect()
 	if err != nil {
-		glog.Errorf("Failed to create PV for volume: %v", err)
+		// TODO: Create placeholder PV?
+		glog.Errorf("Failed to connect volume: %v", err)
 		return nil, err
 	}
+
+	mapper, err := newVolumeMapperFromConnection(p, connection)
+	if err != nil {
+		// TODO: Create placeholder PV?
+		glog.Errorf("Unable to create volume mapper: %f" ,err)
+		return nil, err
+	}
+
+	err = mapper.AuthSetup(options, connection)
+	if err != nil {
+		// TODO: Create placeholder PV?
+		glog.Errorf("Failed to prepare volume auth: %v", err)
+		return nil, err
+	}
+
+	pv, err := mapper.BuildPV(options, connection)
+	if err != nil {
+		// TODO: Create placeholder PV?
+		glog.Errorf("Failed to build PV: %v", err)
+		return nil, err
+	}
+
 	return pv, nil
 }
 
 // Delete removes the storage asset that was created by Provision represented
 // by the given PV.
-func (p *cinderProvisioner) Delete(volume *v1.PersistentVolume) error {
-	ann, ok := volume.Annotations[provisionerIDAnn]
+func (p *cinderProvisioner) Delete(pv *v1.PersistentVolume) error {
+	ann, ok := pv.Annotations[provisionerIDAnn]
 	if !ok {
 		return errors.New("identity annotation not found on PV")
 	}
@@ -131,26 +124,22 @@ func (p *cinderProvisioner) Delete(volume *v1.PersistentVolume) error {
 	// TODO when beta is removed, have to check kube version and pick v1/beta
 	// accordingly: maybe the controller lib should offer a function for that
 
-	// Remove the CHAP secret
-	// TODO: Split this out into type-specific logic
-	if volume.Spec.ISCSI != nil {
-		secretName := volume.Spec.ISCSI.SecretRef.Name
-		secretNamespace := volume.Spec.ClaimRef.Namespace
-		err := p.client.CoreV1().Secrets(secretNamespace).Delete(secretName, nil)
-		if err != nil {
-			glog.Errorf("Failed to remove secret: %s, %v", secretName, err)
-		} else{
-			glog.Infof("Successfully deleted secret %s", secretName)
-		}
+	mapper, err := newVolumeMapperFromPV(p, pv)
+	if err != nil {
+		glog.Errorf("Cannot create volume mapper from PV: %v", err)
+		return err
+	}
+	volumeId := mapper.getCinderVolumeId()
+
+	mapper.AuthTeardown(pv)
+
+	vol := newCinderVolume(p.cloud, volumeId)
+	err = vol.disconnect()
+	if err != nil {
+		glog.Errorf("Failed to disconnect volume: %f", err)
 	}
 
-	volumeId, ok := volume.Annotations[cinderVolumeId]
-	if !ok {
-		return errors.New("cinder volume id annotation not found on PV")
-	}
-	p.disconnectVolume(volumeId)
-
-	err := p.cloud.DeleteVolume(volumeId)
+	err = p.cloud.DeleteVolume(volumeId)
 	if err != nil {
 		glog.Errorf("Error deleting cinder volume: %v", err)
 		return err
