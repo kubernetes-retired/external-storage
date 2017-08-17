@@ -225,19 +225,19 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 		secretName := "glusterblk-" + iscsiVol.User + "-secret"
 		secretRef, err = p.createSecretRef(nameSpace, secretName, iscsiVol.User, iscsiVol.AuthKey)
 		if err != nil {
-			glog.Errorf("glusterblock: failed to create credentials for pv")
-			return nil, fmt.Errorf("glusterblock: failed to create credentials for pv")
+			glog.Errorf("glusterblock: failed to create CHAP auth credentials for pv")
+			return nil, fmt.Errorf("glusterblock: failed to create CHAP auth credentials for pv")
 		}
 		iscsiVol.SessionCHAPAuth = cfg.chapAuthEnabled
 		iscsiVol.BlockSecret = secretName
 		iscsiVol.BlockSecretNs = nameSpace
 	} else if !(cfg.chapAuthEnabled) {
-		glog.V(1).Infof("glusterblock: authentication requested is nil")
+		glog.V(1).Infof("glusterblock: CHAP authentication is not requested")
 		iscsiVol.SessionCHAPAuth = false
 		secretRef = nil
 	} else {
-		glog.Errorf("glusterblock: chapauth enabled - failed to fill user and password")
-		return nil, fmt.Errorf("glusterblock: chapauth enabled - failed to fill user and password")
+		glog.Errorf("glusterblock: chapauth enabled - but CHAP credentials are missing in the response")
+		return nil, fmt.Errorf("glusterblock: chapauth enabled - but CHAP credentials are missing in the response")
 	}
 
 	var blockString []string
@@ -354,14 +354,14 @@ func (p *glusterBlockProvisioner) createVolume(volSizeInt int, blockVol string, 
 		out, cmdErr := cmd.CombinedOutput()
 		if cmdErr != nil {
 			glog.Errorf("glusterblock: command [%v] failed: %v", cmd, cmdErr)
-			return nil, fmt.Errorf("gluster block command failed")
+			return nil, fmt.Errorf("glusterblock: gluster block command failed")
 		}
 
 		// Fill the block configuration.
 		execBlockRes := &blockRes.glusterBlockExecVolRes
 		unmarshErr := json.Unmarshal([]byte(out), execBlockRes)
 		if unmarshErr != nil {
-			return nil, fmt.Errorf("failed to unmarshal the response")
+			return nil, fmt.Errorf("glusterblock: failed to unmarshal gluster-block comamnd response")
 		}
 
 		//TODO: Do volume check before modify
@@ -377,7 +377,7 @@ func (p *glusterBlockProvisioner) createVolume(volSizeInt int, blockVol string, 
 			}
 			unmarshErr = json.Unmarshal([]byte(out), execBlockRes)
 			if unmarshErr != nil {
-				return nil, fmt.Errorf("failed to unmarshal auth response")
+				return nil, fmt.Errorf("glusterblock: failed to unmarshal auth response from gluster-block command output")
 			}
 			if *execBlockRes == nil {
 				return nil, fmt.Errorf("glusterblock: failed to decode gluster-block response")
@@ -492,7 +492,7 @@ func (p *glusterBlockProvisioner) Delete(volume *v1.PersistentVolume) error {
 			deleteSecErr = nil
 		}
 		if deleteSecErr != nil {
-			glog.Errorf("glusterfs: failed to delete secret: %v", deleteSecErr)
+			glog.Errorf("glusterblock: failed to delete secret: %v", deleteSecErr)
 			return fmt.Errorf("error deleting secret: %v", deleteSecErr)
 		}
 	}
