@@ -68,6 +68,20 @@ func newCinderProvisioner(client kubernetes.Interface, id, configFilePath string
 
 var _ controller.Provisioner = &cinderProvisioner{}
 
+
+type provisionCtx struct {
+	p *cinderProvisioner
+	options controller.VolumeOptions
+	connection volumeConnection
+}
+
+
+type deleteCtx struct {
+	p *cinderProvisioner
+	pv *v1.PersistentVolume
+}
+
+
 // Provision creates a storage asset and returns a PV object representing it.
 func (p *cinderProvisioner) Provision(options controller.VolumeOptions) (*v1.PersistentVolume, error) {
 	if options.PVC.Spec.Selector != nil {
@@ -87,21 +101,22 @@ func (p *cinderProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 		return nil, err
 	}
 
-	mapper, err := newVolumeMapperFromConnection(p, connection)
+	mapper, err := newVolumeMapperFromConnection(connection)
 	if err != nil {
 		// TODO: Create placeholder PV?
 		glog.Errorf("Unable to create volume mapper: %f" ,err)
 		return nil, err
 	}
 
-	err = mapper.AuthSetup(options, connection)
+	ctx := provisionCtx{p, options, connection}
+	err = mapper.AuthSetup(ctx)
 	if err != nil {
 		// TODO: Create placeholder PV?
 		glog.Errorf("Failed to prepare volume auth: %v", err)
 		return nil, err
 	}
 
-	pv, err := mapper.BuildPV(options, connection)
+	pv, err := BuildPV(mapper, ctx)
 	if err != nil {
 		// TODO: Create placeholder PV?
 		glog.Errorf("Failed to build PV: %v", err)
@@ -124,14 +139,19 @@ func (p *cinderProvisioner) Delete(pv *v1.PersistentVolume) error {
 	// TODO when beta is removed, have to check kube version and pick v1/beta
 	// accordingly: maybe the controller lib should offer a function for that
 
-	mapper, err := newVolumeMapperFromPV(p, pv)
+	volumeId, ok := pv.Annotations[cinderVolumeId]
+	if !ok {
+		return errors.New("cinder volume id annotation not found on PV")
+	}
+
+	ctx := deleteCtx{p, pv}
+	mapper, err := newVolumeMapperFromPV(ctx)
 	if err != nil {
 		glog.Errorf("Cannot create volume mapper from PV: %v", err)
 		return err
 	}
-	volumeId := mapper.getCinderVolumeId()
 
-	mapper.AuthTeardown(pv)
+	mapper.AuthTeardown(ctx)
 
 	vol := newCinderVolume(p.cloud, volumeId)
 	err = vol.disconnect()
