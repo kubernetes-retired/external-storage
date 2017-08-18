@@ -21,7 +21,6 @@ import (
 	"errors"
 	"flag"
 	"os"
-	"time"
 
 	"syscall"
 
@@ -37,15 +36,7 @@ import (
 )
 
 const (
-	timeout                   = 60 * time.Second
-	resyncPeriod              = 15 * time.Second
-	provisionerName           = "openebs.io/provisioner-iscsi"
-	exponentialBackOffOnError = false
-	failedRetryThreshold      = 5
-	leasePeriod               = controller.DefaultLeaseDuration
-	retryPeriod               = controller.DefaultRetryPeriod
-	renewDeadline             = controller.DefaultRenewDeadline
-	termLimit                 = controller.DefaultTermLimit
+	provisionerName = "openebs.io/provisioner-iscsi"
 )
 
 type openEBSProvisioner struct {
