@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
+	volumes_v2 "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions"
 )
 
@@ -62,21 +62,7 @@ type rcvVolumeConnection struct {
 }
 
 
-type cinderVolume struct {
-	os openstack.OpenStack
-	id string
-}
-
-
-func newCinderVolume(os openstack.OpenStack, id string) *cinderVolume{
-	return &cinderVolume{
-		os: os,
-		id: id,
-	}
-}
-
-
-func createCinderVolume(os openstack.OpenStack, options controller.VolumeOptions) (*cinderVolume, error) {
+func createCinderVolume(p *cinderProvisioner, options controller.VolumeOptions) (string, error) {
 	name := fmt.Sprintf("cinder-dynamic-pvc-%s", uuid.NewUUID())
 	capacity := options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	sizeBytes := capacity.Value()
@@ -93,30 +79,30 @@ func createCinderVolume(os openstack.OpenStack, options controller.VolumeOptions
 		case "availability":
 			availability = v
 		default:
-			return nil, fmt.Errorf("invalid option %q", k)
+			return "", fmt.Errorf("invalid option %q", k)
 		}
 	}
 
-	//TODO udpate kubernetes vendor and fix AZ
-	volumeId, _, err := os.CreateVolume(name, sizeGB, volType, availability, nil)
-	if err != nil {
-		glog.Infof("Error creating cinder volume: %v", err)
-		return nil, err
+	opts := volumes_v2.CreateOpts{
+		Name:             name,
+		Size:             sizeGB,
+		VolumeType:       volType,
+		AvailabilityZone: availability,
 	}
-	glog.Infof("Successfully created cinder volume %s", volumeId)
-	return &cinderVolume{
-		os: os,
-		id: volumeId,
-	}, nil
+
+	vol, err := volumes_v2.Create(p.volumeService, &opts).Extract()
+
+	if err != nil {
+		glog.Errorf("Failed to create a %d GB volume: %v", sizeGB, err)
+		return "", err
+	}
+
+	glog.Infof("Created volume %v in Availability Zone: %v", vol.ID, vol.AvailabilityZone)
+	return vol.ID, nil
 }
 
 
-func (v *cinderVolume) connect() (volumeConnection, error) {
-	cClient, err := v.os.NewBlockStorageV2()
-	if err != nil {
-		glog.Infof("failed to get cinder client: %v", err)
-		return volumeConnection{}, err
-	}
+func connectCinderVolume (p *cinderProvisioner, volumeId string) (volumeConnection, error) {
 	opt := volumeactions.InitializeConnectionOpts{
 		Host:      "localhost",
 		IP:        "127.0.0.1",
@@ -128,7 +114,7 @@ func (v *cinderVolume) connect() (volumeConnection, error) {
 	var rcv rcvVolumeConnection
 
 	go time.AfterFunc(5 * time.Second, func() {
-		err := volumeactions.InitializeConnection(cClient, v.id, &opt).ExtractInto(&rcv)
+		err := volumeactions.InitializeConnection(p.volumeService, volumeId, &opt).ExtractInto(&rcv)
 		if err != nil {
 			glog.Errorf("failed to initialize connection :%v", err)
 			c <- err
@@ -137,7 +123,7 @@ func (v *cinderVolume) connect() (volumeConnection, error) {
 			close(c)
 		}
 	})
-	err = <-c
+	err := <-c
 	if err != nil {
 		return volumeConnection{}, err
 	}
@@ -145,26 +131,31 @@ func (v *cinderVolume) connect() (volumeConnection, error) {
 }
 
 
-func (v *cinderVolume) disconnect() error {
-	cClient, err := v.os.NewBlockStorageV2()
-	if err != nil {
-		glog.Errorf("failed to get cinder client: %v", err)
-		return err
-	}
+func disconnectCinderVolume(p *cinderProvisioner, volumeId string) error {
 	opt := volumeactions.TerminateConnectionOpts{
 		Host:      "localhost",
 		IP:        "127.0.0.1",
 		Initiator: INITIATOR_NAME,
 	}
 
-	err = volumeactions.TerminateConnection(cClient, v.id, &opt).Result.Err
+	err := volumeactions.TerminateConnection(p.volumeService, volumeId, &opt).Result.Err
 	if err != nil {
 		glog.Errorf("Failed to terminate connection to volume %s: %v",
-			v.id, err)
+			volumeId, err)
 		return err
 	}
 
 	return nil
+}
+
+
+func deleteCinderVolume(p *cinderProvisioner, volumeId string) error {
+	err := volumes_v2.Delete(p.volumeService, volumeId).ExtractErr()
+	if err != nil {
+		glog.Errorf("Cannot delete volume %s: %v", volumeId, err)
+	}
+
+	return err
 }
 
 

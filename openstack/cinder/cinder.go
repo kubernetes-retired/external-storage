@@ -23,6 +23,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
+	"github.com/gophercloud/gophercloud"
 
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -30,8 +31,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
 )
 
 const (
@@ -41,8 +40,9 @@ const (
 )
 
 type cinderProvisioner struct {
-	// OpenStack cloud provider
-	cloud openstack.OpenStack
+	// Openstack cinder client
+	volumeService *gophercloud.ServiceClient
+
 	// Kubernetes Client. Use to create secret
 	client kubernetes.Interface
 	// Identity of this cinderProvisioner, generated. Used to identify "this"
@@ -51,16 +51,13 @@ type cinderProvisioner struct {
 }
 
 func newCinderProvisioner(client kubernetes.Interface, id, configFilePath string) (controller.Provisioner, error) {
-	cloud, err := cloudprovider.InitCloudProvider("openstack", configFilePath)
+	volumeService, err := getVolumeService(configFilePath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get volume service: %v", err)
 	}
-	os, ok := cloud.(*openstack.OpenStack)
-	if !ok || cloud == nil {
-		return nil, fmt.Errorf("failed to get openstack cloud provider")
-	}
+
 	return &cinderProvisioner{
-		cloud:    *os,
+		volumeService: volumeService,
 		client:   client,
 		identity: id,
 	}, nil
@@ -88,13 +85,13 @@ func (p *cinderProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 		return nil, fmt.Errorf("claim Selector is not supported")
 	}
 
-	vol, err := createCinderVolume(p.cloud, options)
+	volumeId, err := createCinderVolume(p, options)
 	if err != nil {
 		glog.Errorf("Failed to create volume")
 		return nil, err
 	}
 
-	connection, err := vol.connect()
+	connection, err := connectCinderVolume(p, volumeId)
 	if err != nil {
 		// TODO: Create placeholder PV?
 		glog.Errorf("Failed to connect volume: %v", err)
@@ -147,25 +144,22 @@ func (p *cinderProvisioner) Delete(pv *v1.PersistentVolume) error {
 	ctx := deleteCtx{p, pv}
 	mapper, err := newVolumeMapperFromPV(ctx)
 	if err != nil {
-		glog.Errorf("Cannot create volume mapper from PV: %v", err)
 		return err
 	}
 
 	mapper.AuthTeardown(ctx)
 
-	vol := newCinderVolume(p.cloud, volumeId)
-	err = vol.disconnect()
+	err = disconnectCinderVolume(p, volumeId)
 	if err != nil {
-		glog.Errorf("Failed to disconnect volume: %f", err)
-	}
-
-	err = p.cloud.DeleteVolume(volumeId)
-	if err != nil {
-		glog.Errorf("Error deleting cinder volume: %v", err)
 		return err
 	}
-	glog.Infof("Successfully deleted cinder volume %s", volumeId)
 
+	err = deleteCinderVolume(p, volumeId)
+	if err != nil {
+		return err
+	}
+
+	glog.Infof("Successfully deleted cinder volume %s", volumeId)
 	return nil
 }
 
