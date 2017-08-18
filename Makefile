@@ -12,14 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ifeq ($(REGISTRY),)
-	REGISTRY = quay.io/external_storage/
-endif
-ifeq ($(VERSION),)
-	VERSION = latest
-endif
-
-clean: clean-aws/efs clean-ceph/cephfs clean-ceph/rbd clean-flex clean-gluster/block clean-iscsi/targetd clean-local-volume/provisioner clean-local-volume/bootstrapper clean-nfs-client clean-nfs
+clean: clean-aws/efs clean-ceph/cephfs clean-ceph/rbd clean-flex clean-gluster/block clean-gluster/glusterfs clean-iscsi/targetd clean-local-volume/provisioner clean-local-volume/bootstrapper clean-nfs-client clean-nfs
 .PHONY: clean
 
 test: test-aws/efs test-local-volume/provisioner test-nfs
@@ -45,11 +38,9 @@ clean-aws/efs:
 	make clean
 .PHONY: clean-aws/efs
 
-ceph/cephfs: 
+ceph/cephfs:
 	cd ceph/cephfs; \
-	go build cephfs-provisioner.go; \
-	docker build -t $(REGISTRY)cephfs-provisioner:latest .
-	docker tag $(REGISTRY)cephfs-provisioner:latest $(REGISTRY)cephfs-provisioner:$(VERSION)
+	make container
 .PHONY: ceph/cephfs
 
 clean-ceph/cephfs:
@@ -59,9 +50,7 @@ clean-ceph/cephfs:
 
 ceph/rbd:
 	cd ceph/rbd; \
-	go build -o rbd-provisioner cmd/rbd-provisioner/main.go; \
-	docker build -t $(REGISTRY)rbd-provisioner:latest .
-	docker tag $(REGISTRY)rbd-provisioner:latest $(REGISTRY)rbd-provisioner:$(VERSION)
+	make container
 .PHONY: ceph/rbd
 
 clean-ceph/rbd:
@@ -88,6 +77,16 @@ clean-gluster/block:
 	cd gluster/block; \
 	make clean
 .PHONY: clean-gluster/block
+
+gluster/glusterfs:
+	cd gluster/glusterfs; \
+	make container
+.PHONY: gluster/glusterfs
+
+clean-gluster/glusterfs:
+	cd gluster/glusterfs; \
+	make clean
+.PHONY: clean-gluster/glusterfs
 
 iscsi/targetd:
 	cd iscsi/targetd; \
@@ -126,9 +125,7 @@ clean-local-volume/bootstrapper:
 
 nfs-client:
 	cd nfs-client; \
-	./build.sh; \
-	docker build -t $(REGISTRY)nfs-client-provisioner:latest .
-	docker tag $(REGISTRY)nfs-client-provisioner:latest $(REGISTRY)nfs-client-provisioner:$(VERSION)
+	make container
 .PHONY: nfs-client
 
 clean-nfs-client:
@@ -151,24 +148,14 @@ clean-nfs:
 	make clean
 .PHONY: clean-nfs
 
-openebs:
-	cd openebs; \
-	make build
-.PHONY: openebs
-
-clean-openebs:
-	cd openebs; \
-	make clean
-.PHONY: clean-openebs
-
-push-cephfs-provisioner: ceph/cephfs
-	docker push $(REGISTRY)cephfs-provisioner:$(VERSION)
-	docker push $(REGISTRY)cephfs-provisioner:latest
+push-cephfs-provisioner:
+	cd ceph/cephfs; \
+	make push
 .PHONY: push-cephfs-provisioner
 
-push-rbd-provisioner: ceph/rbd
-	docker push $(REGISTRY)rbd-provisioner:$(VERSION)
-	docker push $(REGISTRY)rbd-provisioner:latest
+push-rbd-provisioner:
+	cd ceph/rbd; \
+	make push
 .PHONY: push-rbd-provisioner
 
 push-efs-provisioner:
@@ -180,6 +167,11 @@ push-glusterblock-provisioner:
 	cd gluster/block; \
 	make push
 .PHONY: push-glusterblock-provisioner
+
+push-glusterfs-simple-provisioner:
+	cd gluster/glusterfs; \
+	make push
+.PHONY: push-glusterfs-simple-provisioner
 
 push-iscsi-controller:
 	cd iscsi/targetd; \
@@ -197,20 +189,11 @@ push-local-volume-provisioner:
 .PHONY: push-local-volume-provisioner
 
 push-nfs-client-provisioner: nfs-client
-	docker push $(REGISTRY)nfs-client-provisioner:$(VERSION)
-	docker push $(REGISTRY)nfs-client-provisioner:latest
+	cd nfs-client; \
+	make push
 .PHONY: push-nfs-client-provisioner
 
 push-nfs-provisioner:
 	cd nfs; \
 	make push
 .PHONY: push-nfs-provisioner
-
-push-openebs-provisioner:
-	cd openebs; \
-	make push
-.PHONY: push-openebs-provisioner
-
-deploy-openebs-provisioner:
-	cd openebs; \
-	make deploy
