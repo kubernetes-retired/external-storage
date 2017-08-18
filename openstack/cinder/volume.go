@@ -34,14 +34,20 @@ import (
 
 type volumeConnectionDetails struct {
 	VolumeId string `json:"volume_id"`
+	Name string `json:"name"`
 
 	AuthMethod string `json:"auth_method"`
 	AuthUsername string `json:"auth_username"`
 	AuthPassword string `json:"auth_password"`
+	SecretType string `json:"secret_type"`
 
 	TargetPortal string `json:"target_portal"`
 	TargetIqn string `json:"target_iqn"`
 	TargetLun int32 `json:"target_lun"`
+
+	ClusterName string `json:"cluster_name"`
+	Hosts []string `json:"hosts"`
+	Ports []string `json:"ports"`
 }
 
 
@@ -182,6 +188,8 @@ func newVolumeMapperFromConnection(conn volumeConnection) (volumeMapper, error) 
 		return nil, errors.New(msg)
 	case ISCSI_TYPE:
 		return new(iscsiMapper), nil
+	case RBD_TYPE:
+		return new(rbdMapper), nil
 	}
 }
 
@@ -189,6 +197,8 @@ func newVolumeMapperFromConnection(conn volumeConnection) (volumeMapper, error) 
 func newVolumeMapperFromPV(ctx deleteCtx) (volumeMapper, error) {
 	if ctx.pv.Spec.ISCSI != nil {
 		return new(iscsiMapper), nil
+	} else if ctx.pv.Spec.RBD != nil {
+		return new(rbdMapper), nil
 	} else {
 		return nil, errors.New("Unsupported volume source")
 	}
