@@ -150,12 +150,23 @@ func NewGlusterBlockProvisioner(client kubernetes.Interface, id string) controll
 
 var _ controller.Provisioner = &glusterBlockProvisioner{}
 
+func (p *glusterBlockProvisioner) GetAccessModes() []v1.PersistentVolumeAccessMode {
+	return []v1.PersistentVolumeAccessMode{
+		v1.ReadWriteOnce,
+		v1.ReadOnlyMany,
+	}
+}
+
 // Provision creates a storage asset and returns a PV object representing it.
 func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*v1.PersistentVolume, error) {
 
 	var err error
 	if options.PVC.Spec.Selector != nil {
 		return nil, fmt.Errorf("glusterblock: claim Selector is not supported")
+	}
+
+	if !util.AccessModesContainedInAll(p.GetAccessModes(), options.PVC.Spec.AccessModes) {
+		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", options.PVC.Spec.AccessModes, p.GetAccessModes())
 	}
 
 	glog.V(4).Infof("glusterblock: VolumeOptions %v", options)
