@@ -162,57 +162,41 @@ func (v *cinderVolume) disconnect() error {
 }
 
 
-type baseMappable interface {
-	getCinderVolumeId() string
-	BuildPV(options controller.VolumeOptions, conn volumeConnection) (*v1.PersistentVolume, error)
+type volumeMapper interface {
+	BuildPVSource(ctx provisionCtx) (*v1.PersistentVolumeSource, error)
+	AuthSetup(ctx provisionCtx) error
+	AuthTeardown(ctx deleteCtx) error
 }
 
-type mappable interface {
-	baseMappable
 
-	BuildPVSource(options controller.VolumeOptions, conn volumeConnection) (*v1.PersistentVolumeSource, error)
-	AuthSetup(options controller.VolumeOptions, conn volumeConnection) error
-	AuthTeardown(pv *v1.PersistentVolume) error
-}
-
-type volumeMapper struct {
+type mapperContext struct {
 	cinderVolumeId string
 	p              *cinderProvisioner
-	mappable
-}
-
-func (m *volumeMapper) getCinderVolumeId() string {
-	return m.cinderVolumeId
 }
 
 
-func newVolumeMapperFromConnection(p *cinderProvisioner, conn volumeConnection) (mappable, error) {
+func newVolumeMapperFromConnection(conn volumeConnection) (volumeMapper, error) {
 	switch conn.DriverVolumeType {
 	default:
 		msg := fmt.Sprintf("Unsupported volume type: %s", conn.DriverVolumeType)
 		return nil, errors.New(msg)
 	case ISCSI_TYPE:
-		return newIscsiMapper(p, conn.Data.VolumeId), nil
+		return new(iscsiMapper), nil
 	}
 }
 
 
-func newVolumeMapperFromPV(p *cinderProvisioner, pv *v1.PersistentVolume) (mappable, error) {
-	volumeId, ok := pv.Annotations[cinderVolumeId]
-	if !ok {
-		return nil, errors.New("cinder volume id annotation not found on PV")
-	}
-
-	if pv.Spec.ISCSI != nil {
-		return newIscsiMapper(p, volumeId), nil
+func newVolumeMapperFromPV(ctx deleteCtx) (volumeMapper, error) {
+	if ctx.pv.Spec.ISCSI != nil {
+		return new(iscsiMapper), nil
 	} else {
 		return nil, errors.New("Unsupported volume source")
 	}
 }
 
 
-func (m *volumeMapper) BuildPV(options controller.VolumeOptions, conn volumeConnection) (*v1.PersistentVolume, error) {
-	pvSource, err := m.BuildPVSource(options, conn)
+func BuildPV(m volumeMapper, ctx provisionCtx) (*v1.PersistentVolume, error) {
+	pvSource, err := m.BuildPVSource(ctx)
 	if err != nil {
 		glog.Errorf("Failed to build PV Source element: %v", err)
 		return nil, err
@@ -220,18 +204,18 @@ func (m *volumeMapper) BuildPV(options controller.VolumeOptions, conn volumeConn
 
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: options.PVName,
-			Namespace: options.PVC.Namespace,
+			Name: ctx.options.PVName,
+			Namespace: ctx.options.PVC.Namespace,
 			Annotations: map[string]string{
-				provisionerIDAnn: m.p.identity,
-				cinderVolumeId: m.cinderVolumeId,
+				provisionerIDAnn: ctx.p.identity,
+				cinderVolumeId: ctx.connection.Data.VolumeId,
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{
-			PersistentVolumeReclaimPolicy: options.PersistentVolumeReclaimPolicy,
-			AccessModes:                   options.PVC.Spec.AccessModes,
+			PersistentVolumeReclaimPolicy: ctx.options.PersistentVolumeReclaimPolicy,
+			AccessModes:                   ctx.options.PVC.Spec.AccessModes,
 			Capacity: v1.ResourceList{
-				v1.ResourceName(v1.ResourceStorage): options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)],
+				v1.ResourceName(v1.ResourceStorage): ctx.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)],
 			},
 			PersistentVolumeSource: *pvSource,
 		},
