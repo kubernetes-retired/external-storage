@@ -1,6 +1,6 @@
 # OpenEBS Kubernetes PV provisioner
 
-## About OpenEBS 
+## About OpenEBS
 
 OpenEBS is containerized storage for containers. More details on OpenEBS can be found on [OpenEBS project page](https://github.com/openebs/openebs)
 
@@ -18,7 +18,7 @@ $ make openebs
 ### Create a docker image on local
 
 ```
-$ make push-openebs-provisoner
+$ make push-openebs-provisioner
 ```
 
 ### Push OpenEBS provisioner image to docker hub
