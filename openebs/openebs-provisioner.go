@@ -55,14 +55,16 @@ func NewOpenEBSProvisioner(client kubernetes.Interface) controller.Provisioner {
 	}
 	var openebsObj mApiv1.OpenEBSVolume
 
+	//Get maya-apiserver IP address from cluster
 	addr, err := openebsObj.GetMayaClusterIP(client)
 
 	if err != nil {
-		glog.Fatal("env variable NODE_NAME must be set so that this provisioner can identify itself")
+		glog.Fatalf("Error getting maya-api-server IP Address: %v", err)
 		return nil
 	}
 	mayaServiceURI := "http://" + addr + ":5656"
 
+	//Set maya-apiserver IP address along with default port
 	os.Setenv("MAPI_ADDR", mayaServiceURI)
 
 	return &openEBSProvisioner{
@@ -105,8 +107,7 @@ func (p *openEBSProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 		}
 	}
 
-	glog.Infof("Volume IQN: %v", iqn)
-	glog.Infof("Volume Target: %v", targetPortal)
+	glog.Infof("Volume IQN: %v , Volume Target: %v", iqn, targetPortal)
 
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
@@ -151,7 +152,10 @@ func (p *openEBSProvisioner) Delete(volume *v1.PersistentVolume) error {
 	}
 
 	// Issue a delete request to Maya API Server
-	openebsVol.DeleteVsm(volume.Name)
+	err := openebsVol.DeleteVsm(volume.Name)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
