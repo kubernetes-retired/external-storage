@@ -641,7 +641,7 @@ func parseClassParameters(params map[string]string, kubeclient kubernetes.Interf
 	}
 
 	if len(parseOpmode) == 0 {
-		cfg.opMode = glusterBlockOpmode
+		cfg.opMode = heketiOpmode
 	} else {
 		parseErr := parseOpmodeArgs(parseOpmode, &cfg, blkmodeArgs)
 		if parseErr != nil {
