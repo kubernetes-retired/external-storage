@@ -174,6 +174,19 @@ func TestController(t *testing.T) {
 				*newVolume("volume-1", v1.VolumeReleased, v1.PersistentVolumeReclaimDelete, map[string]string{annDynamicallyProvisioned: "foo.bar/baz"}),
 			},
 		},
+		{
+			name: "provision for claim-1 but not claim-2, because it is ignored",
+			objs: []runtime.Object{
+				newStorageClass("class-1", "foo.bar/baz"),
+				newClaim("claim-1", "uid-1-1", "class-1", "", nil),
+				newClaim("claim-2", "uid-1-2", "class-1", "", nil),
+			},
+			provisionerName: "foo.bar/baz",
+			provisioner:     newIgnoredProvisioner(),
+			expectedVolumes: []v1.PersistentVolume{
+				*newProvisionedVolume(newStorageClass("class-1", "foo.bar/baz"), newClaim("claim-1", "uid-1-1", "class-1", "", nil)),
+			},
+		},
 	}
 	for _, test := range tests {
 		client := fake.NewSimpleClientset(test.objs...)
@@ -629,6 +642,27 @@ func (p *badTestProvisioner) Provision(options VolumeOptions) (*v1.PersistentVol
 
 func (p *badTestProvisioner) Delete(volume *v1.PersistentVolume) error {
 	return errors.New("fake error")
+}
+
+func newIgnoredProvisioner() Provisioner {
+	return &ignoredProvisioner{}
+}
+
+type ignoredProvisioner struct {
+}
+
+var _ Provisioner = &ignoredProvisioner{}
+
+func (i *ignoredProvisioner) Provision(options VolumeOptions) (*v1.PersistentVolume, error) {
+	if options.PVC.Name == "claim-2" {
+		return nil, &IgnoredError{"Ignored"}
+	}
+
+	return newProvisionedVolume(newStorageClass("class-1", "foo.bar/baz"), newClaim("claim-1", "uid-1-1", "class-1", "", nil)), nil
+}
+
+func (i *ignoredProvisioner) Delete(volume *v1.PersistentVolume) error {
+	return nil
 }
 
 type claimReactor struct {
