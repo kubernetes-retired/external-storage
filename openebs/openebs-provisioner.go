@@ -19,12 +19,14 @@ package main
 import (
 	"errors"
 	"flag"
+	"fmt"
 	"os"
 
 	"syscall"
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
+	"github.com/kubernetes-incubator/external-storage/lib/util"
 	mApiv1 "github.com/kubernetes-incubator/external-storage/openebs/pkg/v1"
 	mayav1 "github.com/kubernetes-incubator/external-storage/openebs/types/v1"
 	"k8s.io/api/core/v1"
@@ -107,7 +109,12 @@ func (p *openEBSProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 		}
 	}
 
-	glog.Infof("Volume IQN: %v , Volume Target: %v", iqn, targetPortal)
+	glog.V(1).Infof("Volume IQN: %v , Volume Target: %v", iqn, targetPortal)
+
+	if !util.AccessModesContainedInAll(p.GetAccessModes(), options.PVC.Spec.AccessModes) {
+		glog.V(1).Info("Invalid Access Modes: %v, Supported Access Modes: %v", options.PVC.Spec.AccessModes, p.GetAccessModes())
+		return nil, fmt.Errorf("Invalid Access Modes: %v, Supported Access Modes: %v", options.PVC.Spec.AccessModes, p.GetAccessModes())
+	}
 
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
@@ -159,6 +166,12 @@ func (p *openEBSProvisioner) Delete(volume *v1.PersistentVolume) error {
 	}
 
 	return nil
+}
+
+func (p *openEBSProvisioner) GetAccessModes() []v1.PersistentVolumeAccessMode {
+	return []v1.PersistentVolumeAccessMode{
+		v1.ReadWriteOnce,
+	}
 }
 
 func main() {
