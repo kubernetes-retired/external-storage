@@ -792,6 +792,11 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 
 	volume, err = ctrl.provisioner.Provision(options)
 	if err != nil {
+		if ierr, ok := err.(*IgnoredError); ok {
+			// Provision ignored, do nothing and hope another provisioner will provision it.
+			glog.Infof("provision of claim %q ignored: %v", claimToClaimKey(claim), ierr)
+			return nil
+		}
 		strerr := fmt.Sprintf("Failed to provision volume with StorageClass %q: %v", claimClass, err)
 		glog.Errorf("Failed to provision volume for claim %q with StorageClass %q: %v", claimToClaimKey(claim), claimClass, err)
 		ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, "ProvisioningFailed", strerr)
