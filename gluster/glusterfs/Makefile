@@ -23,7 +23,7 @@ MUTABLE_IMAGE = $(REGISTRY)glusterfs-simple-provisioner:latest
 
 all build:
 	GOOS=linux go install -v ./cmd/glusterfs-simple-provisioner
-	GOOS=linux go build ./cmd/glusterfs-simple-provisioner
+	GOOS=linux CGO_ENABLED=0 go build ./cmd/glusterfs-simple-provisioner
 .PHONY: all build
 
 build-mac:
