@@ -44,6 +44,9 @@ func (u *RBDUtil) CreateImage(image string, pOpts *rbdProvisionOptions, options 
 	volSizeBytes := capacity.Value()
 	// convert to MB that rbd defaults on
 	sz := int(util.RoundUpSize(volSizeBytes, 1024*1024))
+	if sz <= 0 {
+		return nil, 0, fmt.Errorf("invalid storage '%s' requested for RBD provisioner, it must greater than zero", capacity.String())
+	}
 	volSz := fmt.Sprintf("%d", sz)
 	// rbd create
 	l := len(pOpts.monitors)

@@ -8,6 +8,9 @@ auto-save-list
 tramp
 .\#*
 
+# Vscode files
+.vscode
+
 # Org-mode
 .org-id-locations
 *_archive
@@ -37,6 +40,10 @@ flycheck_*.el
 
 # projectiles files
 .projectile
+
+# glusterfs-simple-provisioner binary
+/gluster/glusterfs/glusterfs-simple-provisioner
+/gluster/glusterfs/deploy/docker/glusterfs-simple-provisioner
 
 # nfs-provisioner binary
 /nfs/nfs-provisioner

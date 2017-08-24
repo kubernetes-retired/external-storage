@@ -40,6 +40,7 @@ import:
   - tools/cache
   - tools/clientcmd
   - tools/record
+  - tools/remotecommand
 - package: k8s.io/api
   version: e24ed681f56165befbea50a24f7e9f1c079ac366
 - package: k8s.io/kubernetes

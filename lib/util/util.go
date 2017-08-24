@@ -16,6 +16,8 @@ limitations under the License.
 
 package util
 
+import "k8s.io/api/core/v1"
+
 // RoundUpSize calculates how many allocation units are needed to accommodate
 // a volume of given size. E.g. when user wants 1500MiB volume, while AWS EBS
 // allocates volumes in gibibyte-sized chunks,
@@ -23,4 +25,24 @@ package util
 // (2 GiB is the smallest allocatable volume that can hold 1500MiB)
 func RoundUpSize(volumeSizeBytes int64, allocationUnitBytes int64) int64 {
 	return (volumeSizeBytes + allocationUnitBytes - 1) / allocationUnitBytes
+}
+
+// AccessModesContains returns whether the requested mode is contained by modes
+func AccessModesContains(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAccessMode) bool {
+	for _, m := range modes {
+		if m == mode {
+			return true
+		}
+	}
+	return false
+}
+
+// AccessModesContainedInAll returns whether all of the requested modes are contained by modes
+func AccessModesContainedInAll(indexedModes []v1.PersistentVolumeAccessMode, requestedModes []v1.PersistentVolumeAccessMode) bool {
+	for _, mode := range requestedModes {
+		if !AccessModesContains(indexedModes, mode) {
+			return false
+		}
+	}
+	return true
 }

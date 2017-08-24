@@ -20,12 +20,13 @@ set -o pipefail
 
 export REGISTRY=quay.io/external_storage/
 
-docker login -e="${QUAY_EMAIL}" -u "${QUAY_USERNAME}" -p "${QUAY_PASSWORD}" quay.io
+docker login -u "${QUAY_USERNAME}" -p "${QUAY_PASSWORD}" quay.io
 
 provisioners=(
 efs-provisioner
 cephfs-provisioner
 glusterblock-provisioner
+glusterfs-simple-provisioner
 iscsi-controller
 local-volume-provisioner-bootstrap
 local-volume-provisioner

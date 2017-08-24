@@ -1,5 +1,5 @@
-hash: d9fec4f4e6805b2a1aa8f8cdb8ff2d9c4af89a93c6ae97c883fb38cc3bc35a26
-updated: 2017-07-13T10:56:47.060442691-04:00
+hash: b4663d3fb8dfc3a0563bbe6fe554a09100c8c1d10d5fe8c82dd0b98969c311ee
+updated: 2017-08-01T08:52:48.10199261+09:00
 imports:
 - name: github.com/aws/aws-sdk-go
   version: b709581f82a77c0ff00790d1446c05719fed714d
@@ -46,6 +46,10 @@ imports:
   version: 092cba3727bb9b4a2f0e922cd6c0f93ea270e363
   subpackages:
   - pkg/mount
+- name: github.com/docker/spdystream
+  version: 449fdfce4d962303d702fec724ef0ad181c92528
+  subpackages:
+  - spdy
 - name: github.com/emicklei/go-restful
   version: ff4f55a206334ef123e4f79bbf348980da81ca46
   subpackages:
@@ -262,11 +266,14 @@ imports:
   - pkg/util/diff
   - pkg/util/errors
   - pkg/util/framer
+  - pkg/util/httpstream
+  - pkg/util/httpstream/spdy
   - pkg/util/intstr
   - pkg/util/json
   - pkg/util/mergepatch
   - pkg/util/net
   - pkg/util/rand
+  - pkg/util/remotecommand
   - pkg/util/runtime
   - pkg/util/sets
   - pkg/util/strategicpatch
@@ -278,6 +285,7 @@ imports:
   - pkg/version
   - pkg/watch
   - third_party/forked/golang/json
+  - third_party/forked/golang/netutil
   - third_party/forked/golang/reflect
 - name: k8s.io/client-go
   version: 42a124578af9e61f5c6902fa7b6b2cb6538f17d2
@@ -342,8 +350,10 @@ imports:
   - tools/clientcmd/api/v1
   - tools/metrics
   - tools/record
+  - tools/remotecommand
   - transport
   - util/cert
+  - util/exec
   - util/flowcontrol
   - util/homedir
   - util/integer

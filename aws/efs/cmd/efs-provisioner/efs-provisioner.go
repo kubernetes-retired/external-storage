@@ -30,8 +30,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/efs"
 	"github.com/docker/docker/pkg/mount"
 	"github.com/golang/glog"
-	"github.com/kubernetes-incubator/external-storage/aws/efs/pkg/gidallocator"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
+	"github.com/kubernetes-incubator/external-storage/lib/gidallocator"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -109,7 +109,11 @@ func getMount(dnsName string) (string, string, error) {
 		}
 	}
 
-	return "", "", fmt.Errorf("no mount entry found for %s", dnsName)
+	entriesStr := ""
+	for _, e := range entries {
+		entriesStr += e.Source + ":" + e.Mountpoint + ", "
+	}
+	return "", "", fmt.Errorf("no mount entry found for %s among entries %s", dnsName, entriesStr)
 }
 
 var _ controller.Provisioner = &efsProvisioner{}

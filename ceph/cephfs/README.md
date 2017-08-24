@@ -1,19 +1,19 @@
 # CephFS Volume Provisioner for Kubernetes 1.5+
 
 [![Docker Repository on Quay](https://quay.io/repository/external_storage/cephfs-provisioner/status "Docker Repository on Quay")](https://quay.io/repository/external_storage/cephfs-provisioner)
-```
-quay.io/external_storage/cephfs-provisioner:v0.1.0
-```
 
 Using Ceph volume client
 
 # Test instruction
 
-* Build cephfs-provisioner and container image
+Compile the provisioner
+``` console
+make
+```
 
-```bash
-go build cephfs-provisioner.go
-docker build -t cephfs-provisioner .
+Make the container image and push to the registry
+``` console
+make push
 ```
 
 * Start Kubernetes local cluster
