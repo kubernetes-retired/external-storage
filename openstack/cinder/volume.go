@@ -196,7 +196,7 @@ func newVolumeMapperFromPV(ctx deleteCtx) (volumeMapper, error) {
 }
 
 
-func BuildPV(m volumeMapper, ctx provisionCtx) (*v1.PersistentVolume, error) {
+func BuildPV(m volumeMapper, ctx provisionCtx, volumeId string) (*v1.PersistentVolume, error) {
 	pvSource, err := m.BuildPVSource(ctx)
 	if err != nil {
 		glog.Errorf("Failed to build PV Source element: %v", err)
@@ -209,7 +209,7 @@ func BuildPV(m volumeMapper, ctx provisionCtx) (*v1.PersistentVolume, error) {
 			Namespace: ctx.options.PVC.Namespace,
 			Annotations: map[string]string{
 				provisionerIDAnn: ctx.p.identity,
-				cinderVolumeId: ctx.connection.Data.VolumeId,
+				cinderVolumeId: volumeId,
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{
