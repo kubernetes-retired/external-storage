@@ -32,28 +32,41 @@ type iscsiMapper struct {
 }
 
 
-func getChapSecretName(volumeId string) string {
-	return volumeId + "-secret"
+func getChapSecretName(ctx provisionCtx) string {
+	if ctx.connection.Data.AuthMethod == "CHAP" {
+		return ctx.options.PVName + "-secret"
+	} else {
+		return ""
+	}
 }
 
 func (m *iscsiMapper) BuildPVSource(ctx provisionCtx) (*v1.PersistentVolumeSource, error) {
-	return &v1.PersistentVolumeSource{
+	ret := &v1.PersistentVolumeSource{
 		ISCSI: &v1.ISCSIVolumeSource{
 			// TODO: Need some way to specify the initiator name
 			TargetPortal: ctx.connection.Data.TargetPortal,
 			IQN: ctx.connection.Data.TargetIqn,
 			Lun: ctx.connection.Data.TargetLun,
-			SessionCHAPAuth: true,
-			SecretRef: &v1.LocalObjectReference{
-				Name: getChapSecretName(ctx.connection.Data.VolumeId),
-			},
+			SessionCHAPAuth: false,
 		},
-	}, nil
+	}
+	secretName := getChapSecretName(ctx)
+	if secretName != "" {
+		ret.ISCSI.SessionCHAPAuth = true
+		ret.ISCSI.SecretRef = &v1.LocalObjectReference{
+			Name: secretName,
+		}
+	}
+	return ret, nil
 }
 
 func (m *iscsiMapper) AuthSetup(ctx provisionCtx) error {
 	// Create a secret for the CHAP credentials
-	secretName := getChapSecretName(ctx.connection.Data.VolumeId)
+	secretName := getChapSecretName(ctx)
+	if secretName == "" {
+		glog.Info("No CHAP authentication secret necessary")
+		return nil
+	}
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: secretName,
@@ -76,6 +89,11 @@ func (m *iscsiMapper) AuthSetup(ctx provisionCtx) error {
 
 func (m *iscsiMapper) AuthTeardown(ctx deleteCtx) error {
 	// Delete the CHAP credentials
+	if ctx.pv.Spec.ISCSI.SecretRef == nil {
+		glog.Info("No associated secret to delete")
+		return nil
+	}
+
 	secretName := ctx.pv.Spec.ISCSI.SecretRef.Name
 	secretNamespace := ctx.pv.Spec.ClaimRef.Namespace
 	err := ctx.p.client.CoreV1().Secrets(secretNamespace).Delete(secretName, nil)
