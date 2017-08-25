@@ -113,7 +113,7 @@ func (p *cinderProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 		return nil, err
 	}
 
-	pv, err := BuildPV(mapper, ctx)
+	pv, err := BuildPV(mapper, ctx, volumeId)
 	if err != nil {
 		// TODO: Create placeholder PV?
 		glog.Errorf("Failed to build PV: %v", err)
