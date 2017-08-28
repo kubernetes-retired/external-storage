@@ -1,4 +1,4 @@
-apiVersion: batch/v1 
+apiVersion: batch/v1
 kind: Job
 metadata:
   name: local-volume-provisioner-bootstrap
@@ -6,16 +6,18 @@ metadata:
   labels:
     app: local-volume-provisioner-bootstrap
 spec:
-  restartPolicy: Never
-  serviceAccountName: local-storage-bootstrapper
-  containers:
-  - name: bootstrapper
-    image: quay.io/external_storage/local-volume-provisioner-bootstrap:latest
-    env:
-    - name: MY_NAMESPACE
-      valueFrom:
-        fieldRef:
-          fieldPath: metadata.namespace
-    args:
-    - --image=quay.io/external_storage/local-volume-provisioner:v1.0.0
-    - --volume-config=local-volume-config
+  template:
+    spec:
+      serviceAccountName: local-storage-bootstrapper
+      restartPolicy: Never
+      containers:
+      - name: bootstrapper
+        image: quay.io/external_storage/local-volume-provisioner-bootstrap:latest
+        env:
+        - name: MY_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        args:
+        - --image=quay.io/external_storage/local-volume-provisioner:v1.0.0
+        - --volume-config=local-volume-config
