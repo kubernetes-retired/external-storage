@@ -174,7 +174,7 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 	//Parse Class Parameters
 	cfg, parseErr := parseClassParameters(options.Parameters, p.client)
 	if parseErr != nil {
-		return nil, fmt.Errorf(" failed to parse class parameters: %v", parseErr)
+		return nil, fmt.Errorf(" failed to parse storage class parameters: %v", parseErr)
 	}
 
 	glog.V(4).Infof(" creating volume with configuration %+v", *cfg)
@@ -213,18 +213,18 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 		iscsiVol.AuthKey = blockVol.glusterBlockExecVolRes.AuthKey
 		iscsiVol.BlockVolName = blockVolName
 	} else {
-		return nil, fmt.Errorf(" failed to parse blockvol : [%v]", *blockVol)
+		return nil, fmt.Errorf(" failed to parse blockvol : [%v] for opmode [%v] response", *blockVol, cfg.opMode)
 	}
 
 	//Sort Target Portal from portal.
 	sortErr := p.sortTargetPortal(iscsiVol)
 	if sortErr != nil {
-		return nil, fmt.Errorf(" failed to fetch Target Portal: %v", sortErr)
+		return nil, fmt.Errorf(" failed to fetch Target Portal: %v from iscsi volume spec", sortErr)
 	}
 
 	// Target Portal and IQN should not be null
 	if iscsiVol.TargetPortal == "" || iscsiVol.Iqn == "" {
-		return nil, fmt.Errorf(" failed to create volume: Target portal/IQN is nil")
+		return nil, fmt.Errorf(" failed to create volume: Target portal/IQN is nil in iscsi volume spec")
 	}
 
 	glog.V(1).Infof(" Volume configuration : %+v", blockVol)
@@ -243,7 +243,7 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 		iscsiVol.BlockSecret = secretName
 		iscsiVol.BlockSecretNs = nameSpace
 	} else if !(cfg.chapAuthEnabled) {
-		glog.V(1).Infof(" CHAP authentication is not requested")
+		glog.V(1).Infof(" CHAP authentication is not requested for this PV")
 		iscsiVol.SessionCHAPAuth = false
 		secretRef = nil
 	} else {
@@ -395,7 +395,7 @@ func (p *glusterBlockProvisioner) createVolume(volSizeInt int, blockVol string, 
 			}
 
 			if config.chapAuthEnabled && ((**execBlockRes).User == "" || (**execBlockRes).AuthKey == "") {
-				return nil, fmt.Errorf(" missing CHAP - invalid volume creation ")
+				return nil, fmt.Errorf(" Invalid response from gluster-block received: CHAP credentials must not be empty")
 			}
 
 		}
@@ -446,13 +446,13 @@ func (p *glusterBlockProvisioner) createVolume(volSizeInt int, blockVol string, 
 				heketiBlockRes.Cluster = blockVolumeInfoRes.Cluster
 				heketiBlockRes.ID = blockVolumeInfoRes.Id
 			} else {
-				return nil, fmt.Errorf(" [heketi] missing IQN and Target - invalid volume creation")
+				return nil, fmt.Errorf(" [heketi] Invalid response from heketi received: IQN and Target must not be empty")
 			}
 
 			blockRes.heketiBlockVolRes = &heketiBlockRes
 
 			if config.chapAuthEnabled && (heketiBlockRes.User == "" || heketiBlockRes.AuthKey == "") {
-				return nil, fmt.Errorf(" [heketi] missing CHAP - invalid volume creation  ")
+				return nil, fmt.Errorf(" [heketi] Invalid response from heketi received: CHAP credentials must not be empty  ")
 			}
 
 		} else {
@@ -518,7 +518,7 @@ func (p *glusterBlockProvisioner) Delete(volume *v1.PersistentVolume) error {
 			config.blockModeArgs["glustervol"]+"/"+delBlockVolName, "--json")
 		_, cmdErr := deleteCmd.CombinedOutput()
 		if cmdErr != nil {
-			glog.Errorf(" error [%v] when running command %v", cmdErr, deleteCmd)
+			glog.Errorf(" error [%v] when running gluster-block command %v", cmdErr, deleteCmd)
 			return cmdErr
 		}
 		glog.V(1).Infof(" successfully deleted Volume %v ", delBlockVolName)
@@ -532,24 +532,24 @@ func (p *glusterBlockProvisioner) Delete(volume *v1.PersistentVolume) error {
 			var err error
 			heketiModeArgs["restsecretvalue"], err = parseSecret(heketiModeArgs["secretnamespace"], heketiModeArgs["secret"], p.client)
 			if err != nil {
-				glog.Errorf(" failed to parse secret %s : Err: [%v]", heketiModeArgs["secret"], err)
+				glog.Errorf(" [heketi]: failed to parse secret %s : Err: [%v]", heketiModeArgs["secret"], err)
 				return err
 			}
 		}
 		cli := gcli.NewClient(heketiModeArgs["url"], heketiModeArgs["user"], heketiModeArgs["restsecretvalue"])
 		if cli == nil {
-			glog.Errorf(" failed to create glusterblock rest client")
-			return fmt.Errorf(" failed to create glusterblock rest client, REST server authentication failed")
+			glog.Errorf("[heketi]: failed to create REST client")
+			return fmt.Errorf("[heketi]: failed to create REST client, REST server authentication failed")
 		}
 
 		volumeID := dstrings.TrimPrefix(delBlockVolName, blockVolPrefix)
 
 		deleteErr := cli.BlockVolumeDelete(volumeID)
 		if deleteErr != nil {
-			glog.Errorf(" failed to delete gluster block volume [%v] : Err: [%v]", delBlockVolName, deleteErr)
-			return fmt.Errorf(" failed to delete glusterblock volume")
+			glog.Errorf("[heketi]: failed to delete gluster block volume [%v] : Err: [%v]", delBlockVolName, deleteErr)
+			return fmt.Errorf("[heketi]: failed to delete glusterblock volume")
 		}
-		glog.V(1).Infof(" successfully deleted Volume %v ", delBlockVolName)
+		glog.V(1).Infof("[heketi]: successfully deleted Volume %v ", delBlockVolName)
 
 	default:
 		glog.Errorf(" Unknown OpMode, failed to delete volume %v", delBlockVolName)
