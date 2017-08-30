@@ -236,8 +236,9 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 		secretName := "glusterblk-" + iscsiVol.User + "-secret"
 		secretRef, err = p.createSecretRef(nameSpace, secretName, iscsiVol.User, iscsiVol.AuthKey)
 		if err != nil {
-			glog.Errorf(" failed to create CHAP auth credentials for pv")
+			glog.Errorf(" failed to create CHAP auth credentials for pv, error: %v", err)
 			return nil, fmt.Errorf(" failed to create CHAP auth credentials for pv")
+
 		}
 		iscsiVol.SessionCHAPAuth = cfg.chapAuthEnabled
 		iscsiVol.BlockSecret = secretName
@@ -372,6 +373,7 @@ func (p *glusterBlockProvisioner) createVolume(volSizeInt int, blockVol string, 
 		execBlockRes := &blockRes.glusterBlockExecVolRes
 		unmarshErr := json.Unmarshal([]byte(out), execBlockRes)
 		if unmarshErr != nil {
+			glog.Errorf("failed to unmarshal gluster-block command response, error: %v", unmarshErr)
 			return nil, fmt.Errorf(" failed to unmarshal gluster-block command response")
 		}
 
@@ -388,6 +390,8 @@ func (p *glusterBlockProvisioner) createVolume(volSizeInt int, blockVol string, 
 			}
 			unmarshErr = json.Unmarshal([]byte(out), execBlockRes)
 			if unmarshErr != nil {
+
+				glog.Errorf("failed to unmarshal gluster-block command response, error: %v", unmarshErr)
 				return nil, fmt.Errorf(" failed to unmarshal auth response from gluster-block command output")
 			}
 			if *execBlockRes == nil {
