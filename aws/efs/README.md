@@ -181,11 +181,13 @@ provisioner: example.com/aws-efs
 parameters:
   gidMin: "40000"
   gidMax: "50000"
+  gidAllocate: "true"
 ```
 
 ### Parameters
 
-* `gidMin` + `gidMax` : The minimum and maximum value of GID range for the storage class. A unique value (GID) in this range ( gidMin-gidMax ) will be used for dynamically provisioned volumes. These are optional values. If not specified, the volume will be provisioned with a value between 2000-2147483647 which are defaults for gidMin and gidMax respectively.
+* `gidMin` + `gidMax` : A unique value (GID) in this range (`gidMin`-`gidMax`) will be allocated for each dynamically provisioned volume. Each volume will be secured to its allocated GID. Any pod that consumes the claim will be able to read/write the volume because the pod will automatically receive the volume's allocated GID as a supplemental group, but non-pod mounters outside the system will not have read/write access unless they have the GID or root privileges. See [here](https://kubernetes.io/docs/tasks/configure-pod-container/configure-persistent-volume-storage/#access-control) and [here](https://docs.openshift.com/container-platform/3.6/install_config/persistent_storage/pod_security_context.html#supplemental-groups) for more information. Default to `"2000"` and `"2147483647"`.
+* `gidAllocate` : Whether to allocate GIDs to volumes according to the above scheme at all. If `"false"`, dynamically provisioned volumes will not be allocated GIDs, `gidMin` and `gidMax` will be ignored, and anyone will be able to read/write volumes. Defaults to `"true"`.
 
 Once you have finished configuring the class to have the name you chose when deploying the provisioner and the parameters you want, create it.
 
@@ -203,7 +205,6 @@ $ kubectl get pv
 NAME                                       CAPACITY   ACCESSMODES   RECLAIMPOLICY   STATUS    CLAIM         REASON    AGE
 pvc-557b4436-ed73-11e6-84b3-06a700dda5f5   1Mi        RWX           Delete          Bound     default/efs             2s
 ```
-Note: any pod that consumes the claim will be able to read/write to the volume. This is because the volumes are provisioned with a GID (from the default range or according to `gidMin` + `gidMax`) and any pod that mounts the volume via the claim automatically gets the GID as a supplemental group.
 
 ---
 ##### Optional: AWS credentials secret
