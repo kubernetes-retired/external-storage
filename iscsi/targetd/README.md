@@ -318,7 +318,3 @@ ansible-playbook -i <your inventory file> ansible/targetd-playbook.yaml
 ansible-playbook -i <your inventory file> ansible/initiator-playbook.yaml
 ansible-playbook -i <your inventory file> ansible/provisioner-playbook.yaml
 ```
-
-## Support for multipath
-
-Multipath is enabled by installing multipathd and passing some additional configuration to the persistent volume
