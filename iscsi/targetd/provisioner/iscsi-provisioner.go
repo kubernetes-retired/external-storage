@@ -122,11 +122,12 @@ func (p *iscsiProvisioner) Provision(options controller.VolumeOptions) (*v1.Pers
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				ISCSI: &v1.ISCSIVolumeSource{
 					TargetPortal:   options.Parameters["targetPortal"],
+          Portals:        options.Parameters["portals"]
 					IQN:            options.Parameters["iqn"],
 					ISCSIInterface: options.Parameters["iscsiInterface"],
 					Lun:            lun,
-					ReadOnly:       false,
-					FSType:         "xfs",
+					ReadOnly:       options.Parameters["readonly"],
+					FSType:         options.Parameters["fsType"]==""?"xfs":options.Parameters["fsType"],
 				},
 			},
 		},
