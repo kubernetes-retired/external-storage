@@ -49,7 +49,7 @@ const (
 	creatorAnn         = "kubernetes.io/createdby"
 	volumeTypeAnn      = "gluster.org/type"
 	descAnn            = "Gluster-external: Dynamically provisioned PV"
-	provisionerVersion = "v0.9"
+	provisionerVersion = "v1.0.0"
 	chapType           = "kubernetes.io/iscsi-chap"
 	blockVolPrefix     = "blockvol_"
 	heketiOpmode       = "heketi"
