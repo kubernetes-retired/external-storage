@@ -55,20 +55,20 @@
          /usr/bin/oc adm --config=/etc/origin/master/admin.kubeconfig
          policy add-cluster-role-to-user cluster-reader system:serviceaccount:iscsi-provisioner:iscsi-provisioner
    
-     - name: Add pv-provisioner-controller role to service account
+     - name: Add system:persistent-volume-provisioner role to service account
        command: >
          /usr/bin/oc adm --config=/etc/origin/master/admin.kubeconfig
-         policy add-cluster-role-to-user system:pv-provisioner-controller system:serviceaccount:iscsi-provisioner:iscsi-provisioner
+         policy add-cluster-role-to-user system:persistent-volume-provisioner system:serviceaccount:iscsi-provisioner:iscsi-provisioner
    
-     - name: Add pv-binder-controller role to service account
+     - name: Add system:controller:persistent-volume-binder role to service account
        command: >
          /usr/bin/oc adm --config=/etc/origin/master/admin.kubeconfig
-         policy add-cluster-role-to-user system:pv-binder-controller system:serviceaccount:iscsi-provisioner:iscsi-provisioner
+         policy add-cluster-role-to-user system:controller:persistent-volume-binder system:serviceaccount:iscsi-provisioner:iscsi-provisioner
    
-     - name: Add pv-recycler-controller role to service account
+     - name: Add system:openshift:controller:pv-recycler-controller role to service account
        command: >
          /usr/bin/oc adm --config=/etc/origin/master/admin.kubeconfig
-         policy add-cluster-role-to-user system:pv-recycler-controller system:serviceaccount:iscsi-provisioner:iscsi-provisioner
+         policy add-cluster-role-to-user system:openshift:controller:pv-recycler-controller system:serviceaccount:iscsi-provisioner:iscsi-provisioner
    
      - name: create iscsi class template
        template: 

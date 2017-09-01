@@ -17,7 +17,7 @@ rules:
     verbs: ["watch", "create", "update", "patch"]
   - apiGroups: ["extensions"]
     resources: ["podsecuritypolicies"]
-    resourceNames: ["nfs-provisioner"]
+    resourceNames: ["iscsi-provisioner"]
     verbs: ["use"]
 ---
 kind: ClusterRoleBinding
