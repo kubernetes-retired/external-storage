@@ -11,8 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+all: aws/efs ceph/cephfs ceph/rbd flex gluster/block gluster/glusterfs iscsi/targetd local-volume/provisioner local-volume/bootstrapper nfs-client nfs snapshot
+.PHONY: all
 
-clean: clean-aws/efs clean-ceph/cephfs clean-ceph/rbd clean-flex clean-gluster/block clean-gluster/glusterfs clean-iscsi/targetd clean-local-volume/provisioner clean-local-volume/bootstrapper clean-nfs-client clean-nfs
+clean: clean-aws/efs clean-ceph/cephfs clean-ceph/rbd clean-flex clean-gluster/block clean-gluster/glusterfs clean-iscsi/targetd clean-local-volume/provisioner clean-local-volume/bootstrapper clean-nfs-client clean-nfs clean-snapshot
 .PHONY: clean
 
 test: test-aws/efs test-local-volume/provisioner test-nfs
@@ -157,6 +159,16 @@ clean-openebs:
 	cd openebs; \
 	make clean
 .PHONY: clean-openebs
+
+snapshot:
+	cd snapshot; \
+	make
+.PHONY: snapshot
+
+clean-snapshot:
+	cd snapshot; \
+	make clean
+.PHONY: clean-snapshot
 
 push-cephfs-provisioner:
 	cd ceph/cephfs; \
