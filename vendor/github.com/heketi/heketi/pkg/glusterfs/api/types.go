@@ -113,26 +113,16 @@ type Cluster struct {
 	Volumes []VolumeInfoResponse `json:"volumes"`
 	Nodes   []NodeInfoResponse   `json:"nodes"`
 	Id      string               `json:"id"`
-	Block   bool                 `json:"block"`
-	File    bool                 `json:"file"`
 }
 
 type TopologyInfoResponse struct {
 	ClusterList []Cluster `json:"clusters"`
 }
 
-type ClusterCreateRequest struct {
-	Block bool `json:"block"`
-	File  bool `json:"file"`
-}
-
 type ClusterInfoResponse struct {
-	Id           string           `json:"id"`
-	Nodes        sort.StringSlice `json:"nodes"`
-	Volumes      sort.StringSlice `json:"volumes"`
-	Block        bool             `json:"block"`
-	File         bool             `json:"file"`
-	BlockVolumes sort.StringSlice `json:"blockvolumes"`
+	Id      string           `json:"id"`
+	Nodes   sort.StringSlice `json:"nodes"`
+	Volumes sort.StringSlice `json:"volumes"`
 }
 
 type ClusterListResponse struct {
@@ -158,14 +148,12 @@ type VolumeDurabilityInfo struct {
 
 type VolumeCreateRequest struct {
 	// Size in GB
-	Size                 int                  `json:"size"`
-	Clusters             []string             `json:"clusters,omitempty"`
-	Name                 string               `json:"name"`
-	Durability           VolumeDurabilityInfo `json:"durability,omitempty"`
-	Gid                  int64                `json:"gid,omitempty"`
-	GlusterVolumeOptions []string             `json:"glustervolumeoptions,omitempty"`
-	Block                bool                 `json:"block,omitempty"`
-	Snapshot             struct {
+	Size       int                  `json:"size"`
+	Clusters   []string             `json:"clusters,omitempty"`
+	Name       string               `json:"name"`
+	Durability VolumeDurabilityInfo `json:"durability,omitempty"`
+	Gid        int64                `json:"gid,omitempty"`
+	Snapshot   struct {
 		Enable bool    `json:"enable"`
 		Factor float32 `json:"factor"`
 	} `json:"snapshot"`
@@ -182,10 +170,6 @@ type VolumeInfo struct {
 			Options    map[string]string `json:"options"`
 		} `json:"glusterfs"`
 	} `json:"mount"`
-	BlockInfo struct {
-		FreeSize     int              `json:"freesize,omitempty"`
-		BlockVolumes sort.StringSlice `json:"blockvolume,omitempty"`
-	} `json:"blockinfo,omitempty"`
 }
 
 type VolumeInfoResponse struct {
@@ -199,42 +183,6 @@ type VolumeListResponse struct {
 
 type VolumeExpandRequest struct {
 	Size int `json:"expand_size"`
-}
-
-// BlockVolume
-
-type BlockVolumeCreateRequest struct {
-	// Size in GB
-	Size     int      `json:"size"`
-	Clusters []string `json:"clusters,omitempty"`
-	Name     string   `json:"name"`
-	Hacount  int      `json:"hacount,omitempty"`
-	Auth     bool     `json:"auth,omitempty"`
-}
-
-type BlockVolumeInfo struct {
-	BlockVolumeCreateRequest
-	Id          string `json:"id"`
-	BlockVolume struct {
-		Hosts    []string `json:"hosts"`
-		Iqn      string   `json:"iqn"`
-		Lun      int      `json:"lun"`
-		Username string   `json:"username"`
-		Password string   `json:"password"`
-		/*
-			Options   map[string]string `json:"options"`  // needed?...
-		*/
-	} `json:"blockvolume"`
-	Cluster            string `json:"cluster,omitempty"`
-	BlockHostingVolume string `json:"blockhostingvolume,omitempty"`
-}
-
-type BlockVolumeInfoResponse struct {
-	BlockVolumeInfo
-}
-
-type BlockVolumeListResponse struct {
-	BlockVolumes []string `json:"blockvolumes"`
 }
 
 // Constructors
@@ -256,9 +204,6 @@ func (v *VolumeInfoResponse) String() string {
 		"Cluster Id: %v\n"+
 		"Mount: %v\n"+
 		"Mount Options: backup-volfile-servers=%v\n"+
-		"Block: %v\n"+
-		"Free Size: %v\n"+
-		"Block Volumes: %v\n"+
 		"Durability Type: %v\n",
 		v.Name,
 		v.Size,
@@ -266,9 +211,6 @@ func (v *VolumeInfoResponse) String() string {
 		v.Cluster,
 		v.Mount.GlusterFS.MountPoint,
 		v.Mount.GlusterFS.Options["backup-volfile-servers"],
-		v.Block,
-		v.BlockInfo.FreeSize,
-		v.BlockInfo.BlockVolumes,
 		v.Durability.Type)
 
 	switch v.Durability.Type {
@@ -286,58 +228,6 @@ func (v *VolumeInfoResponse) String() string {
 		s += fmt.Sprintf("Snapshot Factor: %.2f\n",
 			v.Snapshot.Factor)
 	}
-
-	/*
-		s += "\nBricks:\n"
-		for _, b := range v.Bricks {
-			s += fmt.Sprintf("Id: %v\n"+
-				"Path: %v\n"+
-				"Size (GiB): %v\n"+
-				"Node: %v\n"+
-				"Device: %v\n\n",
-				b.Id,
-				b.Path,
-				b.Size/(1024*1024),
-				b.NodeId,
-				b.DeviceId)
-		}
-	*/
-
-	return s
-}
-
-func NewBlockVolumeInfoResponse() *BlockVolumeInfoResponse {
-
-	info := &BlockVolumeInfoResponse{}
-	// Nothing to Construct now maybe for future
-
-	return info
-}
-
-// String functions
-func (v *BlockVolumeInfoResponse) String() string {
-	s := fmt.Sprintf("Name: %v\n"+
-		"Size: %v\n"+
-		"Volume Id: %v\n"+
-		"Cluster Id: %v\n"+
-		"Hosts: %v\n"+
-		"IQN: %v\n"+
-		"LUN: %v\n"+
-		"Hacount: %v\n"+
-		"Username: %v\n"+
-		"Password: %v\n"+
-		"Block Hosting Volume: %v\n",
-		v.Name,
-		v.Size,
-		v.Id,
-		v.Cluster,
-		v.BlockVolume.Hosts,
-		v.BlockVolume.Iqn,
-		v.BlockVolume.Lun,
-		v.Hacount,
-		v.BlockVolume.Username,
-		v.BlockVolume.Password,
-		v.BlockHostingVolume)
 
 	/*
 		s += "\nBricks:\n"
