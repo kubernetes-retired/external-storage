@@ -40,8 +40,8 @@ import (
 	"github.com/gophercloud/gophercloud/pagination"
 
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/cloudprovider"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api/v1/service"
 )
 
@@ -938,7 +938,8 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 		}
 
 		portID := loadbalancer.VipPortID
-		update_opts := neutronports.UpdateOpts{SecurityGroups: []string{lbSecGroup.ID}}
+		new_opts := []string{lbSecGroup.ID}
+		update_opts := neutronports.UpdateOpts{SecurityGroups: &new_opts}
 		res := neutronports.Update(lbaas.network, portID, update_opts)
 		if res.Err != nil {
 			glog.Errorf("Error occured updating port: %s", portID)
