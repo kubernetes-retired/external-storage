@@ -60,3 +60,6 @@ flycheck_*.el
 
 .idea/
 /.project
+
+# snapshot binaries
+/snapshot/_output
