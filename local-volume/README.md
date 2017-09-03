@@ -8,7 +8,12 @@ affinity information that the system uses to schedule pods to the correct
 nodes.
 
 An external static provisioner and a related bootstrapper are available to help
-simplify local storage management once the local volumes are configured.
+simplify local storage management once the local volumes are configured.  Note
+that the local storage provisioner is different from most provisioners and does
+not support dynamic provisioning.  Instead, it requires that administrators
+preconfigure the local volumes on each node and mount them under discovery
+directories.  The provisioner will manage the volumes under the discovery
+directories by creating and cleaning up PersistentVolumes for each volume.
 
 ## Feature Status
 
