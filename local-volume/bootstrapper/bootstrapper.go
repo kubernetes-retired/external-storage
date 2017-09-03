@@ -250,6 +250,22 @@ func createDaemonSet(client *kubernetes.Clientset, namespace string, config map[
 			MountPath: mount.MountDir,
 		})
 	}
+	// Appending configMap as a volume
+	volumes = append(volumes, v1.Volume{
+		Name: *volumeConfigName,
+		VolumeSource: v1.VolumeSource{
+			ConfigMap: &v1.ConfigMapVolumeSource{
+				LocalObjectReference: v1.LocalObjectReference{
+					Name: *volumeConfigName,
+				},
+			},
+		},
+	})
+	// Appending a mount point for ConfigMap Volume
+	volumeMounts = append(volumeMounts, v1.VolumeMount{
+		Name:      *volumeConfigName,
+		MountPath: common.ProvisionerConfigPath,
+	})
 
 	envVars := []v1.EnvVar{
 		{
@@ -267,10 +283,6 @@ func createDaemonSet(client *kubernetes.Clientset, namespace string, config map[
 					FieldPath: "metadata.namespace",
 				},
 			},
-		},
-		{
-			Name:  "VOLUME_CONFIG_NAME",
-			Value: *volumeConfigName,
 		},
 	}
 
