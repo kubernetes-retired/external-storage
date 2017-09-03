@@ -71,7 +71,7 @@ func getNode(client *kubernetes.Clientset, name string) *v1.Node {
 }
 
 func createDiscoveryMap(client *kubernetes.Clientset) map[string]common.MountConfig {
-	config, err := common.GetVolumeConfigFromConfigMap(client, os.Getenv("MY_NAMESPACE"), os.Getenv("VOLUME_CONFIG_NAME"))
+	config, err := common.GetVolumeConfigFromMountedConfigMap()
 	if err != nil {
 		glog.Infof("Could not get config map due to: %v, using default configmap", err)
 		config = common.GetDefaultVolumeConfig()
