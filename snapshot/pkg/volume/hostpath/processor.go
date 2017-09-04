@@ -21,8 +21,8 @@ import (
 	"os"
 	"os/exec"
 
-	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
 
 	crdv1 "github.com/kubernetes-incubator/external-storage/snapshot/pkg/apis/crd/v1"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/cloudprovider"

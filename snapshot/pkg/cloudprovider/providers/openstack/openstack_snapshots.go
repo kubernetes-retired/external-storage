@@ -73,16 +73,16 @@ func (snapshots *SnapshotsV2) createSnapshot(opts SnapshotCreateOpts) (string, e
 
 func (snapshots *SnapshotsV2) getSnapshot(snapshotID string) (Snapshot, error) {
 	var snap Snapshot
-        glog.Infof("getSnapshot for snapshotID: %s.", snapshotID)
-        snapshot, err := snapshotsV2.Get(snapshots.blockstorage, snapshotID).Extract()
-        if err != nil {
-                return snap, err
-        }
-        glog.Infof("Snapshot details: %#v", snapshot)
-        snap.ID = snapshot.ID
-        snap.Name = snapshot. Name
-        snap.Status = snapshot.Status
-        snap.SourceVolumeID = snapshot.VolumeID
+	glog.Infof("getSnapshot for snapshotID: %s.", snapshotID)
+	snapshot, err := snapshotsV2.Get(snapshots.blockstorage, snapshotID).Extract()
+	if err != nil {
+		return snap, err
+	}
+	glog.Infof("Snapshot details: %#v", snapshot)
+	snap.ID = snapshot.ID
+	snap.Name = snapshot.Name
+	snap.Status = snapshot.Status
+	snap.SourceVolumeID = snapshot.VolumeID
 
 	return snap, nil
 }

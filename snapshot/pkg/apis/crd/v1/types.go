@@ -235,9 +235,9 @@ func GetSupportedVolumeFromPVSpec(spec *core_v1.PersistentVolumeSpec) string {
 	if spec.GCEPersistentDisk != nil {
 		return "gce-pd"
 	}
-        if spec.Cinder != nil {
-                return "cinder"
-        }
+	if spec.Cinder != nil {
+		return "cinder"
+	}
 	return ""
 }
 

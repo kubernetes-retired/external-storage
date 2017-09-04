@@ -37,10 +37,10 @@ import (
 	"gopkg.in/gcfg.v1"
 
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/cloudprovider"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	certutil "k8s.io/client-go/util/cert"
-	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -179,13 +179,13 @@ func (c *Caller) Call(f func()) {
 }
 
 func init() {
-        cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) {
-                cfg, err := readConfig(config)
-                if err != nil {
-                        return nil, err
-                }
-                return newOpenStack(cfg)
-        })
+	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) {
+		cfg, err := readConfig(config)
+		if err != nil {
+			return nil, err
+		}
+		return newOpenStack(cfg)
+	})
 }
 
 func newOpenStack(cfg Config) (*OpenStack, error) {
