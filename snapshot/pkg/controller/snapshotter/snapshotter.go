@@ -22,11 +22,11 @@ import (
 
 	"github.com/golang/glog"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/kubernetes"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
@@ -102,7 +102,7 @@ func (vs *volumeSnapshotter) getPVFromVolumeSnapshot(snapshotName string, snapsh
 		return nil, fmt.Errorf("Failed to retrieve PVC %s from the API server: %q", pvcName, err)
 	}
 	if pvc.Status.Phase != v1.ClaimBound {
-		return nil, fmt.Errorf("The PVC %s not yet bound to a PV, will not attempt to take a snapshot yet.")
+		return nil, fmt.Errorf("The PVC %s not yet bound to a PV, will not attempt to take a snapshot yet.", pvcName)
 	}
 
 	pvName := pvc.Spec.VolumeName

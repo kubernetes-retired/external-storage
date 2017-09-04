@@ -34,11 +34,11 @@ import (
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume/cinder"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume/gce_pd"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume/hostpath"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/api/core/v1"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -134,7 +134,7 @@ func (p *snapshotProvisioner) Provision(options controller.VolumeOptions) (*v1.P
 	}
 	// FIXME: should also check if any VolumeSnapshotData points to this VolumeSnapshot
 	if len(snapshot.Spec.SnapshotDataName) == 0 {
-		return nil, fmt.Errorf("VolumeSnapshot %s is not bound to any VolumeSnapshotData", snapshotName, err)
+		return nil, fmt.Errorf("VolumeSnapshot %s is not bound to any VolumeSnapshotData", snapshotName)
 	}
 	var snapshotData crdv1.VolumeSnapshotData
 	err = p.crdclient.Get().
@@ -191,7 +191,7 @@ func (p *snapshotProvisioner) Delete(volume *v1.PersistentVolume) error {
 		return errors.New("identity annotation not found on PV")
 	}
 	if ann != p.identity {
-		return &controller.IgnoredError{"identity annotation on PV does not match ours"}
+		return &controller.IgnoredError{Reason: "identity annotation on PV does not match ours"}
 	}
 
 	volumeType := crdv1.GetSupportedVolumeFromPVSpec(&volume.Spec)
