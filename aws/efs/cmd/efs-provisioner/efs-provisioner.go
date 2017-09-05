@@ -125,7 +125,6 @@ func (p *efsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 	}
 
 	gidAllocate := true
-	var err error
 	for k, v := range options.Parameters {
 		switch strings.ToLower(k) {
 		case "gidmin":
@@ -133,10 +132,11 @@ func (p *efsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 		case "gidmax":
 		// Let allocator handle
 		case "gidallocate":
-			gidAllocate, err = strconv.ParseBool(v)
+			b, err := strconv.ParseBool(v)
 			if err != nil {
 				return nil, fmt.Errorf("invalid value %s for parameter %s: %v", v, k, err)
 			}
+			gidAllocate = b
 		}
 	}
 
@@ -149,7 +149,7 @@ func (p *efsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 		gid = &allocate
 	}
 
-	err = p.createVolume(p.getLocalPath(options), gid)
+	err := p.createVolume(p.getLocalPath(options), gid)
 	if err != nil {
 		return nil, err
 	}
