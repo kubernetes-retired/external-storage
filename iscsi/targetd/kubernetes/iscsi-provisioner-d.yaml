@@ -14,11 +14,7 @@ rules:
     verbs: ["get", "list", "watch"]
   - apiGroups: [""]
     resources: ["events"]
-    verbs: ["watch", "create", "update", "patch"]
-  - apiGroups: ["extensions"]
-    resources: ["podsecuritypolicies"]
-    resourceNames: ["nfs-provisioner"]
-    verbs: ["use"]
+    verbs: ["list", "watch", "create", "update", "patch"]
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1alpha1
@@ -57,7 +53,7 @@ spec:
             - "start"
           env:
             - name: PROVISIONER_NAME
-              value: iscsi   
+              value: iscsi
             - name: LOG_LEVEL
               value: debug
             - name: TARGETD_USERNAME
@@ -69,7 +65,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: targetd-account
-                  key: password                    
+                  key: password
             - name: TARGETD_ADDRESS
-              value: 192.168.99.100                                                                   
-      serviceAccount: iscsi-provisioner   
+              value: 192.168.99.100
+      serviceAccount: iscsi-provisioner

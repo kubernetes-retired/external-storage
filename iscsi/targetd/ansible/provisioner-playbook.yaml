@@ -50,26 +50,23 @@
          --password={{ targetd_password }} -n iscsi-provisioner
        when: secret_test.rc == 1
    
-     - name: Add cluster-reader role to service account
+     - name: Add system:persistent-volume-provisioner role to service account
        command: >
          /usr/bin/oc adm --config=/etc/origin/master/admin.kubeconfig
-         policy add-cluster-role-to-user cluster-reader system:serviceaccount:iscsi-provisioner:iscsi-provisioner
-   
-     - name: Add pv-provisioner-controller role to service account
-       command: >
-         /usr/bin/oc adm --config=/etc/origin/master/admin.kubeconfig
-         policy add-cluster-role-to-user system:pv-provisioner-controller system:serviceaccount:iscsi-provisioner:iscsi-provisioner
-   
-     - name: Add pv-binder-controller role to service account
-       command: >
-         /usr/bin/oc adm --config=/etc/origin/master/admin.kubeconfig
-         policy add-cluster-role-to-user system:pv-binder-controller system:serviceaccount:iscsi-provisioner:iscsi-provisioner
-   
-     - name: Add pv-recycler-controller role to service account
-       command: >
-         /usr/bin/oc adm --config=/etc/origin/master/admin.kubeconfig
-         policy add-cluster-role-to-user system:pv-recycler-controller system:serviceaccount:iscsi-provisioner:iscsi-provisioner
-   
+         policy add-cluster-role-to-user system:persistent-volume-provisioner system:serviceaccount:iscsi-provisioner:iscsi-provisioner
+       failed_when: false
+       changed_when: system_role.rc == 0
+       register: system_role
+
+     - name: Create iscsi-provisioner-runner role and add to service account if system:persistent-volume-provisioner DNE
+       shell: >
+           /usr/bin/oc --config=/etc/origin/master/admin.kubeconfig
+           create -f ./iscsi-auth.yaml
+       failed_when: "'already exists' not in iscsi_role.stderr and iscsi_role.rc != 0"
+       changed_when: "'already exists' not in iscsi_role.stderr"
+       register: iscsi_role
+       when: system_role.rc == 1
+
      - name: create iscsi class template
        template: 
          src: ./iscsi-provisioner-class.yaml.j2
