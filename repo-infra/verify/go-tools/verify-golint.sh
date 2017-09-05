@@ -17,15 +17,29 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-gometalinter --deadline=50s --vendor \
-    --cyclo-over=50 --dupl-threshold=100 \
-    --disable-all \
-    --enable=vet \
-    --enable=deadcode \
-    --enable=vetshadow \
-    --enable=gocyclo \
-    --skip=.git \
-    --skip=.tool \
-    --skip=vendor \
-    --tests \
-    ./...
+cmd='gometalinter --deadline=50s --vendor
+  --cyclo-over=50 --dupl-threshold=100
+  --exclude=".*should not use dot imports \(golint\)$"
+  --disable-all
+  --enable=golint
+  --skip=.git
+  --skip=.tool
+  --skip=vendor
+  --tests '
+
+skip_file=".golintignore"
+
+if [ -f "$skip_file" ]; then
+  skip_packages=(
+    $(cat $skip_file)
+  )
+  if [ ${#skip_packages[@]} -ne 0 ]; then
+    for p in "${skip_packages[@]}"; do
+      cmd+="--skip=$p "
+    done
+  fi
+fi
+
+cmd+="./..."
+
+eval $cmd
