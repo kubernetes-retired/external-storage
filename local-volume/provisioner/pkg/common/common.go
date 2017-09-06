@@ -19,7 +19,10 @@ package common
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"path"
 
+	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/cache"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/util"
 
@@ -49,6 +52,8 @@ const (
 
 	// EventVolumeFailedDelete copied from k8s.io/kubernetes/pkg/controller/volume/events
 	EventVolumeFailedDelete = "VolumeFailedDelete"
+	// ProvisionerConfigPath points to the path inside of the provisioner container where configMap volume is mounted
+	ProvisionerConfigPath = "/etc/provisioner/config/"
 )
 
 // UserConfig stores all the user-defined parameters to the provisioner
@@ -120,6 +125,26 @@ func CreateLocalPVSpec(config *LocalPVConfig) *v1.PersistentVolume {
 			StorageClassName: config.StorageClass,
 		},
 	}
+}
+
+// GetVolumeConfigFromMountedConfigMap gets volume configuration from the mounted configmap volume,
+func GetVolumeConfigFromMountedConfigMap() (map[string]MountConfig, error) {
+	storageClassMapping := make(map[string]string)
+	files, err := ioutil.ReadDir(ProvisionerConfigPath)
+	if err != nil {
+		return nil, err
+	}
+	for _, file := range files {
+		if !file.IsDir() {
+			fileContents, err := ioutil.ReadFile(path.Join(ProvisionerConfigPath, file.Name()))
+			if err != nil {
+				glog.Infof("Could not read file: %s due to: %v", path.Join(ProvisionerConfigPath, file.Name()), err)
+				continue
+			}
+			storageClassMapping[file.Name()] = string(fileContents)
+		}
+	}
+	return ConfigMapDataToVolumeConfig(storageClassMapping)
 }
 
 // GetVolumeConfigFromConfigMap gets volume configuration from given configmap,
