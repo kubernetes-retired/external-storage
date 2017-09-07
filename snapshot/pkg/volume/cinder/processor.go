@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/golang/glog"
 
@@ -68,26 +69,25 @@ func (c *cinderPlugin) VolumeDelete(pv *v1.PersistentVolume) error {
 }
 
 // SnapshotCreate creates a VolumeSnapshot from a PersistentVolumeSpec
-func (c *cinderPlugin) SnapshotCreate(pv *v1.PersistentVolume) (*crdv1.VolumeSnapshotDataSource, error) {
+func (c *cinderPlugin) SnapshotCreate(pv *v1.PersistentVolume, tags *map[string]string) (*crdv1.VolumeSnapshotDataSource, *[]crdv1.VolumeSnapshotCondition, error) {
 	spec := &pv.Spec
 	if spec == nil || spec.Cinder == nil {
-		return nil, fmt.Errorf("invalid PV spec %v", spec)
+		return nil, nil, fmt.Errorf("invalid PV spec %v", spec)
 	}
 	volumeID := spec.Cinder.VolumeID
 	snapshotName := string(pv.Name) + fmt.Sprintf("%d", time.Now().UnixNano())
 	snapshotDescription := "kubernetes snapshot"
-	tags := make(map[string]string)
-	glog.Infof("issuing Cinder.CreateSnapshot - SourceVol: %s, Name: %s", volumeID, snapshotName)
-	snapID, err := c.cloud.CreateSnapshot(volumeID, snapshotName, snapshotDescription, tags)
+	glog.Infof("issuing Cinder.CreateSnapshot - SourceVol: %s, Name: %s, tags: %#v", volumeID, snapshotName, *tags)
+	snapID, status, err := c.cloud.CreateSnapshot(volumeID, snapshotName, snapshotDescription, *tags)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	return &crdv1.VolumeSnapshotDataSource{
 		CinderSnapshot: &crdv1.CinderVolumeSnapshotSource{
 			SnapshotID: snapID,
 		},
-	}, nil
+	}, c.convertSnapshotStatus(status), nil
 }
 
 // SnapshotDelete deletes a VolumeSnapshot
@@ -151,14 +151,71 @@ func (c *cinderPlugin) SnapshotRestore(snapshotData *crdv1.VolumeSnapshotData, p
 }
 
 // DescribeSnapshot retrieves info for the specified Snapshot
-func (c *cinderPlugin) DescribeSnapshot(snapshotData *crdv1.VolumeSnapshotData) (bool, error) {
+func (c *cinderPlugin) DescribeSnapshot(snapshotData *crdv1.VolumeSnapshotData) (*[]crdv1.VolumeSnapshotCondition, bool, error) {
 	if snapshotData == nil || snapshotData.Spec.CinderSnapshot == nil {
-		return false, fmt.Errorf("invalid VolumeSnapshotDataSource: %v", snapshotData)
+		return nil, false, fmt.Errorf("invalid VolumeSnapshotDataSource: %v", snapshotData)
 	}
 	snapshotID := snapshotData.Spec.CinderSnapshot.SnapshotID
-	isComplete, err := c.cloud.DescribeSnapshot(snapshotID)
+	status, isComplete, err := c.cloud.DescribeSnapshot(snapshotID)
+	glog.Infof("DescribeSnapshot: Snapshot %s, Status %s, isComplete: %v", snapshotID, status, isComplete)
 	if err != nil {
-		return false, err
+		return c.convertSnapshotStatus(status), false, err
 	}
-	return isComplete, nil
+	return c.convertSnapshotStatus(status), isComplete, nil
+}
+
+// convertSnapshotStatus converts Cinder snapshot status to crdv1.VolumeSnapshotCondition
+func (c *cinderPlugin) convertSnapshotStatus(status string) *[]crdv1.VolumeSnapshotCondition {
+	var snapConditions []crdv1.VolumeSnapshotCondition
+	if status == "available" {
+		snapConditions = []crdv1.VolumeSnapshotCondition{
+			{
+				Type:               crdv1.VolumeSnapshotConditionReady,
+				Status:             v1.ConditionTrue,
+				Message:            "Snapshot created succsessfully and it is ready",
+				LastTransitionTime: metav1.Now(),
+			},
+		}
+	} else if status == "creating" {
+		snapConditions = []crdv1.VolumeSnapshotCondition{
+			{
+				Type:               crdv1.VolumeSnapshotConditionPending,
+				Status:             v1.ConditionUnknown,
+				Message:            "Snapshot is being created",
+				LastTransitionTime: metav1.Now(),
+			},
+		}
+	} else {
+		snapConditions = []crdv1.VolumeSnapshotCondition{
+			{
+				Type:               crdv1.VolumeSnapshotConditionError,
+				Status:             v1.ConditionTrue,
+				Message:            "Snapshot creation failed",
+				LastTransitionTime: metav1.Now(),
+			},
+		}
+	}
+
+	return &snapConditions
+}
+
+// FindSnapshot finds a VolumeSnapshot by matching metadata
+func (c *cinderPlugin) FindSnapshot(tags *map[string]string) (*crdv1.VolumeSnapshotDataSource, *[]crdv1.VolumeSnapshotCondition, error) {
+	glog.Infof("Cinder.FindSnapshot by tags: %#v", *tags)
+	snapIDs, statuses, err := c.cloud.FindSnapshot(*tags)
+	if err != nil {
+		glog.Infof("Cinder.FindSnapshot by tags: %#v. Error: %v", *tags, err)
+		//return nil, err
+	}
+
+	if len(snapIDs) > 0 && len(statuses) > 0 {
+		glog.Infof("Found snapshot %s by tags: %#v", snapIDs[0], *tags)
+		return &crdv1.VolumeSnapshotDataSource{
+			CinderSnapshot: &crdv1.CinderVolumeSnapshotSource{
+				SnapshotID: snapIDs[0],
+			},
+		}, c.convertSnapshotStatus(statuses[0]), nil
+	}
+
+	return nil, nil, nil
 }

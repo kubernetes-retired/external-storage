@@ -152,7 +152,10 @@ type Disks interface {
 
 	// Describe a GCE PD volume snapshot status for create or delete.
 	// return status (completed or pending or error), and error
-	DescribeSnapshot(snapshotToGet string) (isCompleted bool, err error)
+	DescribeSnapshot(snapshotToGet string) (status string, isCompleted bool, err error)
+
+	// Find snapshot by tags
+	FindSnapshot(tags map[string]string) ([]string, []string, error)
 
 	// GetAutoLabelsForPD returns labels to apply to PersistentVolume
 	// representing this PD, namely failure domain and zone.
@@ -2843,19 +2846,25 @@ func (gce *GCECloud) CreateDiskFromSnapshot(snapshot string,
 	return err
 }
 
-func (gce *GCECloud) DescribeSnapshot(snapshotToGet string) (isCompleted bool, err error) {
+func (gce *GCECloud) DescribeSnapshot(snapshotToGet string) (status string, isCompleted bool, err error) {
 	snapshot, err := gce.getSnapshotByName(snapshotToGet)
 	if err != nil {
-		return false, err
+		return "", false, err
 	}
 	//no snapshot is found
 	if snapshot == nil {
-		return false, fmt.Errorf("snapshot %s is found", snapshotToGet)
+		return "", false, fmt.Errorf("snapshot %s is found", snapshotToGet)
 	}
 	if snapshot.Status == "READY" {
-		return true, nil
+		return snapshot.Status, true, nil
 	}
-	return false, nil
+	return snapshot.Status, false, nil
+}
+
+// FindSnapshot returns the found snapshots
+func (gce *GCECloud) FindSnapshot(tags map[string]string) ([]string, []string, error) {
+	var snapshotIDs, statuses []string
+	return snapshotIDs, statuses, nil
 }
 
 func (gce *GCECloud) DeleteSnapshot(snapshotToDelete string) error {
@@ -2892,6 +2901,7 @@ func (gce *GCECloud) getSnapshotByName(snapshotName string) (*gceSnapshot, error
 	return nil, nil
 }
 
+// TODO: CreateSnapshot should return snapshot status
 func (gce *GCECloud) CreateSnapshot(diskName string, zone string, snapshotName string, tags map[string]string) error {
 	isManaged := false
 	for _, managedZone := range gce.managedZones {

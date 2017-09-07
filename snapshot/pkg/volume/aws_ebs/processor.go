@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kvol "k8s.io/kubernetes/pkg/volume"
 
 	"github.com/golang/glog"
@@ -50,10 +51,10 @@ func (a *awsEBSPlugin) Init(cloud cloudprovider.Interface) {
 	a.cloud = cloud.(*aws.Cloud)
 }
 
-func (a *awsEBSPlugin) SnapshotCreate(pv *v1.PersistentVolume) (*crdv1.VolumeSnapshotDataSource, error) {
+func (a *awsEBSPlugin) SnapshotCreate(pv *v1.PersistentVolume, tags *map[string]string) (*crdv1.VolumeSnapshotDataSource, *[]crdv1.VolumeSnapshotCondition, error) {
 	spec := &pv.Spec
 	if spec == nil || spec.AWSElasticBlockStore == nil {
-		return nil, fmt.Errorf("invalid PV spec %v", spec)
+		return nil, nil, fmt.Errorf("invalid PV spec %v", spec)
 	}
 	volumeId := spec.AWSElasticBlockStore.VolumeID
 	if ind := strings.LastIndex(volumeId, "/"); ind >= 0 {
@@ -61,16 +62,18 @@ func (a *awsEBSPlugin) SnapshotCreate(pv *v1.PersistentVolume) (*crdv1.VolumeSna
 	}
 	snapshotOpt := &aws.SnapshotOptions{
 		VolumeId: volumeId,
+		Tags:     tags,
 	}
-	snapshotId, err := a.cloud.CreateSnapshot(snapshotOpt)
+	// TODO: Convert AWS EBS snapshot status to crdv1.VolumeSnapshotCondition
+	snapshotId, status, err := a.cloud.CreateSnapshot(snapshotOpt)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	return &crdv1.VolumeSnapshotDataSource{
 		AWSElasticBlockStore: &crdv1.AWSElasticBlockStoreVolumeSnapshotSource{
 			SnapshotID: snapshotId,
 		},
-	}, nil
+	}, convertAWSStatus(status), nil
 }
 
 func (a *awsEBSPlugin) SnapshotDelete(src *crdv1.VolumeSnapshotDataSource, _ *v1.PersistentVolume) error {
@@ -79,6 +82,7 @@ func (a *awsEBSPlugin) SnapshotDelete(src *crdv1.VolumeSnapshotDataSource, _ *v1
 	}
 	snapshotId := src.AWSElasticBlockStore.SnapshotID
 	_, err := a.cloud.DeleteSnapshot(snapshotId)
+	glog.Infof("delete snapshot %s, err: %v", snapshotId, err)
 	if err != nil {
 		return err
 	}
@@ -86,12 +90,25 @@ func (a *awsEBSPlugin) SnapshotDelete(src *crdv1.VolumeSnapshotDataSource, _ *v1
 	return nil
 }
 
-func (a *awsEBSPlugin) DescribeSnapshot(snapshotData *crdv1.VolumeSnapshotData) (isCompleted bool, err error) {
+func (a *awsEBSPlugin) DescribeSnapshot(snapshotData *crdv1.VolumeSnapshotData) (snapConditions *[]crdv1.VolumeSnapshotCondition, isCompleted bool, err error) {
 	if snapshotData == nil || snapshotData.Spec.AWSElasticBlockStore == nil {
-		return false, fmt.Errorf("invalid VolumeSnapshotDataSource: %v", snapshotData)
+		return nil, false, fmt.Errorf("invalid VolumeSnapshotDataSource: %v", snapshotData)
 	}
 	snapshotId := snapshotData.Spec.AWSElasticBlockStore.SnapshotID
-	return a.cloud.DescribeSnapshot(snapshotId)
+	status, isCompleted, err := a.cloud.DescribeSnapshot(snapshotId)
+	return convertAWSStatus(status), isCompleted, err
+}
+
+// FindSnapshot finds a VolumeSnapshot by matching metadata
+func (a *awsEBSPlugin) FindSnapshot(tags *map[string]string) (*crdv1.VolumeSnapshotDataSource, *[]crdv1.VolumeSnapshotCondition, error) {
+	glog.Infof("FindSnapshot by tags: %#v", *tags)
+
+	// TODO: Implement FindSnapshot
+	return &crdv1.VolumeSnapshotDataSource{
+		AWSElasticBlockStore: &crdv1.AWSElasticBlockStoreVolumeSnapshotSource{
+			SnapshotID: "",
+		},
+	}, nil, nil
 }
 
 func (a *awsEBSPlugin) SnapshotRestore(snapshotData *crdv1.VolumeSnapshotData, pvc *v1.PersistentVolumeClaim, pvName string, parameters map[string]string) (*v1.PersistentVolumeSource, map[string]string, error) {
@@ -186,4 +203,38 @@ func (a *awsEBSPlugin) VolumeDelete(pv *v1.PersistentVolume) error {
 	}
 
 	return nil
+}
+
+func convertAWSStatus(status string) *[]crdv1.VolumeSnapshotCondition {
+	var snapConditions []crdv1.VolumeSnapshotCondition
+	if strings.ToLower(status) == "completed" {
+		snapConditions = []crdv1.VolumeSnapshotCondition{
+			{
+				Type:               crdv1.VolumeSnapshotConditionReady,
+				Status:             v1.ConditionTrue,
+				Message:            "Snapshot created succsessfully and it is ready",
+				LastTransitionTime: metav1.Now(),
+			},
+		}
+	} else if strings.ToLower(status) == "pending" {
+		snapConditions = []crdv1.VolumeSnapshotCondition{
+			{
+				Type:               crdv1.VolumeSnapshotConditionPending,
+				Status:             v1.ConditionUnknown,
+				Message:            "Snapshot is being created",
+				LastTransitionTime: metav1.Now(),
+			},
+		}
+	} else {
+		snapConditions = []crdv1.VolumeSnapshotCondition{
+			{
+				Type:               crdv1.VolumeSnapshotConditionError,
+				Status:             v1.ConditionTrue,
+				Message:            "Snapshot creation failed",
+				LastTransitionTime: metav1.Now(),
+			},
+		}
+	}
+
+	return &snapConditions
 }
