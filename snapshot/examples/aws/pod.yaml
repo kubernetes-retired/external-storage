@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  namespace: myns
+  name: nfs-server
+spec:
+      containers:
+      - name: nfs-server
+        image: nginx 
+        volumeMounts:
+          - mountPath: /exports
+            name: mypvc
+      volumes:
+        - name: mypvc
+          persistentVolumeClaim:
+            claimName: snapshot-pv-provisioning-demo
+

@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gce-pvc
+  namespace: myns
+spec:
+  accessModes: [ "ReadWriteOnce" ]
+  storageClassName: standard-class
+  resources:
+    requests:
+      storage: 3Gi

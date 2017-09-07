@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ebs-pvc
+  namespace: myns
+spec:
+  accessModes: [ "ReadWriteOnce" ]
+  storageClassName: slow
+  resources:
+    requests:
+      storage: 4Gi
