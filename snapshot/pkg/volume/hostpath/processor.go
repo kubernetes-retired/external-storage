@@ -21,7 +21,9 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 
 	crdv1 "github.com/kubernetes-incubator/external-storage/snapshot/pkg/apis/crd/v1"
@@ -50,20 +52,41 @@ func GetPluginName() string {
 func (h *hostPathPlugin) Init(_ cloudprovider.Interface) {
 }
 
-func (h *hostPathPlugin) SnapshotCreate(pv *v1.PersistentVolume) (*crdv1.VolumeSnapshotDataSource, error) {
+func (h *hostPathPlugin) SnapshotCreate(pv *v1.PersistentVolume, tags *map[string]string) (*crdv1.VolumeSnapshotDataSource, *[]crdv1.VolumeSnapshotCondition, error) {
 	spec := &pv.Spec
 	if spec == nil || spec.HostPath == nil {
-		return nil, fmt.Errorf("invalid PV spec %v", spec)
+		return nil, nil, fmt.Errorf("invalid PV spec %v", spec)
 	}
 	path := spec.HostPath.Path
 	file := depot + string(uuid.NewUUID()) + ".tgz"
 	cmd := exec.Command("tar", "czf", file, path)
+	runErr := cmd.Run()
+	cond := []crdv1.VolumeSnapshotCondition{}
+	if runErr == nil {
+		cond = []crdv1.VolumeSnapshotCondition{
+			{
+				Status:             v1.ConditionTrue,
+				Message:            "Snapshot created successfully",
+				LastTransitionTime: metav1.Now(),
+				Type:               crdv1.VolumeSnapshotConditionReady,
+			},
+		}
+	} else {
+		cond = []crdv1.VolumeSnapshotCondition{
+			{
+				Status:             v1.ConditionTrue,
+				Message:            fmt.Sprintf("Failed to create the snapshot: %v", runErr),
+				LastTransitionTime: metav1.Now(),
+				Type:               crdv1.VolumeSnapshotConditionError,
+			},
+		}
+	}
 	res := &crdv1.VolumeSnapshotDataSource{
 		HostPath: &crdv1.HostPathVolumeSnapshotSource{
 			Path: file,
 		},
 	}
-	return res, cmd.Run()
+	return res, &cond, runErr
 }
 
 func (h *hostPathPlugin) SnapshotDelete(src *crdv1.VolumeSnapshotDataSource, _ *v1.PersistentVolume) error {
@@ -74,15 +97,27 @@ func (h *hostPathPlugin) SnapshotDelete(src *crdv1.VolumeSnapshotDataSource, _ *
 	return os.Remove(path)
 }
 
-func (a *hostPathPlugin) DescribeSnapshot(snapshotData *crdv1.VolumeSnapshotData) (isCompleted bool, err error) {
+func (a *hostPathPlugin) DescribeSnapshot(snapshotData *crdv1.VolumeSnapshotData) (snapConditions *[]crdv1.VolumeSnapshotCondition, isCompleted bool, err error) {
 	if snapshotData == nil || snapshotData.Spec.HostPath == nil {
-		return false, fmt.Errorf("failed to retrieve Snapshot spec")
+		return nil, false, fmt.Errorf("failed to retrieve Snapshot spec")
 	}
 	path := snapshotData.Spec.HostPath.Path
 	if _, err := os.Stat(path); err != nil {
-		return false, err
+		return nil, false, err
 	}
-	return true, nil
+	return nil, true, nil
+}
+
+// FindSnapshot finds a VolumeSnapshot by matching metadata
+func (a *hostPathPlugin) FindSnapshot(tags *map[string]string) (*crdv1.VolumeSnapshotDataSource, *[]crdv1.VolumeSnapshotCondition, error) {
+	glog.Infof("FindSnapshot by tags: %#v", *tags)
+
+	// TODO: Implement FindSnapshot
+	return &crdv1.VolumeSnapshotDataSource{
+		HostPath: &crdv1.HostPathVolumeSnapshotSource{
+			Path: "",
+		},
+	}, nil, nil
 }
 
 func (h *hostPathPlugin) SnapshotRestore(snapshotData *crdv1.VolumeSnapshotData, _ *v1.PersistentVolumeClaim, _ string, _ map[string]string) (*v1.PersistentVolumeSource, map[string]string, error) {

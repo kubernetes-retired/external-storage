@@ -28,15 +28,15 @@ A Volume plugin must provide `RegisterPlugin()` to return plugin struct, `GetPlu
 import (
 	"k8s.io/client-go/pkg/api/v1"
 
-	crdv1 "github.com/rootfs/snapshot/pkg/apis/crd/v1"
-	"github.com/rootfs/snapshot/pkg/cloudprovider"
+	crdv1 "github.com/kubernetes-incubator/external-storage/snapshot/pkg/apis/crd/v1"
+	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/cloudprovider"
 )
 
 type VolumePlugin interface {
 	// Init inits volume plugin
 	Init(cloudprovider.Interface)
 	// SnapshotCreate creates a VolumeSnapshot from a PersistentVolumeSpec
-	SnapshotCreate(*v1.PersistentVolume) (*crdv1.VolumeSnapshotDataSource, error)
+	SnapshotCreate(*v1.PersistentVolume, *map[string]string) (*crdv1.VolumeSnapshotDataSource, *[]crdv1.VolumeSnapshotCondition, error)
 	// SnapshotDelete deletes a VolumeSnapshot
 	// PersistentVolume is provided for volume types, if any, that need PV Spec to delete snapshot
 	SnapshotDelete(*crdv1.VolumeSnapshotDataSource, *v1.PersistentVolume) error
@@ -44,7 +44,9 @@ type VolumePlugin interface {
 	SnapshotRestore(*crdv1.VolumeSnapshotData, *v1.PersistentVolumeClaim, string, map[string]string) (*v1.PersistentVolumeSource, map[string]string, error)
 	// Describe volume snapshot status.
 	// return true if the snapshot is ready
-	DescribeSnapshot(snapshotData *crdv1.VolumeSnapshotData) (isCompleted bool, err error)
+	DescribeSnapshot(snapshotData *crdv1.VolumeSnapshotData) (snapConditions *[]crdv1.VolumeSnapshotCondition, isCompleted bool, err error)
+	// FindSnapshot finds a VolumeSnapshot by matching metadata
+	FindSnapshot(tags *map[string]string) (*crdv1.VolumeSnapshotDataSource, *[]crdv1.VolumeSnapshotCondition, error)
 	// VolumeDelete deletes a PV
 	// TODO in the future pass kubernetes client for certain volumes (e.g. rbd) so they can access storage class to retrieve secret
 	VolumeDelete(pv *v1.PersistentVolume) error
