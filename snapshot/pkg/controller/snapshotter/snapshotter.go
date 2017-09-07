@@ -268,12 +268,9 @@ func (vs *volumeSnapshotter) updateSnapshotDataStatus(snapshotName string, snaps
 
 	if len(snapshotDataObj.Status.Conditions) < 1 ||
 		snapshotDataObj.Status.Conditions[0].Type != crdv1.VolumeSnapshotDataConditionReady {
-		pv, err := vs.getPVFromVolumeSnapshot(snapshotName, snapshot)
-		if err != nil {
-			return err
-		}
-		spec := &pv.Spec
-		volumeType := crdv1.GetSupportedVolumeFromPVSpec(spec)
+
+		spec := &snapshotDataObj.Spec
+		volumeType := crdv1.GetSupportedVolumeFromSnapshotDataSpec(spec)
 		if len(volumeType) == 0 {
 			return fmt.Errorf("unsupported volume type found in PV %#v", spec)
 		}
@@ -331,16 +328,17 @@ func (vs *volumeSnapshotter) takeSnapshot(pv *v1.PersistentVolume, tags *map[str
 
 // This is the function responsible for determining the correct volume plugin to use,
 // asking it to make a snapshot and assigning it some name that it returns to the caller.
-func (vs *volumeSnapshotter) deleteSnapshot(spec *v1.PersistentVolumeSpec, source *crdv1.VolumeSnapshotDataSource) error {
-	volumeType := crdv1.GetSupportedVolumeFromPVSpec(spec)
+func (vs *volumeSnapshotter) deleteSnapshot(spec *crdv1.VolumeSnapshotDataSpec) error {
+	volumeType := crdv1.GetSupportedVolumeFromSnapshotDataSpec(spec)
 	if len(volumeType) == 0 {
-		return fmt.Errorf("unsupported volume type found in PV %#v", spec)
+		return fmt.Errorf("unsupported volume type found in VolumeSnapshotData %#v", spec)
 	}
 	plugin, ok := (*vs.volumePlugins)[volumeType]
 	if !ok {
 		return fmt.Errorf("%s is not supported volume for %#v", volumeType, spec)
 	}
-	err := plugin.SnapshotDelete(source, nil /* *v1.PersistentVolume */)
+	source := spec.VolumeSnapshotDataSource
+	err := plugin.SnapshotDelete(&source, nil /* *v1.PersistentVolume */)
 	if err != nil {
 		return fmt.Errorf("failed to delete snapshot %#v, err: %v", source, err)
 	}
@@ -664,12 +662,7 @@ func (vs *volumeSnapshotter) getSnapshotDeleteFunc(snapshotName string, snapshot
 			return fmt.Errorf("Error getting VolumeSnapshotData for VolumeSnapshot %s", snapshotName)
 		}
 
-		pv, err := vs.getPVFromVolumeSnapshot(snapshotName, snapshot)
-		if err != nil {
-			return err
-		}
-
-		err = vs.deleteSnapshot(&pv.Spec, &snapshotDataObj.Spec.VolumeSnapshotDataSource)
+		err := vs.deleteSnapshot(&snapshotDataObj.Spec)
 		if err != nil {
 			return fmt.Errorf("Failed to delete snapshot %s: %q", snapshotName, err)
 		}
