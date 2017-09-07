@@ -50,20 +50,15 @@ metadata:
   name: local-volume-config
   namespace: kube-system
 data:
-  "local-fast": |
-    {
-      "hostDir": "/mnt/ssds",
-      "mountDir": "/local-ssds"
-    }
-  "local-slow": |
-    {
-      "hostDir": "/mnt/hdds",
-      "mountDir": "/local-hdds"
-    }
-  "local-storage": |
-    {
-      "hostDir": "/mnt/disks"
-    }
+  storageClassMap: |
+    local-fast: 
+       hostDir: "/mnt/ssds"
+       mountDir: "/local-ssds"
+    local-slow:
+       hostDir: "/mnt/hdds"
+       mountDir: "/local-hdds"
+    local-storage:
+      hostDir: "/mnt/disks"
 ```
 
 ### Command line options

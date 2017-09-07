@@ -58,6 +58,8 @@ var (
 	serviceAccountName = flag.String("serviceaccount", defaultServiceAccountName, "Name of the service accout for local volume provisioner")
 )
 
+var provisionerConfig common.ProvisionerConfiguration
+
 // setupClient creates an in cluster kubernetes client.
 func setupClient() *kubernetes.Clientset {
 	config, err := rest.InClusterConfig()
@@ -90,35 +92,35 @@ func generateMountDir(mount *common.MountConfig) string {
 
 // ensureVolumeConfig reads volume configurations from given configmap, and create a default one
 // if not already exist.
-func ensureVolumeConfig(client *kubernetes.Clientset, namespace string) (map[string]common.MountConfig, error) {
+func ensureVolumeConfig(client *kubernetes.Clientset, namespace string, config *common.ProvisionerConfiguration) error {
 	// Get config map from user or from a default configmap (if created before).
-	config, err := common.GetVolumeConfigFromConfigMap(client, namespace, *volumeConfigName)
+	err := common.GetVolumeConfigFromConfigMap(client, namespace, *volumeConfigName, config)
 	if err != nil && *volumeConfigName != defaultVolumeConfigName {
 		// If configmap is provided by user but we have problem getting it, fail fast.
-		return nil, fmt.Errorf("could not get config map: %v", err)
+		return fmt.Errorf("could not get config map: %v", err)
 	} else if err != nil && errors.IsNotFound(err) {
 		// configmap is not provided by user and default configmap doesn't exist, create one.
 		glog.Infof("No config is given, creating default configmap %v", *volumeConfigName)
-		config = common.GetDefaultVolumeConfig()
+		common.GetDefaultVolumeConfig(config)
 		if err = createConfigMap(client, namespace, config); err != nil {
-			return nil, fmt.Errorf("unable to create configmap: %v", err)
+			return fmt.Errorf("unable to create configmap: %v", err)
 		}
 	} else if err != nil {
 		// error exists, it might be that default configmap is damanged, fail fast.
-		return nil, fmt.Errorf("could not get default config map: %v", err)
+		return fmt.Errorf("could not get default config map: %v", err)
 	}
-	return config, nil
+	return nil
 }
 
 // ensureMountDir checks if each storageclass's mount config has 'MountDir' set; if not, it will
 // automatically generate one and informs an update on configmap is required.
-func ensureMountDir(config map[string]common.MountConfig) bool {
+func ensureMountDir(config *common.ProvisionerConfiguration) bool {
 	needsUpdate := false
-	for class, mount := range config {
+	for class, mount := range config.StorageClassConfig {
 		if mount.MountDir == "" {
 			newMoutConfig := mount
 			newMoutConfig.MountDir = generateMountDir(&mount)
-			config[class] = newMoutConfig
+			config.StorageClassConfig[class] = newMoutConfig
 			needsUpdate = true
 		}
 	}
@@ -126,7 +128,7 @@ func ensureMountDir(config map[string]common.MountConfig) bool {
 }
 
 // updateConfigMap ...
-func updateConfigMap(client *kubernetes.Clientset, namespace string, config map[string]common.MountConfig) error {
+func updateConfigMap(client *kubernetes.Clientset, namespace string, config *common.ProvisionerConfiguration) error {
 	var err error
 	configMap, err := client.CoreV1().ConfigMaps(namespace).Get(*volumeConfigName, metav1.GetOptions{})
 	if err != nil {
@@ -141,7 +143,7 @@ func updateConfigMap(client *kubernetes.Clientset, namespace string, config map[
 }
 
 // createConfigMap ...
-func createConfigMap(client *kubernetes.Clientset, namespace string, config map[string]common.MountConfig) error {
+func createConfigMap(client *kubernetes.Clientset, namespace string, config *common.ProvisionerConfiguration) error {
 	data, err := common.VolumeConfigToConfigMapData(config)
 	if err != nil {
 		glog.Fatalf("Unable to convert volume config to configmap %v\n", err)
@@ -232,10 +234,10 @@ func createClusterRoleBinding(client *kubernetes.Clientset, namespace string) er
 }
 
 // createDaemonSet ...
-func createDaemonSet(client *kubernetes.Clientset, namespace string, config map[string]common.MountConfig) error {
+func createDaemonSet(client *kubernetes.Clientset, namespace string, config *common.ProvisionerConfiguration) error {
 	volumes := []v1.Volume{}
 	volumeMounts := []v1.VolumeMount{}
-	for _, mount := range config {
+	for _, mount := range config.StorageClassConfig {
 		name := generateMountName(&mount)
 		volumes = append(volumes, v1.Volume{
 			Name: name,
@@ -323,7 +325,6 @@ func createDaemonSet(client *kubernetes.Clientset, namespace string, config map[
 			},
 		},
 	}
-
 	_, err := client.Extensions().DaemonSets(namespace).Create(&daemonSet)
 	return err
 }
@@ -340,18 +341,19 @@ func main() {
 	client := setupClient()
 
 	var err error
-	var config map[string]common.MountConfig
-	if config, err = ensureVolumeConfig(client, namespace); err != nil {
+
+	provisionerConfig = common.ProvisionerConfiguration{
+		StorageClassConfig: make(map[string]common.MountConfig),
+	}
+	if err = ensureVolumeConfig(client, namespace, &provisionerConfig); err != nil {
 		glog.Fatalf("Unable to ensure volume config: %v", err)
 	}
-
-	if ensureMountDir(config) {
-		if err = updateConfigMap(client, namespace, config); err != nil {
+	if ensureMountDir(&provisionerConfig) {
+		if err = updateConfigMap(client, namespace, &provisionerConfig); err != nil {
 			glog.Fatalf("Could not update config map to use generated mountdir: %v", err)
 		}
 	}
-
-	glog.Infof("Running bootstrap pod with config %v: %+v\n", *volumeConfigName, config)
+	glog.Infof("Running bootstrap pod with config %v: %+v\n", *volumeConfigName, provisionerConfig)
 
 	if err = createServiceAccount(client, namespace); err != nil && !errors.IsAlreadyExists(err) {
 		glog.Fatalf("Unable to create service account: %v\n", err)
@@ -359,7 +361,7 @@ func main() {
 	if err = createClusterRoleBinding(client, namespace); err != nil && !errors.IsAlreadyExists(err) {
 		glog.Fatalf("Unable to create cluster role bindings: %v\n", err)
 	}
-	if err = createDaemonSet(client, namespace, config); err != nil {
+	if err = createDaemonSet(client, namespace, &provisionerConfig); err != nil {
 		glog.Fatalf("Unable to create daemonset: %v\n", err)
 	}
 
