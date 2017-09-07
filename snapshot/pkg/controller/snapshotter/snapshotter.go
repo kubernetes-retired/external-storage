@@ -249,8 +249,6 @@ func (vs *volumeSnapshotter) waitForSnapshot(snapshotName string, snapshot *crdv
 			return fmt.Errorf("Failed to create snapshot %s.", snapshotName)
 		}
 	}
-
-	return fmt.Errorf("Snapshot %s is NOT completed successfully.", snapshotName)
 }
 
 func (vs *volumeSnapshotter) updateSnapshotDataStatus(snapshotName string, snapshot *crdv1.VolumeSnapshot) error {
