@@ -29,6 +29,7 @@ import (
 	//"net/rpc/jsonrpc"
 	"sort"
 	"strings"
+	"strconv"
 )
 
 var log = logrus.New()
@@ -122,17 +123,29 @@ func (p *iscsiProvisioner) Provision(options controller.VolumeOptions) (*v1.Pers
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				ISCSI: &v1.ISCSIVolumeSource{
 					TargetPortal:   options.Parameters["targetPortal"],
-          Portals:        options.Parameters["portals"]
+          			Portals:        strings.Split(options.Parameters["portals"],"'"),
 					IQN:            options.Parameters["iqn"],
 					ISCSIInterface: options.Parameters["iscsiInterface"],
 					Lun:            lun,
-					ReadOnly:       options.Parameters["readonly"],
-					FSType:         options.Parameters["fsType"]==""?"xfs":options.Parameters["fsType"],
+					ReadOnly:       getReadOnly(options.Parameters["readonly"]),
+					FSType:         getFsType(options.Parameters["fsType"]),
 				},
 			},
 		},
 	}
 	return pv, nil
+}
+
+func getReadOnly(readonly string ) bool{
+  isReadOnly,_:=strconv.ParseBool(readonly)
+	return isReadOnly
+}
+
+func getFsType(fsType string ) string {
+	if fsType == "" {
+		return viper.GetString("default-fs")
+	}
+	return fsType
 }
 
 // Delete removes the storage asset that was created by Provision represented
@@ -193,7 +206,7 @@ func (p *iscsiProvisioner) createVolume(options controller.VolumeOptions) (vol s
 	}
 	log.Debugln("created volume name, size, pool: ", vol, size, pool)
 	for _, initiator := range initiators {
-		log.Debugln("exporting volume name, lun, pool, initiatir: ", vol, lun, pool, initiator)
+		log.Debugln("exporting volume name, lun, pool, initiator: ", vol, lun, pool, initiator)
 		err = p.exportCreate(vol, lun, pool, initiator)
 		if err != nil {
 			log.Warnln(err)
