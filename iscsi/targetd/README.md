@@ -231,11 +231,10 @@ Run the following commands. The secret correspond to username and password you h
 ```
 oc new-project iscsi-provisioner
 oc create sa iscsi-provisioner
-# if Openshift is version < 3.6 add the iscsi-provisioner-runner role
-oc create -f https://raw.githubusercontent.com/kubernetes-incubator/external-storage/master/iscsi/targetd/openshift/iscsi-auth.yaml
-# else if Openshift is version >= 3.6 add the system:persistent-volume-provisioner role
-oc adm policy add-cluster-role-to-user system:persistent-volume-provisioner system:serviceaccount:iscsi-provisioner:iscsi-provisioner
-#
+oc adm policy add-cluster-role-to-user cluster-reader system:serviceaccount:iscsi-provisioner:iscsi-provisioner
+oc adm policy add-cluster-role-to-user system:pv-provisioner-controller system:serviceaccount:iscsi-provisioner:iscsi-provisioner
+oc adm policy add-cluster-role-to-user system:pv-binder-controller system:serviceaccount:iscsi-provisioner:iscsi-provisioner
+oc adm policy add-cluster-role-to-user system:pv-recycler-controller system:serviceaccount:iscsi-provisioner:iscsi-provisioner
 oc secret new-basicauth targetd-account --username=admin --password=ciao
 oc create -f https://raw.githubusercontent.com/kubernetes-incubator/external-storage/master/iscsi/targetd/openshift/iscsi-provisioner-dc.yaml
 ```
@@ -319,3 +318,7 @@ ansible-playbook -i <your inventory file> ansible/targetd-playbook.yaml
 ansible-playbook -i <your inventory file> ansible/initiator-playbook.yaml
 ansible-playbook -i <your inventory file> ansible/provisioner-playbook.yaml
 ```
+
+## Support for multipath
+
+Multipath is enabled by installing multipathd and passing some additional configuration to the persistent volume
