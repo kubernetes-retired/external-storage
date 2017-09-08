@@ -28,8 +28,8 @@ import (
 	//"net/rpc"
 	//"net/rpc/jsonrpc"
 	"sort"
-	"strings"
 	"strconv"
+	"strings"
 )
 
 var log = logrus.New()
@@ -123,7 +123,7 @@ func (p *iscsiProvisioner) Provision(options controller.VolumeOptions) (*v1.Pers
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				ISCSI: &v1.ISCSIVolumeSource{
 					TargetPortal:   options.Parameters["targetPortal"],
-          			Portals:        strings.Split(options.Parameters["portals"],"'"),
+					Portals:        strings.Split(options.Parameters["portals"], "'"),
 					IQN:            options.Parameters["iqn"],
 					ISCSIInterface: options.Parameters["iscsiInterface"],
 					Lun:            lun,
@@ -136,12 +136,12 @@ func (p *iscsiProvisioner) Provision(options controller.VolumeOptions) (*v1.Pers
 	return pv, nil
 }
 
-func getReadOnly(readonly string ) bool{
-  isReadOnly,_:=strconv.ParseBool(readonly)
+func getReadOnly(readonly string) bool {
+	isReadOnly, _ := strconv.ParseBool(readonly)
 	return isReadOnly
 }
 
-func getFsType(fsType string ) string {
+func getFsType(fsType string) string {
 	if fsType == "" {
 		return viper.GetString("default-fs")
 	}
