@@ -23,7 +23,8 @@ import (
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/cloudprovider"
 )
 
-type VolumePlugin interface {
+// Plugin defines functions that should be implemented by the volume plugin
+type Plugin interface {
 	// Init inits volume plugin
 	Init(cloudprovider.Interface)
 	// SnapshotCreate creates a VolumeSnapshot from a PersistentVolumeSpec

@@ -39,12 +39,14 @@ const (
 type hostPathPlugin struct {
 }
 
-var _ volume.VolumePlugin = &hostPathPlugin{}
+var _ volume.Plugin = &hostPathPlugin{}
 
-func RegisterPlugin() volume.VolumePlugin {
+// RegisterPlugin registers the volume plugin
+func RegisterPlugin() volume.Plugin {
 	return &hostPathPlugin{}
 }
 
+// GetPluginName gets the name of the volume plugin
 func GetPluginName() string {
 	return "hostPath"
 }
@@ -97,7 +99,7 @@ func (h *hostPathPlugin) SnapshotDelete(src *crdv1.VolumeSnapshotDataSource, _ *
 	return os.Remove(path)
 }
 
-func (a *hostPathPlugin) DescribeSnapshot(snapshotData *crdv1.VolumeSnapshotData) (snapConditions *[]crdv1.VolumeSnapshotCondition, isCompleted bool, err error) {
+func (h *hostPathPlugin) DescribeSnapshot(snapshotData *crdv1.VolumeSnapshotData) (snapConditions *[]crdv1.VolumeSnapshotCondition, isCompleted bool, err error) {
 	if snapshotData == nil || snapshotData.Spec.HostPath == nil {
 		return nil, false, fmt.Errorf("failed to retrieve Snapshot spec")
 	}
@@ -109,7 +111,7 @@ func (a *hostPathPlugin) DescribeSnapshot(snapshotData *crdv1.VolumeSnapshotData
 }
 
 // FindSnapshot finds a VolumeSnapshot by matching metadata
-func (a *hostPathPlugin) FindSnapshot(tags *map[string]string) (*crdv1.VolumeSnapshotDataSource, *[]crdv1.VolumeSnapshotCondition, error) {
+func (h *hostPathPlugin) FindSnapshot(tags *map[string]string) (*crdv1.VolumeSnapshotDataSource, *[]crdv1.VolumeSnapshotCondition, error) {
 	glog.Infof("FindSnapshot by tags: %#v", *tags)
 
 	// TODO: Implement FindSnapshot
@@ -126,13 +128,13 @@ func (h *hostPathPlugin) SnapshotRestore(snapshotData *crdv1.VolumeSnapshotData,
 		return nil, nil, fmt.Errorf("failed to retrieve Snapshot spec")
 	}
 	// restore snapshot to a PV
-	snapId := snapshotData.Spec.HostPath.Path
+	snapID := snapshotData.Spec.HostPath.Path
 	dir := restorePoint + string(uuid.NewUUID())
 	os.MkdirAll(dir, 0750)
-	cmd := exec.Command("tar", "xzf", snapId, "-C", dir, "--strip-components=1")
+	cmd := exec.Command("tar", "xzf", snapID, "-C", dir, "--strip-components=1")
 	err := cmd.Run()
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to restore %s to %s: %v", snapId, dir, err)
+		return nil, nil, fmt.Errorf("failed to restore %s to %s: %v", snapID, dir, err)
 	}
 	pv := &v1.PersistentVolumeSource{
 		HostPath: &v1.HostPathVolumeSource{

@@ -44,17 +44,24 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 )
 
+// ProviderName is the name of the cloud provider
 const ProviderName = "openstack"
 
+// ErrNotFound is the error for not found
 var ErrNotFound = errors.New("Failed to find object")
+
+// ErrMultipleResults is the error when multiple results obtained but only on expected
 var ErrMultipleResults = errors.New("Multiple results where only one expected")
+
+// ErrNoAddressFound is the error when no address found for host
 var ErrNoAddressFound = errors.New("No address found for host")
 
-// encoding.TextUnmarshaler interface for time.Duration
+// MyDuration is the encoding.TextUnmarshaler interface for time.Duration
 type MyDuration struct {
 	time.Duration
 }
 
+// UnmarshalText unmarshals the text
 func (d *MyDuration) UnmarshalText(text []byte) error {
 	res, err := time.ParseDuration(string(text))
 	if err != nil {
@@ -64,16 +71,18 @@ func (d *MyDuration) UnmarshalText(text []byte) error {
 	return nil
 }
 
+// LoadBalancer is the struct for load balancer
 type LoadBalancer struct {
 	network *gophercloud.ServiceClient
 	compute *gophercloud.ServiceClient
 	opts    LoadBalancerOpts
 }
 
+// LoadBalancerOpts defines options for load balancer
 type LoadBalancerOpts struct {
 	LBVersion            string     `gcfg:"lb-version"` // overrides autodetection. v1 or v2
-	SubnetId             string     `gcfg:"subnet-id"`  // required
-	FloatingNetworkId    string     `gcfg:"floating-network-id"`
+	SubnetID             string     `gcfg:"subnet-id"`  // required
+	FloatingNetworkID    string     `gcfg:"floating-network-id"`
 	LBMethod             string     `gcfg:"lb-method"`
 	CreateMonitor        bool       `gcfg:"create-monitor"`
 	MonitorDelay         MyDuration `gcfg:"monitor-delay"`
@@ -83,13 +92,15 @@ type LoadBalancerOpts struct {
 	NodeSecurityGroupID  string     `gcfg:"node-security-group"`
 }
 
+// BlockStorageOpts defines options for block storage
 type BlockStorageOpts struct {
 	BSVersion       string `gcfg:"bs-version"`        // overrides autodetection. v1 or v2. Defaults to auto
 	TrustDevicePath bool   `gcfg:"trust-device-path"` // See Issue #33128
 }
 
+// RouterOpts defines options for the router
 type RouterOpts struct {
-	RouterId string `gcfg:"router-id"` // required
+	RouterID string `gcfg:"router-id"` // required
 }
 
 // OpenStack is an implementation of cloud provider Interface for OpenStack.
@@ -103,16 +114,17 @@ type OpenStack struct {
 	localInstanceID string
 }
 
+// Config defines config options for the openstack cloud provider
 type Config struct {
 	Global struct {
-		AuthUrl    string `gcfg:"auth-url"`
+		AuthURL    string `gcfg:"auth-url"`
 		Username   string
-		UserId     string `gcfg:"user-id"`
+		UserID     string `gcfg:"user-id"`
 		Password   string
-		TenantId   string `gcfg:"tenant-id"`
+		TenantID   string `gcfg:"tenant-id"`
 		TenantName string `gcfg:"tenant-name"`
-		TrustId    string `gcfg:"trust-id"`
-		DomainId   string `gcfg:"domain-id"`
+		TrustID    string `gcfg:"trust-id"`
+		DomainID   string `gcfg:"domain-id"`
 		DomainName string `gcfg:"domain-name"`
 		Region     string
 		CAFile     string `gcfg:"ca-file"`
@@ -124,13 +136,13 @@ type Config struct {
 
 func (cfg Config) toAuthOptions() gophercloud.AuthOptions {
 	return gophercloud.AuthOptions{
-		IdentityEndpoint: cfg.Global.AuthUrl,
+		IdentityEndpoint: cfg.Global.AuthURL,
 		Username:         cfg.Global.Username,
-		UserID:           cfg.Global.UserId,
+		UserID:           cfg.Global.UserID,
 		Password:         cfg.Global.Password,
-		TenantID:         cfg.Global.TenantId,
+		TenantID:         cfg.Global.TenantID,
 		TenantName:       cfg.Global.TenantName,
-		DomainID:         cfg.Global.DomainId,
+		DomainID:         cfg.Global.DomainID,
 		DomainName:       cfg.Global.DomainName,
 
 		// Persistent service, so we need to be able to renew tokens.
@@ -140,11 +152,11 @@ func (cfg Config) toAuthOptions() gophercloud.AuthOptions {
 
 func (cfg Config) toAuth3Options() tokens3.AuthOptions {
 	return tokens3.AuthOptions{
-		IdentityEndpoint: cfg.Global.AuthUrl,
+		IdentityEndpoint: cfg.Global.AuthURL,
 		Username:         cfg.Global.Username,
-		UserID:           cfg.Global.UserId,
+		UserID:           cfg.Global.UserID,
 		Password:         cfg.Global.Password,
-		DomainID:         cfg.Global.DomainId,
+		DomainID:         cfg.Global.DomainID,
 		DomainName:       cfg.Global.DomainName,
 		AllowReauth:      true,
 	}
@@ -166,12 +178,16 @@ func readConfig(config io.Reader) (Config, error) {
 	return cfg, err
 }
 
-// Tiny helper for conditional unwind logic
+// Caller is Tiny helper for conditional unwind logic
 type Caller bool
 
-func NewCaller() Caller   { return Caller(true) }
+// NewCaller returns a Caller
+func NewCaller() Caller { return Caller(true) }
+
+// Disarm disarms the caller
 func (c *Caller) Disarm() { *c = false }
 
+// Call returns a Call
 func (c *Caller) Call(f func()) {
 	if *c {
 		f()
@@ -189,7 +205,7 @@ func init() {
 }
 
 func newOpenStack(cfg Config) (*OpenStack, error) {
-	provider, err := openstack.NewClient(cfg.Global.AuthUrl)
+	provider, err := openstack.NewClient(cfg.Global.AuthURL)
 	if err != nil {
 		return nil, err
 	}
@@ -203,10 +219,10 @@ func newOpenStack(cfg Config) (*OpenStack, error) {
 		provider.HTTPClient.Transport = netutil.SetOldTransportDefaults(&http.Transport{TLSClientConfig: config})
 
 	}
-	if cfg.Global.TrustId != "" {
+	if cfg.Global.TrustID != "" {
 		opts := cfg.toAuth3Options()
 		authOptsExt := trusts.AuthOptsExt{
-			TrustID:            cfg.Global.TrustId,
+			TrustID:            cfg.Global.TrustID,
 			AuthOptionsBuilder: &opts,
 		}
 		err = openstack.AuthenticateV3(provider, authOptsExt, gophercloud.EndpointOpts{})
@@ -230,6 +246,7 @@ func newOpenStack(cfg Config) (*OpenStack, error) {
 	return &os, nil
 }
 
+// LoadBalancer returns a load balancer
 func (os *OpenStack) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 	glog.V(4).Info("openstack.LoadBalancer() called")
 
@@ -367,7 +384,7 @@ func nodeAddresses(srv *servers.Server) ([]v1.NodeAddress, error) {
 	addrs := []v1.NodeAddress{}
 
 	type Address struct {
-		IpType string `mapstructure:"OS-EXT-IPS:type"`
+		IPType string `mapstructure:"OS-EXT-IPS:type"`
 		Addr   string
 	}
 
@@ -380,7 +397,7 @@ func nodeAddresses(srv *servers.Server) ([]v1.NodeAddress, error) {
 	for network, addrList := range addresses {
 		for _, props := range addrList {
 			var addressType v1.NodeAddressType
-			if props.IpType == "floating" || network == "public" {
+			if props.IPType == "floating" || network == "public" {
 				addressType = v1.NodeExternalIP
 			} else {
 				addressType = v1.NodeInternalIP
@@ -443,6 +460,7 @@ func getAddressByName(client *gophercloud.ServiceClient, name types.NodeName) (s
 	return addrs[0].Address, nil
 }
 
+// Clusters return cloud provider clusters
 func (os *OpenStack) Clusters() (cloudprovider.Clusters, bool) {
 	return nil, false
 }
@@ -475,6 +493,7 @@ func (os *OpenStack) snapshotService() (snapshotService, error) {
 	return &SnapshotsV2{sClient, os.bsOpts}, nil
 }
 
+// Routes returns cloud provider routes
 func (os *OpenStack) Routes() (cloudprovider.Routes, bool) {
 	glog.V(4).Info("openstack.Routes() called")
 
@@ -510,11 +529,14 @@ func (os *OpenStack) Routes() (cloudprovider.Routes, bool) {
 	return r, true
 }
 
+// Zones returns cloud provider zones
 func (os *OpenStack) Zones() (cloudprovider.Zones, bool) {
 	glog.V(1).Info("Claiming to support Zones")
 
 	return os, true
 }
+
+// GetZone gets a zone from cloud provider
 func (os *OpenStack) GetZone() (cloudprovider.Zone, error) {
 	md, err := getMetadata()
 	if err != nil {

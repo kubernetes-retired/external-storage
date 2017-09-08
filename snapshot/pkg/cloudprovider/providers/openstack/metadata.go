@@ -32,11 +32,11 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 )
 
-// metadataUrl is URL to OpenStack metadata server. It's hardcoded IPv4
+// metadataURL is URL to OpenStack metadata server. It's hardcoded IPv4
 // link-local address as documented in "OpenStack Cloud Administrator Guide",
 // chapter Compute - Networking with nova-network.
 // https://docs.openstack.org/admin-guide/compute-networking-nova.html#metadata-service
-const metadataUrl = "http://169.254.169.254/openstack/2012-08-10/meta_data.json"
+const metadataURL = "http://169.254.169.254/openstack/2012-08-10/meta_data.json"
 
 // Config drive is defined as an iso9660 or vfat (deprecated) drive
 // with the "config-2" label.
@@ -44,12 +44,13 @@ const metadataUrl = "http://169.254.169.254/openstack/2012-08-10/meta_data.json"
 const configDriveLabel = "config-2"
 const configDrivePath = "openstack/2012-08-10/meta_data.json"
 
+// ErrBadMetadata is an error for bad metadata
 var ErrBadMetadata = errors.New("Invalid OpenStack metadata, got empty uuid")
 
-// Assumes the "2012-08-10" meta_data.json format.
+// Metadata assumes the "2012-08-10" meta_data.json format.
 // See http://docs.openstack.org/user-guide/cli_config_drive.html
 type Metadata struct {
-	Uuid             string `json:"uuid"`
+	UUID             string `json:"uuid"`
 	Name             string `json:"name"`
 	AvailabilityZone string `json:"availability_zone"`
 	// .. and other fields we don't care about.  Expand as necessary.
@@ -64,7 +65,7 @@ func parseMetadata(r io.Reader) (*Metadata, error) {
 		return nil, err
 	}
 
-	if metadata.Uuid == "" {
+	if metadata.UUID == "" {
 		return nil, ErrBadMetadata
 	}
 
@@ -121,16 +122,16 @@ func getMetadataFromConfigDrive() (*Metadata, error) {
 
 func getMetadataFromMetadataService() (*Metadata, error) {
 	// Try to get JSON from metdata server.
-	glog.V(4).Infof("Attempting to fetch metadata from %s", metadataUrl)
-	resp, err := http.Get(metadataUrl)
+	glog.V(4).Infof("Attempting to fetch metadata from %s", metadataURL)
+	resp, err := http.Get(metadataURL)
 	if err != nil {
-		glog.V(3).Infof("Cannot read %s: %v", metadataUrl, err)
+		glog.V(3).Infof("Cannot read %s: %v", metadataURL, err)
 		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		err = fmt.Errorf("Unexpected status code when reading metadata from %s: %s", metadataUrl, resp.Status)
+		err = fmt.Errorf("Unexpected status code when reading metadata from %s: %s", metadataURL, resp.Status)
 		glog.V(3).Infof("%v", err)
 		return nil, err
 	}

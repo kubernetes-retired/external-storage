@@ -305,14 +305,14 @@ type VolumeOptions struct {
 	Encrypted bool
 	// fully qualified resource name to the key to use for encryption.
 	// example: arn:aws:kms:us-east-1:012345678910:key/abcd1234-a123-456a-a12b-a123b4cd56ef
-	KmsKeyId string
+	KmsKeyID string
 	// an existing EBS snapshotID
-	SnapshotId string
+	SnapshotID string
 }
 
-// VolumeOptions specifies volume snapshot options.
+// SnapshotOptions specifies volume snapshot options.
 type SnapshotOptions struct {
-	VolumeId string
+	VolumeID string
 	Tags     *map[string]string
 }
 
@@ -349,14 +349,14 @@ type Volumes interface {
 	DisksAreAttached(map[types.NodeName][]KubernetesVolumeID) (map[types.NodeName]map[KubernetesVolumeID]bool, error)
 
 	// Create an EBS volume snapshot
-	CreateSnapshot(snapshotOptions *SnapshotOptions) (snapshotId string, status string, err error)
+	CreateSnapshot(snapshotOptions *SnapshotOptions) (snapshotID string, status string, err error)
 
 	// Delete an EBS volume snapshot
-	DeleteSnapshot(snapshotId string) (bool, error)
+	DeleteSnapshot(snapshotID string) (bool, error)
 
 	// Describe an EBS volume snapshot status for create or delete.
 	// return status (completed or pending or error), and error
-	DescribeSnapshot(snapshotId string) (status string, isCompleted bool, err error)
+	DescribeSnapshot(snapshotID string) (status string, isCompleted bool, err error)
 
 	// Find snapshot by tags
 	FindSnapshot(tags map[string]string) ([]string, []string, error)
@@ -1049,7 +1049,7 @@ func (c *Cloud) ExternalID(nodeName types.NodeName) (string, error) {
 		return "", err
 	}
 	if instance == nil {
-		return "", cloudprovider.InstanceNotFound
+		return "", cloudprovider.ErrInstanceNotFound
 	}
 	return orEmpty(instance.InstanceId), nil
 }
@@ -1328,7 +1328,7 @@ func (c *Cloud) getMountDevice(
 	chosen, err := deviceAllocator.GetNext(deviceMappings)
 	if err != nil {
 		glog.Warningf("Could not assign a mount device.  mappings=%v, error: %v", deviceMappings, err)
-		return "", false, fmt.Errorf("Too many EBS volumes attached to node %s.", i.nodeName)
+		return "", false, fmt.Errorf("Too many EBS volumes attached to node %s", i.nodeName)
 	}
 
 	attaching := c.attaching[i.nodeName]
@@ -1426,13 +1426,11 @@ func (d *awsDisk) waitForAttachmentStatus(status string) (*ec2.VolumeAttachment,
 			if describeErrorCount > volumeAttachmentStatusConsecutiveErrorLimit {
 				// report the error
 				return false, err
-			} else {
-				glog.Warningf("Ignoring error from describe volume; will retry: %q", err)
-				return false, nil
 			}
-		} else {
-			describeErrorCount = 0
+			glog.Warningf("Ignoring error from describe volume; will retry: %q", err)
+			return false, nil
 		}
+		describeErrorCount = 0
 		if len(info.Attachments) > 1 {
 			// Shouldn't happen; log so we know if it is
 			glog.Warningf("Found multiple attachments for volume %q: %v", d.awsID, info)
@@ -1623,7 +1621,7 @@ func (c *Cloud) DetachDisk(diskName KubernetesVolumeID, nodeName types.NodeName)
 
 	awsInstance, info, err := c.getFullInstance(nodeName)
 	if err != nil {
-		if err == cloudprovider.InstanceNotFound {
+		if err == cloudprovider.ErrInstanceNotFound {
 			// If instance no longer exists, safe to assume volume is not attached.
 			glog.Warningf(
 				"Instance %q does not exist. DetachDisk will assume disk %q is not attached to it.",
@@ -1724,15 +1722,15 @@ func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (KubernetesVolumeID, er
 	request.Size = aws.Int64(int64(volumeOptions.CapacityGB))
 	request.VolumeType = aws.String(createType)
 	request.Encrypted = aws.Bool(volumeOptions.Encrypted)
-	if len(volumeOptions.KmsKeyId) > 0 {
-		request.KmsKeyId = aws.String(volumeOptions.KmsKeyId)
+	if len(volumeOptions.KmsKeyID) > 0 {
+		request.KmsKeyId = aws.String(volumeOptions.KmsKeyID)
 		request.Encrypted = aws.Bool(true)
 	}
 	if iops > 0 {
 		request.Iops = aws.Int64(iops)
 	}
-	if len(volumeOptions.SnapshotId) > 0 {
-		request.SnapshotId = aws.String(volumeOptions.SnapshotId)
+	if len(volumeOptions.SnapshotID) > 0 {
+		request.SnapshotId = aws.String(volumeOptions.SnapshotID)
 	}
 
 	response, err := c.ec2.CreateVolume(request)
@@ -1815,7 +1813,7 @@ func (c *Cloud) GetDiskPath(volumeName KubernetesVolumeID) (string, error) {
 func (c *Cloud) DiskIsAttached(diskName KubernetesVolumeID, nodeName types.NodeName) (bool, error) {
 	_, instance, err := c.getFullInstance(nodeName)
 	if err != nil {
-		if err == cloudprovider.InstanceNotFound {
+		if err == cloudprovider.ErrInstanceNotFound {
 			// If instance no longer exists, safe to assume volume is not attached.
 			glog.Warningf(
 				"Instance %q does not exist. DiskIsAttached will assume disk %q is not attached to it.",
@@ -1841,6 +1839,7 @@ func (c *Cloud) DiskIsAttached(diskName KubernetesVolumeID, nodeName types.NodeN
 	return false, nil
 }
 
+// DisksAreAttached checks whether disks are attached
 func (c *Cloud) DisksAreAttached(nodeDisks map[types.NodeName][]KubernetesVolumeID) (map[types.NodeName]map[KubernetesVolumeID]bool, error) {
 	attached := make(map[types.NodeName]map[KubernetesVolumeID]bool)
 
@@ -1908,11 +1907,11 @@ func (c *Cloud) DisksAreAttached(nodeDisks map[types.NodeName][]KubernetesVolume
 }
 
 // CreateSnapshot creates an EBS volume snapshot
-func (c *Cloud) CreateSnapshot(snapshotOptions *SnapshotOptions) (snapshotId string, status string, err error) {
+func (c *Cloud) CreateSnapshot(snapshotOptions *SnapshotOptions) (snapshotID string, status string, err error) {
 	request := &ec2.CreateSnapshotInput{}
-	request.VolumeId = aws.String(snapshotOptions.VolumeId)
+	request.VolumeId = aws.String(snapshotOptions.VolumeID)
 	request.DryRun = aws.Bool(false)
-	descriptions := "Created by Kubernetes for volume " + snapshotOptions.VolumeId
+	descriptions := "Created by Kubernetes for volume " + snapshotOptions.VolumeID
 	request.Description = aws.String(descriptions)
 	res, err := c.ec2.CreateSnapshot(request)
 	if err != nil {
@@ -1937,9 +1936,9 @@ func (c *Cloud) CreateSnapshot(snapshotOptions *SnapshotOptions) (snapshotId str
 }
 
 // DeleteSnapshot deletes an EBS volume snapshot
-func (c *Cloud) DeleteSnapshot(snapshotId string) (bool, error) {
+func (c *Cloud) DeleteSnapshot(snapshotID string) (bool, error) {
 	request := &ec2.DeleteSnapshotInput{}
-	request.SnapshotId = aws.String(snapshotId)
+	request.SnapshotId = aws.String(snapshotID)
 	_, err := c.ec2.DeleteSnapshot(request)
 	if err != nil {
 		return false, err
@@ -1949,10 +1948,10 @@ func (c *Cloud) DeleteSnapshot(snapshotId string) (bool, error) {
 }
 
 // DescribeSnapshot returns the status of the snapshot
-func (c *Cloud) DescribeSnapshot(snapshotId string) (status string, isCompleted bool, err error) {
+func (c *Cloud) DescribeSnapshot(snapshotID string) (status string, isCompleted bool, err error) {
 	request := &ec2.DescribeSnapshotsInput{
 		SnapshotIds: []*string{
-			aws.String(snapshotId),
+			aws.String(snapshotID),
 		},
 	}
 	result, err := c.ec2.DescribeSnapshots(request)
@@ -3286,7 +3285,7 @@ func (c *Cloud) getInstanceByID(instanceID string) (*ec2.Instance, error) {
 	}
 
 	if len(instances) == 0 {
-		return nil, cloudprovider.InstanceNotFound
+		return nil, cloudprovider.ErrInstanceNotFound
 	}
 	if len(instances) > 1 {
 		return nil, fmt.Errorf("multiple instances found for instance: %s", instanceID)
@@ -3437,7 +3436,7 @@ func (c *Cloud) findInstanceByNodeName(nodeName types.NodeName) (*ec2.Instance, 
 func (c *Cloud) getInstanceByNodeName(nodeName types.NodeName) (*ec2.Instance, error) {
 	instance, err := c.findInstanceByNodeName(nodeName)
 	if err == nil && instance == nil {
-		return nil, cloudprovider.InstanceNotFound
+		return nil, cloudprovider.ErrInstanceNotFound
 	}
 	return instance, err
 }
