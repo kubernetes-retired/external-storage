@@ -82,7 +82,7 @@
 #       command: >
 #         /usr/bin/oc adm --config=/etc/origin/master/admin.kubeconfig
 #         policy add-cluster-role-to-user system:pv-recycler-controller system:serviceaccount:iscsi-provisioner:iscsi-provisioner
-   
+
      - name: create iscsi class template
        template: 
          src: ./iscsi-provisioner-class.yaml.j2
