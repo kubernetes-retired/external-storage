@@ -265,56 +265,6 @@ func (vs *volumeSnapshotter) waitForSnapshot(snapshotName string, snapshot *crdv
 	return err
 }
 
-func (vs *volumeSnapshotter) updateSnapshotDataStatus(snapshotName string, snapshot *crdv1.VolumeSnapshot) error {
-	var snapshotDataObj crdv1.VolumeSnapshotData
-	snapshotDataName := snapshot.Spec.SnapshotDataName
-	glog.Infof("In UpdateVolumeSnapshotData")
-	err := vs.restClient.Get().
-		Name(snapshotDataName).
-		Resource(crdv1.VolumeSnapshotDataResourcePlural).
-		Namespace(v1.NamespaceDefault).
-		Do().Into(&snapshotDataObj)
-	if err != nil {
-		return err
-	}
-
-	if len(snapshotDataObj.Status.Conditions) < 1 ||
-		snapshotDataObj.Status.Conditions[0].Type != crdv1.VolumeSnapshotDataConditionReady {
-
-		spec := &snapshotDataObj.Spec
-		volumeType := crdv1.GetSupportedVolumeFromSnapshotDataSpec(spec)
-		if len(volumeType) == 0 {
-			return fmt.Errorf("unsupported volume type found in PV %#v", spec)
-		}
-		plugin, ok := (*vs.volumePlugins)[volumeType]
-		if !ok {
-			return fmt.Errorf("%s is not supported volume for %#v", volumeType, spec)
-		}
-		_, completed, err := plugin.DescribeSnapshot(&snapshotDataObj)
-		if !completed {
-			return fmt.Errorf("snapshot is not completed yet: %v", err)
-		}
-		glog.Infof("snapshot successfully created, updating VolumeSnapshotData status for %s", snapshotDataName)
-		status := []crdv1.VolumeSnapshotDataCondition{
-			{
-				Type:               crdv1.VolumeSnapshotDataConditionReady,
-				Status:             v1.ConditionTrue,
-				Message:            "Snapshot data created succsessfully",
-				LastTransitionTime: metav1.Now(),
-			},
-		}
-
-		// Update VolumeSnapshotData status
-		err = vs.UpdateVolumeSnapshotData(snapshotDataName, &status)
-		if err != nil {
-			return fmt.Errorf("Error update snapshotData object %s: %v", snapshotName, err)
-		}
-
-	}
-	vs.actualStateOfWorld.AddSnapshot(snapshot)
-	return nil
-}
-
 // This is the function responsible for determining the correct volume plugin to use,
 // asking it to make a snapshot and assigning it some name that it returns to the caller.
 func (vs *volumeSnapshotter) takeSnapshot(pv *v1.PersistentVolume, tags *map[string]string) (*crdv1.VolumeSnapshotDataSource, *[]crdv1.VolumeSnapshotCondition, error) {
@@ -846,8 +796,8 @@ func (vs *volumeSnapshotter) UpdateVolumeSnapshot(snapshotName string, status *[
 
 	if status != nil && len(*status) > 0 {
 		glog.Infof("UpdateVolumeSnapshot: Setting status in VolumeSnapshot object.")
-		// TODO(xyang): Only the last status is recorded for now. Will revisit later whether previous statuses
-		// should be kept and the last status should be added to existing ones.
+		// Add the new condition to existing ones if it has a different type or
+		// update an existing condition of the same type.
 		ind := len(*status) - 1
 		ind2 := len(snapshotCopy.Status.Conditions)
 		if ind2 < 1 || snapshotCopy.Status.Conditions[ind2-1].Type != (*status)[ind].Type {
@@ -933,8 +883,8 @@ func (vs *volumeSnapshotter) UpdateVolumeSnapshotData(snapshotDataName string, s
 		return fmt.Errorf("Error: expecting type VolumeSnapshotData but received type %T", objCopy)
 	}
 
-	// TODO(xyang): Only the last status is recorded for now. Will revisit later whether previous statuses
-	// should be kept and the last status should be added to existing ones.
+	// Add the new condition to existing ones if it has a different type or
+	// update an existing condition of the same type.
 	ind := len(*status) - 1
 	ind2 := len(snapshotDataCopy.Status.Conditions)
 	if ind2 < 1 || snapshotDataCopy.Status.Conditions[ind2-1].Type != (*status)[ind].Type {
