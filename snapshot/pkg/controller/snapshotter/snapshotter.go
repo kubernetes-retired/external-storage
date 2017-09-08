@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
@@ -38,6 +39,14 @@ import (
 
 const (
 	defaultExponentialBackOffOnError = true
+
+	// volumeSnapshot* is configuration of exponential backoff for
+	// waiting for snapshot operation to complete. Starting with 10
+	// seconds, multiplying by 1.2 with each step and taking 15 steps at maximum.
+	// It will time out after 12.00 minutes.
+	volumeSnapshotInitialDelay = 10 * time.Second
+	volumeSnapshotFactor       = 1.2
+	volumeSnapshotSteps        = 15
 )
 
 // VolumeSnapshotter does the "heavy lifting": it spawns goroutines that talk to the
@@ -65,10 +74,6 @@ const (
 	snapshotOpCreatePrefix  string = "create"
 	snapshotOpDeletePrefix  string = "delete"
 	snapshotOpPromotePrefix string = "promote"
-	// Number of retries when we create a VolumeSnapshotData object.
-	createVolumeSnapshotDataRetryCount = 5
-	// Interval between retries when we create a VolumeSnapshotData object.
-	createVolumeSnapshotDataInterval = 10 * time.Second
 	// CloudSnapshotCreatedForVolumeSnapshotNamespaceTag is a name of a tag attached to a real snapshot in cloud
 	// (e.g. AWS EBS or GCE PD) with namespace of a volumesnapshot used to create this snapshot.
 	CloudSnapshotCreatedForVolumeSnapshotNamespaceTag = "kubernetes.io/created-for/snapshot/namespace"
@@ -191,13 +196,19 @@ func (vs *volumeSnapshotter) waitForSnapshot(snapshotName string, snapshot *crdv
 	var newSnapshot *crdv1.VolumeSnapshot = nil
 	var conditions *[]crdv1.VolumeSnapshotCondition = nil
 	var status, newstatus string = "", ""
+	backoff := wait.Backoff{
+		Duration: volumeSnapshotInitialDelay,
+		Factor:   volumeSnapshotFactor,
+		Steps:    volumeSnapshotSteps,
+	}
 	// Wait until the snapshot is successfully created by the plugin or an error occurs that
 	// fails the snapshot creation.
-	for {
+	err = wait.ExponentialBackoff(backoff, func() (bool, error) {
 		conditions, _, err = (*plugin).DescribeSnapshot(snapshotDataObj)
 		if err != nil {
 			glog.Warningf("failed to get snapshot %v, err: %v", snapshotName, err)
-			continue
+			//continue waiting
+			return false, nil
 		}
 		newstatus = vs.getSimplifiedSnapshotStatus(conditions)
 		if newstatus == statusPending {
@@ -208,20 +219,20 @@ func (vs *volumeSnapshotter) waitForSnapshot(snapshotName string, snapshot *crdv
 				newSnapshot, err = vs.UpdateVolumeSnapshot(snapshotName, conditions)
 				if err != nil {
 					glog.Errorf("Error updating volume snapshot %s: %v", snapshotName, err)
-					return fmt.Errorf("Failed to update VolumeSnapshot for snapshot %s: %v", snapshotName, err)
+					return true, fmt.Errorf("Failed to update VolumeSnapshot for snapshot %s: %v", snapshotName, err)
 				}
 			}
-			time.Sleep(createVolumeSnapshotDataInterval)
-			continue
+			// continue waiting
+			return false, nil
 		} else if newstatus == statusError {
-			return fmt.Errorf("Status for snapshot %s is error.", snapshotName)
+			return true, fmt.Errorf("Status for snapshot %s is error.", snapshotName)
 		}
 		glog.Infof("waitForSnapshot: Snapshot %s creation is complete: %#v", snapshotName, conditions)
 
 		newSnapshot, err = vs.UpdateVolumeSnapshot(snapshotName, conditions)
 		if err != nil {
 			glog.Errorf("Error updating volume snapshot %s: %v", snapshotName, err)
-			return fmt.Errorf("Failed to update VolumeSnapshot for snapshot %s: %v", snapshotName, err)
+			return true, fmt.Errorf("Failed to update VolumeSnapshot for snapshot %s: %v", snapshotName, err)
 		}
 
 		ind := len(*conditions) - 1
@@ -237,18 +248,21 @@ func (vs *volumeSnapshotter) waitForSnapshot(snapshotName string, snapshot *crdv
 		// Update VolumeSnapshotData status
 		err = vs.UpdateVolumeSnapshotData(snapshotDataName, &snapDataConditions)
 		if err != nil {
-			return fmt.Errorf("Error update snapshotData object %s: %v", snapshotName, err)
+			return true, fmt.Errorf("Error update snapshotData object %s: %v", snapshotName, err)
 		}
 
 		if newstatus == statusReady {
 			glog.Infof("waitForSnapshot: Snapshot %s created successfully. Adding it to Actual State of World.", snapshotName)
 			vs.actualStateOfWorld.AddSnapshot(newSnapshot)
 			// Break out of the for loop
-			return nil
+			return true, nil
 		} else if newstatus == statusError {
-			return fmt.Errorf("Failed to create snapshot %s.", snapshotName)
+			return true, fmt.Errorf("Failed to create snapshot %s.", snapshotName)
 		}
-	}
+		return false, nil
+	})
+
+	return err
 }
 
 func (vs *volumeSnapshotter) updateSnapshotDataStatus(snapshotName string, snapshot *crdv1.VolumeSnapshot) error {
@@ -620,22 +634,25 @@ func (vs *volumeSnapshotter) createVolumeSnapshotData(snapshotName string, snaps
 			},
 		},
 	}
+	backoff := wait.Backoff{
+		Duration: volumeSnapshotInitialDelay,
+		Factor:   volumeSnapshotFactor,
+		Steps:    volumeSnapshotSteps,
+	}
 	var result crdv1.VolumeSnapshotData
-	for i := 0; i < createVolumeSnapshotDataRetryCount; i++ {
+	err = wait.ExponentialBackoff(backoff, func() (bool, error) {
 		err = vs.restClient.Post().
 			Resource(crdv1.VolumeSnapshotDataResourcePlural).
 			Namespace(v1.NamespaceDefault).
 			Body(snapshotData).
 			Do().Into(&result)
 		if err != nil {
-			// TODO(xyang): Use exponential backoff instead of a fixed internal.
-			// https://github.com/jpillora/backoff
 			// Re-Try it as errors writing to the API server are common
-			time.Sleep(createVolumeSnapshotDataInterval)
+			return false, err
 		} else {
-			break
+			return true, nil
 		}
-	}
+	})
 
 	if err != nil {
 		glog.Errorf("createVolumeSnapshotData: Error creating the VolumeSnapshotData %s: %v", snapshotName, err)
