@@ -36,7 +36,6 @@ import (
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume/hostpath"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -227,7 +226,7 @@ func main() {
 	} else {
 		config, err = rest.InClusterConfig()
 	}
-	prId := string(uuid.NewUUID())
+	prId := provisionerName
 	if *id != "" {
 		prId = *id
 	}
