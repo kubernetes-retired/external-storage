@@ -34,9 +34,11 @@ import (
 )
 
 const (
+	// SnapshotPVCAnnotation is "snapshot.alpha.kubernetes.io/snapshot"
 	SnapshotPVCAnnotation = "snapshot.alpha.kubernetes.io/snapshot"
 )
 
+// NewClient creates a new RESTClient
 func NewClient(cfg *rest.Config) (*rest.RESTClient, *runtime.Scheme, error) {
 	scheme := runtime.NewScheme()
 	if err := crdv1.AddToScheme(scheme); err != nil {
@@ -57,6 +59,7 @@ func NewClient(cfg *rest.Config) (*rest.RESTClient, *runtime.Scheme, error) {
 	return client, scheme, nil
 }
 
+// CreateCRD creates CustomResourceDefinition
 func CreateCRD(clientset apiextensionsclient.Interface) error {
 	crd := &apiextensionsv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
@@ -101,6 +104,7 @@ func CreateCRD(clientset apiextensionsclient.Interface) error {
 	return nil
 }
 
+// WaitForSnapshotResource waits for the snapshot resource
 func WaitForSnapshotResource(snapshotClient *rest.RESTClient) error {
 	return wait.Poll(100*time.Millisecond, 60*time.Second, func() (bool, error) {
 		_, err := snapshotClient.Get().Namespace(apiv1.NamespaceDefault).Resource(crdv1.VolumeSnapshotDataResourcePlural).DoRaw()

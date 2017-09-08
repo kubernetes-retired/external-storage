@@ -31,7 +31,7 @@ func TestFilterTags(t *testing.T) {
 		return
 	}
 
-	if c.tagging.ClusterID != TestClusterId {
+	if c.tagging.ClusterID != TestClusterID {
 		t.Errorf("unexpected ClusterID: %v", c.tagging.ClusterID)
 	}
 }

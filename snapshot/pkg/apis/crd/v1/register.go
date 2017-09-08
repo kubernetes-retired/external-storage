@@ -26,8 +26,10 @@ import (
 const GroupName = "volume-snapshot-data.external-storage.k8s.io"
 
 var (
+	// SchemeBuilder is the new scheme builder
 	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
-	AddToScheme   = SchemeBuilder.AddToScheme
+	// AddToScheme adds to scheme
+	AddToScheme = SchemeBuilder.AddToScheme
 	// SchemeGroupVersion is the group version used to register these objects.
 	SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1"}
 )

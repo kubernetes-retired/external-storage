@@ -25,12 +25,17 @@ import (
 )
 
 const (
+	// VolumeSnapshotDataResourcePlural is "volumesnapshotdatas"
 	VolumeSnapshotDataResourcePlural = "volumesnapshotdatas"
-	VolumeSnapshotDataResource       = "volume-snapshot-data"
-	VolumeSnapshotResourcePlural     = "volumesnapshots"
-	VolumeSnapshotResource           = "volume-snapshot"
+	// VolumeSnapshotDataResource is "volume-snapshot-data"
+	VolumeSnapshotDataResource = "volume-snapshot-data"
+	// VolumeSnapshotResourcePlural is "volumesnapshots"
+	VolumeSnapshotResourcePlural = "volumesnapshots"
+	// VolumeSnapshotResource is "volume-snapshot"
+	VolumeSnapshotResource = "volume-snapshot"
 )
 
+// VolumeSnapshotStatus is the status of the VolumeSnapshot
 type VolumeSnapshotStatus struct {
 	// The time the snapshot was successfully created
 	// +optional
@@ -40,6 +45,7 @@ type VolumeSnapshotStatus struct {
 	Conditions []VolumeSnapshotCondition `json:"conditions" protobuf:"bytes,2,rep,name=conditions"`
 }
 
+// VolumeSnapshotConditionType is the type of VolumeSnapshot conditions
 type VolumeSnapshotConditionType string
 
 // These are valid conditions of a volume snapshot.
@@ -56,7 +62,7 @@ const (
 	VolumeSnapshotConditionError VolumeSnapshotConditionType = "Error"
 )
 
-// VolumeSnapshot Condition describes the state of a volume snapshot  at a certain point.
+// VolumeSnapshotCondition describes the state of a volume snapshot  at a certain point.
 type VolumeSnapshotCondition struct {
 	// Type of replication controller condition.
 	Type VolumeSnapshotConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=VolumeSnapshotConditionType"`
@@ -75,7 +81,7 @@ type VolumeSnapshotCondition struct {
 
 // +genclient=true
 
-// The volume snapshot object accessible to the user. Upon succesful creation of the actual
+// VolumeSnapshot is the volume snapshot object accessible to the user. Upon succesful creation of the actual
 // snapshot by the volume provider it is bound to the corresponding VolumeSnapshotData through
 // the VolumeSnapshotSpec
 type VolumeSnapshot struct {
@@ -91,13 +97,14 @@ type VolumeSnapshot struct {
 	Status VolumeSnapshotStatus `json:"status" protobuf:"bytes,3,opt,name=status"`
 }
 
+// VolumeSnapshotList is a list of VolumeSnapshot objects
 type VolumeSnapshotList struct {
 	metav1.TypeMeta `json:",inline"`
 	Metadata        metav1.ListMeta  `json:"metadata"`
 	Items           []VolumeSnapshot `json:"items"`
 }
 
-// The desired state of the volume snapshot
+// VolumeSnapshotSpec is the desired state of the volume snapshot
 type VolumeSnapshotSpec struct {
 	// PersistentVolumeClaimName is the name of the PVC being snapshotted
 	// +optional
@@ -108,7 +115,7 @@ type VolumeSnapshotSpec struct {
 	SnapshotDataName string `json:"snapshotDataName" protobuf:"bytes,2,opt,name=snapshotDataName"`
 }
 
-// The actual state of the volume snapshot
+// VolumeSnapshotDataStatus is the actual state of the volume snapshot
 type VolumeSnapshotDataStatus struct {
 	// The time the snapshot was successfully created
 	// +optional
@@ -118,12 +125,14 @@ type VolumeSnapshotDataStatus struct {
 	Conditions []VolumeSnapshotDataCondition `json:"conditions" protobuf:"bytes,2,rep,name=conditions"`
 }
 
+// VolumeSnapshotDataList is a list of VolumeSnapshotData objects
 type VolumeSnapshotDataList struct {
 	metav1.TypeMeta `json:",inline"`
 	Metadata        metav1.ListMeta      `json:"metadata"`
 	Items           []VolumeSnapshotData `json:"items"`
 }
 
+// VolumeSnapshotDataConditionType is the type of the VolumeSnapshotData condition
 type VolumeSnapshotDataConditionType string
 
 // These are valid conditions of a volume snapshot.
@@ -136,7 +145,7 @@ const (
 	VolumeSnapshotDataConditionError VolumeSnapshotDataConditionType = "Error"
 )
 
-// VolumeSnapshot Condition describes the state of a volume snapshot  at a certain point.
+// VolumeSnapshotDataCondition describes the state of a volume snapshot  at a certain point.
 type VolumeSnapshotDataCondition struct {
 	// Type of volume snapshot condition.
 	Type VolumeSnapshotDataConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=VolumeSnapshotDataConditionType"`
@@ -171,7 +180,7 @@ type VolumeSnapshotData struct {
 	Status VolumeSnapshotDataStatus `json:"status" protobuf:"bytes,3,opt,name=status"`
 }
 
-// The desired state of the volume snapshot
+// VolumeSnapshotDataSpec is the spec of the volume snapshot data
 type VolumeSnapshotDataSpec struct {
 	// Source represents the location and type of the volume snapshot
 	VolumeSnapshotDataSource `json:",inline" protobuf:"bytes,1,opt,name=volumeSnapshotDataSource"`
@@ -187,31 +196,31 @@ type VolumeSnapshotDataSpec struct {
 	PersistentVolumeRef *core_v1.ObjectReference `json:"persistentVolumeRef" protobuf:"bytes,3,opt,name=persistentVolumeRef"`
 }
 
-// HostPath volume snapshot source
+// HostPathVolumeSnapshotSource is HostPath volume snapshot source
 type HostPathVolumeSnapshotSource struct {
 	// Path represents a tar file that stores the HostPath volume source
 	Path string `json:"snapshot"`
 }
 
-// AWS EBS volume snapshot source
+// AWSElasticBlockStoreVolumeSnapshotSource is AWS EBS volume snapshot source
 type AWSElasticBlockStoreVolumeSnapshotSource struct {
 	// Unique id of the persistent disk snapshot resource. Used to identify the disk snapshot in AWS
 	SnapshotID string `json:"snapshotId"`
 }
 
-// Cinder volume snapshot source
+// CinderVolumeSnapshotSource is Cinder volume snapshot source
 type CinderVolumeSnapshotSource struct {
 	// Unique id of the cinder volume snapshot resource. Used to identify the snapshot in OpenStack
 	SnapshotID string `json:"snapshotId"`
 }
 
-// GCE PD volume snapshot source
+// GCEPersistentDiskSnapshotSource is GCE PD volume snapshot source
 type GCEPersistentDiskSnapshotSource struct {
 	// Unique id of the persistent disk snapshot resource. Used to identify the disk snapshot in GCE
 	SnapshotName string `json:"snapshotId"`
 }
 
-// Represents the actual location and type of the snapshot. Only one of its members may be specified.
+// VolumeSnapshotDataSource represents the actual location and type of the snapshot. Only one of its members may be specified.
 type VolumeSnapshotDataSource struct {
 	// HostPath represents a directory on the host.
 	// Provisioned by a developer or tester.
@@ -233,6 +242,7 @@ type VolumeSnapshotDataSource struct {
 	CinderSnapshot *CinderVolumeSnapshotSource `json:"cinderVolume,omitempty"`
 }
 
+// GetSupportedVolumeFromPVSpec gets supported volume from PV spec
 func GetSupportedVolumeFromPVSpec(spec *core_v1.PersistentVolumeSpec) string {
 	if spec.HostPath != nil {
 		return "hostPath"
@@ -249,6 +259,7 @@ func GetSupportedVolumeFromPVSpec(spec *core_v1.PersistentVolumeSpec) string {
 	return ""
 }
 
+// GetSupportedVolumeFromSnapshotDataSpec gets supported volume from snapshot data spec
 func GetSupportedVolumeFromSnapshotDataSpec(spec *VolumeSnapshotDataSpec) string {
 	if spec.HostPath != nil {
 		return "hostPath"
@@ -265,91 +276,102 @@ func GetSupportedVolumeFromSnapshotDataSpec(spec *VolumeSnapshotDataSpec) string
 	return ""
 }
 
-// Required to satisfy Object interface
+// GetObjectKind is required to satisfy Object interface
 func (v *VolumeSnapshotData) GetObjectKind() schema.ObjectKind {
 	return &v.TypeMeta
 }
 
-// Required to satisfy ObjectMetaAccessor interface
+// GetObjectMeta is required to satisfy ObjectMetaAccessor interface
 func (v *VolumeSnapshotData) GetObjectMeta() metav1.Object {
 	return &v.Metadata
 }
 
-// Required to satisfy Object interface
+// GetObjectKind is required to satisfy Object interface
 func (vd *VolumeSnapshotDataList) GetObjectKind() schema.ObjectKind {
 	return &vd.TypeMeta
 }
 
-// Required to satisfy ListMetaAccessor interface
+// GetListMeta is required to satisfy ListMetaAccessor interface
 func (vd *VolumeSnapshotDataList) GetListMeta() metav1.List {
 	return &vd.Metadata
 }
 
-// Required to satisfy Object interface
+// GetObjectKind is required to satisfy Object interface
 func (v *VolumeSnapshot) GetObjectKind() schema.ObjectKind {
 	return &v.TypeMeta
 }
 
-// Required to satisfy ObjectMetaAccessor interface
+// GetObjectMeta is required to satisfy ObjectMetaAccessor interface
 func (v *VolumeSnapshot) GetObjectMeta() metav1.Object {
 	return &v.Metadata
 }
 
-// Required to satisfy Object interface
+// GetObjectKind is required to satisfy Object interface
 func (vd *VolumeSnapshotList) GetObjectKind() schema.ObjectKind {
 	return &vd.TypeMeta
 }
 
-// Required to satisfy ListMetaAccessor interface
+// GetListMeta is required to satisfy ListMetaAccessor interface
 func (vd *VolumeSnapshotList) GetListMeta() metav1.List {
 	return &vd.Metadata
 }
 
+// VolumeSnapshotDataListCopy is a VolumeSnapshotDataList type
 type VolumeSnapshotDataListCopy VolumeSnapshotDataList
+
+// VolumeSnapshotDataCopy is a VolumeSnapshotData type
 type VolumeSnapshotDataCopy VolumeSnapshotData
+
+// VolumeSnapshotListCopy is a VolumeSnapshotList type
 type VolumeSnapshotListCopy VolumeSnapshotList
+
+// VolumeSnapshotCopy is a VolumeSnapshot type
 type VolumeSnapshotCopy VolumeSnapshot
 
-func (e *VolumeSnapshot) UnmarshalJSON(data []byte) error {
+// UnmarshalJSON unmarshalls json data
+func (v *VolumeSnapshot) UnmarshalJSON(data []byte) error {
 	tmp := VolumeSnapshotCopy{}
 	err := json.Unmarshal(data, &tmp)
 	if err != nil {
 		return err
 	}
 	tmp2 := VolumeSnapshot(tmp)
-	*e = tmp2
+	*v = tmp2
 	return nil
 }
 
-func (el *VolumeSnapshotList) UnmarshalJSON(data []byte) error {
+// UnmarshalJSON unmarshals json data
+func (vd *VolumeSnapshotList) UnmarshalJSON(data []byte) error {
 	tmp := VolumeSnapshotListCopy{}
 	err := json.Unmarshal(data, &tmp)
 	if err != nil {
 		return err
 	}
 	tmp2 := VolumeSnapshotList(tmp)
-	*el = tmp2
+	*vd = tmp2
 	return nil
 }
 
-func (e *VolumeSnapshotData) UnmarshalJSON(data []byte) error {
+// UnmarshalJSON unmarshals json data
+func (v *VolumeSnapshotData) UnmarshalJSON(data []byte) error {
 	tmp := VolumeSnapshotDataCopy{}
 	err := json.Unmarshal(data, &tmp)
 	if err != nil {
 		return err
 	}
 	tmp2 := VolumeSnapshotData(tmp)
-	*e = tmp2
+	*v = tmp2
 	return nil
 }
 
-func (el *VolumeSnapshotDataList) UnmarshalJSON(data []byte) error {
+// UnmarshalJSON unmarshals json data
+func (vd *VolumeSnapshotDataList) UnmarshalJSON(data []byte) error {
 	tmp := VolumeSnapshotDataListCopy{}
 	err := json.Unmarshal(data, &tmp)
 	if err != nil {
 		return err
 	}
 	tmp2 := VolumeSnapshotDataList(tmp)
-	*el = tmp2
+	*vd = tmp2
 	return nil
 }

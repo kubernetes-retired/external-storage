@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package aws_ebs
+package awsebs
 
 import (
 	"fmt"
@@ -37,12 +37,14 @@ type awsEBSPlugin struct {
 	cloud *aws.Cloud
 }
 
-var _ volume.VolumePlugin = &awsEBSPlugin{}
+var _ volume.Plugin = &awsEBSPlugin{}
 
-func RegisterPlugin() volume.VolumePlugin {
+// RegisterPlugin registers the volume plugin
+func RegisterPlugin() volume.Plugin {
 	return &awsEBSPlugin{}
 }
 
+// GetPluginName gets the name of the volume plugin
 func GetPluginName() string {
 	return "aws_ebs"
 }
@@ -56,22 +58,22 @@ func (a *awsEBSPlugin) SnapshotCreate(pv *v1.PersistentVolume, tags *map[string]
 	if spec == nil || spec.AWSElasticBlockStore == nil {
 		return nil, nil, fmt.Errorf("invalid PV spec %v", spec)
 	}
-	volumeId := spec.AWSElasticBlockStore.VolumeID
-	if ind := strings.LastIndex(volumeId, "/"); ind >= 0 {
-		volumeId = volumeId[(ind + 1):]
+	volumeID := spec.AWSElasticBlockStore.VolumeID
+	if ind := strings.LastIndex(volumeID, "/"); ind >= 0 {
+		volumeID = volumeID[(ind + 1):]
 	}
 	snapshotOpt := &aws.SnapshotOptions{
-		VolumeId: volumeId,
+		VolumeID: volumeID,
 		Tags:     tags,
 	}
 	// TODO: Convert AWS EBS snapshot status to crdv1.VolumeSnapshotCondition
-	snapshotId, status, err := a.cloud.CreateSnapshot(snapshotOpt)
+	snapshotID, status, err := a.cloud.CreateSnapshot(snapshotOpt)
 	if err != nil {
 		return nil, nil, err
 	}
 	return &crdv1.VolumeSnapshotDataSource{
 		AWSElasticBlockStore: &crdv1.AWSElasticBlockStoreVolumeSnapshotSource{
-			SnapshotID: snapshotId,
+			SnapshotID: snapshotID,
 		},
 	}, convertAWSStatus(status), nil
 }
@@ -80,9 +82,9 @@ func (a *awsEBSPlugin) SnapshotDelete(src *crdv1.VolumeSnapshotDataSource, _ *v1
 	if src == nil || src.AWSElasticBlockStore == nil {
 		return fmt.Errorf("invalid VolumeSnapshotDataSource: %v", src)
 	}
-	snapshotId := src.AWSElasticBlockStore.SnapshotID
-	_, err := a.cloud.DeleteSnapshot(snapshotId)
-	glog.Infof("delete snapshot %s, err: %v", snapshotId, err)
+	snapshotID := src.AWSElasticBlockStore.SnapshotID
+	_, err := a.cloud.DeleteSnapshot(snapshotID)
+	glog.Infof("delete snapshot %s, err: %v", snapshotID, err)
 	if err != nil {
 		return err
 	}
@@ -94,8 +96,8 @@ func (a *awsEBSPlugin) DescribeSnapshot(snapshotData *crdv1.VolumeSnapshotData) 
 	if snapshotData == nil || snapshotData.Spec.AWSElasticBlockStore == nil {
 		return nil, false, fmt.Errorf("invalid VolumeSnapshotDataSource: %v", snapshotData)
 	}
-	snapshotId := snapshotData.Spec.AWSElasticBlockStore.SnapshotID
-	status, isCompleted, err := a.cloud.DescribeSnapshot(snapshotId)
+	snapshotID := snapshotData.Spec.AWSElasticBlockStore.SnapshotID
+	status, isCompleted, err := a.cloud.DescribeSnapshot(snapshotID)
 	return convertAWSStatus(status), isCompleted, err
 }
 
@@ -122,9 +124,9 @@ func (a *awsEBSPlugin) SnapshotRestore(snapshotData *crdv1.VolumeSnapshotData, p
 		return nil, nil, fmt.Errorf("nil pvc")
 	}
 
-	snapId := snapshotData.Spec.AWSElasticBlockStore.SnapshotID
+	snapID := snapshotData.Spec.AWSElasticBlockStore.SnapshotID
 
-	tags["Name"] = kvol.GenerateVolumeName("Created from snapshot "+snapId+" ", pvName, 255) // AWS tags can have 255 characters
+	tags["Name"] = kvol.GenerateVolumeName("Created from snapshot "+snapID+" ", pvName, 255) // AWS tags can have 255 characters
 
 	capacity := pvc.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	requestBytes := capacity.Value()
@@ -134,7 +136,7 @@ func (a *awsEBSPlugin) SnapshotRestore(snapshotData *crdv1.VolumeSnapshotData, p
 		CapacityGB: requestGB,
 		Tags:       tags,
 		PVCName:    pvc.Name,
-		SnapshotId: snapId,
+		SnapshotID: snapID,
 	}
 	// Apply Parameters (case-insensitive). We leave validation of
 	// the values to the cloud provider.
@@ -155,7 +157,7 @@ func (a *awsEBSPlugin) SnapshotRestore(snapshotData *crdv1.VolumeSnapshotData, p
 				return nil, nil, fmt.Errorf("invalid encrypted boolean value %q, must be true or false: %v", v, err)
 			}
 		case "kmskeyid":
-			volumeOptions.KmsKeyId = v
+			volumeOptions.KmsKeyID = v
 		default:
 			return nil, nil, fmt.Errorf("invalid option %q", k)
 		}
@@ -196,8 +198,8 @@ func (a *awsEBSPlugin) VolumeDelete(pv *v1.PersistentVolume) error {
 	if pv == nil || pv.Spec.AWSElasticBlockStore == nil {
 		return fmt.Errorf("invalid EBS PV: %v", pv)
 	}
-	volumeId := pv.Spec.AWSElasticBlockStore.VolumeID
-	_, err := a.cloud.DeleteDisk(aws.KubernetesVolumeID(volumeId))
+	volumeID := pv.Spec.AWSElasticBlockStore.VolumeID
+	_, err := a.cloud.DeleteDisk(aws.KubernetesVolumeID(volumeID))
 	if err != nil {
 		return err
 	}

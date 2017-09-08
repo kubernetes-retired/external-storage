@@ -23,6 +23,7 @@ import (
 	"github.com/golang/glog"
 )
 
+// NewNetworkV2 creates a new Network V2 endpoint
 func (os *OpenStack) NewNetworkV2() (*gophercloud.ServiceClient, error) {
 	network, err := openstack.NewNetworkV2(os.provider, gophercloud.EndpointOpts{
 		Region: os.region,
@@ -34,6 +35,7 @@ func (os *OpenStack) NewNetworkV2() (*gophercloud.ServiceClient, error) {
 	return network, nil
 }
 
+// NewComputeV2 creates a new Compute V2 endpoint
 func (os *OpenStack) NewComputeV2() (*gophercloud.ServiceClient, error) {
 	compute, err := openstack.NewComputeV2(os.provider, gophercloud.EndpointOpts{
 		Region: os.region,
@@ -45,6 +47,9 @@ func (os *OpenStack) NewComputeV2() (*gophercloud.ServiceClient, error) {
 	return compute, nil
 }
 
+// NewBlockStorageV1 creates a new BlockStorage V1 endpoint
+// TODO(xyang): This should be removed at some point after the OpenStack Queens release
+// because V1 API has been deprecated for many releases and was finally removed from Cinder in Queens.
 func (os *OpenStack) NewBlockStorageV1() (*gophercloud.ServiceClient, error) {
 	storage, err := openstack.NewBlockStorageV1(os.provider, gophercloud.EndpointOpts{
 		Region: os.region,
@@ -56,6 +61,7 @@ func (os *OpenStack) NewBlockStorageV1() (*gophercloud.ServiceClient, error) {
 	return storage, nil
 }
 
+// NewBlockStorageV2 creates a new BlockStorage V2 endpoint
 func (os *OpenStack) NewBlockStorageV2() (*gophercloud.ServiceClient, error) {
 	storage, err := openstack.NewBlockStorageV2(os.provider, gophercloud.EndpointOpts{
 		Region: os.region,

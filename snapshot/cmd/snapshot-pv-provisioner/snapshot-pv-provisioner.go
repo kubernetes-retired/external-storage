@@ -30,9 +30,9 @@ import (
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/cloudprovider/providers/gce"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/cloudprovider/providers/openstack"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume"
-	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume/aws_ebs"
+	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume/awsebs"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume/cinder"
-	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume/gce_pd"
+	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume/gcepd"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume/hostpath"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -212,7 +212,7 @@ var (
 	id              = flag.String("id", "", "Unique provisioner identity")
 	cloudProvider   = flag.String("cloudprovider", "", "aws|gce|openstack")
 	cloudConfigFile = flag.String("cloudconfig", "", "Path to a Cloud config. Only required if cloudprovider is set.")
-	volumePlugins   = make(map[string]volume.VolumePlugin)
+	volumePlugins   = make(map[string]volume.Plugin)
 )
 
 func main() {
@@ -226,9 +226,9 @@ func main() {
 	} else {
 		config, err = rest.InClusterConfig()
 	}
-	prId := provisionerName
+	prID := provisionerName
 	if *id != "" {
-		prId = *id
+		prID = *id
 	}
 	if err != nil {
 		glog.Fatalf("Failed to create config: %v", err)
@@ -256,7 +256,7 @@ func main() {
 
 	// Create the provisioner: it implements the Provisioner interface expected by
 	// the controller
-	snapshotProvisioner := newSnapshotProvisioner(clientset, snapshotClient, prId)
+	snapshotProvisioner := newSnapshotProvisioner(clientset, snapshotClient, prID)
 
 	// Start the provision controller which will dynamically provision snapshot
 	// PVs
@@ -275,15 +275,15 @@ func buildVolumePlugins() {
 		cloud, err := cloudprovider.InitCloudProvider(*cloudProvider, *cloudConfigFile)
 		if err == nil && cloud != nil {
 			if *cloudProvider == aws.ProviderName {
-				awsPlugin := aws_ebs.RegisterPlugin()
+				awsPlugin := awsebs.RegisterPlugin()
 				awsPlugin.Init(cloud)
-				volumePlugins[aws_ebs.GetPluginName()] = awsPlugin
+				volumePlugins[awsebs.GetPluginName()] = awsPlugin
 			}
 			if *cloudProvider == gce.ProviderName {
-				gcePlugin := gce_pd.RegisterPlugin()
+				gcePlugin := gcepd.RegisterPlugin()
 				gcePlugin.Init(cloud)
-				volumePlugins[gce_pd.GetPluginName()] = gcePlugin
-				glog.Info("Register cloudprovider %s", gce_pd.GetPluginName())
+				volumePlugins[gcepd.GetPluginName()] = gcePlugin
+				glog.Info("Register cloudprovider %s", gcepd.GetPluginName())
 			}
 			if *cloudProvider == openstack.ProviderName {
 				cinderPlugin := cinder.RegisterPlugin()

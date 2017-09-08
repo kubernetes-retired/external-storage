@@ -26,10 +26,14 @@ import (
 	"strings"
 )
 
+// MakeSnapshotName makes a full name for a snapshot that includes
+// the namespace and the short name
 func MakeSnapshotName(namespace, name string) string {
 	return namespace + "/" + name
 }
 
+// GetNameAndNameSpaceFromSnapshotName retrieves the namespace and
+// the short name of a snapshot from its full name
 func GetNameAndNameSpaceFromSnapshotName(name string) (string, string, error) {
 	strs := strings.Split(name, "/")
 	if len(strs) != 2 {

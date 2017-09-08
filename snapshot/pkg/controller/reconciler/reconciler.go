@@ -51,7 +51,7 @@ type reconciler struct {
 	disableReconciliationSync bool
 }
 
-// The constructor
+// NewReconciler is the constructor of Reconciler
 func NewReconciler(
 	loopPeriod time.Duration,
 	syncDuration time.Duration,

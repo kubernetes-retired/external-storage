@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package gce_pd
+package gcepd
 
 import (
 	"fmt"
@@ -36,21 +36,23 @@ const (
 )
 
 type gcePersistentDiskPlugin struct {
-	cloud *gce.GCECloud
+	cloud *gce.Cloud
 }
 
-var _ volume.VolumePlugin = &gcePersistentDiskPlugin{}
+var _ volume.Plugin = &gcePersistentDiskPlugin{}
 
-func RegisterPlugin() volume.VolumePlugin {
+// RegisterPlugin registers the volume plugin
+func RegisterPlugin() volume.Plugin {
 	return &gcePersistentDiskPlugin{}
 }
 
+// GetPluginName gets the name of the volume plugin
 func GetPluginName() string {
 	return gcePersistentDiskPluginName
 }
 
 func (plugin *gcePersistentDiskPlugin) Init(cloud cloudprovider.Interface) {
-	plugin.cloud = cloud.(*gce.GCECloud)
+	plugin.cloud = cloud.(*gce.Cloud)
 }
 
 func (plugin *gcePersistentDiskPlugin) SnapshotCreate(pv *v1.PersistentVolume, tags *map[string]string) (*crdv1.VolumeSnapshotDataSource, *[]crdv1.VolumeSnapshotCondition, error) {
@@ -89,8 +91,8 @@ func (plugin *gcePersistentDiskPlugin) SnapshotRestore(snapshotData *crdv1.Volum
 		return nil, nil, fmt.Errorf("nil pvc")
 	}
 
-	snapId := snapshotData.Spec.GCEPersistentDiskSnapshot.SnapshotName
-	//diskName := k8svol.GenerateVolumeName("pv-from-snapshot"+snapId, pvName, 255)
+	snapID := snapshotData.Spec.GCEPersistentDiskSnapshot.SnapshotName
+	//diskName := k8svol.GenerateVolumeName("pv-from-snapshot"+snapID, pvName, 255)
 	diskName := pvName
 	capacity := pvc.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	requestBytes := capacity.Value()
@@ -123,7 +125,7 @@ func (plugin *gcePersistentDiskPlugin) SnapshotRestore(snapshotData *crdv1.Volum
 		zone = k8svol.ChooseZoneForVolume(zones, pvc.Name)
 	}
 
-	err = plugin.cloud.CreateDiskFromSnapshot(snapId, diskName, diskType, zone, requestGB, tags)
+	err = plugin.cloud.CreateDiskFromSnapshot(snapID, diskName, diskType, zone, requestGB, tags)
 	if err != nil {
 		glog.Infof("Error creating GCE PD volume: %v", err)
 		return nil, nil, err
@@ -157,8 +159,8 @@ func (plugin *gcePersistentDiskPlugin) SnapshotDelete(src *crdv1.VolumeSnapshotD
 	if src == nil || src.GCEPersistentDiskSnapshot == nil {
 		return fmt.Errorf("invalid VolumeSnapshotDataSource: %v", src)
 	}
-	snapshotId := src.GCEPersistentDiskSnapshot.SnapshotName
-	err := plugin.cloud.DeleteSnapshot(snapshotId)
+	snapshotID := src.GCEPersistentDiskSnapshot.SnapshotName
+	err := plugin.cloud.DeleteSnapshot(snapshotID)
 	if err != nil {
 		return err
 	}
@@ -170,14 +172,14 @@ func (plugin *gcePersistentDiskPlugin) DescribeSnapshot(snapshotData *crdv1.Volu
 	if snapshotData == nil || snapshotData.Spec.GCEPersistentDiskSnapshot == nil {
 		return nil, false, fmt.Errorf("invalid VolumeSnapshotDataSource: %v", snapshotData)
 	}
-	snapshotId := snapshotData.Spec.GCEPersistentDiskSnapshot.SnapshotName
-	_, isCompleted, err = plugin.cloud.DescribeSnapshot(snapshotId)
+	snapshotID := snapshotData.Spec.GCEPersistentDiskSnapshot.SnapshotName
+	_, isCompleted, err = plugin.cloud.DescribeSnapshot(snapshotID)
 	// TODO: Convert GCE status to []crdv1.VolumeSnapshotCondition
 	return nil, isCompleted, err
 }
 
 // FindSnapshot finds a VolumeSnapshot by matching metadata
-func (a *gcePersistentDiskPlugin) FindSnapshot(tags *map[string]string) (*crdv1.VolumeSnapshotDataSource, *[]crdv1.VolumeSnapshotCondition, error) {
+func (plugin *gcePersistentDiskPlugin) FindSnapshot(tags *map[string]string) (*crdv1.VolumeSnapshotDataSource, *[]crdv1.VolumeSnapshotCondition, error) {
 	glog.Infof("FindSnapshot by tags: %#v", *tags)
 
 	// TODO: Implement FindSnapshot

@@ -29,6 +29,9 @@ import (
 	crdv1 "github.com/kubernetes-incubator/external-storage/snapshot/pkg/apis/crd/v1"
 )
 
+// DesiredStateOfWorld defines a set of thread-safe operations supported on
+// the snapshot controller's desired state of the world cache. This cache
+// contains all the snapshots that should be created by the snapshot controller.
 type DesiredStateOfWorld interface {
 	// Adds snapshot to the list of snapshots. No-op if the snapshot
 	// is already in the list.
