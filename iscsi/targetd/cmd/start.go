@@ -128,6 +128,19 @@ func init() {
 	viper.BindPFlag("master", startcontrollerCmd.Flags().Lookup("master"))
 	startcontrollerCmd.Flags().String("kubeconfig", "", "Absolute path to the kubeconfig")
 	viper.BindPFlag("kubeconfig", startcontrollerCmd.Flags().Lookup("kubeconfig"))
+	startcontrollerCmd.Flags().String("session-chap-credential-file-path", "/var/run/secrets/iscsi-provisioner/session-chap-credential.properties", "path where the credential for session chap authentication can be found")
+	viper.BindPFlag("session-chap-credential-file-path", startcontrollerCmd.Flags().Lookup("session-chap-credential-file-path"))
+
+	// Here you will define your flags and configuration settings.
+
+	// Cobra supports Persistent Flags which will work for this command
+	// and all subcommands, e.g.:
+	// start-controllerCmd.PersistentFlags().String("foo", "", "A help for foo")
+
+	// Cobra supports local flags which will only run when this command
+	// is called directly, e.g.:
+	// start-controllerCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+
 }
 
 func initLog() {

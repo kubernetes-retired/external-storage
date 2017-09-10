@@ -32,4 +32,16 @@ spec:
                   key: password                    
             - name: TARGETD_ADDRESS
               value: {{ hostvars[groups['targetd'][0]]['ansible_default_ipv4']['address'] }}
-      serviceAccount: iscsi-provisioner   
+{% if chap_auth_session | bool %}
+          volumeMounts:
+          - name: chap-auth-volume
+            mountPath: /var/run/secrets/iscsi-provisioner
+{% endif %}
+      serviceAccount: iscsi-provisioner
+{% if chap_auth_session | bool %}
+      volumes:
+        - name: chap-auth-volume
+          secret:
+            secretName: chap-auth-secret
+{% endif %}
+
