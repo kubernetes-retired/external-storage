@@ -226,7 +226,6 @@ func (p *iscsiProvisioner) createVolume(options controller.VolumeOptions) (vol s
 	pool = p.getVolumeGroup(options)
 	initiators := p.getInitiators(options)
 	chapCredentials := &chapSessionCredentials{}
-
 	//read chap session authentication credentials
 	if getBool(options.Parameters["chapAuthSession"]) {
 		prop, err := properties.LoadFile(viper.GetString("session-chap-credential-file-path"), properties.UTF8)
