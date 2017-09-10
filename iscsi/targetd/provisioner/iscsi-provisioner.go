@@ -19,25 +19,41 @@ package provisioner
 import (
 	"errors"
 	"fmt"
-	"sort"
-	"strconv"
-	"strings"
-
 	"github.com/Sirupsen/logrus"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	"github.com/kubernetes-incubator/external-storage/lib/util"
+	"github.com/magiconair/properties"
 	"github.com/powerman/rpc-codec/jsonrpc2"
 	"github.com/spf13/viper"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sort"
+	"strconv"
+	"strings"
 )
 
 var log = logrus.New()
+
+type chapSessionCredentials struct {
+	InUser      string `properties:"node.session.auth.username"`
+	InPassword  string `properties:"node.session.auth.password"`
+	OutUser     string `properties:"node.session.auth.username_in"`
+	OutPassword string `properties:"node.session.auth.password_in"`
+}
 
 type volCreateArgs struct {
 	Pool string `json:"pool"`
 	Name string `json:"name"`
 	Size int64  `json:"size"`
+}
+
+//initiator_set_auth(initiator_wwn, in_user, in_pass, out_user, out_pass)
+type initiatorSetAuthArgs struct {
+	InitiatorWwn string `json:"initiator_wwn"`
+	InUser       string `json:"in_user"`
+	InPassword   string `json:"in_pass"`
+	OutUser      string `json:"out_user"`
+	OutPassword  string `json:"out_pass"`
 }
 
 type volDestroyArgs struct {
@@ -123,13 +139,16 @@ func (p *iscsiProvisioner) Provision(options controller.VolumeOptions) (*v1.Pers
 			},
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				ISCSI: &v1.ISCSIVolumeSource{
-					TargetPortal:   options.Parameters["targetPortal"],
-					Portals:        strings.Split(options.Parameters["portals"], "'"),
-					IQN:            options.Parameters["iqn"],
-					ISCSIInterface: options.Parameters["iscsiInterface"],
-					Lun:            lun,
-					ReadOnly:       getReadOnly(options.Parameters["readonly"]),
-					FSType:         getFsType(options.Parameters["fsType"]),
+					TargetPortal:      options.Parameters["targetPortal"],
+					Portals:           strings.Split(options.Parameters["portals"], "'"),
+					IQN:               options.Parameters["iqn"],
+					ISCSIInterface:    options.Parameters["iscsiInterface"],
+					Lun:               lun,
+					ReadOnly:          getReadOnly(options.Parameters["readonly"]),
+					FSType:            getFsType(options.Parameters["fsType"]),
+					DiscoveryCHAPAuth: getBool(options.Parameters["chapAuthDiscovery"]),
+					SessionCHAPAuth:   getBool(options.Parameters["chapAuthSession"]),
+					SecretRef:         getSecretRef(getBool(options.Parameters["chapAuthDiscovery"]), getBool(options.Parameters["chapAuthSession"]), &v1.LocalObjectReference{Name: viper.GetString("provisioner-name") + "-chap-secret"}),
 				},
 			},
 		},
@@ -150,6 +169,22 @@ func getFsType(fsType string) string {
 		return viper.GetString("default-fs")
 	}
 	return fsType
+}
+
+func getSecretRef(discovery bool, session bool, ref *v1.LocalObjectReference) *v1.LocalObjectReference {
+	if discovery || session {
+		return ref
+	}
+	return nil
+}
+
+func getBool(value string) bool {
+	res, err := strconv.ParseBool(value)
+	if err != nil {
+		return false
+	}
+	return res
+
 }
 
 // Delete removes the storage asset that was created by Provision represented
@@ -190,6 +225,22 @@ func (p *iscsiProvisioner) createVolume(options controller.VolumeOptions) (vol s
 	vol = p.getVolumeName(options)
 	pool = p.getVolumeGroup(options)
 	initiators := p.getInitiators(options)
+	chap_credentials := &chapSessionCredentials{}
+
+	//read chap session authentication credentials
+	if getBool(options.Parameters["chapAuthSession"]) {
+		prop, err := properties.LoadFile(viper.GetString("session-chap-credential-file-path"), properties.UTF8)
+		if err != nil {
+			log.Warnln(err)
+			return "", 0, "", err
+		}
+		err = prop.Decode(chap_credentials)
+		if err != nil {
+			log.Warnln(err)
+			return "", 0, "", err
+		}
+	}
+
 	log.Debugln("calling export_list")
 	exportList1, err := p.exportList()
 	if err != nil {
@@ -217,6 +268,15 @@ func (p *iscsiProvisioner) createVolume(options controller.VolumeOptions) (vol s
 			return "", 0, "", err
 		}
 		log.Debugln("exported volume name, lun, pool, initiator ", vol, lun, pool, initiator)
+		if getBool(options.Parameters["chapAuthSession"]) {
+			log.Debugln("setting up chap session auth for initiator, initiator, in_user, out_user: ", initiator, chap_credentials.InUser, chap_credentials.OutUser)
+			err = p.setInitiatorAuth(initiator, chap_credentials.InUser, chap_credentials.InPassword, chap_credentials.OutUser, chap_credentials.OutPassword)
+			if err != nil {
+				log.Warnln(err)
+				return "", 0, "", err
+			}
+			log.Debugln("set up chap session auth for initiator, initiator, in_user, out_user: ", initiator, chap_credentials.InUser, chap_credentials.OutUser)
+		}
 	}
 	return vol, lun, pool, nil
 }
@@ -359,6 +419,30 @@ func (p *iscsiProvisioner) exportList() (exportList, error) {
 	var result1 exportList
 	err = client.Call("export_list", nil, &result1)
 	return result1, err
+}
+
+//initiator_set_auth(initiator_wwn, in_user, in_pass, out_user, out_pass)
+
+func (p *iscsiProvisioner) setInitiatorAuth(initiator string, in_user string, in_password string, out_user string, out_password string) error {
+
+	client, err := p.getConnection()
+	defer client.Close()
+	if err != nil {
+		log.Warnln(err)
+		return err
+	}
+
+	//make arguments object
+	args := initiatorSetAuthArgs{
+		InitiatorWwn: initiator,
+		InUser:       in_user,
+		InPassword:   in_password,
+		OutUser:      out_user,
+		OutPassword:  out_password,
+	}
+	//call remote procedure with args
+	err = client.Call("initiator_set_auth", args, null)
+	return err
 }
 
 func (slice exportList) Len() int {
