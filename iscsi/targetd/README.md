@@ -359,3 +359,4 @@ If you enable iSCSI CHAP-based authentication, the ansible installer will set th
 However at provisioning time the provisioner will not setup the set secret. Having the permissions to setup secret in any manepsace would make the provisioner too powerful and insecure.
 So it is up to the project administrator to setup the secret.
 The name of the expected secret will be `<provisioner-name>-chap-secret` 
+
