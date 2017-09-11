@@ -544,15 +544,6 @@ func (lbaas *LbaasV2) createLoadBalancer(service *v1.Service, name string) (*loa
 	return loadbalancer, nil
 }
 
-func stringInArray(x string, list []string) bool {
-	for _, y := range list {
-		if y == x {
-			return true
-		}
-	}
-	return false
-}
-
 // GetLoadBalancer gets the status of the load balancer
 func (lbaas *LbaasV2) GetLoadBalancer(clusterName string, service *v1.Service) (*v1.LoadBalancerStatus, bool, error) {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
@@ -788,9 +779,9 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 				waitLoadbalancerActiveProvisioningStatus(lbaas.network, loadbalancer.ID)
 			}
 			// get and delete pool members
-			members, err := getMembersByPoolID(lbaas.network, pool.ID)
-			if err != nil && !isNotFound(err) {
-				return nil, fmt.Errorf("Error getting members for pool %s: %v", pool.ID, err)
+			members, poolErr := getMembersByPoolID(lbaas.network, pool.ID)
+			if poolErr != nil && !isNotFound(poolErr) {
+				return nil, fmt.Errorf("Error getting members for pool %s: %v", pool.ID, poolErr)
 			}
 			if members != nil {
 				for _, member := range members {
@@ -1082,9 +1073,9 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *v1.
 
 	if lbaas.opts.FloatingNetworkID != "" && loadbalancer != nil {
 		portID := loadbalancer.VipPortID
-		floatingIP, err := getFloatingIPByPortID(lbaas.network, portID)
-		if err != nil && err != ErrNotFound {
-			return err
+		floatingIP, addrErr := getFloatingIPByPortID(lbaas.network, portID)
+		if addrErr != nil && addrErr != ErrNotFound {
+			return addrErr
 		}
 		if floatingIP != nil {
 			err = floatingips.Delete(lbaas.network, floatingIP.ID).ExtractErr()
@@ -1104,9 +1095,9 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *v1.
 	var poolIDs []string
 	var monitorIDs []string
 	for _, listener := range listenerList {
-		pool, err := getPoolByListenerID(lbaas.network, loadbalancer.ID, listener.ID)
-		if err != nil && err != ErrNotFound {
-			return fmt.Errorf("Error getting pool for listener %s: %v", listener.ID, err)
+		pool, poolErr := getPoolByListenerID(lbaas.network, loadbalancer.ID, listener.ID)
+		if poolErr != nil && poolErr != ErrNotFound {
+			return fmt.Errorf("Error getting pool for listener %s: %v", listener.ID, poolErr)
 		}
 		poolIDs = append(poolIDs, pool.ID)
 		monitorIDs = append(monitorIDs, pool.MonitorID)
@@ -1115,9 +1106,9 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *v1.
 	// get all members associated with each poolIDs
 	var memberIDs []string
 	for _, pool := range poolIDs {
-		membersList, err := getMembersByPoolID(lbaas.network, pool)
-		if err != nil && !isNotFound(err) {
-			return fmt.Errorf("Error getting pool members %s: %v", pool, err)
+		membersList, poolErr := getMembersByPoolID(lbaas.network, pool)
+		if poolErr != nil && !isNotFound(poolErr) {
+			return fmt.Errorf("Error getting pool members %s: %v", pool, poolErr)
 		}
 		for _, member := range membersList {
 			memberIDs = append(memberIDs, member.ID)
@@ -1391,9 +1382,9 @@ func (lb *LbaasV1) UpdateLoadBalancer(clusterName string, service *v1.Service, n
 	// Set of member (addresses) that _should_ exist
 	addrs := map[string]bool{}
 	for _, node := range nodes {
-		addr, err := nodeAddressForLB(node)
-		if err != nil {
-			return err
+		addr, addrErr := nodeAddressForLB(node)
+		if addrErr != nil {
+			return addrErr
 		}
 
 		addrs[addr] = true
@@ -1452,9 +1443,9 @@ func (lb *LbaasV1) EnsureLoadBalancerDeleted(clusterName string, service *v1.Ser
 	}
 
 	if lb.opts.FloatingNetworkID != "" && vip != nil {
-		floatingIP, err := getFloatingIPByPortID(lb.network, vip.PortID)
-		if err != nil && !isNotFound(err) {
-			return err
+		floatingIP, addrErr := getFloatingIPByPortID(lb.network, vip.PortID)
+		if addrErr != nil && !isNotFound(addrErr) {
+			return addrErr
 		}
 		if floatingIP != nil {
 			err = floatingips.Delete(lb.network, floatingIP.ID).ExtractErr()
