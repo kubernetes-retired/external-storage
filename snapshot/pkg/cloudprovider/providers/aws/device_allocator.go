@@ -25,14 +25,14 @@ import "fmt"
 // "/dev/xvdba".
 type ExistingDevices map[mountDevice]awsVolumeID
 
-// On AWS, we should assign new (not yet used) device names to attached volumes.
-// If we reuse a previously used name, we may get the volume "attaching" forever,
-// see https://aws.amazon.com/premiumsupport/knowledge-center/ebs-stuck-attaching/.
 // DeviceAllocator finds available device name, taking into account already
 // assigned device names from ExistingDevices map. It tries to find the next
 // device name to the previously assigned one (from previous DeviceAllocator
 // call), so all available device names are used eventually and it minimizes
 // device name reuse.
+// On AWS, we should assign new (not yet used) device names to attached volumes.
+// If we reuse a previously used name, we may get the volume "attaching" forever,
+// see https://aws.amazon.com/premiumsupport/knowledge-center/ebs-stuck-attaching/.
 // All these allocations are in-memory, nothing is written to / read from
 // /dev directory.
 type DeviceAllocator interface {
@@ -47,7 +47,7 @@ type deviceAllocator struct {
 	lastIndex       int
 }
 
-// Allocates device names according to scheme ba..bz, ca..cz
+// NewDeviceAllocator allocates device names according to scheme ba..bz, ca..cz
 // it moves along the ring and always picks next device until
 // device list is exhausted.
 func NewDeviceAllocator(lastIndex int) DeviceAllocator {

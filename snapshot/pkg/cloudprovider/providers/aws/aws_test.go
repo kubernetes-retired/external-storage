@@ -37,7 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-const TestClusterId = "clusterid.test"
+const TestClusterID = "clusterid.test"
 const TestClusterName = "testCluster"
 
 func TestReadAWSCloudConfig(t *testing.T) {
@@ -147,7 +147,7 @@ func NewFakeAWSServices() *FakeAWSServices {
 
 	var tag ec2.Tag
 	tag.Key = aws.String(TagNameKubernetesClusterLegacy)
-	tag.Value = aws.String(TestClusterId)
+	tag.Value = aws.String(TestClusterID)
 	selfInstance.Tags = []*ec2.Tag{&tag}
 
 	return s
@@ -283,7 +283,7 @@ func instanceMatchesFilter(instance *ec2.Instance, filter *ec2.Filter) bool {
 	panic("Unknown filter name: " + name)
 }
 
-func (self *FakeEC2) DescribeInstances(request *ec2.DescribeInstancesInput) ([]*ec2.Instance, error) {
+func (e *FakeEC2) DescribeInstances(request *ec2.DescribeInstancesInput) ([]*ec2.Instance, error) {
 	matches := []*ec2.Instance{}
 	for _, instance := range self.aws.instances {
 		if request.InstanceIds != nil {
@@ -325,7 +325,7 @@ type FakeMetadata struct {
 	aws *FakeAWSServices
 }
 
-func (self *FakeMetadata) GetMetadata(key string) (string, error) {
+func (fake *FakeMetadata) GetMetadata(key string) (string, error) {
 	networkInterfacesPrefix := "network/interfaces/macs/"
 	i := self.aws.selfInstance
 	if key == "placement/availability-zone" {
@@ -347,28 +347,26 @@ func (self *FakeMetadata) GetMetadata(key string) (string, error) {
 	} else if strings.HasPrefix(key, networkInterfacesPrefix) {
 		if key == networkInterfacesPrefix {
 			return strings.Join(self.aws.networkInterfacesMacs, "/\n") + "/\n", nil
-		} else {
-			keySplit := strings.Split(key, "/")
-			macParam := keySplit[3]
-			if len(keySplit) == 5 && keySplit[4] == "vpc-id" {
-				for i, macElem := range self.aws.networkInterfacesMacs {
-					if macParam == macElem {
-						return self.aws.networkInterfacesVpcIDs[i], nil
-					}
+		}
+		keySplit := strings.Split(key, "/")
+		macParam := keySplit[3]
+		if len(keySplit) == 5 && keySplit[4] == "vpc-id" {
+			for i, macElem := range self.aws.networkInterfacesMacs {
+				if macParam == macElem {
+					return self.aws.networkInterfacesVpcIDs[i], nil
 				}
 			}
-			return "", nil
 		}
-	} else {
 		return "", nil
 	}
+	return "", nil
 }
 
-func (ec2 *FakeEC2) AttachVolume(request *ec2.AttachVolumeInput) (resp *ec2.VolumeAttachment, err error) {
+func (e *FakeEC2) AttachVolume(request *ec2.AttachVolumeInput) (resp *ec2.VolumeAttachment, err error) {
 	panic("Not implemented")
 }
 
-func (ec2 *FakeEC2) DetachVolume(request *ec2.DetachVolumeInput) (resp *ec2.VolumeAttachment, err error) {
+func (e *FakeEC2) DetachVolume(request *ec2.DetachVolumeInput) (resp *ec2.VolumeAttachment, err error) {
 	panic("Not implemented")
 }
 
@@ -377,57 +375,57 @@ func (e *FakeEC2) DescribeVolumes(request *ec2.DescribeVolumesInput) ([]*ec2.Vol
 	return args.Get(0).([]*ec2.Volume), nil
 }
 
-func (ec2 *FakeEC2) CreateVolume(request *ec2.CreateVolumeInput) (resp *ec2.Volume, err error) {
+func (e *FakeEC2) CreateVolume(request *ec2.CreateVolumeInput) (resp *ec2.Volume, err error) {
 	panic("Not implemented")
 }
 
-func (ec2 *FakeEC2) DeleteVolume(request *ec2.DeleteVolumeInput) (resp *ec2.DeleteVolumeOutput, err error) {
+func (e *FakeEC2) DeleteVolume(request *ec2.DeleteVolumeInput) (resp *ec2.DeleteVolumeOutput, err error) {
 	panic("Not implemented")
 }
 
-func (ec2 *FakeEC2) DescribeSecurityGroups(request *ec2.DescribeSecurityGroupsInput) ([]*ec2.SecurityGroup, error) {
+func (e *FakeEC2) DescribeSecurityGroups(request *ec2.DescribeSecurityGroupsInput) ([]*ec2.SecurityGroup, error) {
 	panic("Not implemented")
 }
 
-func (ec2 *FakeEC2) CreateSecurityGroup(*ec2.CreateSecurityGroupInput) (*ec2.CreateSecurityGroupOutput, error) {
+func (e *FakeEC2) CreateSecurityGroup(*ec2.CreateSecurityGroupInput) (*ec2.CreateSecurityGroupOutput, error) {
 	panic("Not implemented")
 }
 
-func (ec2 *FakeEC2) DeleteSecurityGroup(*ec2.DeleteSecurityGroupInput) (*ec2.DeleteSecurityGroupOutput, error) {
+func (e *FakeEC2) DeleteSecurityGroup(*ec2.DeleteSecurityGroupInput) (*ec2.DeleteSecurityGroupOutput, error) {
 	panic("Not implemented")
 }
 
-func (ec2 *FakeEC2) AuthorizeSecurityGroupIngress(*ec2.AuthorizeSecurityGroupIngressInput) (*ec2.AuthorizeSecurityGroupIngressOutput, error) {
+func (e *FakeEC2) AuthorizeSecurityGroupIngress(*ec2.AuthorizeSecurityGroupIngressInput) (*ec2.AuthorizeSecurityGroupIngressOutput, error) {
 	panic("Not implemented")
 }
 
-func (ec2 *FakeEC2) RevokeSecurityGroupIngress(*ec2.RevokeSecurityGroupIngressInput) (*ec2.RevokeSecurityGroupIngressOutput, error) {
+func (e *FakeEC2) RevokeSecurityGroupIngress(*ec2.RevokeSecurityGroupIngressInput) (*ec2.RevokeSecurityGroupIngressOutput, error) {
 	panic("Not implemented")
 }
 
-func (ec2 *FakeEC2) DescribeSubnets(request *ec2.DescribeSubnetsInput) ([]*ec2.Subnet, error) {
+func (e *FakeEC2) DescribeSubnets(request *ec2.DescribeSubnetsInput) ([]*ec2.Subnet, error) {
 	ec2.DescribeSubnetsInput = request
 	return ec2.Subnets, nil
 }
 
-func (ec2 *FakeEC2) CreateTags(*ec2.CreateTagsInput) (*ec2.CreateTagsOutput, error) {
+func (e *FakeEC2) CreateTags(*ec2.CreateTagsInput) (*ec2.CreateTagsOutput, error) {
 	panic("Not implemented")
 }
 
-func (ec2 *FakeEC2) DescribeRouteTables(request *ec2.DescribeRouteTablesInput) ([]*ec2.RouteTable, error) {
+func (e *FakeEC2) DescribeRouteTables(request *ec2.DescribeRouteTablesInput) ([]*ec2.RouteTable, error) {
 	ec2.DescribeRouteTablesInput = request
 	return ec2.RouteTables, nil
 }
 
-func (s *FakeEC2) CreateRoute(request *ec2.CreateRouteInput) (*ec2.CreateRouteOutput, error) {
+func (e *FakeEC2) CreateRoute(request *ec2.CreateRouteInput) (*ec2.CreateRouteOutput, error) {
 	panic("Not implemented")
 }
 
-func (s *FakeEC2) DeleteRoute(request *ec2.DeleteRouteInput) (*ec2.DeleteRouteOutput, error) {
+func (e *FakeEC2) DeleteRoute(request *ec2.DeleteRouteInput) (*ec2.DeleteRouteOutput, error) {
 	panic("Not implemented")
 }
 
-func (s *FakeEC2) ModifyInstanceAttribute(request *ec2.ModifyInstanceAttributeInput) (*ec2.ModifyInstanceAttributeOutput, error) {
+func (e *FakeEC2) ModifyInstanceAttribute(request *ec2.ModifyInstanceAttributeInput) (*ec2.ModifyInstanceAttributeOutput, error) {
 	panic("Not implemented")
 }
 
@@ -476,23 +474,23 @@ func (ec2 *FakeELB) ApplySecurityGroupsToLoadBalancer(*elb.ApplySecurityGroupsTo
 	panic("Not implemented")
 }
 
-func (elb *FakeELB) ConfigureHealthCheck(*elb.ConfigureHealthCheckInput) (*elb.ConfigureHealthCheckOutput, error) {
+func (ec2 *FakeELB) ConfigureHealthCheck(*elb.ConfigureHealthCheckInput) (*elb.ConfigureHealthCheckOutput, error) {
 	panic("Not implemented")
 }
 
-func (elb *FakeELB) CreateLoadBalancerPolicy(*elb.CreateLoadBalancerPolicyInput) (*elb.CreateLoadBalancerPolicyOutput, error) {
+func (ec2 *FakeELB) CreateLoadBalancerPolicy(*elb.CreateLoadBalancerPolicyInput) (*elb.CreateLoadBalancerPolicyOutput, error) {
 	panic("Not implemented")
 }
 
-func (elb *FakeELB) SetLoadBalancerPoliciesForBackendServer(*elb.SetLoadBalancerPoliciesForBackendServerInput) (*elb.SetLoadBalancerPoliciesForBackendServerOutput, error) {
+func (ec2 *FakeELB) SetLoadBalancerPoliciesForBackendServer(*elb.SetLoadBalancerPoliciesForBackendServerInput) (*elb.SetLoadBalancerPoliciesForBackendServerOutput, error) {
 	panic("Not implemented")
 }
 
-func (elb *FakeELB) DescribeLoadBalancerAttributes(*elb.DescribeLoadBalancerAttributesInput) (*elb.DescribeLoadBalancerAttributesOutput, error) {
+func (ec2 *FakeELB) DescribeLoadBalancerAttributes(*elb.DescribeLoadBalancerAttributesInput) (*elb.DescribeLoadBalancerAttributesOutput, error) {
 	panic("Not implemented")
 }
 
-func (elb *FakeELB) ModifyLoadBalancerAttributes(*elb.ModifyLoadBalancerAttributesInput) (*elb.ModifyLoadBalancerAttributesOutput, error) {
+func (ec2 *FakeELB) ModifyLoadBalancerAttributes(*elb.ModifyLoadBalancerAttributesInput) (*elb.ModifyLoadBalancerAttributesOutput, error) {
 	panic("Not implemented")
 }
 
@@ -752,13 +750,13 @@ func TestSubnetIDsinVPC(t *testing.T) {
 		return
 	}
 
-	result_set := make(map[string]bool)
+	resultSet := make(map[string]bool)
 	for _, v := range result {
-		result_set[v] = true
+		resultSet[v] = true
 	}
 
 	for i := range subnets {
-		if !result_set[subnets[i]["id"]] {
+		if !resultSet[subnets[i]["id"]] {
 			t.Errorf("Expected subnet%d '%s' in result: %v", i, subnets[i]["id"], result)
 			return
 		}
@@ -778,13 +776,13 @@ func TestSubnetIDsinVPC(t *testing.T) {
 		return
 	}
 
-	result_set = make(map[string]bool)
+	resultSet = make(map[string]bool)
 	for _, v := range result {
-		result_set[v] = true
+		resultSet[v] = true
 	}
 
 	for i := range subnets {
-		if !result_set[subnets[i]["id"]] {
+		if !resultSet[subnets[i]["id"]] {
 			t.Errorf("Expected subnet%d '%s' in result: %v", i, subnets[i]["id"], result)
 			return
 		}
@@ -848,7 +846,7 @@ func TestSubnetIDsinVPC(t *testing.T) {
 }
 
 func TestIpPermissionExistsHandlesMultipleGroupIds(t *testing.T) {
-	oldIpPermission := ec2.IpPermission{
+	oldIPPermission := ec2.IpPermission{
 		UserIdGroupPairs: []*ec2.UserIdGroupPair{
 			{GroupId: aws.String("firstGroupId")},
 			{GroupId: aws.String("secondGroupId")},
@@ -856,24 +854,24 @@ func TestIpPermissionExistsHandlesMultipleGroupIds(t *testing.T) {
 		},
 	}
 
-	existingIpPermission := ec2.IpPermission{
+	existingIPPermission := ec2.IpPermission{
 		UserIdGroupPairs: []*ec2.UserIdGroupPair{
 			{GroupId: aws.String("secondGroupId")},
 		},
 	}
 
-	newIpPermission := ec2.IpPermission{
+	newIPPermission := ec2.IpPermission{
 		UserIdGroupPairs: []*ec2.UserIdGroupPair{
 			{GroupId: aws.String("fourthGroupId")},
 		},
 	}
 
-	equals := ipPermissionExists(&existingIpPermission, &oldIpPermission, false)
+	equals := ipPermissionExists(&existingIPPermission, &oldIPPermission, false)
 	if !equals {
 		t.Errorf("Should have been considered equal since first is in the second array of groups")
 	}
 
-	equals = ipPermissionExists(&newIpPermission, &oldIpPermission, false)
+	equals = ipPermissionExists(&newIPPermission, &oldIPPermission, false)
 	if equals {
 		t.Errorf("Should have not been considered equal since first is not in the second array of groups")
 	}
@@ -881,9 +879,9 @@ func TestIpPermissionExistsHandlesMultipleGroupIds(t *testing.T) {
 
 func TestIpPermissionExistsHandlesRangeSubsets(t *testing.T) {
 	// Two existing scenarios we'll test against
-	emptyIpPermission := ec2.IpPermission{}
+	emptyIPPermission := ec2.IpPermission{}
 
-	oldIpPermission := ec2.IpPermission{
+	oldIPPermission := ec2.IpPermission{
 		IpRanges: []*ec2.IpRange{
 			{CidrIp: aws.String("10.0.0.0/8")},
 			{CidrIp: aws.String("192.168.1.0/24")},
@@ -891,53 +889,53 @@ func TestIpPermissionExistsHandlesRangeSubsets(t *testing.T) {
 	}
 
 	// Two already existing ranges and a new one
-	existingIpPermission := ec2.IpPermission{
+	existingIPPermission := ec2.IpPermission{
 		IpRanges: []*ec2.IpRange{
 			{CidrIp: aws.String("10.0.0.0/8")},
 		},
 	}
-	existingIpPermission2 := ec2.IpPermission{
+	existingIPPermission2 := ec2.IpPermission{
 		IpRanges: []*ec2.IpRange{
 			{CidrIp: aws.String("192.168.1.0/24")},
 		},
 	}
 
-	newIpPermission := ec2.IpPermission{
+	newIPPermission := ec2.IpPermission{
 		IpRanges: []*ec2.IpRange{
 			{CidrIp: aws.String("172.16.0.0/16")},
 		},
 	}
 
-	exists := ipPermissionExists(&emptyIpPermission, &emptyIpPermission, false)
+	exists := ipPermissionExists(&emptyIPPermission, &emptyIPPermission, false)
 	if !exists {
 		t.Errorf("Should have been considered existing since we're comparing a range array against itself")
 	}
-	exists = ipPermissionExists(&oldIpPermission, &oldIpPermission, false)
+	exists = ipPermissionExists(&oldIPPermission, &oldIPPermission, false)
 	if !exists {
 		t.Errorf("Should have been considered existing since we're comparing a range array against itself")
 	}
 
-	exists = ipPermissionExists(&existingIpPermission, &oldIpPermission, false)
+	exists = ipPermissionExists(&existingIPPermission, &oldIPPermission, false)
 	if !exists {
 		t.Errorf("Should have been considered existing since 10.* is in oldIpPermission's array of ranges")
 	}
-	exists = ipPermissionExists(&existingIpPermission2, &oldIpPermission, false)
+	exists = ipPermissionExists(&existingIPPermission2, &oldIPPermission, false)
 	if !exists {
 		t.Errorf("Should have been considered existing since 192.* is in oldIpPermission2's array of ranges")
 	}
 
-	exists = ipPermissionExists(&newIpPermission, &emptyIpPermission, false)
+	exists = ipPermissionExists(&newIPPermission, &emptyIPPermission, false)
 	if exists {
 		t.Errorf("Should have not been considered existing since we compared against a missing array of ranges")
 	}
-	exists = ipPermissionExists(&newIpPermission, &oldIpPermission, false)
+	exists = ipPermissionExists(&newIPPermission, &oldIPPermission, false)
 	if exists {
 		t.Errorf("Should have not been considered existing since 172.* is not in oldIpPermission's array of ranges")
 	}
 }
 
 func TestIpPermissionExistsHandlesMultipleGroupIdsWithUserIds(t *testing.T) {
-	oldIpPermission := ec2.IpPermission{
+	oldIPPermission := ec2.IpPermission{
 		UserIdGroupPairs: []*ec2.UserIdGroupPair{
 			{GroupId: aws.String("firstGroupId"), UserId: aws.String("firstUserId")},
 			{GroupId: aws.String("secondGroupId"), UserId: aws.String("secondUserId")},
@@ -945,24 +943,24 @@ func TestIpPermissionExistsHandlesMultipleGroupIdsWithUserIds(t *testing.T) {
 		},
 	}
 
-	existingIpPermission := ec2.IpPermission{
+	existingIPPermission := ec2.IpPermission{
 		UserIdGroupPairs: []*ec2.UserIdGroupPair{
 			{GroupId: aws.String("secondGroupId"), UserId: aws.String("secondUserId")},
 		},
 	}
 
-	newIpPermission := ec2.IpPermission{
+	newIPPermission := ec2.IpPermission{
 		UserIdGroupPairs: []*ec2.UserIdGroupPair{
 			{GroupId: aws.String("secondGroupId"), UserId: aws.String("anotherUserId")},
 		},
 	}
 
-	equals := ipPermissionExists(&existingIpPermission, &oldIpPermission, true)
+	equals := ipPermissionExists(&existingIPPermission, &oldIPPermission, true)
 	if !equals {
 		t.Errorf("Should have been considered equal since first is in the second array of groups")
 	}
 
-	equals = ipPermissionExists(&newIpPermission, &oldIpPermission, true)
+	equals = ipPermissionExists(&newIPPermission, &oldIPPermission, true)
 	if equals {
 		t.Errorf("Should have not been considered equal since first is not in the second array of groups")
 	}
@@ -975,7 +973,7 @@ func TestFindInstanceByNodeNameExcludesTerminatedInstances(t *testing.T) {
 
 	var tag ec2.Tag
 	tag.Key = aws.String(TagNameKubernetesClusterLegacy)
-	tag.Value = aws.String(TestClusterId)
+	tag.Value = aws.String(TestClusterID)
 	tags := []*ec2.Tag{&tag}
 
 	var runningInstance ec2.Instance
@@ -1018,7 +1016,7 @@ func TestFindInstancesByNodeNameCached(t *testing.T) {
 	nodeNameTwo := "my-dns-two.internal"
 
 	var tag ec2.Tag
-	tag.Key = aws.String(TagNameKubernetesClusterPrefix + TestClusterId)
+	tag.Key = aws.String(TagNameKubernetesClusterPrefix + TestClusterID)
 	tag.Value = aws.String("")
 	tags := []*ec2.Tag{&tag}
 
@@ -1071,16 +1069,16 @@ func TestGetVolumeLabels(t *testing.T) {
 	awsServices := NewFakeAWSServices()
 	c, err := newAWSCloud(strings.NewReader("[global]"), awsServices)
 	assert.Nil(t, err, "Error building aws cloud: %v", err)
-	volumeId := awsVolumeID("vol-VolumeId")
-	expectedVolumeRequest := &ec2.DescribeVolumesInput{VolumeIds: []*string{volumeId.awsString()}}
+	volumeID := awsVolumeID("vol-VolumeId")
+	expectedVolumeRequest := &ec2.DescribeVolumesInput{VolumeIds: []*string{volumeID.awsString()}}
 	awsServices.ec2.On("DescribeVolumes", expectedVolumeRequest).Return([]*ec2.Volume{
 		{
-			VolumeId:         volumeId.awsString(),
+			VolumeId:         volumeID.awsString(),
 			AvailabilityZone: aws.String("us-east-1a"),
 		},
 	})
 
-	labels, err := c.GetVolumeLabels(KubernetesVolumeID("aws:///" + string(volumeId)))
+	labels, err := c.GetVolumeLabels(KubernetesVolumeID("aws:///" + string(volumeID)))
 
 	assert.Nil(t, err, "Error creating Volume %v", err)
 	assert.Equal(t, map[string]string{
@@ -1089,7 +1087,7 @@ func TestGetVolumeLabels(t *testing.T) {
 	awsServices.ec2.AssertExpectations(t)
 }
 
-func (self *FakeELB) expectDescribeLoadBalancers(loadBalancerName string) {
+func (ec2 *FakeELB) expectDescribeLoadBalancers(loadBalancerName string) {
 	self.On("DescribeLoadBalancers", &elb.DescribeLoadBalancersInput{LoadBalancerNames: []*string{aws.String(loadBalancerName)}}).Return(&elb.DescribeLoadBalancersOutput{
 		LoadBalancerDescriptions: []*elb.LoadBalancerDescription{{}},
 	})

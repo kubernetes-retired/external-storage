@@ -27,6 +27,10 @@ import (
 	crdv1 "github.com/kubernetes-incubator/external-storage/snapshot/pkg/apis/crd/v1"
 )
 
+// ActualStateOfWorld defines a set of thread-safe operations supported on
+// the snapshot controller's actual state of the world cache.
+// This cache contains snapshots the snapshot controller believes are
+// successfully created.
 type ActualStateOfWorld interface {
 	// Adds snapshot to the list of snapshots. No-op if the snapshot
 	// is already in the list.
