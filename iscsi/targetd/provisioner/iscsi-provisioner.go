@@ -137,7 +137,10 @@ func (p *iscsiProvisioner) Provision(options controller.VolumeOptions) (*v1.Pers
 }
 
 func getReadOnly(readonly string) bool {
-	isReadOnly, _ := strconv.ParseBool(readonly)
+	isReadOnly, err := strconv.ParseBool(readonly)
+	if err!=nil {
+		return false
+	}
 	return isReadOnly
 }
 

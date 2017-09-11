@@ -8,7 +8,7 @@ parameters:
   targetPortal: 192.168.99.100:3260
 
 # if you are using multipath, you can specify additional IPs here, default empty
-# portals: [192.168.99.101]  
+# portals: [192.168.99.101:3260]
   
 # this is the iscsi server iqn  
   iqn: iqn.2003-01.org.linux-iscsi.minishift:targetd
@@ -22,9 +22,9 @@ parameters:
 # this is a comma separated list of initiators that will be give access to the created volumes, they must correspond to what you have configured in your nodes.
   initiators: iqn.2017-04.com.example:node1
   
-# This is the fyilesystem you want your volume to be formatted with, default xfs  
+# This is the filesystem you want your volume to be formatted with, default xfs
 # fsType: xfs
 
-# Weather the volume should be mounted in readonly mode, default false
+# Whether the volume should be mounted in readonly mode, default false
 # readonly: false
   

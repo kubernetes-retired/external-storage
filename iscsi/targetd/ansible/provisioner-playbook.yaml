@@ -66,7 +66,6 @@
        changed_when: "'already exists' not in iscsi_role.stderr"
        register: iscsi_role
        when: system_role.rc == 1
-         policy add-cluster-role-to-user cluster-reader system:serviceaccount:iscsi-provisioner:iscsi-provisioner
 
      - name: Add system:persistent-volume-provisioner role to service account
        command: >
