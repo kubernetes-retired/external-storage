@@ -215,8 +215,8 @@ func (c *snapshotController) onSnapshotDelete(obj interface{}) {
 	deletedSnapshot, ok := obj.(*crdv1.VolumeSnapshot)
 	if !ok {
 		// DeletedFinalStateUnkown is an expected data type here
-		deletedState, ok := obj.(kcache.DeletedFinalStateUnknown)
-		if !ok {
+		deletedState, isState := obj.(kcache.DeletedFinalStateUnknown)
+		if !isState {
 			glog.Errorf("Error: unkown type passed as snapshot for deletion: %T", obj)
 			return
 		}
