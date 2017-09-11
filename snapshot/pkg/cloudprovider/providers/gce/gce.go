@@ -61,8 +61,6 @@ const (
 	gceAffinityTypeNone = "NONE"
 	// AffinityTypeClientIP - affinity based on Client IP.
 	gceAffinityTypeClientIP = "CLIENT_IP"
-	// AffinityTypeClientIPProto - affinity based on Client IP and port.
-	gceAffinityTypeClientIPProto = "CLIENT_IP_PROTO"
 
 	operationPollInterval = 3 * time.Second
 	// Creating Route in very large clusters, may take more than half an hour.
@@ -646,7 +644,7 @@ func (gce *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service,
 			return
 		}
 		if isSafeToReleaseIP {
-			if err := gce.deleteStaticIP(loadBalancerName, gce.region); err != nil {
+			if err = gce.deleteStaticIP(loadBalancerName, gce.region); err != nil {
 				glog.Errorf("failed to release static IP %s for load balancer (%v(%v), %v): %v", ipAddress, loadBalancerName, serviceName, gce.region, err)
 			}
 			glog.V(2).Infof("EnsureLoadBalancer(%v(%v)): released static IP %s", loadBalancerName, serviceName, ipAddress)
@@ -661,8 +659,8 @@ func (gce *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service,
 		// a different IP, it will be harmlessly abandoned because it was only an
 		// ephemeral IP (or it was a different static IP owned by the user, in which
 		// case we shouldn't delete it anyway).
-		if isStatic, err := gce.projectOwnsStaticIP(loadBalancerName, gce.region, loadBalancerIP); err != nil {
-			return nil, fmt.Errorf("failed to test if this GCE project owns the static IP %s: %v", loadBalancerIP, err)
+		if isStatic, addrErr := gce.projectOwnsStaticIP(loadBalancerName, gce.region, loadBalancerIP); err != nil {
+			return nil, fmt.Errorf("failed to test if this GCE project owns the static IP %s: %v", loadBalancerIP, addrErr)
 		} else if isStatic {
 			// The requested IP is a static IP, owned and managed by the user.
 			isUserOwnedIP = true
@@ -735,13 +733,13 @@ func (gce *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service,
 		// without needing to be deleted and recreated.
 		if firewallExists {
 			glog.Infof("EnsureLoadBalancer(%v(%v)): updating firewall", loadBalancerName, serviceName)
-			if err := gce.updateFirewall(loadBalancerName, gce.region, desc, sourceRanges, ports, hosts); err != nil {
+			if err = gce.updateFirewall(loadBalancerName, gce.region, desc, sourceRanges, ports, hosts); err != nil {
 				return nil, err
 			}
 			glog.Infof("EnsureLoadBalancer(%v(%v)): updated firewall", loadBalancerName, serviceName)
 		} else {
 			glog.Infof("EnsureLoadBalancer(%v(%v)): creating firewall", loadBalancerName, serviceName)
-			if err := gce.createFirewall(loadBalancerName, gce.region, desc, sourceRanges, ports, hosts); err != nil {
+			if err = gce.createFirewall(loadBalancerName, gce.region, desc, sourceRanges, ports, hosts); err != nil {
 				return nil, err
 			}
 			glog.Infof("EnsureLoadBalancer(%v(%v)): created firewall", loadBalancerName, serviceName)
@@ -1341,7 +1339,7 @@ func (gce *Cloud) ensureStaticIP(name, serviceName, region, existingIP string) (
 		existed = true
 	}
 	if op != nil {
-		err := gce.waitForRegionOp(op, region)
+		err = gce.waitForRegionOp(op, region)
 		if err != nil {
 			if !isHTTPErrorCode(err, http.StatusConflict) {
 				return "", false, fmt.Errorf("error waiting for gce static IP address to be created: %v", err)
@@ -2235,11 +2233,6 @@ func mapNodeNameToInstanceName(nodeName types.NodeName) string {
 	return string(nodeName)
 }
 
-// mapInstanceToNodeName maps a GCE Instance to a k8s NodeName
-func mapInstanceToNodeName(instance *compute.Instance) types.NodeName {
-	return types.NodeName(instance.Name)
-}
-
 // ExternalID returns the cloud provider ID of the node with the specified NodeName (deprecated).
 func (gce *Cloud) ExternalID(nodeName types.NodeName) (string, error) {
 	instanceName := mapNodeNameToInstanceName(nodeName)
@@ -2339,15 +2332,6 @@ func (gce *Cloud) GetAllZones() (sets.String, error) {
 	}
 
 	return zones, nil
-}
-
-func getMetadataValue(metadata *compute.Metadata, key string) (string, bool) {
-	for _, item := range metadata.Items {
-		if item.Key == key {
-			return *item.Value, true
-		}
-	}
-	return "", false
 }
 
 func truncateClusterName(clusterName string) string {

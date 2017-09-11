@@ -1544,7 +1544,7 @@ func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName,
 	}
 
 	// mountDevice will hold the device where we should try to attach the disk
-	var mountDevice mountDevice
+	var mountDeviceName mountDevice
 	// alreadyAttached is true if we have already called AttachVolume on this disk
 	var alreadyAttached bool
 
@@ -1553,22 +1553,22 @@ func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName,
 	attachEnded := false
 	defer func() {
 		if attachEnded {
-			if !c.endAttaching(awsInstance, disk.awsID, mountDevice) {
+			if !c.endAttaching(awsInstance, disk.awsID, mountDeviceName) {
 				glog.Errorf("endAttaching called for disk %q when attach not in progress", disk.awsID)
 			}
 		}
 	}()
 
-	mountDevice, alreadyAttached, err = c.getMountDevice(awsInstance, info, disk.awsID, true)
+	mountDeviceName, alreadyAttached, err = c.getMountDevice(awsInstance, info, disk.awsID, true)
 	if err != nil {
 		return "", err
 	}
 
 	// Inside the instance, the mountpoint always looks like /dev/xvdX (?)
-	hostDevice := "/dev/xvd" + string(mountDevice)
+	hostDevice := "/dev/xvd" + string(mountDeviceName)
 	// We are using xvd names (so we are HVM only)
 	// See http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/device_naming.html
-	ec2Device := "/dev/xvd" + string(mountDevice)
+	ec2Device := "/dev/xvd" + string(mountDeviceName)
 
 	if !alreadyAttached {
 		request := &ec2.AttachVolumeInput{
@@ -1577,11 +1577,11 @@ func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName,
 			VolumeId:   disk.awsID.awsString(),
 		}
 
-		attachResponse, err := c.ec2.AttachVolume(request)
-		if err != nil {
+		attachResponse, attachErr := c.ec2.AttachVolume(request)
+		if attachErr != nil {
 			attachEnded = true
 			// TODO: Check if the volume was concurrently attached?
-			return "", fmt.Errorf("Error attaching EBS volume %q to instance %q: %v", disk.awsID, awsInstance.awsID, err)
+			return "", fmt.Errorf("Error attaching EBS volume %q to instance %q: %v", disk.awsID, awsInstance.awsID, attachErr)
 		}
 
 		glog.V(2).Infof("AttachVolume volume=%q instance=%q request returned %v", disk.awsID, awsInstance.awsID, attachResponse)
@@ -1633,7 +1633,7 @@ func (c *Cloud) DetachDisk(diskName KubernetesVolumeID, nodeName types.NodeName)
 		return "", err
 	}
 
-	mountDevice, alreadyAttached, err := c.getMountDevice(awsInstance, info, disk.awsID, false)
+	mountDeviceName, alreadyAttached, err := c.getMountDevice(awsInstance, info, disk.awsID, false)
 	if err != nil {
 		return "", err
 	}
@@ -1665,13 +1665,13 @@ func (c *Cloud) DetachDisk(diskName KubernetesVolumeID, nodeName types.NodeName)
 		glog.V(2).Infof("waitForAttachmentStatus returned non-nil attachment with state=detached: %v", attachment)
 	}
 
-	if mountDevice != "" {
-		c.endAttaching(awsInstance, disk.awsID, mountDevice)
+	if mountDeviceName != "" {
+		c.endAttaching(awsInstance, disk.awsID, mountDeviceName)
 		// We don't check the return value - we don't really expect the attachment to have been
 		// in progress, though it might have been
 	}
 
-	hostDevicePath := "/dev/xvd" + string(mountDevice)
+	hostDevicePath := "/dev/xvd" + string(mountDeviceName)
 	return hostDevicePath, err
 }
 
@@ -2360,7 +2360,7 @@ func (c *Cloud) ensureSecurityGroup(name string, description string) (string, er
 			if len(securityGroups) > 1 {
 				glog.Warningf("Found multiple security groups with name: %q", name)
 			}
-			err := c.tagging.readRepairClusterTags(
+			err = c.tagging.readRepairClusterTags(
 				c.ec2, aws.StringValue(securityGroups[0].GroupId),
 				ResourceLifecycleOwned, nil, securityGroups[0].Tags)
 			if err != nil {
@@ -2730,8 +2730,8 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, n
 	// Determine if an access log emit interval has been specified
 	accessLogEmitIntervalAnnotation := annotations[ServiceAnnotationLoadBalancerAccessLogEmitInterval]
 	if accessLogEmitIntervalAnnotation != "" {
-		accessLogEmitInterval, err := strconv.ParseInt(accessLogEmitIntervalAnnotation, 10, 64)
-		if err != nil {
+		accessLogEmitInterval, parseErr := strconv.ParseInt(accessLogEmitIntervalAnnotation, 10, 64)
+		if parseErr != nil {
 			return nil, fmt.Errorf("error parsing service annotation: %s=%s",
 				ServiceAnnotationLoadBalancerAccessLogEmitInterval,
 				accessLogEmitIntervalAnnotation,
@@ -2743,8 +2743,8 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, n
 	// Determine if access log enabled/disabled has been specified
 	accessLogEnabledAnnotation := annotations[ServiceAnnotationLoadBalancerAccessLogEnabled]
 	if accessLogEnabledAnnotation != "" {
-		accessLogEnabled, err := strconv.ParseBool(accessLogEnabledAnnotation)
-		if err != nil {
+		accessLogEnabled, parseErr := strconv.ParseBool(accessLogEnabledAnnotation)
+		if parseErr != nil {
 			return nil, fmt.Errorf("error parsing service annotation: %s=%s",
 				ServiceAnnotationLoadBalancerAccessLogEnabled,
 				accessLogEnabledAnnotation,
@@ -2768,8 +2768,8 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, n
 	// Determine if connection draining enabled/disabled has been specified
 	connectionDrainingEnabledAnnotation := annotations[ServiceAnnotationLoadBalancerConnectionDrainingEnabled]
 	if connectionDrainingEnabledAnnotation != "" {
-		connectionDrainingEnabled, err := strconv.ParseBool(connectionDrainingEnabledAnnotation)
-		if err != nil {
+		connectionDrainingEnabled, parseErr := strconv.ParseBool(connectionDrainingEnabledAnnotation)
+		if parseErr != nil {
 			return nil, fmt.Errorf("error parsing service annotation: %s=%s",
 				ServiceAnnotationLoadBalancerConnectionDrainingEnabled,
 				connectionDrainingEnabledAnnotation,
@@ -2781,8 +2781,8 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, n
 	// Determine if connection draining timeout has been specified
 	connectionDrainingTimeoutAnnotation := annotations[ServiceAnnotationLoadBalancerConnectionDrainingTimeout]
 	if connectionDrainingTimeoutAnnotation != "" {
-		connectionDrainingTimeout, err := strconv.ParseInt(connectionDrainingTimeoutAnnotation, 10, 64)
-		if err != nil {
+		connectionDrainingTimeout, parseErr := strconv.ParseInt(connectionDrainingTimeoutAnnotation, 10, 64)
+		if parseErr != nil {
 			return nil, fmt.Errorf("error parsing service annotation: %s=%s",
 				ServiceAnnotationLoadBalancerConnectionDrainingTimeout,
 				connectionDrainingTimeoutAnnotation,
@@ -2794,8 +2794,8 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, n
 	// Determine if connection idle timeout has been specified
 	connectionIdleTimeoutAnnotation := annotations[ServiceAnnotationLoadBalancerConnectionIdleTimeout]
 	if connectionIdleTimeoutAnnotation != "" {
-		connectionIdleTimeout, err := strconv.ParseInt(connectionIdleTimeoutAnnotation, 10, 64)
-		if err != nil {
+		connectionIdleTimeout, parseErr := strconv.ParseInt(connectionIdleTimeoutAnnotation, 10, 64)
+		if parseErr != nil {
 			return nil, fmt.Errorf("error parsing service annotation: %s=%s",
 				ServiceAnnotationLoadBalancerConnectionIdleTimeout,
 				connectionIdleTimeoutAnnotation,
@@ -2807,8 +2807,8 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, n
 	// Determine if cross zone load balancing enabled/disabled has been specified
 	crossZoneLoadBalancingEnabledAnnotation := annotations[ServiceAnnotationLoadBalancerCrossZoneLoadBalancingEnabled]
 	if crossZoneLoadBalancingEnabledAnnotation != "" {
-		crossZoneLoadBalancingEnabled, err := strconv.ParseBool(crossZoneLoadBalancingEnabledAnnotation)
-		if err != nil {
+		crossZoneLoadBalancingEnabled, parseErr := strconv.ParseBool(crossZoneLoadBalancingEnabledAnnotation)
+		if parseErr != nil {
 			return nil, fmt.Errorf("error parsing service annotation: %s=%s",
 				ServiceAnnotationLoadBalancerCrossZoneLoadBalancingEnabled,
 				crossZoneLoadBalancingEnabledAnnotation,
