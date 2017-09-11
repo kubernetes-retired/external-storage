@@ -189,9 +189,14 @@ func (vs *volumeSnapshotter) waitForSnapshot(snapshotName string, snapshot *crdv
 		return fmt.Errorf("Failed to update VolumeSnapshot for snapshot %s: no VolumeSnapshotData", snapshotName)
 	}
 
-	plugin, err := vs.getPlugin(snapshotName, snapshot)
-	if plugin == nil {
-		return fmt.Errorf("Failed to get volume plugin to wait for snapshot creation %s. %v", snapshotName, err)
+	spec := &snapshotDataObj.Spec
+	volumeType := crdv1.GetSupportedVolumeFromSnapshotDataSpec(spec)
+	if len(volumeType) == 0 {
+		return fmt.Errorf("unsupported volume type found in snapshot %#v", spec)
+	}
+	plugin, ok := (*vs.volumePlugins)[volumeType]
+	if !ok {
+		return fmt.Errorf("%s is not supported volume for %#v", volumeType, spec)
 	}
 
 	var newSnapshot *crdv1.VolumeSnapshot
