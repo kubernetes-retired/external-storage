@@ -67,10 +67,10 @@
        register: iscsi_role
        when: system_role.rc == 1
 
-     - name: Add system:persistent-volume-provisioner role to service account
-       command: >
-         /usr/bin/oc adm --config=/etc/origin/master/admin.kubeconfig
-         policy add-cluster-role-to-user system:persistent-volume-provisioner system:serviceaccount:iscsi-provisioner:iscsi-provisioner
+#     - name: Add system:persistent-volume-provisioner role to service account
+#       command: >
+#         /usr/bin/oc adm --config=/etc/origin/master/admin.kubeconfig
+#         policy add-cluster-role-to-user system:persistent-volume-provisioner system:serviceaccount:iscsi-provisioner:iscsi-provisioner
    
 #     - name: Add pv-binder-controller role to service account
 #       command: >
