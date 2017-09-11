@@ -305,7 +305,7 @@ before running the playbooks you need to annotate the inventory file with some a
 | targetd_iscsi_target | the name of the target to be created in the target server  |
 | iscsi_provisioner_pullspec |  the location of the iSCSI-targetd provisioner image |
 | iscsi_provisioner_default_storage_class | whether the created storage class should be the default class  |
-| iscsi_provisioner_portal | optional, comma separated list of alternative IP:port where the iscsi server can be found, specifying this parameters trigger the usage of multipath |
+| iscsi_provisioner_portals | optional, comma separated list of alternative IP:port where the iscsi server can be found, specifying this parameters trigger the usage of multipath |
 
 All the nodes should have a label with their defining the initiator name for that node, here is an example:
 
