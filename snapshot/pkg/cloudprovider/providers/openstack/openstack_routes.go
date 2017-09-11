@@ -29,17 +29,20 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-var ErrNoRouterId = errors.New("router-id not set in cloud provider config")
+// ErrNoRouterID is the error for no router ID
+var ErrNoRouterID = errors.New("router-id not set in cloud provider config")
 
+// Routes defines options for the routes
 type Routes struct {
 	compute *gophercloud.ServiceClient
 	network *gophercloud.ServiceClient
 	opts    RouterOpts
 }
 
+// NewRoutes creates new Routes
 func NewRoutes(compute *gophercloud.ServiceClient, network *gophercloud.ServiceClient, opts RouterOpts) (cloudprovider.Routes, error) {
-	if opts.RouterId == "" {
-		return nil, ErrNoRouterId
+	if opts.RouterID == "" {
+		return nil, ErrNoRouterID
 	}
 
 	return &Routes{
@@ -49,6 +52,7 @@ func NewRoutes(compute *gophercloud.ServiceClient, network *gophercloud.ServiceC
 	}, nil
 }
 
+// ListRoutes lists routes
 func (r *Routes) ListRoutes(clusterName string) ([]*cloudprovider.Route, error) {
 	glog.V(4).Infof("ListRoutes(%v)", clusterName)
 
@@ -70,7 +74,7 @@ func (r *Routes) ListRoutes(clusterName string) ([]*cloudprovider.Route, error) 
 		return nil, err
 	}
 
-	router, err := routers.Get(r.network, r.opts.RouterId).Extract()
+	router, err := routers.Get(r.network, r.opts.RouterID).Extract()
 	if err != nil {
 		return nil, err
 	}
@@ -140,6 +144,7 @@ func updateAllowedAddressPairs(network *gophercloud.ServiceClient, port *neutron
 	return unwinder, nil
 }
 
+// CreateRoute creates a route
 func (r *Routes) CreateRoute(clusterName string, nameHint string, route *cloudprovider.Route) error {
 	glog.V(4).Infof("CreateRoute(%v, %v, %v)", clusterName, nameHint, route)
 
@@ -152,7 +157,7 @@ func (r *Routes) CreateRoute(clusterName string, nameHint string, route *cloudpr
 
 	glog.V(4).Infof("Using nexthop %v for node %v", addr, route.TargetNode)
 
-	router, err := routers.Get(r.network, r.opts.RouterId).Extract()
+	router, err := routers.Get(r.network, r.opts.RouterID).Extract()
 	if err != nil {
 		return err
 	}
@@ -207,6 +212,7 @@ func (r *Routes) CreateRoute(clusterName string, nameHint string, route *cloudpr
 	return nil
 }
 
+// DeleteRoute deletes a route
 func (r *Routes) DeleteRoute(clusterName string, route *cloudprovider.Route) error {
 	glog.V(4).Infof("DeleteRoute(%v, %v)", clusterName, route)
 
@@ -217,7 +223,7 @@ func (r *Routes) DeleteRoute(clusterName string, route *cloudprovider.Route) err
 		return err
 	}
 
-	router, err := routers.Get(r.network, r.opts.RouterId).Extract()
+	router, err := routers.Get(r.network, r.opts.RouterID).Extract()
 	if err != nil {
 		return err
 	}
@@ -251,9 +257,9 @@ func (r *Routes) DeleteRoute(clusterName string, route *cloudprovider.Route) err
 		return err
 	}
 
-	addr_pairs := port.AllowedAddressPairs
+	addrPairs := port.AllowedAddressPairs
 	index = -1
-	for i, item := range addr_pairs {
+	for i, item := range addrPairs {
 		if item.IPAddress == route.DestinationCIDR {
 			index = i
 			break
@@ -262,10 +268,10 @@ func (r *Routes) DeleteRoute(clusterName string, route *cloudprovider.Route) err
 
 	if index != -1 {
 		// Delete element `index`
-		addr_pairs[index] = addr_pairs[len(routes)-1]
-		addr_pairs = addr_pairs[:len(routes)-1]
+		addrPairs[index] = addrPairs[len(routes)-1]
+		addrPairs = addrPairs[:len(routes)-1]
 
-		unwind, err := updateAllowedAddressPairs(r.network, &port, addr_pairs)
+		unwind, err := updateAllowedAddressPairs(r.network, &port, addrPairs)
 		if err != nil {
 			return err
 		}

@@ -183,8 +183,8 @@ func (os *OpenStack) DeleteSnapshot(snapshotID string) error {
 	return nil
 }
 
-// FIXME(j-griffith): Name doesn't fit at all here, this is actually more like is `IsAvailable`
 // DescribeSnapshot returns the status of the snapshot
+// FIXME(j-griffith): Name doesn't fit at all here, this is actually more like is `IsAvailable`
 func (os *OpenStack) DescribeSnapshot(snapshotID string) (status string, isCompleted bool, err error) {
 	ss, err := os.snapshotService()
 	if err != nil || ss == nil {
@@ -206,7 +206,7 @@ func (os *OpenStack) DescribeSnapshot(snapshotID string) (status string, isCompl
 	return snap.Status, true, nil
 }
 
-// Find snapshot by metadata
+// FindSnapshot finds snapshot by metadata
 func (os *OpenStack) FindSnapshot(tags map[string]string) ([]string, []string, error) {
 	var snapshotIDs, statuses []string
 	ss, err := os.snapshotService()

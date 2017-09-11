@@ -42,8 +42,7 @@ func ResizeInstanceGroup(asg ASG, instanceGroupName string, size int) error {
 	return nil
 }
 
-// Implement InstanceGroups.ResizeInstanceGroup
-// Set the size to the fixed size
+// ResizeInstanceGroup sets the size to the fixed size
 func (c *Cloud) ResizeInstanceGroup(instanceGroupName string, size int) error {
 	return ResizeInstanceGroup(c.asg, instanceGroupName, size)
 }
@@ -70,8 +69,7 @@ func DescribeInstanceGroup(asg ASG, instanceGroupName string) (InstanceGroupInfo
 	return &awsInstanceGroup{group: group}, nil
 }
 
-// Implement InstanceGroups.DescribeInstanceGroup
-// Queries the cloud provider for information about the specified instance group
+// DescribeInstanceGroup queries the cloud provider for information about the specified instance group
 func (c *Cloud) DescribeInstanceGroup(instanceGroupName string) (InstanceGroupInfo, error) {
 	return DescribeInstanceGroup(c.asg, instanceGroupName)
 }

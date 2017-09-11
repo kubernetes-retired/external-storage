@@ -54,6 +54,7 @@ const (
 	desiredStateOfWorldPopulatorListSnapshotsRetryDuration time.Duration = 3 * time.Minute
 )
 
+// SnapshotController is a controller that handles snapshot operations
 type SnapshotController interface {
 	Run(stopCh <-chan struct{})
 }
@@ -92,10 +93,11 @@ type snapshotController struct {
 	desiredStateOfWorldPopulator populator.DesiredStateOfWorldPopulator
 }
 
+// NewSnapshotController creates a new SnapshotController
 func NewSnapshotController(client *rest.RESTClient,
 	scheme *runtime.Scheme,
 	clientset kubernetes.Interface,
-	volumePlugins *map[string]volume.VolumePlugin,
+	volumePlugins *map[string]volume.Plugin,
 	syncDuration time.Duration) SnapshotController {
 
 	sc := &snapshotController{

@@ -51,6 +51,7 @@ type Clusters interface {
 	Master(clusterName string) (string, error)
 }
 
+// GetLoadBalancerName gets the name of the load balancer.
 // TODO(#6812): Use a shorter name that's less likely to be longer than cloud
 // providers' name length limits.
 func GetLoadBalancerName(service *v1.Service) string {
@@ -64,6 +65,7 @@ func GetLoadBalancerName(service *v1.Service) string {
 	return ret
 }
 
+// GetInstanceProviderID gets the instance provider ID
 func GetInstanceProviderID(cloud Interface, nodeName types.NodeName) (string, error) {
 	instances, ok := cloud.Instances()
 	if !ok {
@@ -153,8 +155,10 @@ type Routes interface {
 }
 
 var (
-	InstanceNotFound = errors.New("instance not found")
-	DiskNotFound     = errors.New("disk is not found")
+	// ErrInstanceNotFound is the error for instance not found
+	ErrInstanceNotFound = errors.New("instance not found")
+	// ErrDiskNotFound is the error for disk not found
+	ErrDiskNotFound = errors.New("disk is not found")
 )
 
 // Zone represents the location of a particular machine.

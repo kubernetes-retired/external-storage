@@ -23,8 +23,10 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 )
 
+// IPPermissionSet is the IP Permission Set
 type IPPermissionSet map[string]*ec2.IpPermission
 
+// NewIPPermissionSet creates a IPPermissionSet
 func NewIPPermissionSet(items ...*ec2.IpPermission) IPPermissionSet {
 	s := make(IPPermissionSet)
 	s.Insert(items...)
@@ -97,10 +99,10 @@ func (s IPPermissionSet) List() []*ec2.IpPermission {
 	return res
 }
 
-// IsSuperset returns true if and only if s1 is a superset of s2.
-func (s1 IPPermissionSet) IsSuperset(s2 IPPermissionSet) bool {
+// IsSuperset returns true if and only if s is a superset of s2.
+func (s IPPermissionSet) IsSuperset(s2 IPPermissionSet) bool {
 	for k := range s2 {
-		_, found := s1[k]
+		_, found := s[k]
 		if !found {
 			return false
 		}
@@ -108,19 +110,19 @@ func (s1 IPPermissionSet) IsSuperset(s2 IPPermissionSet) bool {
 	return true
 }
 
-// Equal returns true if and only if s1 is equal (as a set) to s2.
+// Equal returns true if and only if s is equal (as a set) to s2.
 // Two sets are equal if their membership is identical.
 // (In practice, this means same elements, order doesn't matter)
-func (s1 IPPermissionSet) Equal(s2 IPPermissionSet) bool {
-	return len(s1) == len(s2) && s1.IsSuperset(s2)
+func (s IPPermissionSet) Equal(s2 IPPermissionSet) bool {
+	return len(s) == len(s2) && s.IsSuperset(s2)
 }
 
 // Difference returns a set of objects that are not in s2
 // For example:
-// s1 = {a1, a2, a3}
+// s = {a1, a2, a3}
 // s2 = {a1, a2, a4, a5}
-// s1.Difference(s2) = {a3}
-// s2.Difference(s1) = {a4, a5}
+// s.Difference(s2) = {a3}
+// s2.Difference(s) = {a4, a5}
 func (s IPPermissionSet) Difference(s2 IPPermissionSet) IPPermissionSet {
 	result := NewIPPermissionSet()
 	for k, v := range s {

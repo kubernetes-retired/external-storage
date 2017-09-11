@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
+// Instances defines compute instances
 type Instances struct {
 	compute *gophercloud.ServiceClient
 }
@@ -47,11 +48,12 @@ func (os *OpenStack) Instances() (cloudprovider.Instances, bool) {
 	return &Instances{compute}, true
 }
 
-func (i *Instances) List(name_filter string) ([]types.NodeName, error) {
-	glog.V(4).Infof("openstack List(%v) called", name_filter)
+// List lists node names
+func (i *Instances) List(nameFilter string) ([]types.NodeName, error) {
+	glog.V(4).Infof("openstack List(%v) called", nameFilter)
 
 	opts := servers.ListOpts{
-		Name:   name_filter,
+		Name:   nameFilter,
 		Status: "ACTIVE",
 	}
 	pager := servers.List(i.compute, opts)
@@ -72,12 +74,12 @@ func (i *Instances) List(name_filter string) ([]types.NodeName, error) {
 	}
 
 	glog.V(3).Infof("Found %v instances matching %v: %v",
-		len(ret), name_filter, ret)
+		len(ret), nameFilter, ret)
 
 	return ret, nil
 }
 
-// Implementation of Instances.CurrentNodeName
+// CurrentNodeName is an implementation of Instances.CurrentNodeName
 // Note this is *not* necessarily the same as hostname.
 func (i *Instances) CurrentNodeName(hostname string) (types.NodeName, error) {
 	md, err := getMetadata()
@@ -87,10 +89,12 @@ func (i *Instances) CurrentNodeName(hostname string) (types.NodeName, error) {
 	return types.NodeName(md.Name), nil
 }
 
+// AddSSHKeyToAllInstances adds SSH key to all instances
 func (i *Instances) AddSSHKeyToAllInstances(user string, keyData []byte) error {
 	return errors.New("unimplemented")
 }
 
+// NodeAddresses gets node addresses
 func (i *Instances) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 	glog.V(4).Infof("NodeAddresses(%v) called", name)
 
@@ -115,7 +119,7 @@ func (i *Instances) ExternalID(name types.NodeName) (string, error) {
 	srv, err := getServerByName(i.compute, name)
 	if err != nil {
 		if err == ErrNotFound {
-			return "", cloudprovider.InstanceNotFound
+			return "", cloudprovider.ErrInstanceNotFound
 		}
 		return "", err
 	}
