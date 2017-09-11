@@ -210,7 +210,7 @@ func (vs *volumeSnapshotter) waitForSnapshot(snapshotName string, snapshot *crdv
 	// Wait until the snapshot is successfully created by the plugin or an error occurs that
 	// fails the snapshot creation.
 	err = wait.ExponentialBackoff(backoff, func() (bool, error) {
-		conditions, _, err = (*plugin).DescribeSnapshot(snapshotDataObj)
+		conditions, _, err = plugin.DescribeSnapshot(snapshotDataObj)
 		if err != nil {
 			glog.Warningf("failed to get snapshot %v, err: %v", snapshotName, err)
 			//continue waiting
