@@ -62,7 +62,7 @@ func (h *hostPathPlugin) SnapshotCreate(pv *v1.PersistentVolume, tags *map[strin
 	}
 	path := spec.HostPath.Path
 	file := depot + string(uuid.NewUUID()) + ".tgz"
-	cmdline := []string{"tar", "czf", file, path}
+	cmdline := []string{"tar", "czf", file, "-C", path, "."}
 	cmd := exec.Command(cmdline[0], cmdline[1:]...)
 	out, err := cmd.CombinedOutput()
 	cond := []crdv1.VolumeSnapshotCondition{}
