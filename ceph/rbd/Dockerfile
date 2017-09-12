@@ -13,8 +13,11 @@
 # limitations under the License.
 
 FROM centos:7
-RUN rpm -Uvh https://download.ceph.com/rpm-jewel/el7/noarch/ceph-release-1-1.el7.noarch.rpm
-RUN yum install -y epel-release
-RUN yum install -y ceph-common
-ADD rbd-provisioner /usr/local/bin/rbd-provisioner
+
+ENV CEPH_VERSION "jewel"
+RUN rpm -Uvh https://download.ceph.com/rpm-$CEPH_VERSION/el7/noarch/ceph-release-1-1.el7.noarch.rpm && \
+  yum install -y epel-release && \
+  yum install -y ceph-common
+
+COPY rbd-provisioner /usr/local/bin/rbd-provisioner
 ENTRYPOINT ["/usr/local/bin/rbd-provisioner"]
