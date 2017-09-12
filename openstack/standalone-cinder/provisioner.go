@@ -34,8 +34,8 @@ import (
 )
 
 const (
-	provisionerName  = "openstack.org/cinder-baremetal"
-	provisionerIDAnn = "cinderBaremetalProvisionerIdentity"
+	provisionerName  = "openstack.org/standalone-cinder"
+	provisionerIDAnn = "standaloneCinderProvisionerIdentity"
 	cinderVolumeId = "cinderVolumeId"
 )
 

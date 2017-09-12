@@ -1,5 +1,5 @@
-## Cinder external provisioner
-The cinder external provisioner fulfills persistent
+## Standalone-cinder external provisioner
+The standalone-cinder external provisioner fulfills persistent
 volume claims by creating cinder volumes and mapping them
 to natively supported volume sources.  This approach allows
 cinder to be used as a storage service whether or not the
@@ -31,7 +31,7 @@ cinder is accessed directly.
 
 Conventional cinder deployments can be used by supplying a clound
 config file identical to the one you would use to configure an
-openstack cloud provider.  See [here|() for details.
+openstack cloud provider.
 
 ### Workflows
 | User       | Kubernetes   | Provisioner  | Cinder       |
