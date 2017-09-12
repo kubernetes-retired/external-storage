@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
@@ -33,7 +34,7 @@ import (
 
 const (
 	depot        = "/tmp/"
-	restorePoint = "/restore/"
+	restorePoint = "/tmp/restore/"
 )
 
 type hostPathPlugin struct {
@@ -61,10 +62,11 @@ func (h *hostPathPlugin) SnapshotCreate(pv *v1.PersistentVolume, tags *map[strin
 	}
 	path := spec.HostPath.Path
 	file := depot + string(uuid.NewUUID()) + ".tgz"
-	cmd := exec.Command("tar", "czf", file, path)
-	runErr := cmd.Run()
+	cmdline := []string{"tar", "czf", file, "-C", path, "."}
+	cmd := exec.Command(cmdline[0], cmdline[1:]...)
+	out, err := cmd.CombinedOutput()
 	cond := []crdv1.VolumeSnapshotCondition{}
-	if runErr == nil {
+	if err == nil {
 		cond = []crdv1.VolumeSnapshotCondition{
 			{
 				Status:             v1.ConditionTrue,
@@ -74,10 +76,12 @@ func (h *hostPathPlugin) SnapshotCreate(pv *v1.PersistentVolume, tags *map[strin
 			},
 		}
 	} else {
+		glog.V(2).Infof("failed to execute %q: %v", strings.Join(cmdline, " "), err)
+		glog.V(3).Infof("output: %s", string(out))
 		cond = []crdv1.VolumeSnapshotCondition{
 			{
 				Status:             v1.ConditionTrue,
-				Message:            fmt.Sprintf("Failed to create the snapshot: %v", runErr),
+				Message:            fmt.Sprintf("Failed to create the snapshot: %v", err),
 				LastTransitionTime: metav1.Now(),
 				Type:               crdv1.VolumeSnapshotConditionError,
 			},
@@ -88,7 +92,7 @@ func (h *hostPathPlugin) SnapshotCreate(pv *v1.PersistentVolume, tags *map[strin
 			Path: file,
 		},
 	}
-	return res, &cond, runErr
+	return res, &cond, err
 }
 
 func (h *hostPathPlugin) SnapshotDelete(src *crdv1.VolumeSnapshotDataSource, _ *v1.PersistentVolume) error {
@@ -151,9 +155,12 @@ func (h *hostPathPlugin) SnapshotRestore(snapshotData *crdv1.VolumeSnapshotData,
 	snapID := snapshotData.Spec.HostPath.Path
 	dir := restorePoint + string(uuid.NewUUID())
 	os.MkdirAll(dir, 0750)
-	cmd := exec.Command("tar", "xzf", snapID, "-C", dir, "--strip-components=1")
-	err := cmd.Run()
+	cmdline := []string{"tar", "xzf", snapID, "-C", dir, "--strip-components=1"}
+	cmd := exec.Command(cmdline[0], cmdline[1:]...)
+	out, err := cmd.CombinedOutput()
 	if err != nil {
+		glog.V(2).Infof("failed to execute %q: %v", strings.Join(cmdline, " "), err)
+		glog.V(3).Infof("output: %s", string(out))
 		return nil, nil, fmt.Errorf("failed to restore %s to %s: %v", snapID, dir, err)
 	}
 	pv := &v1.PersistentVolumeSource{
@@ -169,6 +176,5 @@ func (h *hostPathPlugin) VolumeDelete(pv *v1.PersistentVolume) error {
 		return fmt.Errorf("invalid VolumeSnapshotDataSource: %v", pv)
 	}
 	path := pv.Spec.HostPath.Path
-	return os.Remove(path)
-
+	return os.RemoveAll(path)
 }

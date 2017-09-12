@@ -101,14 +101,13 @@ func (p *snapshotProvisioner) snapshotRestore(snapshotName string, snapshotData 
 
 	// restore snapshot
 	pvSrc, labels, err := plugin.SnapshotRestore(&snapshotData, options.PVC, options.PVName, options.Parameters)
-	if err != nil && pv == nil {
-		glog.Warningf("failed to snapshot %#v, err: %v", *spec, err)
+	if err != nil {
+		glog.Warningf("failed to snapshot %#v, err: %v", spec, err)
 	} else {
-		glog.Infof("snapshot %#v to snap %#v", *spec, *pvSrc)
-		return pvSrc, labels, nil
+		glog.Infof("snapshot %#v to snap %#v", spec, pvSrc)
 	}
 
-	return nil, nil, nil
+	return pvSrc, labels, err
 }
 
 // Provision creates a storage asset and returns a PV object representing it.
