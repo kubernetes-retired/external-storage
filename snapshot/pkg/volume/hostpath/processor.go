@@ -107,7 +107,27 @@ func (h *hostPathPlugin) DescribeSnapshot(snapshotData *crdv1.VolumeSnapshotData
 	if _, err := os.Stat(path); err != nil {
 		return nil, false, err
 	}
-	return nil, true, nil
+	if len(snapshotData.Status.Conditions) == 0 {
+		return nil, false, fmt.Errorf("No status condtions in VoluemSnapshotData for hostpath snapshot type")
+	}
+	lastCondIdx := len(snapshotData.Status.Conditions) - 1
+	retCondType := crdv1.VolumeSnapshotConditionError
+	switch snapshotData.Status.Conditions[lastCondIdx].Type {
+	case crdv1.VolumeSnapshotDataConditionReady:
+		retCondType = crdv1.VolumeSnapshotConditionReady
+	case crdv1.VolumeSnapshotDataConditionPending:
+		retCondType = crdv1.VolumeSnapshotConditionPending
+		// Error othewise
+	}
+	retCond := []crdv1.VolumeSnapshotCondition{
+		{
+			Status:             snapshotData.Status.Conditions[lastCondIdx].Status,
+			Message:            snapshotData.Status.Conditions[lastCondIdx].Message,
+			LastTransitionTime: snapshotData.Status.Conditions[lastCondIdx].LastTransitionTime,
+			Type:               retCondType,
+		},
+	}
+	return &retCond, true, nil
 }
 
 // FindSnapshot finds a VolumeSnapshot by matching metadata
