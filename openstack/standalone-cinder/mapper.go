@@ -97,31 +97,32 @@ func createCinderVolume(p *cinderProvisioner, options controller.VolumeOptions) 
 	return vol.ID, nil
 }
 
+func waitForAvailableCinderVolume(p *cinderProvisioner, volumeID string) error {
+	// TODO: Implement proper polling instead of brain-dead timers
+	c := make(chan error)
+	go time.AfterFunc(5*time.Second, func() {
+		c <- nil
+	})
+	return <- c
+}
+
+func reserveCinderVolume(p *cinderProvisioner, volumeID string) error {
+	return volumeactions.Reserve(p.volumeService, volumeID).ExtractErr()
+}
+
 func connectCinderVolume(p *cinderProvisioner, volumeID string) (volumeConnection, error) {
 	opt := volumeactions.InitializeConnectionOpts{
 		Host:      "localhost",
 		IP:        "127.0.0.1",
 		Initiator: initiatorName,
 	}
-
-	// TODO: Implement proper polling instead of brain-dead timers
-	c := make(chan error)
 	var rcv rcvVolumeConnection
-
-	go time.AfterFunc(5*time.Second, func() {
-		err := volumeactions.InitializeConnection(p.volumeService, volumeID, &opt).ExtractInto(&rcv)
-		if err != nil {
-			glog.Errorf("failed to initialize connection :%v", err)
-			c <- err
-		} else {
-			glog.Infof("Received connection info: %v", rcv)
-			close(c)
-		}
-	})
-	err := <-c
+	err := volumeactions.InitializeConnection(p.volumeService, volumeID, &opt).ExtractInto(&rcv)
 	if err != nil {
+		glog.Errorf("failed to initialize connection :%v", err)
 		return volumeConnection{}, err
 	}
+	glog.Infof("Received connection info: %v", rcv)
 	return rcv.ConnectionInfo, nil
 }
 
@@ -140,6 +141,10 @@ func disconnectCinderVolume(p *cinderProvisioner, volumeID string) error {
 	}
 
 	return nil
+}
+
+func unreserveCinderVolume(p *cinderProvisioner, volumeID string) error {
+	return volumeactions.Unreserve(p.volumeService, volumeID).ExtractErr()
 }
 
 func deleteCinderVolume(p *cinderProvisioner, volumeID string) error {

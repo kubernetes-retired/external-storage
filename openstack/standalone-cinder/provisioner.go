@@ -87,6 +87,19 @@ func (p *cinderProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 		return nil, err
 	}
 
+	err = waitForAvailableCinderVolume(p, volumeID)
+	if err != nil {
+		glog.Errorf("Volume did not become available")
+		return nil, err
+	}
+
+	err = reserveCinderVolume(p, volumeID)
+	if err != nil {
+		// TODO: Create placeholder PV?
+		glog.Errorf("Failed to reserve volume: %v", err)
+		return nil, err
+	}
+
 	connection, err := connectCinderVolume(p, volumeID)
 	if err != nil {
 		// TODO: Create placeholder PV?
@@ -149,6 +162,13 @@ func (p *cinderProvisioner) Delete(pv *v1.PersistentVolume) error {
 
 	err = disconnectCinderVolume(p, volumeID)
 	if err != nil {
+		return err
+	}
+
+	err = unreserveCinderVolume(p, volumeID)
+	if err != nil {
+		// TODO: Create placeholder PV?
+		glog.Errorf("Failed to unreserve volume: %v", err)
 		return err
 	}
 

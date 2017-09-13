@@ -41,8 +41,10 @@ openstack cloud provider.
 | | Posted the PVC on API server | | |
 | | | Acquire the PVC and call cinder create | |
 | | | | Create 100GB volume and return info |
+| | | Call cinder reserve | |
+| | | | Volume is marked as reserved/attaching |
 | | | Call cinder os-initialize_connection | |
-| | | | Return connection info (ISCSI target and LUN info) |
+| | | | Create connection on storage server and return info (ISCSI target and LUN info) |
 | | | Create PV using ISCSI as raw volume type using connection info ||
 | | Bind the PV to the PVC | | |
 | **Use storage** | | | |
@@ -56,6 +58,10 @@ openstack cloud provider.
 | | Detach ISCSI PV | | |
 | **Delete storage** | | | |
 | Delete PVC | | | |
-| | | Acquire the PV and call cinder delete | |
-| | | | Delete volume |
+| | | Call cinder os-terminate_connection | |
+| | | | Remove connection on storage server |
+| | | Call cinder unreserve | |
+| | | | Volume is marked as available |
+| | | Call cinder delete | |
+| | | | Delete volume from storage |
 | | Delete PV | | |
