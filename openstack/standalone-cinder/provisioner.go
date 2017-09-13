@@ -26,7 +26,6 @@ import (
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -184,7 +183,7 @@ func main() {
 	} else {
 		config, err = rest.InClusterConfig()
 	}
-	prID := string(uuid.NewUUID())
+	prID := provisionerName
 	if *id != "" {
 		prID = *id
 	}
