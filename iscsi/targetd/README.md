@@ -231,6 +231,7 @@ Run the following commands. The secret correspond to username and password you h
 ```
 oc new-project iscsi-provisioner
 oc create sa iscsi-provisioner
+oc adm policy add-cluster-role-to-user cluster-reader system:serviceaccount:iscsi-provisioner:iscsi-provisioner
 # if Openshift is version < 3.6 add the iscsi-provisioner-runner role
 oc create -f https://raw.githubusercontent.com/kubernetes-incubator/external-storage/master/iscsi/targetd/openshift/iscsi-auth.yaml
 # else if Openshift is version >= 3.6 add the system:persistent-volume-provisioner role
@@ -304,6 +305,7 @@ before running the playbooks you need to annotate the inventory file with some a
 | targetd_iscsi_target | the name of the target to be created in the target server  |
 | iscsi_provisioner_pullspec |  the location of the iSCSI-targetd provisioner image |
 | iscsi_provisioner_default_storage_class | whether the created storage class should be the default class  |
+| iscsi_provisioner_portals | optional, comma separated list of alternative IP:port where the iscsi server can be found, specifying this parameters trigger the usage of multipath |
 
 All the nodes should have a label with their defining the initiator name for that node, here is an example:
 
