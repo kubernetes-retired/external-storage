@@ -53,6 +53,9 @@ func (m *rbdMapper) BuildPVSource(ctx provisionCtx) (*v1.PersistentVolumeSource,
 		return nil, errors.New("No monitors could be parsed from connection info")
 	}
 	splitName := strings.SplitN(ctx.connection.Data.Name, "/", 2)
+	if len(splitName) != 2 {
+		return nil, errors.New("Field 'name' cannot be split into pool and image")
+	}
 
 	return &v1.PersistentVolumeSource{
 		RBD: &v1.RBDVolumeSource{
