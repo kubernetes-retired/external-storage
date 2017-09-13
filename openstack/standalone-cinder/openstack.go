@@ -14,11 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-
 package main
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"net/http"
@@ -35,33 +35,32 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 )
 
-type Config struct {
+type cinderConfig struct {
 	Global struct {
-		CinderEndpoint  string `gcfg:"cinder-endpoint"`
-		AuthUrl         string `gcfg:"auth-url"`
-		Username        string
-		UserId          string `gcfg:"user-id"`
-		Password        string
-		TenantId        string `gcfg:"tenant-id"`
-		TenantName      string `gcfg:"tenant-name"`
-		TrustId         string `gcfg:"trust-id"`
-		DomainId        string `gcfg:"domain-id"`
-		DomainName      string `gcfg:"domain-name"`
-		Region          string
-		CAFile          string `gcfg:"ca-file"`
-       }
+	       CinderEndpoint string `gcfg:"cinder-endpoint"`
+	       AuthURL        string `gcfg:"auth-url"`
+	       Username       string
+	       UserID         string `gcfg:"user-id"`
+	       Password       string
+	       TenantID       string `gcfg:"tenant-id"`
+	       TenantName     string `gcfg:"tenant-name"`
+	       TrustID        string `gcfg:"trust-id"`
+	       DomainID       string `gcfg:"domain-id"`
+	       DomainName     string `gcfg:"domain-name"`
+	       Region         string
+	       CAFile         string `gcfg:"ca-file"`
+	}
 }
 
-
-func (cfg Config) toAuthOptions() gophercloud.AuthOptions {
+func (cfg cinderConfig) toAuthOptions() gophercloud.AuthOptions {
 	return gophercloud.AuthOptions{
-		IdentityEndpoint: cfg.Global.AuthUrl,
+		IdentityEndpoint: cfg.Global.AuthURL,
 		Username:         cfg.Global.Username,
-		UserID:           cfg.Global.UserId,
+		UserID:           cfg.Global.UserID,
 		Password:         cfg.Global.Password,
-		TenantID:         cfg.Global.TenantId,
+		TenantID:         cfg.Global.TenantID,
 		TenantName:       cfg.Global.TenantName,
-		DomainID:         cfg.Global.DomainId,
+		DomainID:         cfg.Global.DomainID,
 		DomainName:       cfg.Global.DomainName,
 
 		// Persistent service, so we need to be able to renew tokens.
@@ -69,29 +68,27 @@ func (cfg Config) toAuthOptions() gophercloud.AuthOptions {
 	}
 }
 
-
-func (cfg Config) toAuth3Options() tokens3.AuthOptions {
+func (cfg cinderConfig) toAuth3Options() tokens3.AuthOptions {
 	return tokens3.AuthOptions{
-		IdentityEndpoint: cfg.Global.AuthUrl,
+		IdentityEndpoint: cfg.Global.AuthURL,
 		Username:         cfg.Global.Username,
-		UserID:           cfg.Global.UserId,
+		UserID:           cfg.Global.UserID,
 		Password:         cfg.Global.Password,
-		DomainID:         cfg.Global.DomainId,
+		DomainID:         cfg.Global.DomainID,
 		DomainName:       cfg.Global.DomainName,
 		AllowReauth:      true,
 	}
 }
 
-
-func getConfig(configFilePath string) (Config, error) {
+func getConfig(configFilePath string) (cinderConfig, error) {
 	if configFilePath != "" {
 		var configFile *os.File
-		var config Config
+		var config cinderConfig
 		configFile, err := os.Open(configFilePath)
 		if err != nil {
 			glog.Fatalf("Couldn't open configuration %s: %#v",
 				configFilePath, err)
-			return Config{}, err
+			return cinderConfig{}, err
 		}
 
 		defer configFile.Close()
@@ -99,26 +96,26 @@ func getConfig(configFilePath string) (Config, error) {
 		err = gcfg.ReadInto(&config, configFile)
 		if err != nil {
 			glog.Fatalf("Couldn't read configuration: %#v", err)
-			return Config{}, err
+			return cinderConfig{}, err
 		}
 		return config, nil
 
-	} else {
-		// Pass explicit nil so plugins can actually check for nil. See
-		// "Why is my nil error value not equal to nil?" in golang.org/doc/faq.
-		glog.Fatal("No config file path specified")
-		return Config{}, errors.New("Missing configuration")
 	}
+
+	// Pass explicit nil so plugins can actually check for nil. See
+	// "Why is my nil error value not equal to nil?" in golang.org/doc/faq.
+	glog.Fatal("No config file path specified")
+	return cinderConfig{}, errors.New("Missing configuration")
 }
 
-
-func getKeystoneVolumeService(cfg Config) (*gophercloud.ServiceClient, error) {
-	provider, err := openstack.NewClient(cfg.Global.AuthUrl)
+func getKeystoneVolumeService(cfg cinderConfig) (*gophercloud.ServiceClient, error) {
+	provider, err := openstack.NewClient(cfg.Global.AuthURL)
 	if err != nil {
 		return nil, err
 	}
 	if cfg.Global.CAFile != "" {
-		roots, err := certutil.NewPool(cfg.Global.CAFile)
+		var roots *x509.CertPool
+		roots, err = certutil.NewPool(cfg.Global.CAFile)
 		if err != nil {
 			return nil, err
 		}
@@ -127,10 +124,10 @@ func getKeystoneVolumeService(cfg Config) (*gophercloud.ServiceClient, error) {
 		provider.HTTPClient.Transport = netutil.SetOldTransportDefaults(&http.Transport{TLSClientConfig: config})
 
 	}
-	if cfg.Global.TrustId != "" {
+	if cfg.Global.TrustID != "" {
 		opts := cfg.toAuth3Options()
 		authOptsExt := trusts.AuthOptsExt{
-			TrustID:            cfg.Global.TrustId,
+			TrustID:            cfg.Global.TrustID,
 			AuthOptionsBuilder: &opts,
 		}
 		err = openstack.AuthenticateV3(provider, authOptsExt, gophercloud.EndpointOpts{})
@@ -152,7 +149,6 @@ func getKeystoneVolumeService(cfg Config) (*gophercloud.ServiceClient, error) {
 	return volumeService, nil
 }
 
-
 func getVolumeService(configFilePath string) (*gophercloud.ServiceClient, error) {
 	config, err := getConfig(configFilePath)
 	if err != nil {
@@ -161,7 +157,6 @@ func getVolumeService(configFilePath string) (*gophercloud.ServiceClient, error)
 
 	if config.Global.CinderEndpoint != "" {
 		return nil, errors.New("Standalone cinder is not yet supported")
-	} else {
-		return getKeystoneVolumeService(config)
 	}
+	return getKeystoneVolumeService(config)
 }

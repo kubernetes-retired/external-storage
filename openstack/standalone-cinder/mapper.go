@@ -23,44 +23,40 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions"
+	volumes_v2 "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
-	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	volumes_v2 "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
-	"github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions"
+	"k8s.io/apimachinery/pkg/util/uuid"
 )
 
-
 type volumeConnectionDetails struct {
-	VolumeId string `json:"volume_id"`
-	Name string `json:"name"`
+	VolumeID     string `json:"volume_id"`
+	Name         string `json:"name"`
 
-	AuthMethod string `json:"auth_method"`
+	AuthMethod   string `json:"auth_method"`
 	AuthUsername string `json:"auth_username"`
 	AuthPassword string `json:"auth_password"`
-	SecretType string `json:"secret_type"`
+	SecretType   string `json:"secret_type"`
 
 	TargetPortal string `json:"target_portal"`
-	TargetIqn string `json:"target_iqn"`
-	TargetLun int32 `json:"target_lun"`
+	TargetIqn    string `json:"target_iqn"`
+	TargetLun    int32  `json:"target_lun"`
 
-	ClusterName string `json:"cluster_name"`
-	Hosts []string `json:"hosts"`
-	Ports []string `json:"ports"`
+	ClusterName  string   `json:"cluster_name"`
+	Hosts        []string `json:"hosts"`
+	Ports        []string `json:"ports"`
 }
-
 
 type volumeConnection struct {
-	DriverVolumeType string `json:"driver_volume_type"`
-	Data volumeConnectionDetails `json:"data"`
+	DriverVolumeType string                  `json:"driver_volume_type"`
+	Data             volumeConnectionDetails `json:"data"`
 }
-
 
 type rcvVolumeConnection struct {
 	ConnectionInfo volumeConnection `json:"connection_info"`
 }
-
 
 func createCinderVolume(p *cinderProvisioner, options controller.VolumeOptions) (string, error) {
 	name := fmt.Sprintf("cinder-dynamic-pvc-%s", uuid.NewUUID())
@@ -101,20 +97,19 @@ func createCinderVolume(p *cinderProvisioner, options controller.VolumeOptions) 
 	return vol.ID, nil
 }
 
-
-func connectCinderVolume (p *cinderProvisioner, volumeId string) (volumeConnection, error) {
+func connectCinderVolume(p *cinderProvisioner, volumeID string) (volumeConnection, error) {
 	opt := volumeactions.InitializeConnectionOpts{
 		Host:      "localhost",
 		IP:        "127.0.0.1",
-		Initiator: INITIATOR_NAME,
+		Initiator: initiatorName,
 	}
 
 	// TODO: Implement proper polling instead of brain-dead timers
 	c := make(chan error)
 	var rcv rcvVolumeConnection
 
-	go time.AfterFunc(5 * time.Second, func() {
-		err := volumeactions.InitializeConnection(p.volumeService, volumeId, &opt).ExtractInto(&rcv)
+	go time.AfterFunc(5*time.Second, func() {
+		err := volumeactions.InitializeConnection(p.volumeService, volumeID, &opt).ExtractInto(&rcv)
 		if err != nil {
 			glog.Errorf("failed to initialize connection :%v", err)
 			c <- err
@@ -130,34 +125,31 @@ func connectCinderVolume (p *cinderProvisioner, volumeId string) (volumeConnecti
 	return rcv.ConnectionInfo, nil
 }
 
-
-func disconnectCinderVolume(p *cinderProvisioner, volumeId string) error {
+func disconnectCinderVolume(p *cinderProvisioner, volumeID string) error {
 	opt := volumeactions.TerminateConnectionOpts{
 		Host:      "localhost",
 		IP:        "127.0.0.1",
-		Initiator: INITIATOR_NAME,
+		Initiator: initiatorName,
 	}
 
-	err := volumeactions.TerminateConnection(p.volumeService, volumeId, &opt).Result.Err
+	err := volumeactions.TerminateConnection(p.volumeService, volumeID, &opt).Result.Err
 	if err != nil {
 		glog.Errorf("Failed to terminate connection to volume %s: %v",
-			volumeId, err)
+			volumeID, err)
 		return err
 	}
 
 	return nil
 }
 
-
-func deleteCinderVolume(p *cinderProvisioner, volumeId string) error {
-	err := volumes_v2.Delete(p.volumeService, volumeId).ExtractErr()
+func deleteCinderVolume(p *cinderProvisioner, volumeID string) error {
+	err := volumes_v2.Delete(p.volumeService, volumeID).ExtractErr()
 	if err != nil {
-		glog.Errorf("Cannot delete volume %s: %v", volumeId, err)
+		glog.Errorf("Cannot delete volume %s: %v", volumeID, err)
 	}
 
 	return err
 }
-
 
 type volumeMapper interface {
 	BuildPVSource(ctx provisionCtx) (*v1.PersistentVolumeSource, error)
@@ -165,25 +157,17 @@ type volumeMapper interface {
 	AuthTeardown(ctx deleteCtx) error
 }
 
-
-type mapperContext struct {
-	cinderVolumeId string
-	p              *cinderProvisioner
-}
-
-
 func newVolumeMapperFromConnection(conn volumeConnection) (volumeMapper, error) {
 	switch conn.DriverVolumeType {
 	default:
 		msg := fmt.Sprintf("Unsupported volume type: %s", conn.DriverVolumeType)
 		return nil, errors.New(msg)
-	case ISCSI_TYPE:
+	case iscsiType:
 		return new(iscsiMapper), nil
-	case RBD_TYPE:
+	case rbdType:
 		return new(rbdMapper), nil
 	}
 }
-
 
 func newVolumeMapperFromPV(ctx deleteCtx) (volumeMapper, error) {
 	if ctx.pv.Spec.ISCSI != nil {
@@ -195,8 +179,7 @@ func newVolumeMapperFromPV(ctx deleteCtx) (volumeMapper, error) {
 	}
 }
 
-
-func BuildPV(m volumeMapper, ctx provisionCtx, volumeId string) (*v1.PersistentVolume, error) {
+func buildPV(m volumeMapper, ctx provisionCtx, volumeID string) (*v1.PersistentVolume, error) {
 	pvSource, err := m.BuildPVSource(ctx)
 	if err != nil {
 		glog.Errorf("Failed to build PV Source element: %v", err)
@@ -205,11 +188,11 @@ func BuildPV(m volumeMapper, ctx provisionCtx, volumeId string) (*v1.PersistentV
 
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: ctx.options.PVName,
+			Name:      ctx.options.PVName,
 			Namespace: ctx.options.PVC.Namespace,
 			Annotations: map[string]string{
 				provisionerIDAnn: ctx.p.identity,
-				cinderVolumeId: volumeId,
+				cinderVolumeID:   volumeID,
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{
