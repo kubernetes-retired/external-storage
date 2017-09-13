@@ -226,6 +226,9 @@ func (os *OpenStack) FindSnapshot(tags map[string]string) ([]string, []string, e
 
 	glog.Infof("Looking for matching tags [%#v] in snapshots.", tags)
 	// Loop around to find the snapshot with the matching input metadata
+	// NOTE(xyang): Metadata based filtering for snapshots is supported by Cinder volume API
+	// microversion 3.21 and above. Currently the OpenStack Cloud Provider only supports V2.0.
+	// Revisit this later when V3.0 is supported.
 	for _, snapshot := range snapshots {
 		glog.Infof("Looking for matching tags in snapshot [%#v].", snapshot)
 		namespaceVal, ok := snapshot.Metadata[ctrlsnap.CloudSnapshotCreatedForVolumeSnapshotNamespaceTag]
@@ -234,12 +237,17 @@ func (os *OpenStack) FindSnapshot(tags map[string]string) ([]string, []string, e
 				nameVal, ok := snapshot.Metadata[ctrlsnap.CloudSnapshotCreatedForVolumeSnapshotNameTag]
 				if ok {
 					if tags[ctrlsnap.CloudSnapshotCreatedForVolumeSnapshotNameTag] == nameVal {
-						timeVal, ok := snapshot.Metadata[ctrlsnap.CloudSnapshotCreatedForVolumeSnapshotTimestampTag]
+						uidVal, ok := snapshot.Metadata[ctrlsnap.CloudSnapshotCreatedForVolumeSnapshotUIDTag]
 						if ok {
-							if tags[ctrlsnap.CloudSnapshotCreatedForVolumeSnapshotTimestampTag] == timeVal {
-								snapshotIDs = append(snapshotIDs, snapshot.ID)
-								statuses = append(statuses, snapshot.Status)
-								glog.Infof("Add snapshot [%#v].", snapshot)
+							if tags[ctrlsnap.CloudSnapshotCreatedForVolumeSnapshotUIDTag] == uidVal {
+								timeVal, ok := snapshot.Metadata[ctrlsnap.CloudSnapshotCreatedForVolumeSnapshotTimestampTag]
+								if ok {
+									if tags[ctrlsnap.CloudSnapshotCreatedForVolumeSnapshotTimestampTag] == timeVal {
+										snapshotIDs = append(snapshotIDs, snapshot.ID)
+										statuses = append(statuses, snapshot.Status)
+										glog.Infof("Add snapshot [%#v].", snapshot)
+									}
+								}
 							}
 						}
 
