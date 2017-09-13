@@ -80,6 +80,9 @@ const (
 	// CloudSnapshotCreatedForVolumeSnapshotNameTag is a name of a tag attached to a real snapshot in cloud
 	// (e.g. AWS EBS or GCE PD) with name of a volumesnapshot used to create this snapshot.
 	CloudSnapshotCreatedForVolumeSnapshotNameTag = "kubernetes.io/created-for/snapshot/name"
+	// CloudSnapshotCreatedForVolumeSnapshotUIDTag is a name of a tag attached to a real snapshot in cloud
+	// (e.g. AWS EBS or GCE PD) with uid of a volumesnapshot used to create this snapshot.
+	CloudSnapshotCreatedForVolumeSnapshotUIDTag = "kubernetes.io/created-for/snapshot/uid"
 	// CloudSnapshotCreatedForVolumeSnapshotTimestampTag is a name of a tag attached to a real snapshot in cloud
 	// (e.g. AWS EBS or GCE PD) with timestamp when the create snapshot request is issued.
 	CloudSnapshotCreatedForVolumeSnapshotTimestampTag = "kubernetes.io/created-for/snapshot/timestamp"
@@ -339,13 +342,14 @@ func (vs *volumeSnapshotter) getSimplifiedSnapshotStatus(conditions *[]crdv1.Vol
 
 func (vs *volumeSnapshotter) findVolumeSnapshotMetadata(snapshot *crdv1.VolumeSnapshot) *map[string]string {
 	var tags *map[string]string
-	if snapshot.Metadata.Name != "" && snapshot.Metadata.Namespace != "" {
+	if snapshot.Metadata.Name != "" && snapshot.Metadata.Namespace != "" && snapshot.Metadata.UID != "" {
 		if snapshot.Metadata.Labels != nil {
 			timestamp, ok := snapshot.Metadata.Labels["Timestamp"]
 			if ok {
 				tags := make(map[string]string)
 				tags[CloudSnapshotCreatedForVolumeSnapshotNamespaceTag] = snapshot.Metadata.Namespace
 				tags[CloudSnapshotCreatedForVolumeSnapshotNameTag] = snapshot.Metadata.Name
+				tags[CloudSnapshotCreatedForVolumeSnapshotUIDTag] = fmt.Sprintf("%v", snapshot.Metadata.UID)
 				tags[CloudSnapshotCreatedForVolumeSnapshotTimestampTag] = timestamp
 				glog.Infof("findVolumeSnapshotMetadata: returning tags [%#v]", tags)
 			}
@@ -742,7 +746,7 @@ func (vs *volumeSnapshotter) updateVolumeSnapshotMetadata(snapshot *crdv1.Volume
 	tags := make(map[string]string)
 	tags["Timestamp"] = fmt.Sprintf("%d", time.Now().UnixNano())
 	snapshotCopy.Metadata.Labels = tags
-	glog.Infof("updateVolumeSnapshotMetadata: Metadata Name: %s Metadata Namespace: %s Setting tags in Metadata Labels: %#v.", snapshotCopy.Metadata.Name, snapshotCopy.Metadata.Namespace, snapshotCopy.Metadata.Labels)
+	glog.Infof("updateVolumeSnapshotMetadata: Metadata UID: %s Metadata Name: %s Metadata Namespace: %s Setting tags in Metadata Labels: %#v.", snapshotCopy.Metadata.UID, snapshotCopy.Metadata.Name, snapshotCopy.Metadata.Namespace, snapshotCopy.Metadata.Labels)
 
 	var result crdv1.VolumeSnapshot
 	err = vs.restClient.Put().
@@ -758,6 +762,7 @@ func (vs *volumeSnapshotter) updateVolumeSnapshotMetadata(snapshot *crdv1.Volume
 	cloudTags := make(map[string]string)
 	cloudTags[CloudSnapshotCreatedForVolumeSnapshotNamespaceTag] = result.Metadata.Namespace
 	cloudTags[CloudSnapshotCreatedForVolumeSnapshotNameTag] = result.Metadata.Name
+	cloudTags[CloudSnapshotCreatedForVolumeSnapshotUIDTag] = fmt.Sprintf("%v", result.Metadata.UID)
 	cloudTags[CloudSnapshotCreatedForVolumeSnapshotTimestampTag] = result.Metadata.Labels["Timestamp"]
 
 	glog.Infof("updateVolumeSnapshotMetadata: returning cloudTags [%#v]", cloudTags)
