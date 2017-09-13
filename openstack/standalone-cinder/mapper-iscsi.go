@@ -17,36 +17,32 @@ limitations under the License.
 package main
 
 import (
-	"k8s.io/api/core/v1"
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-
-const ISCSI_TYPE = "iscsi"
-const INITIATOR_NAME = "iqn.1994-05.com.redhat:a13fc3d1cc22"
-
+const iscsiType = "iscsi"
+const initiatorName = "iqn.1994-05.com.redhat:a13fc3d1cc22"
 
 type iscsiMapper struct {
 	volumeMapper
 }
 
-
 func getChapSecretName(ctx provisionCtx) string {
 	if ctx.connection.Data.AuthMethod == "CHAP" {
 		return ctx.options.PVName + "-secret"
-	} else {
-		return ""
 	}
+	return ""
 }
 
 func (m *iscsiMapper) BuildPVSource(ctx provisionCtx) (*v1.PersistentVolumeSource, error) {
 	ret := &v1.PersistentVolumeSource{
 		ISCSI: &v1.ISCSIVolumeSource{
 			// TODO: Need some way to specify the initiator name
-			TargetPortal: ctx.connection.Data.TargetPortal,
-			IQN: ctx.connection.Data.TargetIqn,
-			Lun: ctx.connection.Data.TargetLun,
+			TargetPortal:    ctx.connection.Data.TargetPortal,
+			IQN:             ctx.connection.Data.TargetIqn,
+			Lun:             ctx.connection.Data.TargetLun,
 			SessionCHAPAuth: false,
 		},
 	}
@@ -100,8 +96,7 @@ func (m *iscsiMapper) AuthTeardown(ctx deleteCtx) error {
 	if err != nil {
 		glog.Errorf("Failed to remove secret: %s, %v", secretName, err)
 		return err
-	} else{
-		glog.Infof("Successfully deleted secret %s", secretName)
-		return nil
 	}
+	glog.Infof("Successfully deleted secret %s", secretName)
+	return nil
 }
