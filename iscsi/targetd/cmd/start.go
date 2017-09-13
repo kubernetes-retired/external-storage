@@ -123,6 +123,8 @@ func init() {
 	viper.BindPFlag("targetd-address", startcontrollerCmd.Flags().Lookup("targetd-address"))
 	startcontrollerCmd.Flags().Int("targetd-port", 18700, "port on which targetd is listening")
 	viper.BindPFlag("targetd-port", startcontrollerCmd.Flags().Lookup("targetd-port"))
+	startcontrollerCmd.Flags().String("default-fs", "xfs", "filesystem to use when not specified")
+	viper.BindPFlag("default-fs", startcontrollerCmd.Flags().Lookup("default-fs"))
 
 	// Here you will define your flags and configuration settings.
 
