@@ -192,10 +192,6 @@ func main() {
 	flag.Parse()
 	flag.Set("logtostderr", "true")
 
-	if *cloudconfig == "" {
-		glog.Fatalf("missing OpenStack config file")
-	}
-
 	var config *rest.Config
 	var err error
 	if *master != "" || *kubeconfig != "" {

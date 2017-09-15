@@ -36,20 +36,22 @@ import (
 )
 
 type cinderConfig struct {
-	Global struct {
-		CinderEndpoint string `gcfg:"cinder-endpoint"`
-		AuthURL        string `gcfg:"auth-url"`
-		Username       string
-		UserID         string `gcfg:"user-id"`
-		Password       string
-		TenantID       string `gcfg:"tenant-id"`
-		TenantName     string `gcfg:"tenant-name"`
-		TrustID        string `gcfg:"trust-id"`
-		DomainID       string `gcfg:"domain-id"`
-		DomainName     string `gcfg:"domain-name"`
-		Region         string
-		CAFile         string `gcfg:"ca-file"`
-	}
+	Global cinderConfigGlobal
+}
+
+type cinderConfigGlobal struct {
+	CinderEndpoint string `gcfg:"cinder-endpoint"`
+	AuthURL        string `gcfg:"auth-url"`
+	Username       string
+	UserID         string `gcfg:"user-id"`
+	Password       string
+	TenantID       string `gcfg:"tenant-id"`
+	TenantName     string `gcfg:"tenant-name"`
+	TrustID        string `gcfg:"trust-id"`
+	DomainID       string `gcfg:"domain-id"`
+	DomainName     string `gcfg:"domain-name"`
+	Region         string
+	CAFile         string `gcfg:"ca-file"`
 }
 
 func (cfg cinderConfig) toAuthOptions() gophercloud.AuthOptions {
@@ -80,6 +82,24 @@ func (cfg cinderConfig) toAuth3Options() tokens3.AuthOptions {
 	}
 }
 
+func getConfigFromEnv() cinderConfig {
+	authURL := os.Getenv("OS_AUTH_URL")
+	if authURL == "" {
+		glog.Warning("OS_AUTH_URL missing from environment")
+		return cinderConfig{}
+	}
+
+	return cinderConfig{
+		Global: cinderConfigGlobal{
+			AuthURL:  authURL,
+			Username: os.Getenv("OS_USERNAME"),
+			Password: os.Getenv("OS_PASSWORD"), // TODO: Replace with secret
+			TenantID: os.Getenv("OS_TENANT_ID"),
+			Region:   os.Getenv("OS_REGION_NAME"),
+		},
+	}
+}
+
 func getConfig(configFilePath string) (cinderConfig, error) {
 	if configFilePath != "" {
 		var configFile *os.File
@@ -99,12 +119,16 @@ func getConfig(configFilePath string) (cinderConfig, error) {
 			return cinderConfig{}, err
 		}
 		return config, nil
-
+	}
+	envConfig := getConfigFromEnv()
+	if envConfig != (cinderConfig{}) {
+		return envConfig, nil
 	}
 
 	// Pass explicit nil so plugins can actually check for nil. See
 	// "Why is my nil error value not equal to nil?" in golang.org/doc/faq.
-	glog.Fatal("No config file path specified")
+	glog.Fatal("Configuration missing: no config file specified and " +
+		"environment variables are not set.")
 	return cinderConfig{}, errors.New("Missing configuration")
 }
 
