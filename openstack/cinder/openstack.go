@@ -112,29 +112,6 @@ func getConfig(configFilePath string) (Config, error) {
 }
 
 
-func getStandaloneVolumeService(cfg Config) (*gophercloud.ServiceClient, error) {
-	opts := gophercloud.NoAuthOptions{
-		Username:   cfg.Global.Username,
-		TenantName: cfg.Global.TenantName,
-	}
-	provider, err := openstack.UnAuthenticatedClient(opts)
-	if err != nil {
-		glog.Fatalf("Unable to initialize noauth client: %#v", err)
-		return nil, err
-	}
-
-	volumeService, err := openstack.NewBlockStorageV2(provider, gophercloud.EndpointOpts{
-		Region: cfg.Global.Region,
-		CinderEndpoint: cfg.Global.CinderEndpoint,
-	})
-	if err != nil {
-		glog.Fatalf("Unable to get volume service: %#v", err)
-		return nil, err
-	}
-	return volumeService, nil
-}
-
-
 func getKeystoneVolumeService(cfg Config) (*gophercloud.ServiceClient, error) {
 	provider, err := openstack.NewClient(cfg.Global.AuthUrl)
 	if err != nil {
@@ -183,7 +160,7 @@ func getVolumeService(configFilePath string) (*gophercloud.ServiceClient, error)
 	}
 
 	if config.Global.CinderEndpoint != "" {
-		return getStandaloneVolumeService(config)
+		return nil, errors.New("Standalone cinder is not yet supported")
 	} else {
 		return getKeystoneVolumeService(config)
 	}
