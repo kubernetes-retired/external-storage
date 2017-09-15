@@ -1,8 +1,7 @@
 package distribution
 
 import (
-	"context"
-
+	"github.com/docker/distribution/context"
 	"github.com/docker/distribution/reference"
 )
 
@@ -36,7 +35,7 @@ type Namespace interface {
 	// reference.
 	Repository(ctx context.Context, name reference.Named) (Repository, error)
 
-	// Repositories fills 'repos' with a lexicographically sorted catalog of repositories
+	// Repositories fills 'repos' with a lexigraphically sorted catalog of repositories
 	// up to the size of 'repos' and returns the value 'n' for the number of entries
 	// which were filled.  'last' contains an offset in the catalog, and 'err' will be
 	// set to io.EOF if there are no more entries to obtain.

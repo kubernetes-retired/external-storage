@@ -356,9 +356,6 @@ func (d *bincDecDriver) uncacheRead() {
 }
 
 func (d *bincDecDriver) ContainerType() (vt valueType) {
-	if !d.bdRead {
-		d.readNextBd()
-	}
 	if d.vd == bincVdSpecial && d.vs == bincSpNil {
 		return valueTypeNil
 	} else if d.vd == bincVdByteArray {
@@ -583,9 +580,6 @@ func (d *bincDecDriver) DecodeBool() (b bool) {
 }
 
 func (d *bincDecDriver) ReadMapStart() (length int) {
-	if !d.bdRead {
-		d.readNextBd()
-	}
 	if d.vd != bincVdMap {
 		d.d.errorf("Invalid d.vd for map. Expecting 0x%x. Got: 0x%x", bincVdMap, d.vd)
 		return
@@ -596,9 +590,6 @@ func (d *bincDecDriver) ReadMapStart() (length int) {
 }
 
 func (d *bincDecDriver) ReadArrayStart() (length int) {
-	if !d.bdRead {
-		d.readNextBd()
-	}
 	if d.vd != bincVdArray {
 		d.d.errorf("Invalid d.vd for array. Expecting 0x%x. Got: 0x%x", bincVdArray, d.vd)
 		return
@@ -648,12 +639,12 @@ func (d *bincDecDriver) decStringAndBytes(bs []byte, withString, zerocopy bool) 
 			if d.br {
 				bs2 = d.r.readx(slen)
 			} else if len(bs) == 0 {
-				bs2 = decByteSlice(d.r, slen, d.d.h.MaxInitLen, d.b[:])
+				bs2 = decByteSlice(d.r, slen, d.b[:])
 			} else {
-				bs2 = decByteSlice(d.r, slen, d.d.h.MaxInitLen, bs)
+				bs2 = decByteSlice(d.r, slen, bs)
 			}
 		} else {
-			bs2 = decByteSlice(d.r, slen, d.d.h.MaxInitLen, bs)
+			bs2 = decByteSlice(d.r, slen, bs)
 		}
 		if withString {
 			s = string(bs2)
@@ -705,7 +696,7 @@ func (d *bincDecDriver) decStringAndBytes(bs []byte, withString, zerocopy bool) 
 			// since using symbols, do not store any part of
 			// the parameter bs in the map, as it might be a shared buffer.
 			// bs2 = decByteSlice(d.r, slen, bs)
-			bs2 = decByteSlice(d.r, slen, d.d.h.MaxInitLen, nil)
+			bs2 = decByteSlice(d.r, slen, nil)
 			if withString {
 				s = string(bs2)
 			}
@@ -756,7 +747,7 @@ func (d *bincDecDriver) DecodeBytes(bs []byte, isstring, zerocopy bool) (bsOut [
 			bs = d.b[:]
 		}
 	}
-	return decByteSlice(d.r, clen, d.d.h.MaxInitLen, bs)
+	return decByteSlice(d.r, clen, bs)
 }
 
 func (d *bincDecDriver) DecodeExt(rv interface{}, xtag uint64, ext Ext) (realxtag uint64) {
@@ -919,7 +910,7 @@ func (h *BincHandle) newEncDriver(e *Encoder) encDriver {
 }
 
 func (h *BincHandle) newDecDriver(d *Decoder) decDriver {
-	return &bincDecDriver{d: d, h: h, r: d.r, br: d.bytes}
+	return &bincDecDriver{d: d, r: d.r, h: h, br: d.bytes}
 }
 
 func (e *bincEncDriver) reset() {
@@ -929,7 +920,7 @@ func (e *bincEncDriver) reset() {
 }
 
 func (d *bincDecDriver) reset() {
-	d.r, d.br = d.d.r, d.d.bytes
+	d.r = d.d.r
 	d.s = nil
 	d.bd, d.bdRead, d.vd, d.vs = 0, false, 0, 0
 }
