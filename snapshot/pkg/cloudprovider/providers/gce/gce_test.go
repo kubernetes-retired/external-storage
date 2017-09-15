@@ -30,7 +30,7 @@ func TestGetRegion(t *testing.T) {
 	if regionName != "us-central1" {
 		t.Errorf("Unexpected region from GetGCERegion: %s", regionName)
 	}
-	gce := &GCECloud{
+	gce := &Cloud{
 		localZone: zoneName,
 		region:    regionName,
 	}
@@ -137,7 +137,7 @@ func TestScrubDNS(t *testing.T) {
 			searchesOut: []string{"c.prj.internal.", "zone.c.prj.internal.", "google.internal.", "unexpected"},
 		},
 	}
-	gce := &GCECloud{}
+	gce := &Cloud{}
 	for i := range tcs {
 		n, s := gce.ScrubDNS(tcs[i].nameserversIn, tcs[i].searchesIn)
 		if !reflect.DeepEqual(n, tcs[i].nameserversOut) {
@@ -153,7 +153,7 @@ func TestCreateFirewallFails(t *testing.T) {
 	name := "loadbalancer"
 	region := "us-central1"
 	desc := "description"
-	gce := &GCECloud{}
+	gce := &Cloud{}
 	if err := gce.createFirewall(name, region, desc, nil, nil, nil); err == nil {
 		t.Errorf("error expected when creating firewall without any tags found")
 	}
