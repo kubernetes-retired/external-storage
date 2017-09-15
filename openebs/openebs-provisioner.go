@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 
+	"strings"
 	"syscall"
 
 	"github.com/golang/glog"
@@ -85,6 +86,13 @@ func (p *openEBSProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 	var openebsVol mApiv1.OpenEBSVolume
 
 	volSize := options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
+
+	if strings.HasPrefix(options.PVName, "pvc") {
+		pvNameArr := strings.SplitAfter(options.PVName, "pvc")
+		if len(pvNameArr) > 1 {
+			options.PVName = "openebs-volume" + pvNameArr[1]
+		}
+	}
 
 	_, err := openebsVol.CreateVsm(options.PVName, volSize.String())
 	if err != nil {
