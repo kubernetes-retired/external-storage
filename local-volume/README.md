@@ -152,7 +152,7 @@ spec:
   persistentVolumeReclaimPolicy: Retain
   storageClassName: local-storage
   local:
-    path: /mnt/disks/ssd1
+    path: /mnt/disks/vol1
 ```
 Please replace the following elements to reflect your configuration:
   * "my-node" with the name of kubernetes node which is hosting this
@@ -160,7 +160,7 @@ Please replace the following elements to reflect your configuration:
   * "5Gi" with the required size of storage volume, same as specified in PVC
   * "local-storage" with the name of storage class which should be used
      for local volumes
-  * "/mnt/disks/ssd1" with the path to the mount point of local volumes
+  * "/mnt/disks/vol1" with the path to the mount point of local volumes
  
 ### Step 3: Create local persistent volume claim
 
