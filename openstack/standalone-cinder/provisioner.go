@@ -35,7 +35,7 @@ import (
 const (
 	provisionerName  = "openstack.org/standalone-cinder"
 	provisionerIDAnn = "standaloneCinderProvisionerIdentity"
-	cinderVolumeID = "cinderVolumeId"
+	cinderVolumeID   = "cinderVolumeId"
 )
 
 type cinderProvisioner struct {

@@ -32,8 +32,8 @@ import (
 )
 
 type volumeConnectionDetails struct {
-	VolumeID     string `json:"volume_id"`
-	Name         string `json:"name"`
+	VolumeID string `json:"volume_id"`
+	Name     string `json:"name"`
 
 	AuthMethod   string `json:"auth_method"`
 	AuthUsername string `json:"auth_username"`
@@ -44,9 +44,9 @@ type volumeConnectionDetails struct {
 	TargetIqn    string `json:"target_iqn"`
 	TargetLun    int32  `json:"target_lun"`
 
-	ClusterName  string   `json:"cluster_name"`
-	Hosts        []string `json:"hosts"`
-	Ports        []string `json:"ports"`
+	ClusterName string   `json:"cluster_name"`
+	Hosts       []string `json:"hosts"`
+	Ports       []string `json:"ports"`
 }
 
 type volumeConnection struct {
@@ -103,7 +103,7 @@ func waitForAvailableCinderVolume(p *cinderProvisioner, volumeID string) error {
 	go time.AfterFunc(5*time.Second, func() {
 		c <- nil
 	})
-	return <- c
+	return <-c
 }
 
 func reserveCinderVolume(p *cinderProvisioner, volumeID string) error {
