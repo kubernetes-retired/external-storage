@@ -18,7 +18,7 @@ all: aws/efs ceph/cephfs ceph/rbd flex gluster/block gluster/glusterfs iscsi/tar
 clean: clean-aws/efs clean-ceph/cephfs clean-ceph/rbd clean-flex clean-gluster/block clean-gluster/glusterfs clean-iscsi/targetd clean-local-volume/provisioner clean-local-volume/bootstrapper clean-nfs-client clean-nfs clean-snapshot clean-openstack/standalone-cinder
 .PHONY: clean
 
-test: test-aws/efs test-local-volume/provisioner test-nfs
+test: test-aws/efs test-local-volume/provisioner test-nfs test-snapshot
 .PHONY: test
 
 verify:
@@ -180,6 +180,11 @@ clean-openstack/standalone-cinder:
 	cd openstack/standalone-cinder; \
 	make clean
 .PHONY: clean-openstack/standalone-cinder
+
+test-snapshot:
+	cd snapshot; \
+	make test
+.PHONY: test-snapshot
 
 push-cephfs-provisioner:
 	cd ceph/cephfs; \

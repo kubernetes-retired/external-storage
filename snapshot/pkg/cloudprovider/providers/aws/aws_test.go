@@ -35,6 +35,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
 const TestClusterID = "clusterid.test"
@@ -285,7 +286,7 @@ func instanceMatchesFilter(instance *ec2.Instance, filter *ec2.Filter) bool {
 
 func (e *FakeEC2) DescribeInstances(request *ec2.DescribeInstancesInput) ([]*ec2.Instance, error) {
 	matches := []*ec2.Instance{}
-	for _, instance := range self.aws.instances {
+	for _, instance := range e.aws.instances {
 		if request.InstanceIds != nil {
 			if instance.InstanceId == nil {
 				glog.Warning("Instance with no instance id: ", instance)
@@ -327,7 +328,7 @@ type FakeMetadata struct {
 
 func (fake *FakeMetadata) GetMetadata(key string) (string, error) {
 	networkInterfacesPrefix := "network/interfaces/macs/"
-	i := self.aws.selfInstance
+	i := fake.aws.selfInstance
 	if key == "placement/availability-zone" {
 		az := ""
 		if i.Placement != nil {
@@ -346,14 +347,14 @@ func (fake *FakeMetadata) GetMetadata(key string) (string, error) {
 		return aws.StringValue(i.PublicIpAddress), nil
 	} else if strings.HasPrefix(key, networkInterfacesPrefix) {
 		if key == networkInterfacesPrefix {
-			return strings.Join(self.aws.networkInterfacesMacs, "/\n") + "/\n", nil
+			return strings.Join(fake.aws.networkInterfacesMacs, "/\n") + "/\n", nil
 		}
 		keySplit := strings.Split(key, "/")
 		macParam := keySplit[3]
 		if len(keySplit) == 5 && keySplit[4] == "vpc-id" {
-			for i, macElem := range self.aws.networkInterfacesMacs {
+			for i, macElem := range fake.aws.networkInterfacesMacs {
 				if macParam == macElem {
-					return self.aws.networkInterfacesVpcIDs[i], nil
+					return fake.aws.networkInterfacesVpcIDs[i], nil
 				}
 			}
 		}
@@ -383,6 +384,17 @@ func (e *FakeEC2) DeleteVolume(request *ec2.DeleteVolumeInput) (resp *ec2.Delete
 	panic("Not implemented")
 }
 
+func (e *FakeEC2) CreateSnapshot(*ec2.CreateSnapshotInput) (*ec2.Snapshot, error) {
+	panic("Not implemented")
+}
+
+func (e *FakeEC2) DeleteSnapshot(*ec2.DeleteSnapshotInput) (*ec2.DeleteSnapshotOutput, error) {
+	panic("Not implemented")
+}
+
+func (e *FakeEC2) DescribeSnapshots(*ec2.DescribeSnapshotsInput) ([]*ec2.Snapshot, error) {
+	panic("Not implemented")
+}
 func (e *FakeEC2) DescribeSecurityGroups(request *ec2.DescribeSecurityGroupsInput) ([]*ec2.SecurityGroup, error) {
 	panic("Not implemented")
 }
@@ -404,8 +416,8 @@ func (e *FakeEC2) RevokeSecurityGroupIngress(*ec2.RevokeSecurityGroupIngressInpu
 }
 
 func (e *FakeEC2) DescribeSubnets(request *ec2.DescribeSubnetsInput) ([]*ec2.Subnet, error) {
-	ec2.DescribeSubnetsInput = request
-	return ec2.Subnets, nil
+	e.DescribeSubnetsInput = request
+	return e.Subnets, nil
 }
 
 func (e *FakeEC2) CreateTags(*ec2.CreateTagsInput) (*ec2.CreateTagsOutput, error) {
@@ -413,8 +425,8 @@ func (e *FakeEC2) CreateTags(*ec2.CreateTagsInput) (*ec2.CreateTagsOutput, error
 }
 
 func (e *FakeEC2) DescribeRouteTables(request *ec2.DescribeRouteTablesInput) ([]*ec2.RouteTable, error) {
-	ec2.DescribeRouteTablesInput = request
-	return ec2.RouteTables, nil
+	e.DescribeRouteTablesInput = request
+	return e.RouteTables, nil
 }
 
 func (e *FakeEC2) CreateRoute(request *ec2.CreateRouteInput) (*ec2.CreateRouteOutput, error) {
@@ -597,11 +609,10 @@ func TestNodeAddresses(t *testing.T) {
 	if err3 != nil {
 		t.Errorf("Should not error when instance found")
 	}
-	if len(addrs3) != 5 {
-		t.Errorf("Should return exactly 5 NodeAddresses")
+	if len(addrs3) != 4 {
+		t.Errorf("Should return exactly 4 NodeAddresses")
 	}
 	testHasNodeAddress(t, addrs3, v1.NodeInternalIP, "192.168.0.1")
-	testHasNodeAddress(t, addrs3, v1.NodeLegacyHostIP, "192.168.0.1")
 	testHasNodeAddress(t, addrs3, v1.NodeExternalIP, "1.2.3.4")
 	testHasNodeAddress(t, addrs3, v1.NodeExternalDNS, "instance-same.ec2.external")
 	testHasNodeAddress(t, addrs3, v1.NodeInternalDNS, "instance-same.ec2.internal")
@@ -1082,13 +1093,13 @@ func TestGetVolumeLabels(t *testing.T) {
 
 	assert.Nil(t, err, "Error creating Volume %v", err)
 	assert.Equal(t, map[string]string{
-		metav1.LabelZoneFailureDomain: "us-east-1a",
-		metav1.LabelZoneRegion:        "us-east-1"}, labels)
+		apis.LabelZoneFailureDomain: "us-east-1a",
+		apis.LabelZoneRegion:        "us-east-1"}, labels)
 	awsServices.ec2.AssertExpectations(t)
 }
 
 func (ec2 *FakeELB) expectDescribeLoadBalancers(loadBalancerName string) {
-	self.On("DescribeLoadBalancers", &elb.DescribeLoadBalancersInput{LoadBalancerNames: []*string{aws.String(loadBalancerName)}}).Return(&elb.DescribeLoadBalancersOutput{
+	ec2.On("DescribeLoadBalancers", &elb.DescribeLoadBalancersInput{LoadBalancerNames: []*string{aws.String(loadBalancerName)}}).Return(&elb.DescribeLoadBalancersOutput{
 		LoadBalancerDescriptions: []*elb.LoadBalancerDescription{{}},
 	})
 }
