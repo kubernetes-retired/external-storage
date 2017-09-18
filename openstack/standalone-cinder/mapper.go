@@ -89,11 +89,11 @@ func createCinderVolume(p *cinderProvisioner, options controller.VolumeOptions) 
 	vol, err := volumes_v2.Create(p.volumeService, &opts).Extract()
 
 	if err != nil {
-		glog.Errorf("Failed to create a %d GB volume: %v", sizeGB, err)
+		glog.Errorf("Failed to create a %d GiB volume: %v", sizeGB, err)
 		return "", err
 	}
 
-	glog.Infof("Created volume %v in Availability Zone: %v", vol.ID, vol.AvailabilityZone)
+	glog.V(2).Infof("Created volume %v in Availability Zone: %v", vol.ID, vol.AvailabilityZone)
 	return vol.ID, nil
 }
 
@@ -122,7 +122,7 @@ func connectCinderVolume(p *cinderProvisioner, volumeID string) (volumeConnectio
 		glog.Errorf("failed to initialize connection :%v", err)
 		return volumeConnection{}, err
 	}
-	glog.Infof("Received connection info: %v", rcv)
+	glog.V(3).Infof("Received connection info: %v", rcv)
 	return rcv.ConnectionInfo, nil
 }
 
@@ -165,7 +165,7 @@ type volumeMapper interface {
 func newVolumeMapperFromConnection(conn volumeConnection) (volumeMapper, error) {
 	switch conn.DriverVolumeType {
 	default:
-		msg := fmt.Sprintf("Unsupported volume type: %s", conn.DriverVolumeType)
+		msg := fmt.Sprintf("Unsupported persistent volume type: %s", conn.DriverVolumeType)
 		return nil, errors.New(msg)
 	case iscsiType:
 		return new(iscsiMapper), nil
@@ -180,7 +180,7 @@ func newVolumeMapperFromPV(ctx deleteCtx) (volumeMapper, error) {
 	} else if ctx.pv.Spec.RBD != nil {
 		return new(rbdMapper), nil
 	} else {
-		return nil, errors.New("Unsupported volume source")
+		return nil, errors.New("Unsupported persistent volume source")
 	}
 }
 

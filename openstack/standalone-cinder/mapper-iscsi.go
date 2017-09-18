@@ -60,7 +60,7 @@ func (m *iscsiMapper) AuthSetup(ctx provisionCtx) error {
 	// Create a secret for the CHAP credentials
 	secretName := getChapSecretName(ctx)
 	if secretName == "" {
-		glog.Info("No CHAP authentication secret necessary")
+		glog.V(3).Info("No CHAP authentication secret necessary")
 		return nil
 	}
 	secret := &v1.Secret{
@@ -76,17 +76,17 @@ func (m *iscsiMapper) AuthSetup(ctx provisionCtx) error {
 	namespace := ctx.options.PVC.Namespace
 	_, err := ctx.p.client.CoreV1().Secrets(namespace).Create(secret)
 	if err != nil {
-		glog.Errorf("Failed to create chap secret: %v", err)
+		glog.Errorf("Failed to create chap secret in namespace %s: %v", namespace, err)
 		return err
 	}
-	glog.Infof("Secret %s created", secretName)
+	glog.V(3).Infof("Secret %s created", secretName)
 	return nil
 }
 
 func (m *iscsiMapper) AuthTeardown(ctx deleteCtx) error {
 	// Delete the CHAP credentials
 	if ctx.pv.Spec.ISCSI.SecretRef == nil {
-		glog.Info("No associated secret to delete")
+		glog.V(3).Info("No associated secret to delete")
 		return nil
 	}
 
@@ -94,9 +94,9 @@ func (m *iscsiMapper) AuthTeardown(ctx deleteCtx) error {
 	secretNamespace := ctx.pv.Spec.ClaimRef.Namespace
 	err := ctx.p.client.CoreV1().Secrets(secretNamespace).Delete(secretName, nil)
 	if err != nil {
-		glog.Errorf("Failed to remove secret: %s, %v", secretName, err)
+		glog.Errorf("Failed to remove secret %s from namespace %s: %v", secretName, secretNamespace, err)
 		return err
 	}
-	glog.Infof("Successfully deleted secret %s", secretName)
+	glog.V(3).Infof("Successfully deleted secret %s", secretName)
 	return nil
 }

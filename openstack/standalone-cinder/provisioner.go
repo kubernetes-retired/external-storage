@@ -149,7 +149,7 @@ func (p *cinderProvisioner) Delete(pv *v1.PersistentVolume) error {
 
 	volumeID, ok := pv.Annotations[cinderVolumeID]
 	if !ok {
-		return errors.New("cinder volume id annotation not found on PV")
+		return errors.New(cinderVolumeID + " annotation not found on PV")
 	}
 
 	ctx := deleteCtx{p, pv}
@@ -177,7 +177,7 @@ func (p *cinderProvisioner) Delete(pv *v1.PersistentVolume) error {
 		return err
 	}
 
-	glog.Infof("Successfully deleted cinder volume %s", volumeID)
+	glog.V(2).Infof("Successfully deleted cinder volume %s", volumeID)
 	return nil
 }
 
