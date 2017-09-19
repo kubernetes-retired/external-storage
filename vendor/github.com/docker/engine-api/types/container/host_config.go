@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/docker/engine-api/types/blkiodev"
-	"github.com/docker/engine-api/types/mount"
 	"github.com/docker/engine-api/types/strslice"
 	"github.com/docker/go-connections/nat"
 	"github.com/docker/go-units"
@@ -196,7 +195,7 @@ type RestartPolicy struct {
 // IsNone indicates whether the container has the "no" restart policy.
 // This means the container will not automatically restart when exiting.
 func (rp *RestartPolicy) IsNone() bool {
-	return rp.Name == "no" || rp.Name == ""
+	return rp.Name == "no"
 }
 
 // IsAlways indicates whether the container has the "always" restart policy.
@@ -258,10 +257,11 @@ type Resources struct {
 	Ulimits              []*units.Ulimit // List of ulimits to be set in the container
 
 	// Applicable to Windows
-	CPUCount           int64  `json:"CpuCount"`   // CPU count
-	CPUPercent         int64  `json:"CpuPercent"` // CPU percent
-	IOMaximumIOps      uint64 // Maximum IOps for the container system drive
-	IOMaximumBandwidth uint64 // Maximum IO in bytes per second for the container system drive
+	CPUCount                int64  `json:"CpuCount"`   // CPU count
+	CPUPercent              int64  `json:"CpuPercent"` // CPU percent
+	IOMaximumIOps           uint64 // Maximum IOps for the container system drive
+	IOMaximumBandwidth      uint64 // Maximum IO in bytes per second for the container system drive
+	NetworkMaximumBandwidth uint64 // Maximum bandwidth of the network endpoint in bytes per second
 }
 
 // UpdateConfig holds the mutable attributes of a Container.
@@ -304,13 +304,12 @@ type HostConfig struct {
 	PublishAllPorts bool              // Should docker publish all exposed port for the container
 	ReadonlyRootfs  bool              // Is the container root filesystem in read-only
 	SecurityOpt     []string          // List of string values to customize labels for MLS systems, such as SELinux.
-	StorageOpt      map[string]string `json:",omitempty"` // Storage driver options per container.
+	StorageOpt      map[string]string // Storage driver options per container.
 	Tmpfs           map[string]string `json:",omitempty"` // List of tmpfs (mounts) used for the container
 	UTSMode         UTSMode           // UTS namespace to use for the container
 	UsernsMode      UsernsMode        // The user namespace to use for the container
 	ShmSize         int64             // Total shm memory usage
 	Sysctls         map[string]string `json:",omitempty"` // List of Namespaced sysctls used for the container
-	Runtime         string            `json:",omitempty"` // Runtime to use with this container
 
 	// Applicable to Windows
 	ConsoleSize [2]int    // Initial console size
@@ -318,7 +317,4 @@ type HostConfig struct {
 
 	// Contains container's resources (cgroups, ulimits)
 	Resources
-
-	// Mounts specs used by the container
-	Mounts []mount.Mount `json:",omitempty"`
 }

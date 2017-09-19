@@ -48,12 +48,12 @@ import:
   subpackages:
   - pkg/util/goroutinemap
   - pkg/util/version
-- package: github.com/heketi/heketi/client/api/go-client
+- package: github.com/heketi/heketi
   version: 7a54b6fc903feab1e7cb6573177ca09b544eb1e2
-- package: github.com/heketi/heketi/pkg/glusterfs/api
-  version: 7a54b6fc903feab1e7cb6573177ca09b544eb1e2
-- package: github.com/heketi/heketi/pkg/utils
-  version: 7a54b6fc903feab1e7cb6573177ca09b544eb1e2
+  subpackages:
+  - client/api/go-client
+  - pkg/glusterfs/api
+  - pkg/utils
 - package: github.com/lpabon/godbc
   version: 9577782540c1398b710ddae1b86268ba03a19b0c
 - package: github.com/dgrijalva/jwt-go
@@ -61,4 +61,8 @@ import:
   version: f62e98d28ab7ad31d707ba837a966378465c7b57
 - package: github.com/spf13/pflag
   version: 5ccb023bc27df288a957c5e994cd44fd19619465
-- package: github.com/powerman/rpc-codec/jsonrpc2
+- package: github.com/powerman/rpc-codec
+  subpackages:
+  - jsonrpc2
+- package: github.com/gophercloud/gophercloud
+  version: b4c2377fa77951a0e08163f52dc9b3e206355194
