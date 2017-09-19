@@ -6,6 +6,7 @@
 # Folders
 _obj
 _test
+vendor
 
 # Architecture specific extensions/prefixes
 *.[56vq]
@@ -44,3 +45,10 @@ tags
 log
 *.sw?
 *~
+.vscode
+debug
+
+.coverage
+.tox
+*.log
+.envrc

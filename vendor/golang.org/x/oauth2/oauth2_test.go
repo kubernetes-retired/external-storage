@@ -5,12 +5,15 @@
 package oauth2
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
+	"strconv"
 	"testing"
 	"time"
 
@@ -89,7 +92,7 @@ func TestExchangeRequest(t *testing.T) {
 		if err != nil {
 			t.Errorf("Failed reading request body: %s.", err)
 		}
-		if string(body) != "code=exchange-code&grant_type=authorization_code&redirect_uri=REDIRECT_URL" {
+		if string(body) != "client_id=CLIENT_ID&code=exchange-code&grant_type=authorization_code&redirect_uri=REDIRECT_URL&scope=scope1+scope2" {
 			t.Errorf("Unexpected exchange payload, %v is found.", string(body))
 		}
 		w.Header().Set("Content-Type", "application/x-www-form-urlencoded")
@@ -133,7 +136,7 @@ func TestExchangeRequest_JSONResponse(t *testing.T) {
 		if err != nil {
 			t.Errorf("Failed reading request body: %s.", err)
 		}
-		if string(body) != "code=exchange-code&grant_type=authorization_code&redirect_uri=REDIRECT_URL" {
+		if string(body) != "client_id=CLIENT_ID&code=exchange-code&grant_type=authorization_code&redirect_uri=REDIRECT_URL&scope=scope1+scope2" {
 			t.Errorf("Unexpected exchange payload, %v is found.", string(body))
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -207,22 +210,23 @@ const day = 24 * time.Hour
 
 func TestExchangeRequest_JSONResponse_Expiry(t *testing.T) {
 	seconds := int32(day.Seconds())
+	jsonNumberType := reflect.TypeOf(json.Number("0"))
 	for _, c := range []struct {
 		expires string
-		want    bool
+		expect  error
 	}{
-		{fmt.Sprintf(`"expires_in": %d`, seconds), true},
-		{fmt.Sprintf(`"expires_in": "%d"`, seconds), true}, // PayPal case
-		{fmt.Sprintf(`"expires": %d`, seconds), true},      // Facebook case
-		{`"expires": false`, false},                        // wrong type
-		{`"expires": {}`, false},                           // wrong type
-		{`"expires": "zzz"`, false},                        // wrong value
+		{fmt.Sprintf(`"expires_in": %d`, seconds), nil},
+		{fmt.Sprintf(`"expires_in": "%d"`, seconds), nil},                                             // PayPal case
+		{fmt.Sprintf(`"expires": %d`, seconds), nil},                                                  // Facebook case
+		{`"expires": false`, &json.UnmarshalTypeError{Value: "bool", Type: jsonNumberType}},           // wrong type
+		{`"expires": {}`, &json.UnmarshalTypeError{Value: "object", Type: jsonNumberType}},            // wrong type
+		{`"expires": "zzz"`, &strconv.NumError{Func: "ParseInt", Num: "zzz", Err: strconv.ErrSyntax}}, // wrong value
 	} {
-		testExchangeRequest_JSONResponse_expiry(t, c.expires, c.want)
+		testExchangeRequest_JSONResponse_expiry(t, c.expires, c.expect)
 	}
 }
 
-func testExchangeRequest_JSONResponse_expiry(t *testing.T, exp string, want bool) {
+func testExchangeRequest_JSONResponse_expiry(t *testing.T, exp string, expect error) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(fmt.Sprintf(`{"access_token": "90d", "scope": "user", "token_type": "bearer", %s}`, exp)))
@@ -232,15 +236,19 @@ func testExchangeRequest_JSONResponse_expiry(t *testing.T, exp string, want bool
 	t1 := time.Now().Add(day)
 	tok, err := conf.Exchange(context.Background(), "exchange-code")
 	t2 := time.Now().Add(day)
-
-	if got := (err == nil); got != want {
-		if want {
-			t.Errorf("unexpected error: got %v", err)
-		} else {
-			t.Errorf("unexpected success")
-		}
+	// Do a fmt.Sprint comparison so either side can be
+	// nil. fmt.Sprint just stringifies them to "<nil>", and no
+	// non-nil expected error ever stringifies as "<nil>", so this
+	// isn't terribly disgusting.  We do this because Go 1.4 and
+	// Go 1.5 return a different deep value for
+	// json.UnmarshalTypeError.  In Go 1.5, the
+	// json.UnmarshalTypeError contains a new field with a new
+	// non-zero value.  Rather than ignore it here with reflect or
+	// add new files and +build tags, just look at the strings.
+	if fmt.Sprint(err) != fmt.Sprint(expect) {
+		t.Errorf("Error = %v; want %v", err, expect)
 	}
-	if !want {
+	if err != nil {
 		return
 	}
 	if !tok.Valid() {
@@ -325,7 +333,7 @@ func TestPasswordCredentialsTokenRequest(t *testing.T) {
 		if err != nil {
 			t.Errorf("Failed reading request body: %s.", err)
 		}
-		expected = "grant_type=password&password=password1&scope=scope1+scope2&username=user1"
+		expected = "client_id=CLIENT_ID&grant_type=password&password=password1&scope=scope1+scope2&username=user1"
 		if string(body) != expected {
 			t.Errorf("res.Body = %q; want %q", string(body), expected)
 		}
@@ -364,7 +372,7 @@ func TestTokenRefreshRequest(t *testing.T) {
 			t.Errorf("Unexpected Content-Type header, %v is found.", headerContentType)
 		}
 		body, _ := ioutil.ReadAll(r.Body)
-		if string(body) != "grant_type=refresh_token&refresh_token=REFRESH_TOKEN" {
+		if string(body) != "client_id=CLIENT_ID&grant_type=refresh_token&refresh_token=REFRESH_TOKEN" {
 			t.Errorf("Unexpected refresh token payload, %v is found.", string(body))
 		}
 	}))
@@ -403,15 +411,15 @@ func TestFetchWithNoRefreshToken(t *testing.T) {
 func TestRefreshToken_RefreshTokenReplacement(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"access_token":"ACCESS_TOKEN",  "scope": "user", "token_type": "bearer", "refresh_token": "NEW_REFRESH_TOKEN"}`))
+		w.Write([]byte(`{"access_token":"ACCESS TOKEN",  "scope": "user", "token_type": "bearer", "refresh_token": "NEW REFRESH TOKEN"}`))
 		return
 	}))
 	defer ts.Close()
 	conf := newConf(ts.URL)
-	tkr := &tokenRefresher{
+	tkr := tokenRefresher{
 		conf:         conf,
 		ctx:          context.Background(),
-		refreshToken: "OLD_REFRESH_TOKEN",
+		refreshToken: "OLD REFRESH TOKEN",
 	}
 	tk, err := tkr.Token()
 	if err != nil {
@@ -420,29 +428,6 @@ func TestRefreshToken_RefreshTokenReplacement(t *testing.T) {
 	}
 	if tk.RefreshToken != tkr.refreshToken {
 		t.Errorf("tokenRefresher.refresh_token = %q; want %q", tkr.refreshToken, tk.RefreshToken)
-	}
-}
-
-func TestRefreshToken_RefreshTokenPreservation(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"access_token":"ACCESS_TOKEN",  "scope": "user", "token_type": "bearer"}`))
-		return
-	}))
-	defer ts.Close()
-	conf := newConf(ts.URL)
-	const oldRefreshToken = "OLD_REFRESH_TOKEN"
-	tkr := &tokenRefresher{
-		conf:         conf,
-		ctx:          context.Background(),
-		refreshToken: oldRefreshToken,
-	}
-	_, err := tkr.Token()
-	if err != nil {
-		t.Fatalf("got err = %v; want none", err)
-	}
-	if tkr.refreshToken != oldRefreshToken {
-		t.Errorf("tokenRefresher.refreshToken = %q; want %q", tkr.refreshToken, oldRefreshToken)
 	}
 }
 

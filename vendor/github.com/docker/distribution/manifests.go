@@ -1,29 +1,24 @@
 package distribution
 
 import (
-	"context"
 	"fmt"
 	"mime"
 
-	"github.com/opencontainers/go-digest"
+	"github.com/docker/distribution/context"
+	"github.com/docker/distribution/digest"
 )
 
 // Manifest represents a registry object specifying a set of
 // references and an optional target
 type Manifest interface {
 	// References returns a list of objects which make up this manifest.
-	// A reference is anything which can be represented by a
-	// distribution.Descriptor. These can consist of layers, resources or other
-	// manifests.
-	//
-	// While no particular order is required, implementations should return
-	// them from highest to lowest priority. For example, one might want to
-	// return the base layer before the top layer.
+	// The references are strictly ordered from base to head. A reference
+	// is anything which can be represented by a distribution.Descriptor
 	References() []Descriptor
 
 	// Payload provides the serialized format of the manifest, in addition to
-	// the media type.
-	Payload() (mediaType string, payload []byte, err error)
+	// the mediatype.
+	Payload() (mediatype string, payload []byte, err error)
 }
 
 // ManifestBuilder creates a manifest allowing one to include dependencies.
@@ -41,9 +36,6 @@ type ManifestBuilder interface {
 	// AppendReference includes the given object in the manifest after any
 	// existing dependencies. If the add fails, such as when adding an
 	// unsupported dependency, an error may be returned.
-	//
-	// The destination of the reference is dependent on the manifest type and
-	// the dependency type.
 	AppendReference(dependency Describable) error
 }
 
@@ -67,6 +59,12 @@ type ManifestService interface {
 type ManifestEnumerator interface {
 	// Enumerate calls ingester for each manifest.
 	Enumerate(ctx context.Context, ingester func(digest.Digest) error) error
+}
+
+// SignaturesGetter provides an interface for getting the signatures of a schema1 manifest. If the digest
+// referred to is not a schema1 manifest, an error should be returned.
+type SignaturesGetter interface {
+	GetSignatures(ctx context.Context, manifestDigest digest.Digest) ([]digest.Digest, error)
 }
 
 // Describable is an interface for descriptors
@@ -94,20 +92,20 @@ var mappings = make(map[string]UnmarshalFunc, 0)
 func UnmarshalManifest(ctHeader string, p []byte) (Manifest, Descriptor, error) {
 	// Need to look up by the actual media type, not the raw contents of
 	// the header. Strip semicolons and anything following them.
-	var mediaType string
+	var mediatype string
 	if ctHeader != "" {
 		var err error
-		mediaType, _, err = mime.ParseMediaType(ctHeader)
+		mediatype, _, err = mime.ParseMediaType(ctHeader)
 		if err != nil {
 			return nil, Descriptor{}, err
 		}
 	}
 
-	unmarshalFunc, ok := mappings[mediaType]
+	unmarshalFunc, ok := mappings[mediatype]
 	if !ok {
 		unmarshalFunc, ok = mappings[""]
 		if !ok {
-			return nil, Descriptor{}, fmt.Errorf("unsupported manifest media type and no default available: %s", mediaType)
+			return nil, Descriptor{}, fmt.Errorf("unsupported manifest mediatype and no default available: %s", mediatype)
 		}
 	}
 
@@ -116,10 +114,10 @@ func UnmarshalManifest(ctHeader string, p []byte) (Manifest, Descriptor, error) 
 
 // RegisterManifestSchema registers an UnmarshalFunc for a given schema type.  This
 // should be called from specific
-func RegisterManifestSchema(mediaType string, u UnmarshalFunc) error {
-	if _, ok := mappings[mediaType]; ok {
-		return fmt.Errorf("manifest media type registration would overwrite existing: %s", mediaType)
+func RegisterManifestSchema(mediatype string, u UnmarshalFunc) error {
+	if _, ok := mappings[mediatype]; ok {
+		return fmt.Errorf("manifest mediatype registration would overwrite existing: %s", mediatype)
 	}
-	mappings[mediaType] = u
+	mappings[mediatype] = u
 	return nil
 }

@@ -9,7 +9,7 @@ import (
 	"net/http"
 )
 
-// DefaultResponseMimeType is DEPRECATED, use DefaultResponseContentType(mime)
+// DEPRECATED, use DefaultResponseContentType(mime)
 var DefaultResponseMimeType string
 
 //PrettyPrintResponses controls the indentation feature of XML and JSON serialization
@@ -21,18 +21,17 @@ type Response struct {
 	http.ResponseWriter
 	requestAccept string   // mime-type what the Http Request says it wants to receive
 	routeProduces []string // mime-types what the Route says it can produce
-	statusCode    int      // HTTP status code that has been written explicitly (if zero then net/http has written 200)
+	statusCode    int      // HTTP status code that has been written explicity (if zero then net/http has written 200)
 	contentLength int      // number of bytes written for the response body
 	prettyPrint   bool     // controls the indentation feature of XML and JSON serialization. It is initialized using var PrettyPrintResponses.
 	err           error    // err property is kept when WriteError is called
 }
 
-// NewResponse creates a new response based on a http ResponseWriter.
+// Creates a new response based on a http ResponseWriter.
 func NewResponse(httpWriter http.ResponseWriter) *Response {
 	return &Response{httpWriter, "", []string{}, http.StatusOK, 0, PrettyPrintResponses, nil} // empty content-types
 }
 
-// DefaultResponseContentType set a default.
 // If Accept header matching fails, fall back to this type.
 // Valid values are restful.MIME_JSON and restful.MIME_XML
 // Example:
