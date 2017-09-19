@@ -1346,7 +1346,8 @@ type NodeConfig struct {
 	// and conflicts should be avoided.
 	// For more information, including usage and the valid values,
 	// see:
-	// http://kubernetes.io/v1.1/docs/user-guide/labels.html
+	// https://kubernetes.io/docs/concepts/overview/working-with-objects
+	// /labels/
 	Labels map[string]string `json:"labels,omitempty"`
 
 	// LocalSsdCount: The number of local SSD disks to be attached to the
@@ -1392,6 +1393,20 @@ type NodeConfig struct {
 	//
 	// The total size of all keys and values must be less than 512 KB.
 	Metadata map[string]string `json:"metadata,omitempty"`
+
+	// MinCpuPlatform: Minimum cpu/platform to be used by this instance. The
+	// instance may be
+	// scheduled on the specified or newer cpu/platform. Applicable values
+	// are the
+	// friendly names of CPU platforms, such as
+	// <code>minCpuPlatform: &quot;Intel Haswell&quot;</code>
+	// or
+	// <code>minCpuPlatform: &quot;Intel Sandy Bridge&quot;</code>. For
+	// more
+	// information, read <a
+	// href="/compute/docs/instances/specify-min-cpu-platform">Specifying a
+	// Minimum CPU Platform</a>.
+	MinCpuPlatform string `json:"minCpuPlatform,omitempty"`
 
 	// OauthScopes: The set of Google API scopes to be made available on all
 	// of the

@@ -49,11 +49,11 @@ import:
   - pkg/util/goroutinemap
   - pkg/util/version
 - package: github.com/heketi/heketi/client/api/go-client
-  version: 7a54b6fc903feab1e7cb6573177ca09b544eb1e2
+  version: 300752517908f3456e90d1ee2a773e7dd8ce1afe
 - package: github.com/heketi/heketi/pkg/glusterfs/api
-  version: 7a54b6fc903feab1e7cb6573177ca09b544eb1e2
+  version: 300752517908f3456e90d1ee2a773e7dd8ce1afe
 - package: github.com/heketi/heketi/pkg/utils
-  version: 7a54b6fc903feab1e7cb6573177ca09b544eb1e2
+  version: 300752517908f3456e90d1ee2a773e7dd8ce1afe
 - package: github.com/lpabon/godbc
   version: 9577782540c1398b710ddae1b86268ba03a19b0c
 - package: github.com/dgrijalva/jwt-go

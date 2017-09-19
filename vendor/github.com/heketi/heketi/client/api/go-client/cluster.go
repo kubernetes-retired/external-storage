@@ -14,15 +14,23 @@ package client
 
 import (
 	"bytes"
+	"encoding/json"
+	"net/http"
+
 	"github.com/heketi/heketi/pkg/glusterfs/api"
 	"github.com/heketi/heketi/pkg/utils"
-	"net/http"
 )
 
-func (c *Client) ClusterCreate() (*api.ClusterInfoResponse, error) {
+func (c *Client) ClusterCreate(request *api.ClusterCreateRequest) (*api.ClusterInfoResponse, error) {
+
+	buffer, err := json.Marshal(request)
+	if err != nil {
+		return nil, err
+	}
 
 	// Create a request
-	req, err := http.NewRequest("POST", c.host+"/clusters", bytes.NewBuffer([]byte(`{}`)))
+	req, err := http.NewRequest("POST", c.host+"/clusters",
+		bytes.NewBuffer(buffer))
 	if err != nil {
 		return nil, err
 	}
