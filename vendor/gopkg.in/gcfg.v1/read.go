@@ -6,10 +6,11 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+)
 
+import (
 	"gopkg.in/gcfg.v1/scanner"
 	"gopkg.in/gcfg.v1/token"
-	"gopkg.in/warnings.v0"
 )
 
 var unescape = map[rune]rune{'\\': '\\', '"': '"', 'n': '\n', 't': '\t'}
@@ -48,9 +49,7 @@ func unquote(s string) string {
 	return string(u)
 }
 
-func readIntoPass(c *warnings.Collector, config interface{}, fset *token.FileSet,
-	file *token.File, src []byte, subsectPass bool) error {
-	//
+func readInto(config interface{}, fset *token.FileSet, file *token.File, src []byte) error {
 	var s scanner.Scanner
 	var errs scanner.ErrorList
 	s.Init(file, src, func(p token.Position, m string) { errs.Add(p, m) }, 0)
@@ -61,9 +60,7 @@ func readIntoPass(c *warnings.Collector, config interface{}, fset *token.FileSet
 	}
 	for {
 		if errs.Len() > 0 {
-			if err := c.Collect(errs.Err()); err != nil {
-				return err
-			}
+			return errs.Err()
 		}
 		switch tok {
 		case token.EOF:
@@ -73,64 +70,46 @@ func readIntoPass(c *warnings.Collector, config interface{}, fset *token.FileSet
 		case token.LBRACK:
 			pos, tok, lit = s.Scan()
 			if errs.Len() > 0 {
-				if err := c.Collect(errs.Err()); err != nil {
-					return err
-				}
+				return errs.Err()
 			}
 			if tok != token.IDENT {
-				if err := c.Collect(errfn("expected section name")); err != nil {
-					return err
-				}
+				return errfn("expected section name")
 			}
 			sect, sectsub = lit, ""
 			pos, tok, lit = s.Scan()
 			if errs.Len() > 0 {
-				if err := c.Collect(errs.Err()); err != nil {
-					return err
-				}
+				return errs.Err()
 			}
 			if tok == token.STRING {
 				sectsub = unquote(lit)
 				if sectsub == "" {
-					if err := c.Collect(errfn("empty subsection name")); err != nil {
-						return err
-					}
+					return errfn("empty subsection name")
 				}
 				pos, tok, lit = s.Scan()
 				if errs.Len() > 0 {
-					if err := c.Collect(errs.Err()); err != nil {
-						return err
-					}
+					return errs.Err()
 				}
 			}
 			if tok != token.RBRACK {
 				if sectsub == "" {
-					if err := c.Collect(errfn("expected subsection name or right bracket")); err != nil {
-						return err
-					}
+					return errfn("expected subsection name or right bracket")
 				}
-				if err := c.Collect(errfn("expected right bracket")); err != nil {
-					return err
-				}
+				return errfn("expected right bracket")
 			}
 			pos, tok, lit = s.Scan()
 			if tok != token.EOL && tok != token.EOF && tok != token.COMMENT {
-				if err := c.Collect(errfn("expected EOL, EOF, or comment")); err != nil {
-					return err
-				}
+				return errfn("expected EOL, EOF, or comment")
 			}
 			// If a section/subsection header was found, ensure a
 			// container object is created, even if there are no
 			// variables further down.
-			err := c.Collect(set(c, config, sect, sectsub, "", true, "", subsectPass))
+			err := set(config, sect, sectsub, "", true, "")
 			if err != nil {
 				return err
 			}
 		case token.IDENT:
 			if sect == "" {
-				if err := c.Collect(errfn("expected section header")); err != nil {
-					return err
-				}
+				return errfn("expected section header")
 			}
 			n := lit
 			pos, tok, lit = s.Scan()
@@ -140,65 +119,36 @@ func readIntoPass(c *warnings.Collector, config interface{}, fset *token.FileSet
 			blank, v := tok == token.EOF || tok == token.EOL || tok == token.COMMENT, ""
 			if !blank {
 				if tok != token.ASSIGN {
-					if err := c.Collect(errfn("expected '='")); err != nil {
-						return err
-					}
+					return errfn("expected '='")
 				}
 				pos, tok, lit = s.Scan()
 				if errs.Len() > 0 {
-					if err := c.Collect(errs.Err()); err != nil {
-						return err
-					}
+					return errs.Err()
 				}
 				if tok != token.STRING {
-					if err := c.Collect(errfn("expected value")); err != nil {
-						return err
-					}
+					return errfn("expected value")
 				}
 				v = unquote(lit)
 				pos, tok, lit = s.Scan()
 				if errs.Len() > 0 {
-					if err := c.Collect(errs.Err()); err != nil {
-						return err
-					}
+					return errs.Err()
 				}
 				if tok != token.EOL && tok != token.EOF && tok != token.COMMENT {
-					if err := c.Collect(errfn("expected EOL, EOF, or comment")); err != nil {
-						return err
-					}
+					return errfn("expected EOL, EOF, or comment")
 				}
 			}
-			err := set(c, config, sect, sectsub, n, blank, v, subsectPass)
+			err := set(config, sect, sectsub, n, blank, v)
 			if err != nil {
 				return err
 			}
 		default:
 			if sect == "" {
-				if err := c.Collect(errfn("expected section header")); err != nil {
-					return err
-				}
+				return errfn("expected section header")
 			}
-			if err := c.Collect(errfn("expected section header or variable declaration")); err != nil {
-				return err
-			}
+			return errfn("expected section header or variable declaration")
 		}
 	}
 	panic("never reached")
-}
-
-func readInto(config interface{}, fset *token.FileSet, file *token.File,
-	src []byte) error {
-	//
-	c := warnings.NewCollector(isFatal)
-	err := readIntoPass(c, config, fset, file, src, false)
-	if err != nil {
-		return err
-	}
-	err = readIntoPass(c, config, fset, file, src, true)
-	if err != nil {
-		return err
-	}
-	return c.Done()
 }
 
 // ReadInto reads gcfg formatted data from reader and sets the values into the
