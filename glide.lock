@@ -1,8 +1,8 @@
-hash: 7cc1194c762781b6c0f203599cb4afb1d55061fd638358e12ca283e072d1600e
-updated: 2017-09-19T09:47:08.676470869-04:00
+hash: ef128b88161cdea558e5ae947d38936e5cd85fad0aea0aac07a8e47465921875
+updated: 2017-09-19T21:17:26.399597032-04:00
 imports:
 - name: cloud.google.com/go
-  version: 0f0b8420cb699ac4ce059c63bac263f4301fe95b
+  version: 38a7def97ebdc2c74a198a4252b7f273fc216929
   subpackages:
   - compute/metadata
 - name: github.com/aws/aws-sdk-go
@@ -119,7 +119,7 @@ imports:
   - proto
   - sortkeys
 - name: github.com/golang/glog
-  version: 23def4e6c14b4da8ac2ed8007337bc5eb5007998
+  version: 44145f04b68cf362d9c4df2182967c2275eaefed
 - name: github.com/golang/groupcache
   version: 02826c3e79038b59d737d3b1c0a1d937f71a4433
   subpackages:
@@ -180,7 +180,7 @@ imports:
   - json/scanner
   - json/token
 - name: github.com/heketi/heketi
-  version: 7a54b6fc903feab1e7cb6573177ca09b544eb1e2
+  version: 300752517908f3456e90d1ee2a773e7dd8ce1afe
   subpackages:
   - client/api/go-client
   - pkg/glusterfs/api
@@ -214,7 +214,7 @@ imports:
 - name: github.com/mitchellh/mapstructure
   version: db1efb556f84b25a0a13a04aad883943538ad2e0
 - name: github.com/pborman/uuid
-  version: e790cca94e6cc75c7064b1332e63811d4aae1a53
+  version: ca53cad383cad2479bbba7f7a1a05797ec1386e4
 - name: github.com/pelletier/go-buffruneio
   version: df1e16fde7fc330a0ca68167c23bf7ed6ac31d6d
 - name: github.com/pelletier/go-toml
@@ -228,7 +228,7 @@ imports:
   subpackages:
   - jsonrpc2
 - name: github.com/prometheus/client_golang
-  version: 967789050ba94deca04a5e84cce8ad472ce313c1
+  version: 50b3332fd63be43e38472600ec187ceec39d26d6
   subpackages:
   - prometheus
 - name: github.com/prometheus/client_model
@@ -250,7 +250,7 @@ imports:
 - name: github.com/PuerkitoBio/urlesc
   version: 5bd2802263f21d8788851d5305584c82a5c75d7e
 - name: github.com/Sirupsen/logrus
-  version: 89742aefa4b206dcf400792f3bd35b542998eb3b
+  version: 51fe59aca108dc5680109e7b2051cbdcfa5a253c
 - name: github.com/spf13/afero
   version: b28a7effac979219c2a2ed6205a4d70e4b1bcd02
   subpackages:
@@ -295,7 +295,7 @@ imports:
   - jws
   - jwt
 - name: golang.org/x/sys
-  version: a07a691ac871746ae690ccf3ab217363b2144531
+  version: b6e1ae21643682ce023deb8d152024597b0e9bb4
   subpackages:
   - unix
 - name: golang.org/x/text
@@ -314,11 +314,17 @@ imports:
 - name: google.golang.org/api
   version: e3824ed33c72bf7e81da0286772c34b987520914
   subpackages:
+  - cloudmonitoring/v2beta2
+  - compute/v0.beta
   - compute/v1
   - container/v1
+  - dns/v1
   - gensupport
   - googleapi
   - googleapi/internal/uritemplates
+  - logging/v2beta1
+  - monitoring/v3
+  - pubsub/v1
 - name: google.golang.org/appengine
   version: 4f7eeb5305a4ba1966344836ba4af9996b7b4e05
   subpackages:
@@ -340,7 +346,7 @@ imports:
 - name: gopkg.in/inf.v0
   version: 3887ee99ecf07df5b447e9b00d9c0b2adaa9f3e4
 - name: gopkg.in/yaml.v2
-  version: eb3733d160e74a9c7e442f435eb3bea458e1d19f
+  version: 53feefa2559fb8dfa8d81baad31be332c97d6c77
 - name: k8s.io/api
   version: e24ed681f56165befbea50a24f7e9f1c079ac366
   subpackages:
@@ -365,7 +371,7 @@ imports:
   - storage/v1
   - storage/v1beta1
 - name: k8s.io/apiextensions-apiserver
-  version: be41f5093e2b05c7a0befe35b04b715eb325ab43
+  version: 2bfb07d318ed549813240d1165fcebad6250c666
   subpackages:
   - pkg/apis/apiextensions
   - pkg/apis/apiextensions/v1beta1
@@ -430,7 +436,7 @@ imports:
   - third_party/forked/golang/netutil
   - third_party/forked/golang/reflect
 - name: k8s.io/apiserver
-  version: 149fc2228647cea28b0670c240ec582e985e8eda
+  version: 26ddb013b915693f5d5cf98c7a17b6b5c85a0ad3
   subpackages:
   - pkg/authentication/authenticator
   - pkg/authentication/serviceaccount
