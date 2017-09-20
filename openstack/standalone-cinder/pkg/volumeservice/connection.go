@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package volumeservice
 
 import (
 	"crypto/tls"
@@ -173,7 +173,9 @@ func getKeystoneVolumeService(cfg cinderConfig) (*gophercloud.ServiceClient, err
 	return volumeService, nil
 }
 
-func getVolumeService(configFilePath string) (*gophercloud.ServiceClient, error) {
+// GetVolumeService returns a connected cinder client based on configuration
+// specified in configFilePath or the environment.
+func GetVolumeService(configFilePath string) (*gophercloud.ServiceClient, error) {
 	config, err := getConfig(configFilePath)
 	if err != nil {
 		return nil, err

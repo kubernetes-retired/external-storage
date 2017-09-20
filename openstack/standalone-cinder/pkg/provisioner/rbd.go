@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package provisioner
 
 import (
 	"errors"
@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
+	"github.com/kubernetes-incubator/external-storage/openstack/standalone-cinder/pkg/volumeservice"
 	"k8s.io/api/core/v1"
 )
 
@@ -31,7 +32,7 @@ type rbdMapper struct {
 	volumeMapper
 }
 
-func getMonitors(conn volumeConnection) []string {
+func getMonitors(conn volumeservice.VolumeConnection) []string {
 	if len(conn.Data.Hosts) != len(conn.Data.Ports) {
 		glog.Errorf("Error parsing rbd connection info: 'hosts' and 'ports' have different lengths")
 		return nil
@@ -44,15 +45,15 @@ func getMonitors(conn volumeConnection) []string {
 }
 
 func getRbdSecretName(ctx provisionCtx) string {
-	return fmt.Sprintf("%s-cephx-secret", *ctx.options.PVC.Spec.StorageClassName)
+	return fmt.Sprintf("%s-cephx-secret", *ctx.Options.PVC.Spec.StorageClassName)
 }
 
 func (m *rbdMapper) BuildPVSource(ctx provisionCtx) (*v1.PersistentVolumeSource, error) {
-	mons := getMonitors(ctx.connection)
+	mons := getMonitors(ctx.Connection)
 	if mons == nil {
 		return nil, errors.New("No monitors could be parsed from connection info")
 	}
-	splitName := strings.SplitN(ctx.connection.Data.Name, "/", 2)
+	splitName := strings.SplitN(ctx.Connection.Data.Name, "/", 2)
 	if len(splitName) != 2 {
 		return nil, errors.New("Field 'name' cannot be split into pool and image")
 	}
@@ -62,7 +63,7 @@ func (m *rbdMapper) BuildPVSource(ctx provisionCtx) (*v1.PersistentVolumeSource,
 			CephMonitors: mons,
 			RBDPool:      splitName[0],
 			RBDImage:     splitName[1],
-			RadosUser:    ctx.connection.Data.AuthUsername,
+			RadosUser:    ctx.Connection.Data.AuthUsername,
 			SecretRef: &v1.LocalObjectReference{
 				Name: getRbdSecretName(ctx),
 			},
