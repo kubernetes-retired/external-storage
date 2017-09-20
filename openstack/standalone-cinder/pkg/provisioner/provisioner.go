@@ -14,65 +14,67 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package provisioner
 
 import (
 	"errors"
-	"flag"
 	"fmt"
 
 	"github.com/golang/glog"
 	"github.com/gophercloud/gophercloud"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
-
+	"github.com/kubernetes-incubator/external-storage/openstack/standalone-cinder/pkg/volumeservice"
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 const (
-	provisionerName  = "openstack.org/standalone-cinder"
-	provisionerIDAnn = "standaloneCinderProvisionerIdentity"
-	cinderVolumeID   = "cinderVolumeId"
+	// ProvisionerName is the unique name of this provisioner
+	ProvisionerName = "openstack.org/standalone-cinder"
+
+	// ProvisionerIDAnn is an annotation to identify a particular instance of this provisioner
+	ProvisionerIDAnn = "standaloneCinderProvisionerIdentity"
+
+	// CinderVolumeID is an annotation to store the ID of the associated cinder volume
+	CinderVolumeID = "cinderVolumeId"
 )
 
 type cinderProvisioner struct {
 	// Openstack cinder client
-	volumeService *gophercloud.ServiceClient
+	VolumeService *gophercloud.ServiceClient
 
 	// Kubernetes Client. Use to create secret
-	client kubernetes.Interface
+	Client kubernetes.Interface
 	// Identity of this cinderProvisioner, generated. Used to identify "this"
 	// provisioner's PVs.
-	identity string
+	Identity string
 }
 
-func newCinderProvisioner(client kubernetes.Interface, id, configFilePath string) (controller.Provisioner, error) {
-	volumeService, err := getVolumeService(configFilePath)
+// NewCinderProvisioner returns a Provisioner that creates volumes using a
+// standalone cinder instance and produces PersistentVolumes that use native
+// kubernetes PersistentVolumeSources.
+func NewCinderProvisioner(client kubernetes.Interface, id, configFilePath string) (controller.Provisioner, error) {
+	volumeService, err := volumeservice.GetVolumeService(configFilePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get volume service: %v", err)
 	}
 
 	return &cinderProvisioner{
-		volumeService: volumeService,
-		client:        client,
-		identity:      id,
+		VolumeService: volumeService,
+		Client:        client,
+		Identity:      id,
 	}, nil
 }
 
-var _ controller.Provisioner = &cinderProvisioner{}
-
 type provisionCtx struct {
-	p          *cinderProvisioner
-	options    controller.VolumeOptions
-	connection volumeConnection
+	P          *cinderProvisioner
+	Options    controller.VolumeOptions
+	Connection volumeservice.VolumeConnection
 }
 
 type deleteCtx struct {
-	p  *cinderProvisioner
-	pv *v1.PersistentVolume
+	P  *cinderProvisioner
+	PV *v1.PersistentVolume
 }
 
 // Provision creates a storage asset and returns a PV object representing it.
@@ -81,26 +83,26 @@ func (p *cinderProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 		return nil, fmt.Errorf("claim Selector is not supported")
 	}
 
-	volumeID, err := createCinderVolume(p, options)
+	volumeID, err := volumeservice.CreateCinderVolume(p.VolumeService, options)
 	if err != nil {
 		glog.Errorf("Failed to create volume")
 		return nil, err
 	}
 
-	err = waitForAvailableCinderVolume(p, volumeID)
+	err = volumeservice.WaitForAvailableCinderVolume(p.VolumeService, volumeID)
 	if err != nil {
 		glog.Errorf("Volume did not become available")
 		return nil, err
 	}
 
-	err = reserveCinderVolume(p, volumeID)
+	err = volumeservice.ReserveCinderVolume(p.VolumeService, volumeID)
 	if err != nil {
 		// TODO: Create placeholder PV?
 		glog.Errorf("Failed to reserve volume: %v", err)
 		return nil, err
 	}
 
-	connection, err := connectCinderVolume(p, volumeID)
+	connection, err := volumeservice.ConnectCinderVolume(p.VolumeService, volumeID)
 	if err != nil {
 		// TODO: Create placeholder PV?
 		glog.Errorf("Failed to connect volume: %v", err)
@@ -135,11 +137,11 @@ func (p *cinderProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 // Delete removes the storage asset that was created by Provision represented
 // by the given PV.
 func (p *cinderProvisioner) Delete(pv *v1.PersistentVolume) error {
-	ann, ok := pv.Annotations[provisionerIDAnn]
+	ann, ok := pv.Annotations[ProvisionerIDAnn]
 	if !ok {
 		return errors.New("identity annotation not found on PV")
 	}
-	if ann != p.identity {
+	if ann != p.Identity {
 		return &controller.IgnoredError{
 			Reason: "identity annotation on PV does not match ours",
 		}
@@ -147,9 +149,9 @@ func (p *cinderProvisioner) Delete(pv *v1.PersistentVolume) error {
 	// TODO when beta is removed, have to check kube version and pick v1/beta
 	// accordingly: maybe the controller lib should offer a function for that
 
-	volumeID, ok := pv.Annotations[cinderVolumeID]
+	volumeID, ok := pv.Annotations[CinderVolumeID]
 	if !ok {
-		return errors.New(cinderVolumeID + " annotation not found on PV")
+		return errors.New(CinderVolumeID + " annotation not found on PV")
 	}
 
 	ctx := deleteCtx{p, pv}
@@ -160,79 +162,23 @@ func (p *cinderProvisioner) Delete(pv *v1.PersistentVolume) error {
 
 	mapper.AuthTeardown(ctx)
 
-	err = disconnectCinderVolume(p, volumeID)
+	err = volumeservice.DisconnectCinderVolume(p.VolumeService, volumeID)
 	if err != nil {
 		return err
 	}
 
-	err = unreserveCinderVolume(p, volumeID)
+	err = volumeservice.UnreserveCinderVolume(p.VolumeService, volumeID)
 	if err != nil {
 		// TODO: Create placeholder PV?
 		glog.Errorf("Failed to unreserve volume: %v", err)
 		return err
 	}
 
-	err = deleteCinderVolume(p, volumeID)
+	err = volumeservice.DeleteCinderVolume(p.VolumeService, volumeID)
 	if err != nil {
 		return err
 	}
 
 	glog.V(2).Infof("Successfully deleted cinder volume %s", volumeID)
 	return nil
-}
-
-var (
-	master      = flag.String("master", "", "Master URL")
-	kubeconfig  = flag.String("kubeconfig", "", "Absolute path to the kubeconfig")
-	id          = flag.String("id", "", "Unique provisioner identity")
-	cloudconfig = flag.String("cloudconfig", "", "Path to OpenStack config file")
-)
-
-func main() {
-	flag.Parse()
-	flag.Set("logtostderr", "true")
-
-	var config *rest.Config
-	var err error
-	if *master != "" || *kubeconfig != "" {
-		config, err = clientcmd.BuildConfigFromFlags(*master, *kubeconfig)
-	} else {
-		config, err = rest.InClusterConfig()
-	}
-	prID := provisionerName
-	if *id != "" {
-		prID = *id
-	}
-	if err != nil {
-		glog.Fatalf("Failed to create config: %v", err)
-	}
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		glog.Fatalf("Failed to create client: %v", err)
-	}
-
-	// The controller needs to know what the server version is because out-of-tree
-	// provisioners aren't officially supported until 1.5
-	serverVersion, err := clientset.Discovery().ServerVersion()
-	if err != nil {
-		glog.Fatalf("Error getting server version: %v", err)
-	}
-
-	// Create the provisioner: it implements the Provisioner interface expected by
-	// the controller
-	cinderProvisioner, err := newCinderProvisioner(clientset, prID, *cloudconfig)
-	if err != nil {
-		glog.Fatalf("Error creating Cinder provisioner: %v", err)
-	}
-
-	// Start the provision controller which will dynamically provision cinder
-	// PVs
-	pc := controller.NewProvisionController(
-		clientset,
-		provisionerName,
-		cinderProvisioner,
-		serverVersion.GitVersion,
-	)
-
-	pc.Run(wait.NeverStop)
 }

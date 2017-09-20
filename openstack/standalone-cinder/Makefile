@@ -28,7 +28,7 @@ MUTABLE_IMAGE = $(REGISTRY)standalone-cinder-provisioner:latest
 all: build
 
 build:
-	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o standalone-cinder
+	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o cinder-provisioner ./cmd/cinder-provisioner
 
 container: build
 	docker build -t $(MUTABLE_IMAGE) .
@@ -36,5 +36,5 @@ container: build
 
 
 clean:
-	-rm standalone-cinder
+	-rm cinder-provisioner
 

@@ -14,24 +14,28 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package volumeservice
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions"
 	volumes_v2 "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	"k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 )
 
-type volumeConnectionDetails struct {
+const initiatorName = "iqn.1994-05.com.redhat:a13fc3d1cc22"
+
+// VolumeConnectionDetails represent the type-specific values for a given
+// DriverVolumeType.  Depending on the volume type, fields may be absent or
+// have a semantically different meaning.
+type VolumeConnectionDetails struct {
 	VolumeID string `json:"volume_id"`
 	Name     string `json:"name"`
 
@@ -49,16 +53,19 @@ type volumeConnectionDetails struct {
 	Ports       []string `json:"ports"`
 }
 
-type volumeConnection struct {
+// VolumeConnection represents the connection information returned from the
+// cinder os-initialize_connection API call
+type VolumeConnection struct {
 	DriverVolumeType string                  `json:"driver_volume_type"`
-	Data             volumeConnectionDetails `json:"data"`
+	Data             VolumeConnectionDetails `json:"data"`
 }
 
 type rcvVolumeConnection struct {
-	ConnectionInfo volumeConnection `json:"connection_info"`
+	ConnectionInfo VolumeConnection `json:"connection_info"`
 }
 
-func createCinderVolume(p *cinderProvisioner, options controller.VolumeOptions) (string, error) {
+// CreateCinderVolume creates a new volume in cinder according to the PVC specifications
+func CreateCinderVolume(vs *gophercloud.ServiceClient, options controller.VolumeOptions) (string, error) {
 	name := fmt.Sprintf("cinder-dynamic-pvc-%s", uuid.NewUUID())
 	capacity := options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	sizeBytes := capacity.Value()
@@ -86,7 +93,7 @@ func createCinderVolume(p *cinderProvisioner, options controller.VolumeOptions) 
 		AvailabilityZone: availability,
 	}
 
-	vol, err := volumes_v2.Create(p.volumeService, &opts).Extract()
+	vol, err := volumes_v2.Create(vs, &opts).Extract()
 
 	if err != nil {
 		glog.Errorf("Failed to create a %d GiB volume: %v", sizeGB, err)
@@ -97,7 +104,10 @@ func createCinderVolume(p *cinderProvisioner, options controller.VolumeOptions) 
 	return vol.ID, nil
 }
 
-func waitForAvailableCinderVolume(p *cinderProvisioner, volumeID string) error {
+// WaitForAvailableCinderVolume waits for a newly created cinder volume to
+// become available.  The connection information cannot be retrieved from cinder
+// until the volume is available.
+func WaitForAvailableCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
 	// TODO: Implement proper polling instead of brain-dead timers
 	c := make(chan error)
 	go time.AfterFunc(5*time.Second, func() {
@@ -106,34 +116,42 @@ func waitForAvailableCinderVolume(p *cinderProvisioner, volumeID string) error {
 	return <-c
 }
 
-func reserveCinderVolume(p *cinderProvisioner, volumeID string) error {
-	return volumeactions.Reserve(p.volumeService, volumeID).ExtractErr()
+// ReserveCinderVolume marks the volume as 'Attaching' in cinder.  This prevents
+// the volume from being used for another purpose.
+func ReserveCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
+	return volumeactions.Reserve(vs, volumeID).ExtractErr()
 }
 
-func connectCinderVolume(p *cinderProvisioner, volumeID string) (volumeConnection, error) {
+// ConnectCinderVolume retrieves connection information for a cinder volume.
+// Depending on the type of volume, cinder may perform setup on a storage server
+// such as mapping a LUN to a particular ISCSI initiator.
+func ConnectCinderVolume(vs *gophercloud.ServiceClient, volumeID string) (VolumeConnection, error) {
 	opt := volumeactions.InitializeConnectionOpts{
 		Host:      "localhost",
 		IP:        "127.0.0.1",
 		Initiator: initiatorName,
 	}
 	var rcv rcvVolumeConnection
-	err := volumeactions.InitializeConnection(p.volumeService, volumeID, &opt).ExtractInto(&rcv)
+	err := volumeactions.InitializeConnection(vs, volumeID, &opt).ExtractInto(&rcv)
 	if err != nil {
 		glog.Errorf("failed to initialize connection :%v", err)
-		return volumeConnection{}, err
+		return VolumeConnection{}, err
 	}
 	glog.V(3).Infof("Received connection info: %v", rcv)
 	return rcv.ConnectionInfo, nil
 }
 
-func disconnectCinderVolume(p *cinderProvisioner, volumeID string) error {
+// DisconnectCinderVolume removes a connection to a cinder volume.  Depending on
+// the volume type, this may cause cinder to clean up the connection at a
+// storage server (i.e. remove a LUN mapping).
+func DisconnectCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
 	opt := volumeactions.TerminateConnectionOpts{
 		Host:      "localhost",
 		IP:        "127.0.0.1",
 		Initiator: initiatorName,
 	}
 
-	err := volumeactions.TerminateConnection(p.volumeService, volumeID, &opt).Result.Err
+	err := volumeactions.TerminateConnection(vs, volumeID, &opt).Result.Err
 	if err != nil {
 		glog.Errorf("Failed to terminate connection to volume %s: %v",
 			volumeID, err)
@@ -143,71 +161,18 @@ func disconnectCinderVolume(p *cinderProvisioner, volumeID string) error {
 	return nil
 }
 
-func unreserveCinderVolume(p *cinderProvisioner, volumeID string) error {
-	return volumeactions.Unreserve(p.volumeService, volumeID).ExtractErr()
+// UnreserveCinderVolume marks a cinder volume in 'Attaching' state as 'Available'.
+func UnreserveCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
+	return volumeactions.Unreserve(vs, volumeID).ExtractErr()
 }
 
-func deleteCinderVolume(p *cinderProvisioner, volumeID string) error {
-	err := volumes_v2.Delete(p.volumeService, volumeID).ExtractErr()
+// DeleteCinderVolume removes a volume from cinder which will cause it to be
+// deleted on the storage server.
+func DeleteCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
+	err := volumes_v2.Delete(vs, volumeID).ExtractErr()
 	if err != nil {
 		glog.Errorf("Cannot delete volume %s: %v", volumeID, err)
 	}
 
 	return err
-}
-
-type volumeMapper interface {
-	BuildPVSource(ctx provisionCtx) (*v1.PersistentVolumeSource, error)
-	AuthSetup(ctx provisionCtx) error
-	AuthTeardown(ctx deleteCtx) error
-}
-
-func newVolumeMapperFromConnection(conn volumeConnection) (volumeMapper, error) {
-	switch conn.DriverVolumeType {
-	default:
-		msg := fmt.Sprintf("Unsupported persistent volume type: %s", conn.DriverVolumeType)
-		return nil, errors.New(msg)
-	case iscsiType:
-		return new(iscsiMapper), nil
-	case rbdType:
-		return new(rbdMapper), nil
-	}
-}
-
-func newVolumeMapperFromPV(ctx deleteCtx) (volumeMapper, error) {
-	if ctx.pv.Spec.ISCSI != nil {
-		return new(iscsiMapper), nil
-	} else if ctx.pv.Spec.RBD != nil {
-		return new(rbdMapper), nil
-	} else {
-		return nil, errors.New("Unsupported persistent volume source")
-	}
-}
-
-func buildPV(m volumeMapper, ctx provisionCtx, volumeID string) (*v1.PersistentVolume, error) {
-	pvSource, err := m.BuildPVSource(ctx)
-	if err != nil {
-		glog.Errorf("Failed to build PV Source element: %v", err)
-		return nil, err
-	}
-
-	pv := &v1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      ctx.options.PVName,
-			Namespace: ctx.options.PVC.Namespace,
-			Annotations: map[string]string{
-				provisionerIDAnn: ctx.p.identity,
-				cinderVolumeID:   volumeID,
-			},
-		},
-		Spec: v1.PersistentVolumeSpec{
-			PersistentVolumeReclaimPolicy: ctx.options.PersistentVolumeReclaimPolicy,
-			AccessModes:                   ctx.options.PVC.Spec.AccessModes,
-			Capacity: v1.ResourceList{
-				v1.ResourceName(v1.ResourceStorage): ctx.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)],
-			},
-			PersistentVolumeSource: *pvSource,
-		},
-	}
-	return pv, nil
 }

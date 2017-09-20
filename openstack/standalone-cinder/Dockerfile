@@ -14,6 +14,6 @@
 
 FROM alpine:latest
 
-COPY standalone-cinder /
+COPY cinder-provisioner /
 
-ENTRYPOINT ["/standalone-cinder"]
+ENTRYPOINT ["/cinder-provisioner"]

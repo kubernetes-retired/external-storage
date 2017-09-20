@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package provisioner
 
 import (
 	"github.com/golang/glog"
@@ -23,15 +23,14 @@ import (
 )
 
 const iscsiType = "iscsi"
-const initiatorName = "iqn.1994-05.com.redhat:a13fc3d1cc22"
 
 type iscsiMapper struct {
 	volumeMapper
 }
 
 func getChapSecretName(ctx provisionCtx) string {
-	if ctx.connection.Data.AuthMethod == "CHAP" {
-		return ctx.options.PVName + "-secret"
+	if ctx.Connection.Data.AuthMethod == "CHAP" {
+		return ctx.Options.PVName + "-secret"
 	}
 	return ""
 }
@@ -40,9 +39,9 @@ func (m *iscsiMapper) BuildPVSource(ctx provisionCtx) (*v1.PersistentVolumeSourc
 	ret := &v1.PersistentVolumeSource{
 		ISCSI: &v1.ISCSIVolumeSource{
 			// TODO: Need some way to specify the initiator name
-			TargetPortal:    ctx.connection.Data.TargetPortal,
-			IQN:             ctx.connection.Data.TargetIqn,
-			Lun:             ctx.connection.Data.TargetLun,
+			TargetPortal:    ctx.Connection.Data.TargetPortal,
+			IQN:             ctx.Connection.Data.TargetIqn,
+			Lun:             ctx.Connection.Data.TargetLun,
 			SessionCHAPAuth: false,
 		},
 	}
@@ -69,12 +68,12 @@ func (m *iscsiMapper) AuthSetup(ctx provisionCtx) error {
 		},
 		Type: "kubernetes.io/iscsi-chap",
 		Data: map[string][]byte{
-			"node.session.auth.username": []byte(ctx.connection.Data.AuthUsername),
-			"node.session.auth.password": []byte(ctx.connection.Data.AuthPassword),
+			"node.session.auth.username": []byte(ctx.Connection.Data.AuthUsername),
+			"node.session.auth.password": []byte(ctx.Connection.Data.AuthPassword),
 		},
 	}
-	namespace := ctx.options.PVC.Namespace
-	_, err := ctx.p.client.CoreV1().Secrets(namespace).Create(secret)
+	namespace := ctx.Options.PVC.Namespace
+	_, err := ctx.P.Client.CoreV1().Secrets(namespace).Create(secret)
 	if err != nil {
 		glog.Errorf("Failed to create chap secret in namespace %s: %v", namespace, err)
 		return err
@@ -85,14 +84,14 @@ func (m *iscsiMapper) AuthSetup(ctx provisionCtx) error {
 
 func (m *iscsiMapper) AuthTeardown(ctx deleteCtx) error {
 	// Delete the CHAP credentials
-	if ctx.pv.Spec.ISCSI.SecretRef == nil {
+	if ctx.PV.Spec.ISCSI.SecretRef == nil {
 		glog.V(3).Info("No associated secret to delete")
 		return nil
 	}
 
-	secretName := ctx.pv.Spec.ISCSI.SecretRef.Name
-	secretNamespace := ctx.pv.Spec.ClaimRef.Namespace
-	err := ctx.p.client.CoreV1().Secrets(secretNamespace).Delete(secretName, nil)
+	secretName := ctx.PV.Spec.ISCSI.SecretRef.Name
+	secretNamespace := ctx.PV.Spec.ClaimRef.Namespace
+	err := ctx.P.Client.CoreV1().Secrets(secretNamespace).Delete(secretName, nil)
 	if err != nil {
 		glog.Errorf("Failed to remove secret %s from namespace %s: %v", secretName, secretNamespace, err)
 		return err
