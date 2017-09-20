@@ -11,6 +11,7 @@ BRANCH := $(subst /,-,$(shell git rev-parse --abbrev-ref HEAD))
 VER := $(shell git describe)
 ARCH := $(shell go env GOARCH)
 GOOS := $(shell go env GOOS)
+GLIDEPATH := $(shell command -v glide 2> /dev/null)
 DIR=.
 
 ifdef APP_SUFFIX
@@ -51,17 +52,34 @@ name:
 package:
 	@echo $(PACKAGE)
 
-server:
-	godep go build $(LDFLAGS) -o $(APP_NAME)
+heketi: vendor glide.lock
+	go build -i $(LDFLAGS) -o $(APP_NAME)
 
-client:
+server: heketi
+
+vendor:
+ifndef GLIDEPATH
+	$(info Please install glide.)
+	$(info Install it using your package manager or)
+	$(info by running: curl https://glide.sh/get | sh.)
+	$(info )
+	$(error glide is required to continue)
+endif
+	echo "Installing vendor directory"
+	glide install -v
+
+glide.lock: glide.yaml
+	echo "Glide.yaml has changed, updating glide.lock"
+	glide update -v
+
+client: vendor glide.lock
 	@$(MAKE) -C client/cli/go
 
 run: server
 	./$(APP_NAME)
 
-test:
-	godep go test $(GOFILES)
+test: vendor glide.lock
+	go test $(GOFILES)
 
 clean:
 	@echo Cleaning Workspace...
@@ -113,4 +131,5 @@ darwin_amd64_dist:
 release: darwin_amd64_dist linux_arm64_dist linux_arm_dist linux_amd64_dist
 
 .PHONY: server client test clean name run version release \
-        darwin_amd64_dist linux_arm_dist linux_amd64_dist linux_arm64_dist
+        darwin_amd64_dist linux_arm_dist linux_amd64_dist linux_arm64_dist \
+        heketi
