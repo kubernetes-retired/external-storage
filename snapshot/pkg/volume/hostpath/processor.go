@@ -61,6 +61,9 @@ func (h *hostPathPlugin) SnapshotCreate(pv *v1.PersistentVolume, tags *map[strin
 		return nil, nil, fmt.Errorf("invalid PV spec %v", spec)
 	}
 	path := spec.HostPath.Path
+	if _, err := os.Stat(path); err != nil {
+		return nil, nil, fmt.Errorf("Invalid HostPath spec in PV %s: %v", pv.ObjectMeta.Name, err)
+	}
 	file := depot + string(uuid.NewUUID()) + ".tgz"
 	cmdline := []string{"tar", "czf", file, "-C", path, "."}
 	cmd := exec.Command(cmdline[0], cmdline[1:]...)
@@ -86,6 +89,10 @@ func (h *hostPathPlugin) SnapshotCreate(pv *v1.PersistentVolume, tags *map[strin
 				Type:               crdv1.VolumeSnapshotConditionError,
 			},
 		}
+		// tar will happily create the tgz file and then end with error. Since
+		// the controller will re-try the operation in such case we should remove
+		// the broken snapshot file in order not to fill the disk with empty tarballs.
+		_ = os.RemoveAll(file)
 	}
 	res := &crdv1.VolumeSnapshotDataSource{
 		HostPath: &crdv1.HostPathVolumeSnapshotSource{
