@@ -13,6 +13,10 @@ import:
 - package: github.com/guelfey/go.dbus
 - package: github.com/mitchellh/mapstructure
   version: db1efb5
+- package: k8s.io/apiserver
+  version: 149fc2228647cea28b0670c240ec582e985e8eda
+- package: k8s.io/apiextensions-apiserver
+  version: be41f5093e2b05c7a0befe35b04b715eb325ab43
 - package: k8s.io/apimachinery
   version: 728b986edb9bd4bb8a022a8cc13573a97ecc2239
 - package: k8s.io/client-go

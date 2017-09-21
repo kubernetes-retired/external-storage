@@ -70,16 +70,10 @@ const (
 // FeatureGate parses and stores flag gates for known features from
 // a string like feature1=true,feature2=false,...
 type FeatureGate interface {
-	// AddFlag adds a flag for setting global feature gates to the specified FlagSet.
 	AddFlag(fs *pflag.FlagSet)
-	// Set parses and stores flag gates for known features
-	// from a string like feature1=true,feature2=false,...
 	Set(value string) error
-	// Enabled returns true if the key is enabled.
 	Enabled(key Feature) bool
-	// Add adds features to the featureGate.
 	Add(features map[Feature]FeatureSpec) error
-	// KnownFeatures returns a slice of strings describing the FeatureGate's known features.
 	KnownFeatures() []string
 }
 
@@ -118,7 +112,7 @@ func NewFeatureGate() *featureGate {
 	return f
 }
 
-// Set Parses a string of the form "key1=value1,key2=value2,..." into a
+// Set Parses a string of the form // "key1=value1,key2=value2,..." into a
 // map[string]bool of known keys or returns an error.
 func (f *featureGate) Set(value string) error {
 	for _, s := range strings.Split(value, ",") {
@@ -151,7 +145,6 @@ func (f *featureGate) Set(value string) error {
 	return nil
 }
 
-// String returns a string containing all enabled feature gates, formatted as "key1=value1,key2=value2,...".
 func (f *featureGate) String() string {
 	pairs := []string{}
 	for k, v := range f.enabled {
@@ -165,7 +158,6 @@ func (f *featureGate) Type() string {
 	return "mapStringBool"
 }
 
-// Add adds features to the featureGate.
 func (f *featureGate) Add(features map[Feature]FeatureSpec) error {
 	if f.closed {
 		return fmt.Errorf("cannot add a feature gate after adding it to the flag set")
@@ -184,7 +176,6 @@ func (f *featureGate) Add(features map[Feature]FeatureSpec) error {
 	return nil
 }
 
-// Enabled returns true if the key is enabled.
 func (f *featureGate) Enabled(key Feature) bool {
 	defaultValue := f.known[key].Default
 	if f.enabled != nil {
@@ -205,7 +196,7 @@ func (f *featureGate) AddFlag(fs *pflag.FlagSet) {
 		"Options are:\n"+strings.Join(known, "\n"))
 }
 
-// KnownFeatures returns a slice of strings describing the FeatureGate's known features.
+// Returns a string describing the FeatureGate's known features.
 func (f *featureGate) KnownFeatures() []string {
 	var known []string
 	for k, v := range f.known {
