@@ -61,8 +61,12 @@ func (h *hostPathPlugin) SnapshotCreate(pv *v1.PersistentVolume, tags *map[strin
 		return nil, nil, fmt.Errorf("invalid PV spec %v", spec)
 	}
 	path := spec.HostPath.Path
-	if _, err := os.Stat(path); err != nil {
+	finfo, err := os.Stat(path)
+	if err != nil {
 		return nil, nil, fmt.Errorf("Invalid HostPath spec in PV %s: %v", pv.ObjectMeta.Name, err)
+	}
+	if !finfo.IsDir() {
+		return nil, nil, fmt.Errorf("Invalid HostPath spec in PV %s: %s is not a directory", pv.ObjectMeta.Name, spec.HostPath.Path)
 	}
 	file := depot + string(uuid.NewUUID()) + ".tgz"
 	cmdline := []string{"tar", "czf", file, "-C", path, "."}
