@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
+	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	"github.com/kubernetes-incubator/external-storage/openstack/standalone-cinder/pkg/volumeservice"
 	"k8s.io/api/core/v1"
 )
@@ -44,16 +45,16 @@ func getMonitors(conn volumeservice.VolumeConnection) []string {
 	return mons
 }
 
-func getRbdSecretName(ctx provisionCtx) string {
-	return fmt.Sprintf("%s-cephx-secret", *ctx.Options.PVC.Spec.StorageClassName)
+func getRbdSecretName(pvc *v1.PersistentVolumeClaim) string {
+	return fmt.Sprintf("%s-cephx-secret", *pvc.Spec.StorageClassName)
 }
 
-func (m *rbdMapper) BuildPVSource(ctx provisionCtx) (*v1.PersistentVolumeSource, error) {
-	mons := getMonitors(ctx.Connection)
+func (m *rbdMapper) BuildPVSource(conn volumeservice.VolumeConnection, options controller.VolumeOptions) (*v1.PersistentVolumeSource, error) {
+	mons := getMonitors(conn)
 	if mons == nil {
 		return nil, errors.New("No monitors could be parsed from connection info")
 	}
-	splitName := strings.SplitN(ctx.Connection.Data.Name, "/", 2)
+	splitName := strings.SplitN(conn.Data.Name, "/", 2)
 	if len(splitName) != 2 {
 		return nil, errors.New("Field 'name' cannot be split into pool and image")
 	}
@@ -63,18 +64,18 @@ func (m *rbdMapper) BuildPVSource(ctx provisionCtx) (*v1.PersistentVolumeSource,
 			CephMonitors: mons,
 			RBDPool:      splitName[0],
 			RBDImage:     splitName[1],
-			RadosUser:    ctx.Connection.Data.AuthUsername,
+			RadosUser:    conn.Data.AuthUsername,
 			SecretRef: &v1.LocalObjectReference{
-				Name: getRbdSecretName(ctx),
+				Name: getRbdSecretName(options.PVC),
 			},
 		},
 	}, nil
 }
 
-func (m *rbdMapper) AuthSetup(ctx provisionCtx) error {
+func (m *rbdMapper) AuthSetup(p *cinderProvisioner, options controller.VolumeOptions, conn volumeservice.VolumeConnection) error {
 	return nil
 }
 
-func (m *rbdMapper) AuthTeardown(ctx deleteCtx) error {
+func (m *rbdMapper) AuthTeardown(p *cinderProvisioner, pv *v1.PersistentVolume) error {
 	return nil
 }
