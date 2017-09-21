@@ -1,12 +1,12 @@
-hash: ef128b88161cdea558e5ae947d38936e5cd85fad0aea0aac07a8e47465921875
-updated: 2017-09-19T21:17:26.399597032-04:00
+hash: c93b7bb90a59a66ebfa93614b4d3bc73a46d973db4fcc5212ab1b9da8261132c
+updated: 2017-09-20T20:27:26.578282752-04:00
 imports:
 - name: cloud.google.com/go
-  version: 38a7def97ebdc2c74a198a4252b7f273fc216929
+  version: 6914032ea644de194c5f05cc04124f111396531c
   subpackages:
   - compute/metadata
 - name: github.com/aws/aws-sdk-go
-  version: 9924c83c280264fb32f34cc5095204c451bedf0c
+  version: d76e48be81c125ffb3d030020b66d64731d2b9d0
   subpackages:
   - aws
   - aws/awserr
@@ -371,7 +371,7 @@ imports:
   - storage/v1
   - storage/v1beta1
 - name: k8s.io/apiextensions-apiserver
-  version: 2bfb07d318ed549813240d1165fcebad6250c666
+  version: be41f5093e2b05c7a0befe35b04b715eb325ab43
   subpackages:
   - pkg/apis/apiextensions
   - pkg/apis/apiextensions/v1beta1
@@ -436,7 +436,7 @@ imports:
   - third_party/forked/golang/netutil
   - third_party/forked/golang/reflect
 - name: k8s.io/apiserver
-  version: 26ddb013b915693f5d5cf98c7a17b6b5c85a0ad3
+  version: 149fc2228647cea28b0670c240ec582e985e8eda
   subpackages:
   - pkg/authentication/authenticator
   - pkg/authentication/serviceaccount
