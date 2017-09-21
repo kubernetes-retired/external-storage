@@ -66,17 +66,6 @@ func NewCinderProvisioner(client kubernetes.Interface, id, configFilePath string
 	}, nil
 }
 
-type provisionCtx struct {
-	P          *cinderProvisioner
-	Options    controller.VolumeOptions
-	Connection volumeservice.VolumeConnection
-}
-
-type deleteCtx struct {
-	P  *cinderProvisioner
-	PV *v1.PersistentVolume
-}
-
 // Provision creates a storage asset and returns a PV object representing it.
 func (p *cinderProvisioner) Provision(options controller.VolumeOptions) (*v1.PersistentVolume, error) {
 	if options.PVC.Spec.Selector != nil {
@@ -116,15 +105,14 @@ func (p *cinderProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 		return nil, err
 	}
 
-	ctx := provisionCtx{p, options, connection}
-	err = mapper.AuthSetup(ctx)
+	err = mapper.AuthSetup(p, options, connection)
 	if err != nil {
 		// TODO: Create placeholder PV?
 		glog.Errorf("Failed to prepare volume auth: %v", err)
 		return nil, err
 	}
 
-	pv, err := buildPV(mapper, ctx, volumeID)
+	pv, err := buildPV(mapper, p, options, connection, volumeID)
 	if err != nil {
 		// TODO: Create placeholder PV?
 		glog.Errorf("Failed to build PV: %v", err)
@@ -154,13 +142,12 @@ func (p *cinderProvisioner) Delete(pv *v1.PersistentVolume) error {
 		return errors.New(CinderVolumeID + " annotation not found on PV")
 	}
 
-	ctx := deleteCtx{p, pv}
-	mapper, err := newVolumeMapperFromPV(ctx)
+	mapper, err := newVolumeMapperFromPV(pv)
 	if err != nil {
 		return err
 	}
 
-	mapper.AuthTeardown(ctx)
+	mapper.AuthTeardown(p, pv)
 
 	err = volumeservice.DisconnectCinderVolume(p.VolumeService, volumeID)
 	if err != nil {

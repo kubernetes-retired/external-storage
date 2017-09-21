@@ -21,15 +21,16 @@ import (
 	"fmt"
 
 	"github.com/golang/glog"
+	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	"github.com/kubernetes-incubator/external-storage/openstack/standalone-cinder/pkg/volumeservice"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type volumeMapper interface {
-	BuildPVSource(ctx provisionCtx) (*v1.PersistentVolumeSource, error)
-	AuthSetup(ctx provisionCtx) error
-	AuthTeardown(ctx deleteCtx) error
+	BuildPVSource(conn volumeservice.VolumeConnection, options controller.VolumeOptions) (*v1.PersistentVolumeSource, error)
+	AuthSetup(p *cinderProvisioner, options controller.VolumeOptions, conn volumeservice.VolumeConnection) error
+	AuthTeardown(p *cinderProvisioner, pv *v1.PersistentVolume) error
 }
 
 func newVolumeMapperFromConnection(conn volumeservice.VolumeConnection) (volumeMapper, error) {
@@ -44,18 +45,18 @@ func newVolumeMapperFromConnection(conn volumeservice.VolumeConnection) (volumeM
 	}
 }
 
-func newVolumeMapperFromPV(ctx deleteCtx) (volumeMapper, error) {
-	if ctx.PV.Spec.ISCSI != nil {
+func newVolumeMapperFromPV(pv *v1.PersistentVolume) (volumeMapper, error) {
+	if pv.Spec.ISCSI != nil {
 		return new(iscsiMapper), nil
-	} else if ctx.PV.Spec.RBD != nil {
+	} else if pv.Spec.RBD != nil {
 		return new(rbdMapper), nil
 	} else {
 		return nil, errors.New("Unsupported persistent volume source")
 	}
 }
 
-func buildPV(m volumeMapper, ctx provisionCtx, volumeID string) (*v1.PersistentVolume, error) {
-	pvSource, err := m.BuildPVSource(ctx)
+func buildPV(m volumeMapper, p *cinderProvisioner, options controller.VolumeOptions, conn volumeservice.VolumeConnection, volumeID string) (*v1.PersistentVolume, error) {
+	pvSource, err := m.BuildPVSource(conn, options)
 	if err != nil {
 		glog.Errorf("Failed to build PV Source element: %v", err)
 		return nil, err
@@ -63,18 +64,18 @@ func buildPV(m volumeMapper, ctx provisionCtx, volumeID string) (*v1.PersistentV
 
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      ctx.Options.PVName,
-			Namespace: ctx.Options.PVC.Namespace,
+			Name:      options.PVName,
+			Namespace: options.PVC.Namespace,
 			Annotations: map[string]string{
-				ProvisionerIDAnn: ctx.P.Identity,
+				ProvisionerIDAnn: p.Identity,
 				CinderVolumeID:   volumeID,
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{
-			PersistentVolumeReclaimPolicy: ctx.Options.PersistentVolumeReclaimPolicy,
-			AccessModes:                   ctx.Options.PVC.Spec.AccessModes,
+			PersistentVolumeReclaimPolicy: options.PersistentVolumeReclaimPolicy,
+			AccessModes:                   options.PVC.Spec.AccessModes,
 			Capacity: v1.ResourceList{
-				v1.ResourceName(v1.ResourceStorage): ctx.Options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)],
+				v1.ResourceName(v1.ResourceStorage): options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)],
 			},
 			PersistentVolumeSource: *pvSource,
 		},

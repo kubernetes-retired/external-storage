@@ -18,6 +18,8 @@ package provisioner
 
 import (
 	"github.com/golang/glog"
+	"github.com/kubernetes-incubator/external-storage/lib/controller"
+	"github.com/kubernetes-incubator/external-storage/openstack/standalone-cinder/pkg/volumeservice"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -28,24 +30,24 @@ type iscsiMapper struct {
 	volumeMapper
 }
 
-func getChapSecretName(ctx provisionCtx) string {
-	if ctx.Connection.Data.AuthMethod == "CHAP" {
-		return ctx.Options.PVName + "-secret"
+func getChapSecretName(connection volumeservice.VolumeConnection, options controller.VolumeOptions) string {
+	if connection.Data.AuthMethod == "CHAP" {
+		return options.PVName + "-secret"
 	}
 	return ""
 }
 
-func (m *iscsiMapper) BuildPVSource(ctx provisionCtx) (*v1.PersistentVolumeSource, error) {
+func (m *iscsiMapper) BuildPVSource(conn volumeservice.VolumeConnection, options controller.VolumeOptions) (*v1.PersistentVolumeSource, error) {
 	ret := &v1.PersistentVolumeSource{
 		ISCSI: &v1.ISCSIVolumeSource{
 			// TODO: Need some way to specify the initiator name
-			TargetPortal:    ctx.Connection.Data.TargetPortal,
-			IQN:             ctx.Connection.Data.TargetIqn,
-			Lun:             ctx.Connection.Data.TargetLun,
+			TargetPortal:    conn.Data.TargetPortal,
+			IQN:             conn.Data.TargetIqn,
+			Lun:             conn.Data.TargetLun,
 			SessionCHAPAuth: false,
 		},
 	}
-	secretName := getChapSecretName(ctx)
+	secretName := getChapSecretName(conn, options)
 	if secretName != "" {
 		ret.ISCSI.SessionCHAPAuth = true
 		ret.ISCSI.SecretRef = &v1.LocalObjectReference{
@@ -55,9 +57,19 @@ func (m *iscsiMapper) BuildPVSource(ctx provisionCtx) (*v1.PersistentVolumeSourc
 	return ret, nil
 }
 
-func (m *iscsiMapper) AuthSetup(ctx provisionCtx) error {
+func createSecret(p *cinderProvisioner, ns string, secret *v1.Secret) error {
+	_, err := p.Client.CoreV1().Secrets(ns).Create(secret)
+	if err != nil {
+		glog.Errorf("Failed to create chap secret in namespace %s: %v", ns, err)
+		return err
+	}
+	glog.V(3).Infof("Secret %s created", secret.ObjectMeta.Name)
+	return nil
+}
+
+func (m *iscsiMapper) AuthSetup(p *cinderProvisioner, options controller.VolumeOptions, conn volumeservice.VolumeConnection) error {
 	// Create a secret for the CHAP credentials
-	secretName := getChapSecretName(ctx)
+	secretName := getChapSecretName(conn, options)
 	if secretName == "" {
 		glog.V(3).Info("No CHAP authentication secret necessary")
 		return nil
@@ -68,30 +80,24 @@ func (m *iscsiMapper) AuthSetup(ctx provisionCtx) error {
 		},
 		Type: "kubernetes.io/iscsi-chap",
 		Data: map[string][]byte{
-			"node.session.auth.username": []byte(ctx.Connection.Data.AuthUsername),
-			"node.session.auth.password": []byte(ctx.Connection.Data.AuthPassword),
+			"node.session.auth.username": []byte(conn.Data.AuthUsername),
+			"node.session.auth.password": []byte(conn.Data.AuthPassword),
 		},
 	}
-	namespace := ctx.Options.PVC.Namespace
-	_, err := ctx.P.Client.CoreV1().Secrets(namespace).Create(secret)
-	if err != nil {
-		glog.Errorf("Failed to create chap secret in namespace %s: %v", namespace, err)
-		return err
-	}
-	glog.V(3).Infof("Secret %s created", secretName)
-	return nil
+	namespace := options.PVC.Namespace
+	return createSecret(p, namespace, secret)
 }
 
-func (m *iscsiMapper) AuthTeardown(ctx deleteCtx) error {
+func (m *iscsiMapper) AuthTeardown(p *cinderProvisioner, pv *v1.PersistentVolume) error {
 	// Delete the CHAP credentials
-	if ctx.PV.Spec.ISCSI.SecretRef == nil {
+	if pv.Spec.ISCSI.SecretRef == nil {
 		glog.V(3).Info("No associated secret to delete")
 		return nil
 	}
 
-	secretName := ctx.PV.Spec.ISCSI.SecretRef.Name
-	secretNamespace := ctx.PV.Spec.ClaimRef.Namespace
-	err := ctx.P.Client.CoreV1().Secrets(secretNamespace).Delete(secretName, nil)
+	secretName := pv.Spec.ISCSI.SecretRef.Name
+	secretNamespace := pv.Spec.ClaimRef.Namespace
+	err := p.Client.CoreV1().Secrets(secretNamespace).Delete(secretName, nil)
 	if err != nil {
 		glog.Errorf("Failed to remove secret %s from namespace %s: %v", secretName, secretNamespace, err)
 		return err
