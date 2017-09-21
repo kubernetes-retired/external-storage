@@ -225,7 +225,7 @@ func (p *iscsiProvisioner) createVolume(options controller.VolumeOptions) (vol s
 	vol = p.getVolumeName(options)
 	pool = p.getVolumeGroup(options)
 	initiators := p.getInitiators(options)
-	chap_credentials := &chapSessionCredentials{}
+	chapCredentials := &chapSessionCredentials{}
 
 	//read chap session authentication credentials
 	if getBool(options.Parameters["chapAuthSession"]) {
@@ -234,7 +234,7 @@ func (p *iscsiProvisioner) createVolume(options controller.VolumeOptions) (vol s
 			log.Warnln(err)
 			return "", 0, "", err
 		}
-		err = prop.Decode(chap_credentials)
+		err = prop.Decode(chapCredentials)
 		if err != nil {
 			log.Warnln(err)
 			return "", 0, "", err
@@ -269,13 +269,13 @@ func (p *iscsiProvisioner) createVolume(options controller.VolumeOptions) (vol s
 		}
 		log.Debugln("exported volume name, lun, pool, initiator ", vol, lun, pool, initiator)
 		if getBool(options.Parameters["chapAuthSession"]) {
-			log.Debugln("setting up chap session auth for initiator, initiator, in_user, out_user: ", initiator, chap_credentials.InUser, chap_credentials.OutUser)
-			err = p.setInitiatorAuth(initiator, chap_credentials.InUser, chap_credentials.InPassword, chap_credentials.OutUser, chap_credentials.OutPassword)
+			log.Debugln("setting up chap session auth for initiator, initiator, in_user, out_user: ", initiator, chapCredentials.InUser, chapCredentials.OutUser)
+			err = p.setInitiatorAuth(initiator, chapCredentials.InUser, chapCredentials.InPassword, chapCredentials.OutUser, chapCredentials.OutPassword)
 			if err != nil {
 				log.Warnln(err)
 				return "", 0, "", err
 			}
-			log.Debugln("set up chap session auth for initiator, initiator, in_user, out_user: ", initiator, chap_credentials.InUser, chap_credentials.OutUser)
+			log.Debugln("set up chap session auth for initiator, initiator, in_user, out_user: ", initiator, chapCredentials.InUser, chapCredentials.OutUser)
 		}
 	}
 	return vol, lun, pool, nil
@@ -423,7 +423,7 @@ func (p *iscsiProvisioner) exportList() (exportList, error) {
 
 //initiator_set_auth(initiator_wwn, in_user, in_pass, out_user, out_pass)
 
-func (p *iscsiProvisioner) setInitiatorAuth(initiator string, in_user string, in_password string, out_user string, out_password string) error {
+func (p *iscsiProvisioner) setInitiatorAuth(initiator string, inUser string, inPassword string, outUser string, outPassword string) error {
 
 	client, err := p.getConnection()
 	defer client.Close()
@@ -435,10 +435,10 @@ func (p *iscsiProvisioner) setInitiatorAuth(initiator string, in_user string, in
 	//make arguments object
 	args := initiatorSetAuthArgs{
 		InitiatorWwn: initiator,
-		InUser:       in_user,
-		InPassword:   in_password,
-		OutUser:      out_user,
-		OutPassword:  out_password,
+		InUser:       inUser,
+		InPassword:   inPassword,
+		OutUser:      outUser,
+		OutPassword:  outPassword,
 	}
 	//call remote procedure with args
 	err = client.Call("initiator_set_auth", args, null)
