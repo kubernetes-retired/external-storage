@@ -1,0 +1,37 @@
+kind: Deployment
+apiVersion: extensions/v1beta1
+metadata:
+  name: snapshot-controller
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: snapshot-controller
+    spec:
+      serviceAccountName: snapshot-controller-runner
+      containers:
+        - name: snapshot-controller
+          image: quay.io/external_storage/snapshot-controller
+          imagePullPolicy: "IfNotPresent"
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: hostpath-source
+              mountPath: /test
+        - name: snapshot-provisioner
+          image: quay.io/external_storage/snapshot-provisioner
+          imagePullPolicy: "IfNotPresent"
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: hostpath-source
+              mountPath: /test
+      volumes:
+        - name: tmp
+          hostPath:
+            path: /tmp
+        - name: hostpath-source
+          emptyDir: {}
