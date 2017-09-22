@@ -6,7 +6,6 @@
 quay.io/external_storage/glusterblock-provisioner:latest
 ```
 
-[TOC]
 
 ## What is Gluster Block Provisioner ?
 
@@ -31,9 +30,9 @@ If you want to build the container from source instead of pulling the docker ima
 [root@localhost]# go build glusterblock-provisioner.go
 ```
 
-Step 2:  Build docker container image
+Step 2:  Get Gluster Block Provisioner Container image
 ```
-[root@localhost]# docker build -t glusterblock-provisioner .
+[root@localhost]# docker pull quay.io/external_storage/glusterblock-provisioner:latest
 ```
 
 ## Start Kubernetes Cluster
@@ -72,9 +71,9 @@ parameters:
 
 ### Global parameters applicable for both modes:
 
-* `opmode`: This value decide in which mode gluster block provisioner has to work.
+* `opmode`: This value decide in which mode gluster block provisioner has to work and the default is `heketi`. This is an optional parameter.
 
-* `chapauthenabled`: This value has to be set to `true` if we want to provision block volume with CHAP authentication enabled. This is an optional parameter.
+* `chapauthenabled`: This value has to be set to `false` if you want to provision block volume without CHAP authentication. This is an optional parameter defaults to `true`. 
 
 * `hacount`: This is the count of number of paths to the block target server. This provide high availability via multipathing capability of iscsi. If there is a path failure, the I/Os will not be disturbed and will be served via another available paths.
 
