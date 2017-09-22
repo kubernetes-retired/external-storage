@@ -39,7 +39,7 @@ func newVolumeMapperFromConnection(conn volumeservice.VolumeConnection) (volumeM
 		msg := fmt.Sprintf("Unsupported persistent volume type: %s", conn.DriverVolumeType)
 		return nil, errors.New(msg)
 	case iscsiType:
-		return new(iscsiMapper), nil
+		return &iscsiMapper{cb: &k8sClusterBroker{}}, nil
 	case rbdType:
 		return new(rbdMapper), nil
 	}
@@ -47,7 +47,7 @@ func newVolumeMapperFromConnection(conn volumeservice.VolumeConnection) (volumeM
 
 func newVolumeMapperFromPV(pv *v1.PersistentVolume) (volumeMapper, error) {
 	if pv.Spec.ISCSI != nil {
-		return new(iscsiMapper), nil
+		return &iscsiMapper{cb: &k8sClusterBroker{}}, nil
 	} else if pv.Spec.RBD != nil {
 		return new(rbdMapper), nil
 	} else {

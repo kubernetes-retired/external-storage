@@ -48,6 +48,9 @@ type cinderProvisioner struct {
 	// Identity of this cinderProvisioner, generated. Used to identify "this"
 	// provisioner's PVs.
 	Identity string
+
+	vsb volumeServiceBroker
+	mb  mapperBroker
 }
 
 // NewCinderProvisioner returns a Provisioner that creates volumes using a
@@ -63,6 +66,8 @@ func NewCinderProvisioner(client kubernetes.Interface, id, configFilePath string
 		VolumeService: volumeService,
 		Client:        client,
 		Identity:      id,
+		vsb:           &gophercloudBroker{},
+		mb:            &volumeMapperBroker{},
 	}, nil
 }
 
@@ -72,33 +77,33 @@ func (p *cinderProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 		return nil, fmt.Errorf("claim Selector is not supported")
 	}
 
-	volumeID, err := volumeservice.CreateCinderVolume(p.VolumeService, options)
+	volumeID, err := p.vsb.CreateCinderVolume(p.VolumeService, options)
 	if err != nil {
 		glog.Errorf("Failed to create volume")
 		return nil, err
 	}
 
-	err = volumeservice.WaitForAvailableCinderVolume(p.VolumeService, volumeID)
+	err = p.vsb.WaitForAvailableCinderVolume(p.VolumeService, volumeID)
 	if err != nil {
 		glog.Errorf("Volume did not become available")
 		return nil, err
 	}
 
-	err = volumeservice.ReserveCinderVolume(p.VolumeService, volumeID)
+	err = p.vsb.ReserveCinderVolume(p.VolumeService, volumeID)
 	if err != nil {
 		// TODO: Create placeholder PV?
 		glog.Errorf("Failed to reserve volume: %v", err)
 		return nil, err
 	}
 
-	connection, err := volumeservice.ConnectCinderVolume(p.VolumeService, volumeID)
+	connection, err := p.vsb.ConnectCinderVolume(p.VolumeService, volumeID)
 	if err != nil {
 		// TODO: Create placeholder PV?
 		glog.Errorf("Failed to connect volume: %v", err)
 		return nil, err
 	}
 
-	mapper, err := newVolumeMapperFromConnection(connection)
+	mapper, err := p.mb.newVolumeMapperFromConnection(connection)
 	if err != nil {
 		// TODO: Create placeholder PV?
 		glog.Errorf("Unable to create volume mapper: %f", err)
@@ -112,7 +117,7 @@ func (p *cinderProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 		return nil, err
 	}
 
-	pv, err := buildPV(mapper, p, options, connection, volumeID)
+	pv, err := p.mb.buildPV(mapper, p, options, connection, volumeID)
 	if err != nil {
 		// TODO: Create placeholder PV?
 		glog.Errorf("Failed to build PV: %v", err)
@@ -142,26 +147,26 @@ func (p *cinderProvisioner) Delete(pv *v1.PersistentVolume) error {
 		return errors.New(CinderVolumeID + " annotation not found on PV")
 	}
 
-	mapper, err := newVolumeMapperFromPV(pv)
+	mapper, err := p.mb.newVolumeMapperFromPV(pv)
 	if err != nil {
 		return err
 	}
 
 	mapper.AuthTeardown(p, pv)
 
-	err = volumeservice.DisconnectCinderVolume(p.VolumeService, volumeID)
+	err = p.vsb.DisconnectCinderVolume(p.VolumeService, volumeID)
 	if err != nil {
 		return err
 	}
 
-	err = volumeservice.UnreserveCinderVolume(p.VolumeService, volumeID)
+	err = p.vsb.UnreserveCinderVolume(p.VolumeService, volumeID)
 	if err != nil {
 		// TODO: Create placeholder PV?
 		glog.Errorf("Failed to unreserve volume: %v", err)
 		return err
 	}
 
-	err = volumeservice.DeleteCinderVolume(p.VolumeService, volumeID)
+	err = p.vsb.DeleteCinderVolume(p.VolumeService, volumeID)
 	if err != nil {
 		return err
 	}

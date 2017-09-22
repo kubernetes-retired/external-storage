@@ -28,6 +28,7 @@ const iscsiType = "iscsi"
 
 type iscsiMapper struct {
 	volumeMapper
+	cb clusterBroker
 }
 
 func getChapSecretName(connection volumeservice.VolumeConnection, options controller.VolumeOptions) string {
@@ -57,16 +58,6 @@ func (m *iscsiMapper) BuildPVSource(conn volumeservice.VolumeConnection, options
 	return ret, nil
 }
 
-func createSecret(p *cinderProvisioner, ns string, secret *v1.Secret) error {
-	_, err := p.Client.CoreV1().Secrets(ns).Create(secret)
-	if err != nil {
-		glog.Errorf("Failed to create chap secret in namespace %s: %v", ns, err)
-		return err
-	}
-	glog.V(3).Infof("Secret %s created", secret.ObjectMeta.Name)
-	return nil
-}
-
 func (m *iscsiMapper) AuthSetup(p *cinderProvisioner, options controller.VolumeOptions, conn volumeservice.VolumeConnection) error {
 	// Create a secret for the CHAP credentials
 	secretName := getChapSecretName(conn, options)
@@ -85,7 +76,7 @@ func (m *iscsiMapper) AuthSetup(p *cinderProvisioner, options controller.VolumeO
 		},
 	}
 	namespace := options.PVC.Namespace
-	return createSecret(p, namespace, secret)
+	return m.cb.createSecret(p, namespace, secret)
 }
 
 func (m *iscsiMapper) AuthTeardown(p *cinderProvisioner, pv *v1.PersistentVolume) error {
@@ -97,11 +88,5 @@ func (m *iscsiMapper) AuthTeardown(p *cinderProvisioner, pv *v1.PersistentVolume
 
 	secretName := pv.Spec.ISCSI.SecretRef.Name
 	secretNamespace := pv.Spec.ClaimRef.Namespace
-	err := p.Client.CoreV1().Secrets(secretNamespace).Delete(secretName, nil)
-	if err != nil {
-		glog.Errorf("Failed to remove secret %s from namespace %s: %v", secretName, secretNamespace, err)
-		return err
-	}
-	glog.V(3).Infof("Successfully deleted secret %s", secretName)
-	return nil
+	return m.cb.deleteSecret(p, secretNamespace, secretName)
 }
