@@ -1,3 +1,7 @@
+# v1.0.3
+- Pull heketi hash of gluster block API merge.
+- Humble Chirammal <hchiramm@redhat.com>
+
 # v1.0.0
 - with manual heketi vendor update and working heketi opmode.
 - Humble Chirammal <hchiramm@redhat.com>
