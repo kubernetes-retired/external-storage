@@ -17,6 +17,7 @@ Many storage systems provide the ability to create "snapshots" of a persistent v
     * Amazon EBS
     * GCE PD
     * HostPath
+    * OpenStack Cinder
 
 # Lifecycle of a Volume Snapshot and Volume Snapshot Data
 
@@ -53,14 +54,22 @@ spec:
 Volume Snapshot Data is automatically created based on the Volume Snapshot. Relationship between Volume Snapshot and Volume Snapshot Data is similar to the relationship between Persistent Volume Claim and Persistent Volume.
 
 Depending on the Persistent Volume type the operation might go through several phases which are reflected by the Volume Snapshot status:
-1. The Volume Snapshot Data is created and is bound to the Volume Snapshot.
+
+1. The new Volume Snapshot object is created.
 2. The controller starts the snapshot operation: the snapshotted Persistent Volume might need to be frozen and the applications paused.
-3. The storage system finishes creating the snapshot (the snapshot is "cut") and the snapshotted Persistent Volume might return to normal operation. The snapshot itself is not ready yet. The last status condition is of `Created` type with status value "True"
+3. The storage system finishes creating the snapshot (the snapshot is "cut") and the snapshotted Persistent Volume might return to normal operation. The snapshot itself is not ready yet. The last status condition is of `Pending` type with status value "True". A new VolumeSnapshotData object is created to represent the actual snapshot.
 4. The newly created snapshot is completed and ready to use. The last status condition is of `Ready` type with status value "True"
 
+*Notes*
+
+* It is the user's responsibility to ensure the data consistency (stop the pod/application, flush caches, freeze the filesystem, ...).
+* In case of error in any of the steps the Volume Snapshot status is appended with an `Error` condition.
+
 A Volume Snapshot status can be displayed as shown below:
-```yaml
+```sh
 $ kubectl get volumesnapshot -o yaml
+```
+```yaml
 apiVersion: volume-snapshot-data.external-storage.k8s.io/v1
   kind: VolumeSnapshot
   metadata:
