@@ -38,7 +38,7 @@ provisioner: volumesnapshot.external-storage.k8s.io/snapshot-promoter
 ```
 Such Storage Class is necessary for restoring a Persistent Volume from already created Volume Snapshot and Volume Snapshot Data.
 
-## Creating
+## Creating Snapshot
 Each `VolumeSnapshot` contains a spec and status, which is the specification and status of the Volume Snapshot.
 ```yaml
 apiVersion: volume-snapshot-data.external-storage.k8s.io/v1
@@ -96,7 +96,7 @@ apiVersion: volume-snapshot-data.external-storage.k8s.io/v1
     creationTimestamp: null
 ```
 
-## Restoring
+## Restoring Snapshot
 In order to restore a Persistent Volume from a Volume Snapshot a user creates the following Persistent Volume Claim:
 ```yaml
 apiVersion: v1
@@ -113,7 +113,7 @@ spec:
 
 A Persistent Volume will be created and bound to the Persistent Volume Claim. The process may take several minutes depending on the Persistent Volume Type.
 
-## Deleting
+## Deleting Snapshot
 A Volume Snapshot `snapshot-demo` can be deleted as shown below:
 ```
 $ kubectl delete -f volumesnapshot/snapshot-demo
