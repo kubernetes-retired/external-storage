@@ -3,7 +3,7 @@
 `quay.io/external-storage/local-volume-provisioner:1.0.0`
 
 local-volume-provisioner is an out-of-tree static provisioner for the local volume
-plugin, which is a 1.7 alpha feature.
+plugin, which is a 1.7 & 1.8 alpha feature.
 
 It runs on each node in the cluster and monitors specified directories to look for
 new local file-based volumes.  The volumes can be a mount point or a directory in

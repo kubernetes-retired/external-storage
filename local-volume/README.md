@@ -17,7 +17,7 @@ directories by creating and cleaning up PersistentVolumes for each volume.
 
 ## Feature Status
 
-Current status: 1.7 - Alpha
+Current status: 1.7 & 1.8 - Alpha
 
 What works:
 * Create a PV specifying a directory with node affinity.
@@ -27,11 +27,11 @@ What works:
 
 What doesn't work and workarounds:
 * Multiple local PVCs in a single pod.
-    * Goal for 1.8.
+    * Goal for 1.9.
     * No known workarounds.
 * PVC binding does not consider pod scheduling requirements and may make
   suboptimal or incorrect decisions.
-    * Goal for 1.8.
+    * Goal for 1.9.
     * Workarounds:
         * Run your pods that require local storage first.
         * Give your pods high priority.
@@ -39,7 +39,7 @@ What doesn't work and workarounds:
           stuck pending. TODO: add link
 * External provisioner cannot correctly detect capacity of mounts added after it
   has been started.
-    * This requires mount propagation to work, which is targeted for 1.8.
+    * This requires mount propagation to work, which is targeted for 1.9.
     * Workaround: Before adding any new mount points, stop the daemonset, add
       the new mount points, start the daemonset.
 * Fsgroup conflict if multiple pods using the same PVC specify different fsgroup
