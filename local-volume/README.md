@@ -42,8 +42,6 @@ What doesn't work and workarounds:
     * This requires mount propagation to work, which is targeted for 1.9.
     * Workaround: Before adding any new mount points, stop the daemonset, add
       the new mount points, start the daemonset.
-* Fsgroup conflict if multiple pods using the same PVC specify different fsgroup
-    * Workaround: Don't do this!
 
 Future features:
 * Local block devices as a volume source, with partitioning and fs formatting
