@@ -18,6 +18,7 @@ package cmd
 
 import (
 	"fmt"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/kubernetes-incubator/external-storage/iscsi/targetd/provisioner"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
@@ -26,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 var log = logrus.New()
@@ -42,12 +44,18 @@ This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		initLog()
-
 		log.Debugln("start called")
-
+		var config *rest.Config
+		var err error
+		master := viper.GetString("master")
+		kubeconfig := viper.GetString("kubeconfig")
 		// creates the in-cluster config
 		log.Debugln("creating in cluster default kube client config")
-		config, err := rest.InClusterConfig()
+		if master != "" || kubeconfig != "" {
+			config, err = clientcmd.BuildConfigFromFlags(master, kubeconfig)
+		} else {
+			config, err = rest.InClusterConfig()
+		}
 		if err != nil {
 			log.Fatalln(err)
 		}
@@ -126,6 +134,10 @@ func init() {
 	startcontrollerCmd.Flags().String("default-fs", "xfs", "filesystem to use when not specified")
 	viper.BindPFlag("default-fs", startcontrollerCmd.Flags().Lookup("default-fs"))
 
+	startcontrollerCmd.Flags().String("master", "", "Master URL")
+	viper.BindPFlag("master", startcontrollerCmd.Flags().Lookup("master"))
+	startcontrollerCmd.Flags().String("kubeconfig", "", "Absolute path to the kubeconfig")
+	viper.BindPFlag("kubeconfig", startcontrollerCmd.Flags().Lookup("kubeconfig"))
 	// Here you will define your flags and configuration settings.
 
 	// Cobra supports Persistent Flags which will work for this command

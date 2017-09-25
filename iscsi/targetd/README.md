@@ -241,6 +241,14 @@ oc secret new-basicauth targetd-account --username=admin --password=ciao
 oc create -f https://raw.githubusercontent.com/kubernetes-incubator/external-storage/master/iscsi/targetd/openshift/iscsi-provisioner-dc.yaml
 ```
 
+### Start iscsi provisioner as docker container.
+
+Alternatively, you can start a provisioner as a container locally.
+
+```bash
+docker run -ti -v /root/.kube:/kube -v /var/run/kubernetes:/var/run/kubernetes --privileged --net=host quay.io/external_storage/iscsi-controller:latest start --kubeconfig=/kube/config --master=http://127.0.0.1:8080 --log-level=debug --targetd-address=192.168.99.100 --targetd-password=ciao --targetd-username=admin
+```
+
 ### Create a storage class
 
 storage classes should look like the following
