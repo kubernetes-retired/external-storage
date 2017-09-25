@@ -18,18 +18,21 @@ package provisioner
 
 import (
 	"errors"
-	"github.com/Sirupsen/logrus"
-	"github.com/powerman/rpc-codec/jsonrpc2"
-	//"github.com/kubernetes-incubator/external-storage/iscsi/targetd/provisioner/jsonrpc2"
-	"github.com/kubernetes-incubator/external-storage/lib/controller"
-	"github.com/spf13/viper"
-	"k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"fmt"
 	//"net/rpc"
 	//"net/rpc/jsonrpc"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/Sirupsen/logrus"
+	"github.com/powerman/rpc-codec/jsonrpc2"
+	//"github.com/kubernetes-incubator/external-storage/iscsi/targetd/provisioner/jsonrpc2"
+	"github.com/kubernetes-incubator/external-storage/lib/controller"
+	"github.com/kubernetes-incubator/external-storage/lib/util"
+	"github.com/spf13/viper"
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var log = logrus.New()
@@ -85,8 +88,19 @@ func NewiscsiProvisioner(url string) controller.Provisioner {
 	}
 }
 
+// getAccessModes returns access modes iscsi volume supported.
+func (p *iscsiProvisioner) getAccessModes() []v1.PersistentVolumeAccessMode {
+	return []v1.PersistentVolumeAccessMode{
+		v1.ReadWriteOnce,
+		v1.ReadOnlyMany,
+	}
+}
+
 // Provision creates a storage asset and returns a PV object representing it.
 func (p *iscsiProvisioner) Provision(options controller.VolumeOptions) (*v1.PersistentVolume, error) {
+	if !util.AccessModesContainedInAll(p.getAccessModes(), options.PVC.Spec.AccessModes) {
+		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", options.PVC.Spec.AccessModes, p.getAccessModes())
+	}
 	log.Debugln("new provision request received for pvc: ", options.PVName)
 	vol, lun, pool, err := p.createVolume(options)
 	if err != nil {
