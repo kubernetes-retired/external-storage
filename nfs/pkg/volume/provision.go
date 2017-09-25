@@ -385,6 +385,8 @@ func (p *nfsProvisioner) getServer() (string, error) {
 	}
 	endpoints, err := p.client.Core().Endpoints(namespace).Get(serviceName, metav1.GetOptions{})
 	for _, subset := range endpoints.Subsets {
+		// One service can't have multiple nfs-provisioner endpoints. If it had, kubernetes would round-robin
+		// the request which would probably go to the wrong instance.
 		if len(subset.Addresses) != 1 {
 			continue
 		}
@@ -402,7 +404,7 @@ func (p *nfsProvisioner) getServer() (string, error) {
 		break
 	}
 	if !valid {
-		return "", fmt.Errorf("service %s=%s is not valid; check that it has for ports %v one endpoint, this pod's IP %s=%s", p.serviceEnv, serviceName, expectedPorts, p.podIPEnv, podIP)
+		return "", fmt.Errorf("service %s=%s is not valid; check that it has for ports %v exactly one endpoint, this pod's IP %s=%s", p.serviceEnv, serviceName, expectedPorts, p.podIPEnv, podIP)
 	}
 	if service.Spec.ClusterIP == v1.ClusterIPNone {
 		return "", fmt.Errorf("service %s=%s is valid but it doesn't have a cluster IP", p.serviceEnv, serviceName)
