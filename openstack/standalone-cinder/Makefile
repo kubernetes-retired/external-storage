@@ -23,7 +23,7 @@ endif
 IMAGE = $(REGISTRY)standalone-cinder-provisioner:$(VERSION)
 MUTABLE_IMAGE = $(REGISTRY)standalone-cinder-provisioner:latest
 
-.PHONY: all build container
+.PHONY: all build container test
 
 all: build
 
@@ -33,6 +33,9 @@ build:
 container: build
 	docker build -t $(MUTABLE_IMAGE) .
 	docker tag $(MUTABLE_IMAGE) $(IMAGE)
+
+test:
+	go test ./pkg/provisioner
 
 
 clean:
