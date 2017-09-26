@@ -224,6 +224,12 @@ go run hack/e2e.go -- -v --test --test_args="--ginkgo.focus=\[Feature:LocalPersi
 [GCE Alpha](https://k8s-testgrid.appspot.com/sig-storage#gce-alpha)
 [GCE GCI Alpha](https://k8s-testgrid.appspot.com/sig-storage#gci-gce-alpha)
 
+
+## Requirements
+
+* The local-volume plugin expects paths to be stable, including across 
+  reboots and when disks are added or removed.
+
 ## Best Practices
 
 * For IO isolation, a whole disk per volume is recommended
@@ -231,17 +237,10 @@ go run hack/e2e.go -- -v --test --test_args="--ginkgo.focus=\[Feature:LocalPersi
 * Avoid recreating nodes with the same node name while there are still old PVs
   with that node's affinity specified. Otherwise, the system could think that
   the new node contains the old PVs.
-* While leveraging the local PV provisioner, race conditions can occur when
-  an admin is adding new volumes and they are being discovered. To avoid 
-  this situation, in the discovery directories we recommend utilizing bind
-  mounts for mount points and symlinks for raw block volumes. For example, 
-  if the discovery directory is /mnt/volumes and we want the provisioner 
-  to expose /dev/sda1 as a volume named vol1, then we would bind mount 
-  /dev/sda1 at /mnt/volumes/vol1.   
-* For volumes with a filesystem, its recommended to utilize their UUID (e.g.
-  the output from `ls -l /dev/disk/by-uuid`) both in fstab mounting logic and
-  in the directory name representing that volume. This practice ensures
-  that the wrong local volume is not mistakenly mounted, even if its mountpoint
+* For volumes with a filesystem, it's recommended to utilize their UUID (e.g.
+  the output from `ls -l /dev/disk/by-uuid`) both in fstab entries
+  and in the directory name of that mount point. This practice ensures
+  that the wrong local volume is not mistakenly mounted, even if its device path
   changes (e.g. if /dev/sda1 becomes /dev/sdb1 when a new disk is added).
   Additionally, this practice will ensure that if another node with the
   same name is created, that any volumes on that node are unique and not
