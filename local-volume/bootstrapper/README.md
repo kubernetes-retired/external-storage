@@ -66,30 +66,7 @@ data:
     }
 ```
 
-If the directory `/mnt/ssds/` contained one diretory `/mnt/ssds/ssd1` then the following
-local storage PV would be created by the bootstrapper:
-
-```
-$ kubectl describe pv <example-local-pv>
-Name:	       	<example-local-pv>
-Labels:	        <snip>
-Annotations:	pv.kubernetes.io/provisioned-by=local-volume-provisioner
-		volume.alpha.kubernetes.io/node-affinity={"requiredDuringSchedulingIgnoredDuringExecution":{"nodeSelectorTerms":[{"matchExpressions":[{"key":"kubernetes.io/hostname","operator":"In","values":["kuberne...
-StorageClass:	local-fast
-Status:		    Available
-Claim:		    <snip>
-Reclaim Policy:	Delete
-Access Modes:	RWO
-Capacity:	    <snip>
-Message:
-Source:
-    Type:	LocalVolume (a persistent volume backed by local storage on a node)
-    Path:	/mnt/ssds/ssd1
-Events:	    	<none>
-
-```
-
-The PV described above can be claimed and bound to a PVC by referencing the `local-fast` storageClassName.
+An example of using the bootstraper is included [here](../README.md).
 
 ### Command line options
 
