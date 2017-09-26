@@ -2,14 +2,6 @@
 
 1. Sign one of the contributor license agreements below.
 1. `go get golang.org/x/review/git-codereview` to install the code reviewing tool.
-    1. You will need to ensure that your `GOBIN` directory (by default
-       `$GOPATH/bin`) is in your `PATH` so that git can find the command.
-    1. If you would like, you may want to set up aliases for git-codereview,
-       such that `git codereview change` becomes `git change`. See the
-       [godoc](https://godoc.org/golang.org/x/review/git-codereview) for details.
-    1. Should you run into issues with the git-codereview tool, please note
-       that all error messages will assume that you have set up these
-       aliases.
 1. Get the cloud package by running `go get -d cloud.google.com/go`.
     1. If you have already checked out the source, make sure that the remote git
        origin is https://code.googlesource.com/gocloud:
@@ -20,8 +12,7 @@
    the directions.
 1. Make changes and create a change by running `git codereview change <name>`,
 provide a commit message, and use `git codereview mail` to create a Gerrit CL.
-1. Keep amending to the change with `git codereview change` and mail as your receive
-feedback. Each new mailed amendment will create a new patch set for your change in Gerrit.
+1. Keep amending to the change and mail as your receive feedback.
 
 ## Integration Tests
 
@@ -40,33 +31,30 @@ run the against the actual APIs.
 
 - **GCLOUD_TESTS_GOLANG_PROJECT_ID**: Developers Console project's ID (e.g. bamboo-shift-455)
 - **GCLOUD_TESTS_GOLANG_KEY**: The path to the JSON key file.
-- **GCLOUD_TESTS_API_KEY**: Your API key.
 
 Install the [gcloud command-line tool][gcloudcli] to your machine and use it
-to create some resources used in integration tests.
+to create the indexes used in the datastore integration tests with indexes
+found in `datastore/testdata/index.yaml`:
 
 From the project's root directory:
 
 ``` sh
-# Set the default project in your env.
+# Set the default project in your env
 $ gcloud config set project $GCLOUD_TESTS_GOLANG_PROJECT_ID
 
-# Authenticate the gcloud tool with your account.
+# Authenticate the gcloud tool with your account
 $ gcloud auth login
 
-# Create the indexes used in the datastore integration tests.
+# Create the indexes
 $ gcloud preview datastore create-indexes datastore/testdata/index.yaml
+```
 
-# Create a Google Cloud storage bucket with the same name as your test project,
-# and with the Stackdriver Logging service account as owner, for the sink
-# integration tests in logging.
+The Sink integration tests in preview/logging require a Google Cloud storage
+bucket with the same name as your test project, and with the Stackdriver Logging
+service account as owner:
+``` sh
 $ gsutil mb gs://$GCLOUD_TESTS_GOLANG_PROJECT_ID
 $ gsutil acl ch -g cloud-logs@google.com:O gs://$GCLOUD_TESTS_GOLANG_PROJECT_ID
-
-# Create a Spanner instance for the spanner integration tests.
-$ gcloud beta spanner instances create go-integration-test --config regional-us-central1 --nodes 1 --description 'Instance for go client test'
-# NOTE: Spanner instances are priced by the node-hour, so you may want to delete
-# the instance after testing with 'gcloud beta spanner instances delete'.
 ```
 
 Once you've set the environment variables, you can run the integration tests by
