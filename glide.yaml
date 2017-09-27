@@ -45,9 +45,9 @@ import:
   version: b4c2377fa77951a0e08163f52dc9b3e206355194
 - package: github.com/davecgh/go-spew
   version: 04cdfd42973bb9c8589fd6a731800cf222fde1a9
-  supbackages:
-  - spew
 - package: golang.org/x/sys
   version: a2e06a18
   subpackages:
   - unix
+- package: github.com/onsi/ginkgo
+- package: github.com/onsi/gomega
