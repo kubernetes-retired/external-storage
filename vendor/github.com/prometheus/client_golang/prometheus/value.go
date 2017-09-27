@@ -14,11 +14,11 @@
 package prometheus
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"sort"
 	"sync/atomic"
-	"time"
 
 	dto "github.com/prometheus/client_model/go"
 
@@ -36,17 +36,19 @@ const (
 	UntypedValue
 )
 
+var errInconsistentCardinality = errors.New("inconsistent label cardinality")
+
 // value is a generic metric for simple values. It implements Metric, Collector,
 // Counter, Gauge, and Untyped. Its effective type is determined by
 // ValueType. This is a low-level building block used by the library to back the
 // implementations of Counter, Gauge, and Untyped.
 type value struct {
-	// valBits contains the bits of the represented float64 value. It has
+	// valBits containst the bits of the represented float64 value. It has
 	// to go first in the struct to guarantee alignment for atomic
 	// operations.  http://golang.org/pkg/sync/atomic/#pkg-note-BUG
 	valBits uint64
 
-	selfCollector
+	SelfCollector
 
 	desc       *Desc
 	valType    ValueType
@@ -66,7 +68,7 @@ func newValue(desc *Desc, valueType ValueType, val float64, labelValues ...strin
 		valBits:    math.Float64bits(val),
 		labelPairs: makeLabelPairs(desc, labelValues),
 	}
-	result.init(result)
+	result.Init(result)
 	return result
 }
 
@@ -76,10 +78,6 @@ func (v *value) Desc() *Desc {
 
 func (v *value) Set(val float64) {
 	atomic.StoreUint64(&v.valBits, math.Float64bits(val))
-}
-
-func (v *value) SetToCurrentTime() {
-	v.Set(float64(time.Now().UnixNano()) / 1e9)
 }
 
 func (v *value) Inc() {
@@ -115,7 +113,7 @@ func (v *value) Write(out *dto.Metric) error {
 // library to back the implementations of CounterFunc, GaugeFunc, and
 // UntypedFunc.
 type valueFunc struct {
-	selfCollector
+	SelfCollector
 
 	desc       *Desc
 	valType    ValueType
@@ -136,7 +134,7 @@ func newValueFunc(desc *Desc, valueType ValueType, function func() float64) *val
 		function:   function,
 		labelPairs: makeLabelPairs(desc, nil),
 	}
-	result.init(result)
+	result.Init(result)
 	return result
 }
 
@@ -155,8 +153,8 @@ func (v *valueFunc) Write(out *dto.Metric) error {
 // the Collect method. NewConstMetric returns an error if the length of
 // labelValues is not consistent with the variable labels in Desc.
 func NewConstMetric(desc *Desc, valueType ValueType, value float64, labelValues ...string) (Metric, error) {
-	if err := validateLabelValues(labelValues, len(desc.variableLabels)); err != nil {
-		return nil, err
+	if len(desc.variableLabels) != len(labelValues) {
+		return nil, errInconsistentCardinality
 	}
 	return &constMetric{
 		desc:       desc,

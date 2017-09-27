@@ -13,6 +13,7 @@
 package unix
 
 import (
+	"sync/atomic"
 	"syscall"
 	"unsafe"
 )
@@ -514,65 +515,47 @@ func Acct(path string) (err error) {
 	return acct(pathp)
 }
 
-//sys	__makedev(version int, major uint, minor uint) (val uint64)
-
-func Mkdev(major, minor uint32) uint64 {
-	return __makedev(NEWDEV, uint(major), uint(minor))
-}
-
-//sys	__major(version int, dev uint64) (val uint)
-
-func Major(dev uint64) uint32 {
-	return uint32(__major(NEWDEV, dev))
-}
-
-//sys	__minor(version int, dev uint64) (val uint)
-
-func Minor(dev uint64) uint32 {
-	return uint32(__minor(NEWDEV, dev))
-}
-
 /*
  * Expose the ioctl function
  */
 
-//sys	ioctl(fd int, req uint, arg uintptr) (err error)
+//sys	ioctl(fd int, req int, arg uintptr) (err error)
 
-func IoctlSetInt(fd int, req uint, value int) (err error) {
+func IoctlSetInt(fd int, req int, value int) (err error) {
 	return ioctl(fd, req, uintptr(value))
 }
 
-func IoctlSetWinsize(fd int, req uint, value *Winsize) (err error) {
+func IoctlSetWinsize(fd int, req int, value *Winsize) (err error) {
 	return ioctl(fd, req, uintptr(unsafe.Pointer(value)))
 }
 
-func IoctlSetTermios(fd int, req uint, value *Termios) (err error) {
+func IoctlSetTermios(fd int, req int, value *Termios) (err error) {
 	return ioctl(fd, req, uintptr(unsafe.Pointer(value)))
 }
 
-func IoctlSetTermio(fd int, req uint, value *Termio) (err error) {
+func IoctlSetTermio(fd int, req int, value *Termio) (err error) {
 	return ioctl(fd, req, uintptr(unsafe.Pointer(value)))
 }
 
-func IoctlGetInt(fd int, req uint) (int, error) {
+func IoctlGetInt(fd int, req int) (int, error) {
 	var value int
 	err := ioctl(fd, req, uintptr(unsafe.Pointer(&value)))
 	return value, err
 }
 
-func IoctlGetWinsize(fd int, req uint) (*Winsize, error) {
+func IoctlGetWinsize(fd int, req int) (*Winsize, error) {
 	var value Winsize
 	err := ioctl(fd, req, uintptr(unsafe.Pointer(&value)))
 	return &value, err
 }
 
-func IoctlGetTermios(fd int, req uint) (*Termios, error) {
+func IoctlGetTermios(fd int, req int) (*Termios, error) {
 	var value Termios
 	err := ioctl(fd, req, uintptr(unsafe.Pointer(&value)))
 	return &value, err
 }
 
-func IoctlGetTermio(fd int, req uint) (*Termio, error) {
+func IoctlGetTermio(fd int, req int) (*Termio, error) {
 	var value Termio
 	err := ioctl(fd, req, uintptr(unsafe.Pointer(&value)))
 	return &value, err
@@ -598,7 +581,6 @@ func IoctlGetTermio(fd int, req uint) (*Termio, error) {
 //sys	Fchown(fd int, uid int, gid int) (err error)
 //sys	Fchownat(dirfd int, path string, uid int, gid int, flags int) (err error)
 //sys	Fdatasync(fd int) (err error)
-//sys Flock(fd int, how int) (err error)
 //sys	Fpathconf(fd int, name int) (val int, err error)
 //sys	Fstat(fd int, stat *Stat_t) (err error)
 //sys	Fstatvfs(fd int, vfsstat *Statvfs_t) (err error)
@@ -630,7 +612,6 @@ func IoctlGetTermio(fd int, req uint) (*Termio, error) {
 //sys	Mlock(b []byte) (err error)
 //sys	Mlockall(flags int) (err error)
 //sys	Mprotect(b []byte, prot int) (err error)
-//sys	Msync(b []byte, flags int) (err error)
 //sys	Munlock(b []byte) (err error)
 //sys	Munlockall() (err error)
 //sys	Nanosleep(time *Timespec, leftover *Timespec) (err error)
@@ -716,4 +697,19 @@ func Mmap(fd int, offset int64, length int, prot int, flags int) (data []byte, e
 
 func Munmap(b []byte) (err error) {
 	return mapper.Munmap(b)
+}
+
+//sys	sysconf(name int) (n int64, err error)
+
+// pageSize caches the value of Getpagesize, since it can't change
+// once the system is booted.
+var pageSize int64 // accessed atomically
+
+func Getpagesize() int {
+	n := atomic.LoadInt64(&pageSize)
+	if n == 0 {
+		n, _ = sysconf(_SC_PAGESIZE)
+		atomic.StoreInt64(&pageSize, n)
+	}
+	return int(n)
 }

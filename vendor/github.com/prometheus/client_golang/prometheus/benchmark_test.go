@@ -14,7 +14,6 @@
 package prometheus
 
 import (
-	"sync"
 	"testing"
 )
 
@@ -31,29 +30,6 @@ func BenchmarkCounterWithLabelValues(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		m.WithLabelValues("eins", "zwei", "drei").Inc()
 	}
-}
-
-func BenchmarkCounterWithLabelValuesConcurrent(b *testing.B) {
-	m := NewCounterVec(
-		CounterOpts{
-			Name: "benchmark_counter",
-			Help: "A counter to benchmark it.",
-		},
-		[]string{"one", "two", "three"},
-	)
-	b.ReportAllocs()
-	b.ResetTimer()
-	wg := sync.WaitGroup{}
-	for i := 0; i < 10; i++ {
-		wg.Add(1)
-		go func() {
-			for j := 0; j < b.N/10; j++ {
-				m.WithLabelValues("eins", "zwei", "drei").Inc()
-			}
-			wg.Done()
-		}()
-	}
-	wg.Wait()
 }
 
 func BenchmarkCounterWithMappedLabels(b *testing.B) {
@@ -129,9 +105,8 @@ func BenchmarkGaugeNoLabels(b *testing.B) {
 func BenchmarkSummaryWithLabelValues(b *testing.B) {
 	m := NewSummaryVec(
 		SummaryOpts{
-			Name:       "benchmark_summary",
-			Help:       "A summary to benchmark it.",
-			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
+			Name: "benchmark_summary",
+			Help: "A summary to benchmark it.",
 		},
 		[]string{"one", "two", "three"},
 	)
@@ -144,9 +119,8 @@ func BenchmarkSummaryWithLabelValues(b *testing.B) {
 
 func BenchmarkSummaryNoLabels(b *testing.B) {
 	m := NewSummary(SummaryOpts{
-		Name:       "benchmark_summary",
-		Help:       "A summary to benchmark it.",
-		Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
+		Name: "benchmark_summary",
+		Help: "A summary to benchmark it.",
 	},
 	)
 	b.ReportAllocs()
