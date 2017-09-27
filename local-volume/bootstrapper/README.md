@@ -66,6 +66,8 @@ data:
     }
 ```
 
+An example of using the bootstraper is included [here](../README.md).
+
 ### Command line options
 
 To see all options, compile bootstrapper and use `-h` option, below is a curated
