@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM registry.access.redhat.com/rhel7-atomic:latest
+FROM centos:7
 LABEL authors="Raffaele Spazzoli <rspazzol@redhat.com>" 
 ADD iscsi-controller /iscsi-controller
 ENTRYPOINT ["/iscsi-controller"]
