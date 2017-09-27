@@ -21,29 +21,40 @@ import (
 )
 
 func Example_applicationDefaultCredentials() {
-	// Google Application Default Credentials is the recommended way to authorize
-	// and authenticate clients.
-	//
-	// See the following link on how to create and obtain Application Default Credentials:
+	ctx := context.Background()
+	// Use Google Application Default Credentials to authorize and authenticate the client.
+	// More information about Application Default Credentials and how to enable is at
 	// https://developers.google.com/identity/protocols/application-default-credentials.
-	client, err := datastore.NewClient(context.Background(), "project-id")
+	//
+	// This is the recommended way of authorizing and authenticating.
+	//
+	// Note: The example uses the datastore client, but the same steps apply to
+	// the other client libraries underneath this package.
+	client, err := datastore.NewClient(ctx, "project-id")
 	if err != nil {
 		// TODO: handle error.
 	}
-	_ = client // Use the client.
+	// Use the client.
+	_ = client
 }
 
 func Example_serviceAccountFile() {
+	// Warning: The better way to use service accounts is to set GOOGLE_APPLICATION_CREDENTIALS
+	// and use the Application Default Credentials.
+	ctx := context.Background()
 	// Use a JSON key file associated with a Google service account to
-	// authenticate and authorize. Service Account keys can be created and
-	// downloaded from https://console.developers.google.com/permissions/serviceaccounts.
+	// authenticate and authorize.
+	// Go to https://console.developers.google.com/permissions/serviceaccounts to create
+	// and download a service account key for your project.
 	//
-	// Note: This example uses the datastore client, but the same steps apply to
+	// Note: The example uses the datastore client, but the same steps apply to
 	// the other client libraries underneath this package.
-	client, err := datastore.NewClient(context.Background(),
-		"project-id", option.WithServiceAccountFile("/path/to/service-account-key.json"))
+	client, err := datastore.NewClient(ctx,
+		"project-id",
+		option.WithServiceAccountFile("/path/to/service-account-key.json"))
 	if err != nil {
 		// TODO: handle error.
 	}
-	_ = client // Use the client.
+	// Use the client.
+	_ = client
 }
