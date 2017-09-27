@@ -31,4 +31,5 @@ deploy:
 
 clean:
 	rm -rf vendor
-	rm openebs-provisioner
+	rm -f openebs-provisioner
+	rm -f buildscripts/docker/openebs-provisioner

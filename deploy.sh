@@ -32,6 +32,7 @@ local-volume-provisioner-bootstrap
 local-volume-provisioner
 nfs-client-provisioner
 nfs-provisioner
+openebs-provisioner
 rbd-provisioner
 )
 
@@ -43,7 +44,15 @@ if [[ "${TRAVIS_TAG}" =~ $regex ]]; then
 		export REGISTRY=quay.io/kubernetes_incubator/
 	fi
 	echo "Pushing image '${PROVISIONER}' with tags '${VERSION}' and 'latest' to '${REGISTRY}'."
-	make push-"${PROVISIONER}"
+	if [[ "${PROVISIONER}" = openebs-provisioner ]]; then
+		export DIMAGE="${REGISTRY}openebs-provisioner"
+		export DNAME="${QUAY_USERNAME}"
+		export DPASS="${QUAY_PASSWORD}"
+		pushd openebs; make; popd
+		make deploy-openebs-provisioner
+	else
+		make push-"${PROVISIONER}"
+	fi
 else
 	echo "Nothing to deploy"
 fi
