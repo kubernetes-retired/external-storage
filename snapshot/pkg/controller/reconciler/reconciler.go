@@ -23,11 +23,8 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 
-	crdv1 "github.com/kubernetes-incubator/external-storage/snapshot/pkg/apis/crd/v1"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/controller/cache"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/controller/snapshotter"
 )
@@ -128,26 +125,6 @@ func (rc *reconciler) reconcile() {
 			// It's likely that the operation exists already: it should be fired by the controller right
 			// after the event has arrived.
 			rc.snapshotter.CreateVolumeSnapshot(snapshot)
-		} else {
-			// The VolumeSnapshot is in both states of world: check its OK and fix it eventually.
-			aswSnapshot := rc.actualStateOfWorld.GetSnapshot(name)
-			if aswSnapshot.Spec.SnapshotDataName == "" {
-				// Seems the write to API server failed before. Find the SnapshotData and fix
-				// this VolumeSnapshot reference and status
-				glog.Infof("Volume snapshot %s is missing the snapshot data name - updating.", name)
-				snapConditions := []crdv1.VolumeSnapshotCondition{
-					{
-						Type:               crdv1.VolumeSnapshotConditionReady,
-						Status:             v1.ConditionTrue,
-						Message:            "Snapshot created succsessfully",
-						LastTransitionTime: metav1.Now(),
-					},
-				}
-				_, err := rc.snapshotter.UpdateVolumeSnapshot(name, &snapConditions)
-				if err != nil {
-					glog.Errorf("Error updating VolumeSnapshot %s: %v", name, err)
-				}
-			}
 		}
 	}
 }

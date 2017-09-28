@@ -137,7 +137,6 @@ func (p *snapshotProvisioner) Provision(options controller.VolumeOptions) (*v1.P
 	var snapshotData crdv1.VolumeSnapshotData
 	err = p.crdclient.Get().
 		Resource(crdv1.VolumeSnapshotDataResourcePlural).
-		Namespace(v1.NamespaceDefault).
 		Name(snapshot.Spec.SnapshotDataName).
 		Do().Into(&snapshotData)
 
