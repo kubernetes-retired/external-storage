@@ -30,6 +30,18 @@ import (
 	"k8s.io/client-go/rest"
 )
 
+var provisionerConfig common.ProvisionerConfiguration
+
+func init() {
+	provisionerConfig = common.ProvisionerConfiguration{
+		StorageClassConfig: make(map[string]common.MountConfig),
+	}
+	if err := common.LoadProvisionerConfigs(&provisionerConfig); err != nil {
+		glog.Fatalf("Error parsing Provisioner's configuration: %#v. Exiting...\n", err)
+	}
+	glog.Infof("Configuration parsing has been completed, ready to run...")
+}
+
 func setupClient() *kubernetes.Clientset {
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -58,7 +70,7 @@ func main() {
 	glog.Info("Starting controller\n")
 	controller.StartLocalController(client, &common.UserConfig{
 		Node:         node,
-		DiscoveryMap: createDiscoveryMap(client),
+		DiscoveryMap: provisionerConfig.StorageClassConfig,
 	})
 }
 
@@ -68,14 +80,4 @@ func getNode(client *kubernetes.Clientset, name string) *v1.Node {
 		glog.Fatalf("Could not get node information: %v", err)
 	}
 	return node
-}
-
-func createDiscoveryMap(client *kubernetes.Clientset) map[string]common.MountConfig {
-	config, err := common.GetVolumeConfigFromMountedConfigMap()
-	if err != nil {
-		glog.Infof("Could not get config map due to: %v, using default configmap", err)
-		config = common.GetDefaultVolumeConfig()
-	}
-	glog.Infof("Running provisioner with config %+v\n", config)
-	return config
 }
