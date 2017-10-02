@@ -21,6 +21,7 @@ import (
 	"k8s.io/api/core/v1"
 )
 
+// clusterBroker provides a mechanism for tests to override calls kubernetes with mocks.
 type clusterBroker interface {
 	createSecret(p *cinderProvisioner, ns string, secret *v1.Secret) error
 	deleteSecret(p *cinderProvisioner, ns string, secretName string) error

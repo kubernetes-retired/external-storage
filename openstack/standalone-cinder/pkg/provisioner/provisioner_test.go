@@ -72,7 +72,7 @@ var _ = Describe("Provisioner", func() {
 
 		Context("when creating a volume fails", func() {
 			BeforeEach(func() {
-				vsb.mightFail.set("CreateCinderVolume")
+				vsb.mightFail.set("createCinderVolume")
 			})
 			It("should fail", func() {
 				Expect(pv).To(BeNil())
@@ -82,8 +82,8 @@ var _ = Describe("Provisioner", func() {
 
 		Context("when the volume does not become available", func() {
 			BeforeEach(func() {
-				vsb.mightFail.set("WaitForAvailableCinderVolume")
-				cleanup = "DeleteCinderVolume."
+				vsb.mightFail.set("waitForAvailableCinderVolume")
+				cleanup = "deleteCinderVolume."
 			})
 			It("should fail and delete the volume", func() {
 				Expect(pv).To(BeNil())
@@ -94,8 +94,8 @@ var _ = Describe("Provisioner", func() {
 
 		Context("when reserving the volume fails", func() {
 			BeforeEach(func() {
-				vsb.mightFail.set("ReserveCinderVolume")
-				cleanup = "DeleteCinderVolume."
+				vsb.mightFail.set("reserveCinderVolume")
+				cleanup = "deleteCinderVolume."
 			})
 			It("should fail and delete the volume", func() {
 				Expect(pv).To(BeNil())
@@ -106,8 +106,8 @@ var _ = Describe("Provisioner", func() {
 
 		Context("when connecting the volume fails", func() {
 			BeforeEach(func() {
-				vsb.mightFail.set("ConnectCinderVolume")
-				cleanup = "UnreserveCinderVolume.DeleteCinderVolume."
+				vsb.mightFail.set("connectCinderVolume")
+				cleanup = "unreserveCinderVolume.deleteCinderVolume."
 			})
 			It("should fail and the volume should be unreserved and deleted", func() {
 				Expect(pv).To(BeNil())
@@ -118,8 +118,8 @@ var _ = Describe("Provisioner", func() {
 
 		Context("when getting a volumeMapper fails", func() {
 			BeforeEach(func() {
-				mb.mightFail.set("NewVolumeMapperFromConnection")
-				cleanup = "DisconnectCinderVolume.UnreserveCinderVolume.DeleteCinderVolume."
+				mb.mightFail.set("newVolumeMapperFromConnection")
+				cleanup = "disconnectCinderVolume.unreserveCinderVolume.deleteCinderVolume."
 			})
 			It("should fail and the volume should be disconnected, unreserved and deleted", func() {
 				Expect(pv).To(BeNil())
@@ -131,7 +131,7 @@ var _ = Describe("Provisioner", func() {
 		Context("when preparing volume authentication fails", func() {
 			BeforeEach(func() {
 				mb.FakeVolumeMapper.mightFail.set("AuthSetup")
-				cleanup = "DisconnectCinderVolume.UnreserveCinderVolume.DeleteCinderVolume."
+				cleanup = "disconnectCinderVolume.unreserveCinderVolume.deleteCinderVolume."
 			})
 			It("should fail and the volume should be disconnected, unreserved and deleted", func() {
 				Expect(pv).To(BeNil())
@@ -142,8 +142,8 @@ var _ = Describe("Provisioner", func() {
 
 		Context("when building the PV fails", func() {
 			BeforeEach(func() {
-				mb.mightFail.set("BuildPV")
-				cleanup = "DisconnectCinderVolume.UnreserveCinderVolume.DeleteCinderVolume."
+				mb.mightFail.set("buildPV")
+				cleanup = "disconnectCinderVolume.unreserveCinderVolume.deleteCinderVolume."
 			})
 			It("should fail and the volume should be disconnected, unreserved and deleted", func() {
 				Expect(pv).To(BeNil())
@@ -212,7 +212,7 @@ var _ = Describe("Provisioner", func() {
 
 		Context("when getting a volumeMapper fails", func() {
 			BeforeEach(func() {
-				mb.mightFail.set("NewVolumeMapperFromPV")
+				mb.mightFail.set("newVolumeMapperFromPV")
 			})
 			It("should fail", func() {
 				Expect(err).To(Not(BeNil()))
@@ -230,7 +230,7 @@ var _ = Describe("Provisioner", func() {
 
 		Context("when disconnecting the volume fails", func() {
 			BeforeEach(func() {
-				vsb.mightFail.set("DisconnectCinderVolume")
+				vsb.mightFail.set("disconnectCinderVolume")
 			})
 			It("should fail", func() {
 				Expect(err).To(Not(BeNil()))
@@ -239,7 +239,7 @@ var _ = Describe("Provisioner", func() {
 
 		Context("when unreserving the volume fails", func() {
 			BeforeEach(func() {
-				vsb.mightFail.set("UnreserveCinderVolume")
+				vsb.mightFail.set("unreserveCinderVolume")
 			})
 			It("should fail", func() {
 				Expect(err).To(Not(BeNil()))
@@ -248,7 +248,7 @@ var _ = Describe("Provisioner", func() {
 
 		Context("when deleting the volume fails", func() {
 			BeforeEach(func() {
-				vsb.mightFail.set("DeleteCinderVolume")
+				vsb.mightFail.set("deleteCinderVolume")
 			})
 			It("should fail", func() {
 				Expect(err).To(Not(BeNil()))
@@ -263,23 +263,23 @@ type fakeVolumeServiceBroker struct {
 	volumeServiceBroker
 }
 
-func (vsb *fakeVolumeServiceBroker) CreateCinderVolume(vs *gophercloud.ServiceClient, options controller.VolumeOptions) (string, error) {
-	if vsb.mightFail.isSet("CreateCinderVolume") {
+func (vsb *fakeVolumeServiceBroker) createCinderVolume(vs *gophercloud.ServiceClient, options controller.VolumeOptions) (string, error) {
+	if vsb.mightFail.isSet("createCinderVolume") {
 		return "", errors.New("injected error for testing")
 	}
 	return "cinderVolumeID", nil
 }
 
-func (vsb *fakeVolumeServiceBroker) WaitForAvailableCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
-	return vsb.mightFail.ret("WaitForAvailableCinderVolume")
+func (vsb *fakeVolumeServiceBroker) waitForAvailableCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
+	return vsb.mightFail.ret("waitForAvailableCinderVolume")
 }
 
-func (vsb *fakeVolumeServiceBroker) ReserveCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
-	return vsb.mightFail.ret("ReserveCinderVolume")
+func (vsb *fakeVolumeServiceBroker) reserveCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
+	return vsb.mightFail.ret("reserveCinderVolume")
 }
 
-func (vsb *fakeVolumeServiceBroker) ConnectCinderVolume(vs *gophercloud.ServiceClient, volumeID string) (volumeservice.VolumeConnection, error) {
-	if vsb.mightFail.isSet("ConnectCinderVolume") {
+func (vsb *fakeVolumeServiceBroker) connectCinderVolume(vs *gophercloud.ServiceClient, volumeID string) (volumeservice.VolumeConnection, error) {
+	if vsb.mightFail.isSet("connectCinderVolume") {
 		return volumeservice.VolumeConnection{}, errors.New("injected error for testing")
 	}
 	return volumeservice.VolumeConnection{}, nil
@@ -294,16 +294,16 @@ func (vsb *fakeVolumeServiceBroker) _cleanupRet(fn string) error {
 	return nil
 }
 
-func (vsb *fakeVolumeServiceBroker) DisconnectCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
-	return vsb._cleanupRet("DisconnectCinderVolume")
+func (vsb *fakeVolumeServiceBroker) disconnectCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
+	return vsb._cleanupRet("disconnectCinderVolume")
 }
 
-func (vsb *fakeVolumeServiceBroker) UnreserveCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
-	return vsb._cleanupRet("UnreserveCinderVolume")
+func (vsb *fakeVolumeServiceBroker) unreserveCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
+	return vsb._cleanupRet("unreserveCinderVolume")
 }
 
-func (vsb *fakeVolumeServiceBroker) DeleteCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
-	return vsb._cleanupRet("DeleteCinderVolume")
+func (vsb *fakeVolumeServiceBroker) deleteCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
+	return vsb._cleanupRet("deleteCinderVolume")
 }
 
 type fakeMapperBroker struct {
@@ -320,21 +320,21 @@ func newFakeMapperBroker() *fakeMapperBroker {
 }
 
 func (mb *fakeMapperBroker) newVolumeMapperFromConnection(conn volumeservice.VolumeConnection) (volumeMapper, error) {
-	if mb.mightFail.isSet("NewVolumeMapperFromConnection") {
+	if mb.mightFail.isSet("newVolumeMapperFromConnection") {
 		return nil, errors.New("injected error for testing")
 	}
 	return mb.FakeVolumeMapper, nil
 }
 
 func (mb *fakeMapperBroker) newVolumeMapperFromPV(pv *v1.PersistentVolume) (volumeMapper, error) {
-	if mb.mightFail.isSet("NewVolumeMapperFromPV") {
+	if mb.mightFail.isSet("newVolumeMapperFromPV") {
 		return nil, errors.New("injected error for testing")
 	}
 	return mb.FakeVolumeMapper, nil
 }
 
 func (mb *fakeMapperBroker) buildPV(m volumeMapper, p *cinderProvisioner, options controller.VolumeOptions, conn volumeservice.VolumeConnection, volumeID string) (*v1.PersistentVolume, error) {
-	if mb.mightFail.isSet("BuildPV") {
+	if mb.mightFail.isSet("buildPV") {
 		return nil, errors.New("injected error for testing")
 	}
 	return &v1.PersistentVolume{}, nil

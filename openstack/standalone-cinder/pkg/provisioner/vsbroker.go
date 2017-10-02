@@ -22,44 +22,45 @@ import (
 	"github.com/kubernetes-incubator/external-storage/openstack/standalone-cinder/pkg/volumeservice"
 )
 
+// volumeServiceBroker provides a mechanism for tests to override calls to cinder with mocks.
 type volumeServiceBroker interface {
-	CreateCinderVolume(vs *gophercloud.ServiceClient, options controller.VolumeOptions) (string, error)
-	WaitForAvailableCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error
-	ReserveCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error
-	ConnectCinderVolume(vs *gophercloud.ServiceClient, volumeID string) (volumeservice.VolumeConnection, error)
-	DisconnectCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error
-	UnreserveCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error
-	DeleteCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error
+	createCinderVolume(vs *gophercloud.ServiceClient, options controller.VolumeOptions) (string, error)
+	waitForAvailableCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error
+	reserveCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error
+	connectCinderVolume(vs *gophercloud.ServiceClient, volumeID string) (volumeservice.VolumeConnection, error)
+	disconnectCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error
+	unreserveCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error
+	deleteCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error
 }
 
 type gophercloudBroker struct {
 	volumeServiceBroker
 }
 
-func (vsb *gophercloudBroker) CreateCinderVolume(vs *gophercloud.ServiceClient, options controller.VolumeOptions) (string, error) {
+func (vsb *gophercloudBroker) createCinderVolume(vs *gophercloud.ServiceClient, options controller.VolumeOptions) (string, error) {
 	return volumeservice.CreateCinderVolume(vs, options)
 }
 
-func (vsb *gophercloudBroker) WaitForAvailableCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
+func (vsb *gophercloudBroker) waitForAvailableCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
 	return volumeservice.WaitForAvailableCinderVolume(vs, volumeID)
 }
 
-func (vsb *gophercloudBroker) ReserveCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
+func (vsb *gophercloudBroker) reserveCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
 	return volumeservice.ReserveCinderVolume(vs, volumeID)
 }
 
-func (vsb *gophercloudBroker) ConnectCinderVolume(vs *gophercloud.ServiceClient, volumeID string) (volumeservice.VolumeConnection, error) {
+func (vsb *gophercloudBroker) connectCinderVolume(vs *gophercloud.ServiceClient, volumeID string) (volumeservice.VolumeConnection, error) {
 	return volumeservice.ConnectCinderVolume(vs, volumeID)
 }
 
-func (vsb *gophercloudBroker) DisconnectCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
+func (vsb *gophercloudBroker) disconnectCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
 	return volumeservice.DisconnectCinderVolume(vs, volumeID)
 }
 
-func (vsb *gophercloudBroker) UnreserveCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
+func (vsb *gophercloudBroker) unreserveCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
 	return volumeservice.UnreserveCinderVolume(vs, volumeID)
 }
 
-func (vsb *gophercloudBroker) DeleteCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
+func (vsb *gophercloudBroker) deleteCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
 	return volumeservice.DeleteCinderVolume(vs, volumeID)
 }

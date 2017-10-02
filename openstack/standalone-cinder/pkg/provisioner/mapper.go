@@ -28,8 +28,14 @@ import (
 )
 
 type volumeMapper interface {
+	// BuildPVSource should build a PersistentVolumeSource from cinder connection
+	// information and context from the cluster such as the PVC.
 	BuildPVSource(conn volumeservice.VolumeConnection, options controller.VolumeOptions) (*v1.PersistentVolumeSource, error)
+	// AuthSetup should perform any authentication setup such as secret creation
+	// that would be required before a host can connect to the volume.
 	AuthSetup(p *cinderProvisioner, options controller.VolumeOptions, conn volumeservice.VolumeConnection) error
+	// AuthTeardown should perform any necessary cleanup related to authentication
+	// as the volume is being deleted.
 	AuthTeardown(p *cinderProvisioner, pv *v1.PersistentVolume) error
 }
 
