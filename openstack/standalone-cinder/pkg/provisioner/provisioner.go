@@ -84,25 +84,27 @@ func (p *cinderProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 		return nil, fmt.Errorf("claim Selector is not supported")
 	}
 
-	volumeID, err := p.vsb.CreateCinderVolume(p.VolumeService, options)
+	// TODO: Check access mode
+
+	volumeID, err := p.vsb.createCinderVolume(p.VolumeService, options)
 	if err != nil {
 		glog.Errorf("Failed to create volume")
 		goto ERROR
 	}
 
-	err = p.vsb.WaitForAvailableCinderVolume(p.VolumeService, volumeID)
+	err = p.vsb.waitForAvailableCinderVolume(p.VolumeService, volumeID)
 	if err != nil {
 		glog.Errorf("Volume %s did not become available", volumeID)
 		goto ERROR_DELETE
 	}
 
-	err = p.vsb.ReserveCinderVolume(p.VolumeService, volumeID)
+	err = p.vsb.reserveCinderVolume(p.VolumeService, volumeID)
 	if err != nil {
 		glog.Errorf("Failed to reserve volume %s: %v", volumeID, err)
 		goto ERROR_DELETE
 	}
 
-	connection, err = p.vsb.ConnectCinderVolume(p.VolumeService, volumeID)
+	connection, err = p.vsb.connectCinderVolume(p.VolumeService, volumeID)
 	if err != nil {
 		glog.Errorf("Failed to connect volume %s: %v", volumeID, err)
 		goto ERROR_UNRESERVE
@@ -128,19 +130,19 @@ func (p *cinderProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 	return pv, nil
 
 ERROR_DISCONNECT:
-	cleanupErr = p.vsb.DisconnectCinderVolume(p.VolumeService, volumeID)
+	cleanupErr = p.vsb.disconnectCinderVolume(p.VolumeService, volumeID)
 	if cleanupErr != nil {
 		glog.Errorf("Failed to disconnect volume %s: %v", volumeID, cleanupErr)
 	}
 	glog.V(3).Infof("Volume %s disconnected", volumeID)
 ERROR_UNRESERVE:
-	cleanupErr = p.vsb.UnreserveCinderVolume(p.VolumeService, volumeID)
+	cleanupErr = p.vsb.unreserveCinderVolume(p.VolumeService, volumeID)
 	if cleanupErr != nil {
 		glog.Errorf("Failed to unreserve volume %s: %v", volumeID, cleanupErr)
 	}
 	glog.V(3).Infof("Volume %s unreserved", volumeID)
 ERROR_DELETE:
-	cleanupErr = p.vsb.DeleteCinderVolume(p.VolumeService, volumeID)
+	cleanupErr = p.vsb.deleteCinderVolume(p.VolumeService, volumeID)
 	if cleanupErr != nil {
 		glog.Errorf("Failed to delete volume %s: %v", volumeID, cleanupErr)
 	}
@@ -177,20 +179,20 @@ func (p *cinderProvisioner) Delete(pv *v1.PersistentVolume) error {
 
 	mapper.AuthTeardown(p, pv)
 
-	err = p.vsb.DisconnectCinderVolume(p.VolumeService, volumeID)
+	err = p.vsb.disconnectCinderVolume(p.VolumeService, volumeID)
 	if err != nil {
 		glog.Errorf("Failed to disconnect volume %s: %v", volumeID, err)
 		return err
 	}
 
-	err = p.vsb.UnreserveCinderVolume(p.VolumeService, volumeID)
+	err = p.vsb.unreserveCinderVolume(p.VolumeService, volumeID)
 	if err != nil {
 		// TODO: Create placeholder PV?
 		glog.Errorf("Failed to unreserve volume %s: %v", volumeID, err)
 		return err
 	}
 
-	err = p.vsb.DeleteCinderVolume(p.VolumeService, volumeID)
+	err = p.vsb.deleteCinderVolume(p.VolumeService, volumeID)
 	if err != nil {
 		glog.Errorf("Failed to delete volume %s: %v", volumeID, err)
 		return err
