@@ -1,5 +1,5 @@
-hash: 1626357572d7723d44f5c3d8ba27e94a6c95a306ff8906f9d79a2e2711d5af9f
-updated: 2017-09-26T20:49:30.595112131+02:00
+hash: 1334daf8f668df5298c2ebb2132e3e45def3f7fdf3f3e4558912a1133424fed4
+updated: 2017-09-27T12:40:51.281879295-04:00
 imports:
 - name: cloud.google.com/go
   version: 3b1ae45394a234c385be014e9a488f2bb6eef821
@@ -7,7 +7,7 @@ imports:
   - compute/metadata
   - internal
 - name: github.com/aws/aws-sdk-go
-  version: b69f447375c7fa0047ebcdd8ae5d585d5aac2f71
+  version: 93c0610f5cfe455cdccfdbe17bb0276764e62f1f
   subpackages:
   - aws
   - aws/awserr
@@ -214,6 +214,40 @@ imports:
   - pbutil
 - name: github.com/mitchellh/mapstructure
   version: db1efb556f84b25a0a13a04aad883943538ad2e0
+- name: github.com/onsi/ginkgo
+  version: 67b9df7f55fe1165fd9ad49aca7754cce01a42b8
+  subpackages:
+  - config
+  - internal/codelocation
+  - internal/containernode
+  - internal/failer
+  - internal/leafnodes
+  - internal/remote
+  - internal/spec
+  - internal/spec_iterator
+  - internal/specrunner
+  - internal/suite
+  - internal/testingtproxy
+  - internal/writer
+  - reporters
+  - reporters/stenographer
+  - reporters/stenographer/support/go-colorable
+  - reporters/stenographer/support/go-isatty
+  - types
+- name: github.com/onsi/gomega
+  version: d59fa0ac68bb5dd932ee8d24eed631cdd519efc3
+  subpackages:
+  - format
+  - internal/assertion
+  - internal/asyncassertion
+  - internal/oraclematcher
+  - internal/testingtsupport
+  - matchers
+  - matchers/support/goraph/bipartitegraph
+  - matchers/support/goraph/edge
+  - matchers/support/goraph/node
+  - matchers/support/goraph/util
+  - types
 - name: github.com/pborman/uuid
   version: ca53cad383cad2479bbba7f7a1a05797ec1386e4
 - name: github.com/pelletier/go-buffruneio
@@ -315,17 +349,11 @@ imports:
 - name: google.golang.org/api
   version: e3824ed33c72bf7e81da0286772c34b987520914
   subpackages:
-  - cloudmonitoring/v2beta2
-  - compute/v0.beta
   - compute/v1
   - container/v1
-  - dns/v1
   - gensupport
   - googleapi
   - googleapi/internal/uritemplates
-  - logging/v2beta1
-  - monitoring/v3
-  - pubsub/v1
 - name: google.golang.org/appengine
   version: 4f7eeb5305a4ba1966344836ba4af9996b7b4e05
   subpackages:

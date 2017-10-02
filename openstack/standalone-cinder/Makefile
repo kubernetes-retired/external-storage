@@ -23,18 +23,21 @@ endif
 IMAGE = $(REGISTRY)standalone-cinder-provisioner:$(VERSION)
 MUTABLE_IMAGE = $(REGISTRY)standalone-cinder-provisioner:latest
 
-.PHONY: all build container
+.PHONY: all build container test
 
 all: build
 
 build:
-	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o standalone-cinder
+	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o cinder-provisioner ./cmd/cinder-provisioner
 
 container: build
 	docker build -t $(MUTABLE_IMAGE) .
 	docker tag $(MUTABLE_IMAGE) $(IMAGE)
 
+test:
+	go test ./pkg/provisioner
+
 
 clean:
-	-rm standalone-cinder
+	-rm cinder-provisioner
 
