@@ -27,12 +27,12 @@ import (
 const (
 	// VolumeSnapshotDataResourcePlural is "volumesnapshotdatas"
 	VolumeSnapshotDataResourcePlural = "volumesnapshotdatas"
-	// VolumeSnapshotDataResource is "volume-snapshot-data"
-	VolumeSnapshotDataResource = "volume-snapshot-data"
+	// VolumeSnapshotDataResource is "volumesnapshotdata"
+	VolumeSnapshotDataResource = "volumesnapshotdata"
 	// VolumeSnapshotResourcePlural is "volumesnapshots"
 	VolumeSnapshotResourcePlural = "volumesnapshots"
-	// VolumeSnapshotResource is "volume-snapshot"
-	VolumeSnapshotResource = "volume-snapshot"
+	// VolumeSnapshotResource is "volumesnapshot"
+	VolumeSnapshotResource = "volumesnapshot"
 )
 
 // VolumeSnapshotStatus is the status of the VolumeSnapshot
