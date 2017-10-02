@@ -17,11 +17,12 @@ limitations under the License.
 package common
 
 import (
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"path"
+	"strings"
 
+	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/cache"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/util"
@@ -54,6 +55,9 @@ const (
 	EventVolumeFailedDelete = "VolumeFailedDelete"
 	// ProvisionerConfigPath points to the path inside of the provisioner container where configMap volume is mounted
 	ProvisionerConfigPath = "/etc/provisioner/config/"
+	// ProvisonerStorageClassConfig defines file name of the file which stores storage class
+	// configuration. The file name must match to the key name used in configuration map.
+	ProvisonerStorageClassConfig = "storageClassMap"
 )
 
 // UserConfig stores all the user-defined parameters to the provisioner
@@ -67,9 +71,9 @@ type UserConfig struct {
 // MountConfig stores a configuration for discoverying a specific storageclass
 type MountConfig struct {
 	// The hostpath directory
-	HostDir string `json:"hostDir"`
+	HostDir string `json:"hostDir" yaml:"hostDir"`
 	// The mount point of the hostpath volume
-	MountDir string `json:"mountDir"`
+	MountDir string `json:"mountDir" yaml:"mountDir"`
 }
 
 // RuntimeConfig stores all the objects that the provisioner needs to run
@@ -97,6 +101,15 @@ type LocalPVConfig struct {
 	StorageClass    string
 	ProvisionerName string
 	AffinityAnn     string
+}
+
+// ProvisionerConfiguration defines Provisioner configuration objects
+// Each configuration key of the struct e.g StorageClassConfig is individually
+// marshaled in VolumeConfigToConfigMapData.
+// TODO Need to find a way to marshal the struct  more efficiently.
+type ProvisionerConfiguration struct {
+	// StorageClassConfig defines configuration of Provisioner's storage classes
+	StorageClassConfig map[string]MountConfig `json:"storageClassMap" yaml:"storageClassMap"`
 }
 
 // CreateLocalPVSpec returns a PV spec that can be used for PV creation
@@ -127,38 +140,19 @@ func CreateLocalPVSpec(config *LocalPVConfig) *v1.PersistentVolume {
 	}
 }
 
-// GetVolumeConfigFromMountedConfigMap gets volume configuration from the mounted configmap volume,
-func GetVolumeConfigFromMountedConfigMap() (map[string]MountConfig, error) {
-	storageClassMapping := make(map[string]string)
-	files, err := ioutil.ReadDir(ProvisionerConfigPath)
-	if err != nil {
-		return nil, err
-	}
-	for _, file := range files {
-		if !file.IsDir() {
-			fileContents, err := ioutil.ReadFile(path.Join(ProvisionerConfigPath, file.Name()))
-			if err != nil {
-				glog.Infof("Could not read file: %s due to: %v", path.Join(ProvisionerConfigPath, file.Name()), err)
-				continue
-			}
-			storageClassMapping[file.Name()] = string(fileContents)
-		}
-	}
-	return ConfigMapDataToVolumeConfig(storageClassMapping)
-}
-
 // GetVolumeConfigFromConfigMap gets volume configuration from given configmap,
-func GetVolumeConfigFromConfigMap(client *kubernetes.Clientset, namespace, name string) (map[string]MountConfig, error) {
+func GetVolumeConfigFromConfigMap(client *kubernetes.Clientset, namespace, name string, provisionerConfig *ProvisionerConfiguration) error {
 	configMap, err := client.CoreV1().ConfigMaps(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return ConfigMapDataToVolumeConfig(configMap.Data)
+	err = ConfigMapDataToVolumeConfig(configMap.Data, provisionerConfig)
+	return err
 }
 
 // GetDefaultVolumeConfig returns the default volume configuration.
-func GetDefaultVolumeConfig() map[string]MountConfig {
-	return map[string]MountConfig{
+func GetDefaultVolumeConfig(provisionerConfig *ProvisionerConfiguration) {
+	provisionerConfig.StorageClassConfig = map[string]MountConfig{
 		"local-storage": {
 			HostDir:  DefaultHostDir,
 			MountDir: DefaultMountDir,
@@ -167,28 +161,61 @@ func GetDefaultVolumeConfig() map[string]MountConfig {
 }
 
 // VolumeConfigToConfigMapData converts volume config to configmap data.
-func VolumeConfigToConfigMapData(config map[string]MountConfig) (map[string]string, error) {
+func VolumeConfigToConfigMapData(config *ProvisionerConfiguration) (map[string]string, error) {
 	configMapData := make(map[string]string)
-	for class, data := range config {
-		var val []byte
-		var err error
-		if val, err = json.Marshal(data); err != nil {
-			return nil, fmt.Errorf("unable to unmarshal config for class %v: %v", class, err)
-		}
-		configMapData[class] = string(val)
+	val, err := yaml.Marshal(config.StorageClassConfig)
+	if err != nil {
+		return nil, fmt.Errorf("unable to Marshal volume config: %v", err)
 	}
+	configMapData[ProvisonerStorageClassConfig] = string(val)
 	return configMapData, nil
 }
 
 // ConfigMapDataToVolumeConfig converts configmap data to volume config
-func ConfigMapDataToVolumeConfig(data map[string]string) (map[string]MountConfig, error) {
-	mountConfig := make(map[string]MountConfig)
-	for class, val := range data {
-		config := MountConfig{}
-		if err := json.Unmarshal([]byte(val), &config); err != nil {
-			return nil, fmt.Errorf("unable to unmarshal config for class %v: %v", class, err)
-		}
-		mountConfig[class] = config
+func ConfigMapDataToVolumeConfig(data map[string]string, provisionerConfig *ProvisionerConfiguration) error {
+	rawYaml := ""
+	for key, val := range data {
+		rawYaml += key
+		rawYaml += ": \n"
+		rawYaml += insertSpaces(string(val))
 	}
-	return mountConfig, nil
+	if err := yaml.Unmarshal([]byte(rawYaml), provisionerConfig); err != nil {
+		return fmt.Errorf("fail to Unmarshal yaml due to: %#v", err)
+	}
+	return nil
+}
+
+func insertSpaces(original string) string {
+	spaced := ""
+	for _, line := range strings.Split(original, "\n") {
+		spaced += "   "
+		spaced += line
+		spaced += "\n"
+	}
+	return spaced
+}
+
+// LoadProvisionerConfigs loads all configuration into a string and unmarshal it into ProvisionerConfiguration struct.
+// The configuration is stored in the configmap which is mounted as a volume.
+func LoadProvisionerConfigs(provisionerConfig *ProvisionerConfiguration) error {
+	files, err := ioutil.ReadDir(ProvisionerConfigPath)
+	if err != nil {
+		return err
+	}
+	data := make(map[string]string)
+	for _, file := range files {
+		if !file.IsDir() {
+			fileContents, err := ioutil.ReadFile(path.Join(ProvisionerConfigPath, file.Name()))
+			if err != nil {
+				// TODO Currently errors in reading configuration keys/files are ignored. This is due to
+				// the precense of "..data" file, it is a symbolic link which gets created when kubelet mounts a
+				// configmap inside of a container. It needs to be revisited later for a safer solution, if ignoring read errors
+				// will prove to be causing issues.
+				glog.Infof("Could not read file: %s due to: %v", path.Join(ProvisionerConfigPath, file.Name()), err)
+				continue
+			}
+			data[file.Name()] = string(fileContents)
+		}
+	}
+	return ConfigMapDataToVolumeConfig(data, provisionerConfig)
 }
