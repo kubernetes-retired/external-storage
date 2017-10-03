@@ -23,7 +23,7 @@ import (
 )
 
 // GroupName is the group name use in this package.
-const GroupName = "volume-snapshot-data.external-storage.k8s.io"
+const GroupName = "volumesnapshot.external-storage.k8s.io"
 
 var (
 	// SchemeBuilder is the new scheme builder

@@ -42,7 +42,7 @@ Now we have PVC bound to a PV that contains some data. We want to take snapshot 
     kubectl get volumesnapshot,volumesnapshotdata -o yaml
     apiVersion: v1
     items:
-    - apiVersion: volume-snapshot-data.external-storage.k8s.io/v1
+    - apiVersion: volumesnapshot.external-storage.k8s.io/v1
       kind: VolumeSnapshot
       metadata:
         labels:
@@ -58,7 +58,7 @@ Now we have PVC bound to a PV that contains some data. We want to take snapshot 
           message: Snapshot created successfully
           status: "True"
           type: Ready
-    - apiVersion: volume-snapshot-data.external-storage.k8s.io/v1
+    - apiVersion: volumesnapshot.external-storage.k8s.io/v1
       kind: VolumeSnapshotData
       metadata:
         name: k8s-volume-snapshot-d2209d5a-97a9-11e7-b963-5254000ac840

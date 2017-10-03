@@ -1,4 +1,4 @@
-apiVersion: volume-snapshot-data.external-storage.k8s.io/v1
+apiVersion: volumesnapshot.external-storage.k8s.io/v1
 kind: VolumeSnapshot
 metadata:
   name: hostpath-test-snapshot
