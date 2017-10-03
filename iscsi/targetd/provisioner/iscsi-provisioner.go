@@ -19,17 +19,14 @@ package provisioner
 import (
 	"errors"
 	"fmt"
-	//"net/rpc"
-	//"net/rpc/jsonrpc"
 	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/powerman/rpc-codec/jsonrpc2"
-	//"github.com/kubernetes-incubator/external-storage/iscsi/targetd/provisioner/jsonrpc2"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	"github.com/kubernetes-incubator/external-storage/lib/util"
+	"github.com/powerman/rpc-codec/jsonrpc2"
 	"github.com/spf13/viper"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -76,8 +73,6 @@ type export struct {
 
 type exportList []export
 
-type result int
-
 // NewiscsiProvisioner creates new iscsi provisioner
 func NewiscsiProvisioner(url string) controller.Provisioner {
 
@@ -113,14 +108,6 @@ func (p *iscsiProvisioner) Provision(options controller.VolumeOptions) (*v1.Pers
 	annotations["volume_name"] = vol
 	annotations["pool"] = pool
 	annotations["initiators"] = options.Parameters["initiators"]
-	//	annotations[annExportBlock] = exportBlock
-	//	annotations[annExportID] = strconv.FormatUint(uint64(exportID), 10)
-	//	annotations[annProjectBlock] = projectBlock
-	//	annotations[annProjectID] = strconv.FormatUint(uint64(projectID), 10)
-	//	if supGroup != 0 {
-	//		annotations[VolumeGidAnnotationKey] = strconv.FormatUint(supGroup, 10)
-	//	}
-	//	annotations[annProvisionerID] = string(p.identity)
 
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
@@ -254,9 +241,8 @@ func (p *iscsiProvisioner) getInitiators(options controller.VolumeOptions) []str
 	return strings.Split(options.Parameters["initiators"], ",")
 }
 
+// getFirstAvailableLun gets first available Lun.
 func getFirstAvailableLun(exportList exportList) (int32, error) {
-	log.Debug("export List: ", exportList)
-
 	sort.Sort(exportList)
 	log.Debug("sorted export List: ", exportList)
 	//this is sloppy way to remove duplicates
@@ -283,21 +269,18 @@ func getFirstAvailableLun(exportList exportList) (int32, error) {
 	sluns = luns[0:]
 	sort.Sort(sluns)
 	log.Debug("sorted lun list: ", sluns)
-	lun := int32(-1)
+
+	lun := int32(len(sluns))
 	for i, clun := range sluns {
 		if i < int(clun) {
 			lun = int32(i)
 			break
 		}
 	}
-	if lun == -1 {
-		lun = int32(len(sluns))
-	}
 	return lun, nil
-	//return 0, nil
 }
 
-////// json rpc operations ////
+// volDestroy removes calls vol_destroy targetd API to remove volume.
 func (p *iscsiProvisioner) volDestroy(vol string, pool string) error {
 	client, err := p.getConnection()
 	defer client.Close()
@@ -305,98 +288,75 @@ func (p *iscsiProvisioner) volDestroy(vol string, pool string) error {
 		log.Warnln(err)
 		return err
 	}
-
-	//make arguments object
 	args := volDestroyArgs{
 		Pool: pool,
 		Name: vol,
 	}
-	//this will store returned result
-	var result1 result
-	//call remote procedure with args
-	err = client.Call("vol_destroy", args, &result1)
+	err = client.Call("vol_destroy", args, nil)
 	return err
 }
 
+// exportDestroy calls export_destroy targetd API to remove export of volume.
 func (p *iscsiProvisioner) exportDestroy(vol string, pool string, initiator string) error {
-
 	client, err := p.getConnection()
 	defer client.Close()
 	if err != nil {
 		log.Warnln(err)
 		return err
 	}
-
-	//make arguments object
 	args := exportDestroyArgs{
 		Pool:         pool,
 		Vol:          vol,
 		InitiatorWwn: initiator,
 	}
-	//this will store returned result
-	var result1 result
-	//call remote procedure with args
-	err = client.Call("export_destroy", args, &result1)
+	err = client.Call("export_destroy", args, nil)
 	return err
 }
 
+// volCreate calls vol_create targetd API to create a volume.
 func (p *iscsiProvisioner) volCreate(name string, size int64, pool string) error {
-
 	client, err := p.getConnection()
 	defer client.Close()
 	if err != nil {
 		log.Warnln(err)
 		return err
 	}
-
-	//make arguments object
 	args := volCreateArgs{
 		Pool: pool,
 		Name: name,
 		Size: size,
 	}
-	//this will store returned result
-	var result1 result
-	//call remote procedure with args
-	err = client.Call("vol_create", args, &result1)
+	err = client.Call("vol_create", args, nil)
 	return err
 }
 
+// exportCreate calls export_create targetd API to create an export of volume.
 func (p *iscsiProvisioner) exportCreate(vol string, lun int32, pool string, initiator string) error {
-
 	client, err := p.getConnection()
 	defer client.Close()
 	if err != nil {
 		log.Warnln(err)
 		return err
 	}
-
-	//make arguments object
 	args := exportCreateArgs{
 		Pool:         pool,
 		Vol:          vol,
 		InitiatorWwn: initiator,
 		Lun:          lun,
 	}
-	//this will store returned result
-	var result1 result
-	//call remote procedure with args
-	err = client.Call("export_create", args, &result1)
+	err = client.Call("export_create", args, nil)
 	return err
 }
 
+// exportList lists calls export_list targetd API to get export objects.
 func (p *iscsiProvisioner) exportList() (exportList, error) {
-
 	client, err := p.getConnection()
 	defer client.Close()
 	if err != nil {
 		log.Warnln(err)
 		return nil, err
 	}
-
-	//this will store returned result
 	var result1 exportList
-	//call remote procedure with args
 	err = client.Call("export_list", nil, &result1)
 	return result1, err
 }
@@ -417,7 +377,6 @@ func (p *iscsiProvisioner) getConnection() (*jsonrpc2.Client, error) {
 	log.Debugln("opening connection to targetd: ", p.targetdURL)
 
 	client := jsonrpc2.NewHTTPClient(p.targetdURL)
-
 	if client == nil {
 		log.Warnln("error creating the connection to targetd", p.targetdURL)
 		return nil, errors.New("error creating the connection to targetd")
@@ -425,16 +384,3 @@ func (p *iscsiProvisioner) getConnection() (*jsonrpc2.Client, error) {
 	log.Debugln("targetd client created")
 	return client, nil
 }
-
-//func (p *iscsiProvisioner) getConnection2() (*rpc.Client, error) {
-//	log.Debugln("opening connection to targetd: ", p.targetdURL)
-//
-//	client, err := jsonrpc.Dial("tcp", p.targetdURL)
-//
-//	if err != nil {
-//		log.Warnln(err)
-//		return nil, err
-//	}
-//	log.Debugln("targetd client created")
-//	return client, nil
-//}
