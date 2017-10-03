@@ -30,6 +30,7 @@ import (
 )
 
 type exporter interface {
+	CanExport(int) bool
 	AddExportBlock(string, bool) (string, uint16, error)
 	RemoveExportBlock(string, uint16) error
 	Export(string) error
@@ -40,14 +41,27 @@ type exportBlockCreator interface {
 	CreateExportBlock(string, string, bool) string
 }
 
-type genericExporter struct {
-	ebc    exportBlockCreator
-	config string
-
+type exportMap struct {
 	// Map to track used exportIDs. Each ganesha export needs a unique fsid and
 	// Export_Id, each kernel a unique fsid. Assign each export an exportID and
 	// use it as both fsid and Export_Id.
 	exportIDs map[uint16]bool
+}
+
+func (e *exportMap) CanExport(limit int) bool {
+	if limit < 0 {
+		return true
+	}
+
+	totalExports := len(e.exportIDs)
+	return totalExports < limit
+}
+
+type genericExporter struct {
+	*exportMap
+
+	ebc    exportBlockCreator
+	config string
 
 	mapMutex  *sync.Mutex
 	fileMutex *sync.Mutex
@@ -63,9 +77,11 @@ func newGenericExporter(ebc exportBlockCreator, config string, re *regexp.Regexp
 		glog.Errorf("error while populating exportIDs map, there may be errors exporting later if exportIDs are reused: %v", err)
 	}
 	return &genericExporter{
+		exportMap: &exportMap{
+			exportIDs: exportIDs,
+		},
 		ebc:       ebc,
 		config:    config,
-		exportIDs: exportIDs,
 		mapMutex:  &sync.Mutex{},
 		fileMutex: &sync.Mutex{},
 	}
