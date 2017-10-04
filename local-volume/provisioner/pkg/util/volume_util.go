@@ -159,9 +159,9 @@ type FakeDirEntry struct {
 }
 
 // NewFakeVolumeUtil returns a VolumeUtil object for use in unit testing
-func NewFakeVolumeUtil(deleteShouldFail bool) *FakeVolumeUtil {
+func NewFakeVolumeUtil(deleteShouldFail bool, dirFiles map[string][]*FakeDirEntry) *FakeVolumeUtil {
 	return &FakeVolumeUtil{
-		directoryFiles:   map[string][]*FakeDirEntry{},
+		directoryFiles:   dirFiles,
 		deleteShouldFail: deleteShouldFail,
 	}
 }

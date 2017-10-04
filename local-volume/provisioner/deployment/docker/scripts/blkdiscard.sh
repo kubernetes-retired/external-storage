@@ -1,4 +1,6 @@
-# Copyright 2016 The Kubernetes Authors.
+#!/bin/bash -e
+
+# Copyright 2017 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,12 +14,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM centos:7
 
-RUN yum update -y && \
-    yum install -y e2fsprogs && \
-    yum install -y hdparm
+# Usage:
+# $ blkdiscard.sh
 
-ADD local-volume-provisioner /local-provisioner
-ADD scripts /scripts
-ENTRYPOINT ["/local-provisioner"]
+# Import common functions.
+. $(dirname "$0")/common.sh
+
+if [ "$1" == "-h" ]; then
+  echo "Usage: $(basename $0) "
+  echo "Invokes blkdiscard on the block device specified by environment variable LOCAL_PV_BLKDEVICE"
+  exit 0
+fi
+
+# Validate that we got a valid block device to cleanup
+validateBlockDevice
+
+echo "Calling blkdiscard"
+/sbin/blkdiscard -vz $LOCAL_PV_BLKDEVICE

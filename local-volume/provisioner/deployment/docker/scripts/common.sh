@@ -1,4 +1,4 @@
-# Copyright 2016 The Kubernetes Authors.
+# Copyright 2017 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,12 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM centos:7
+function errorExit {
+    echo $@
+    exit 1
+}
 
-RUN yum update -y && \
-    yum install -y e2fsprogs && \
-    yum install -y hdparm
+function validateBlockDevice {
+    if [ -z ${LOCAL_PV_BLKDEVICE+x} ]
+    then
+        errorExit "Environment variable LOCAL_PV_BLKDEVICE has not been set"
+    fi
 
-ADD local-volume-provisioner /local-provisioner
-ADD scripts /scripts
-ENTRYPOINT ["/local-provisioner"]
+    if [ ! -b "$LOCAL_PV_BLKDEVICE" ]
+    then
+        errorExit "$LOCAL_PV_BLKDEVICE is not a block device."
+    fi
+}
+
