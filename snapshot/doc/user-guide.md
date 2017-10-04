@@ -41,7 +41,7 @@ Such Storage Class is necessary for restoring a Persistent Volume from already c
 ## Creating Snapshot
 Each `VolumeSnapshot` contains a spec and status, which is the specification and status of the Volume Snapshot.
 ```yaml
-apiVersion: volume-snapshot-data.external-storage.k8s.io/v1
+apiVersion: volumesnapshot.external-storage.k8s.io/v1
 kind: VolumeSnapshot
 metadata:
   name: snapshot-demo
@@ -70,7 +70,7 @@ A Volume Snapshot status can be displayed as shown below:
 $ kubectl get volumesnapshot -o yaml
 ```
 ```yaml
-apiVersion: volume-snapshot-data.external-storage.k8s.io/v1
+apiVersion: volumesnapshot.external-storage.k8s.io/v1
   kind: VolumeSnapshot
   metadata:
     clusterName: ""
@@ -81,7 +81,7 @@ apiVersion: volume-snapshot-data.external-storage.k8s.io/v1
     name: snapshot-demo
     namespace: default
     resourceVersion: "780"
-    selfLink: /apis/volume-snapshot-data.external-storage.k8s.io/v1/namespaces/default/volumesnapshots/snapshot-demo
+    selfLink: /apis/volumesnapshot.external-storage.k8s.io/v1/namespaces/default/volumesnapshots/snapshot-demo
     uid: 9cc5da57-9d42-11e7-9b25-90b11c132b3f
   spec:
     persistentVolumeClaimName: pvc-hostpath
