@@ -18,7 +18,9 @@ package volume
 
 import (
 	"errors"
+	"fmt"
 	"io/ioutil"
+	"math"
 	"os"
 	"reflect"
 	"regexp"
@@ -51,6 +53,7 @@ func TestCreateVolume(t *testing.T) {
 		expectedBlock    string
 		expectedExportID uint16
 		expectError      bool
+		expectIgnored    bool
 	}{
 		{
 			name: "succeed creating volume",
@@ -64,8 +67,8 @@ func TestCreateVolume(t *testing.T) {
 			expectedServer:   "1.1.1.1",
 			expectedPath:     tmpDir + "/pvc-1",
 			expectedGroup:    0,
-			expectedBlock:    "\nExport_Id = 0;\n",
-			expectedExportID: 0,
+			expectedBlock:    "\nExport_Id = 1;\n",
+			expectedExportID: 1,
 			expectError:      false,
 		},
 		{
@@ -80,8 +83,8 @@ func TestCreateVolume(t *testing.T) {
 			expectedServer:   "1.1.1.1",
 			expectedPath:     tmpDir + "/pvc-2",
 			expectedGroup:    0,
-			expectedBlock:    "\nExport_Id = 0;\n",
-			expectedExportID: 0,
+			expectedBlock:    "\nExport_Id = 2;\n",
+			expectedExportID: 2,
 			expectError:      false,
 		},
 		{
@@ -99,6 +102,7 @@ func TestCreateVolume(t *testing.T) {
 			expectedBlock:    "",
 			expectedExportID: 0,
 			expectError:      true,
+			expectIgnored:    false,
 		},
 		{
 			name: "bad server",
@@ -115,6 +119,7 @@ func TestCreateVolume(t *testing.T) {
 			expectedBlock:    "",
 			expectedExportID: 0,
 			expectError:      true,
+			expectIgnored:    false,
 		},
 		{
 			name: "dir already exists",
@@ -131,6 +136,7 @@ func TestCreateVolume(t *testing.T) {
 			expectedBlock:    "",
 			expectedExportID: 0,
 			expectError:      true,
+			expectIgnored:    false,
 		},
 		{
 			name: "error exporting",
@@ -148,6 +154,39 @@ func TestCreateVolume(t *testing.T) {
 			expectedExportID: 0,
 			expectError:      true,
 		},
+		{
+			name: "succeed creating volume last slot",
+			options: controller.VolumeOptions{
+				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
+				PVName:     "pvc-3",
+				PVC:        newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
+				Parameters: map[string]string{},
+			},
+			envKey:           podIPEnv,
+			expectedServer:   "1.1.1.1",
+			expectedPath:     tmpDir + "/pvc-3",
+			expectedGroup:    0,
+			expectedBlock:    "\nExport_Id = 3;\n",
+			expectedExportID: 3,
+			expectError:      false,
+		},
+		{
+			name: "max export limit exceeded",
+			options: controller.VolumeOptions{
+				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
+				PVName:     "pvc-3",
+				PVC:        newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
+				Parameters: map[string]string{},
+			},
+			envKey:           podIPEnv,
+			expectedServer:   "",
+			expectedPath:     "",
+			expectedGroup:    0,
+			expectedBlock:    "",
+			expectedExportID: 0,
+			expectError:      true,
+			expectIgnored:    true,
+		},
 	}
 
 	client := fake.NewSimpleClientset()
@@ -156,18 +195,29 @@ func TestCreateVolume(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error creating file %s: %v", conf, err)
 	}
-	p := newNFSProvisionerInternal(tmpDir+"/", client, false, &testExporter{config: conf}, newDummyQuotaer(), "")
+	exporter := &testExporter{
+		exportMap: &exportMap{exportIDs: map[uint16]bool{}},
+		config:    conf,
+	}
+	maxExports := 3
+	p := newNFSProvisionerInternal(tmpDir+"/", client, false, exporter, newDummyQuotaer(), "", maxExports)
 
 	for _, test := range tests {
 		os.Setenv(test.envKey, "1.1.1.1")
 
 		volume, err := p.createVolume(test.options)
+		if err == nil {
+			p.exporter.(*testExporter).exportIDs[volume.exportID] = true
+		}
 
 		evaluate(t, test.name, test.expectError, err, test.expectedServer, volume.server, "server")
 		evaluate(t, test.name, test.expectError, err, test.expectedPath, volume.path, "path")
 		evaluate(t, test.name, test.expectError, err, test.expectedGroup, volume.supGroup, "group")
 		evaluate(t, test.name, test.expectError, err, test.expectedBlock, volume.exportBlock, "block")
 		evaluate(t, test.name, test.expectError, err, test.expectedExportID, volume.exportID, "export id")
+
+		_, isIgnored := err.(*controller.IgnoredError)
+		evaluate(t, test.name, test.expectError, err, test.expectIgnored, isIgnored, "ignored error")
 
 		os.Unsetenv(test.envKey)
 	}
@@ -294,13 +344,55 @@ func TestValidateOptions(t *testing.T) {
 	}
 
 	client := fake.NewSimpleClientset()
-	p := newNFSProvisionerInternal(tmpDir+"/", client, false, &testExporter{}, newDummyQuotaer(), "")
+	p := newNFSProvisionerInternal(tmpDir+"/", client, false, &testExporter{}, newDummyQuotaer(), "", -1)
 
 	for _, test := range tests {
 		gid, rootSquash, _, err := p.validateOptions(test.options)
 
 		evaluate(t, test.name, test.expectError, err, test.expectedGid, gid, "gid")
 		evaluate(t, test.name, test.expectError, err, test.expectedRootSquash, rootSquash, "root squash")
+	}
+}
+
+func TestCheckExportLimit(t *testing.T) {
+	tmpDir := utiltesting.MkTmpdirOrDie("nfsProvisionTest")
+	defer os.RemoveAll(tmpDir)
+
+	tests := []struct {
+		name           string
+		configContents string
+		exportIDs      map[uint16]bool
+		maxExports     int
+		expectedResult bool
+		expectError    bool
+	}{
+		{
+			name:           "unlimited exports",
+			exportIDs:      map[uint16]bool{1: true, 3: true},
+			maxExports:     -1,
+			expectedResult: true,
+			expectError:    false,
+		},
+		{
+			name:           "max export limit reached",
+			exportIDs:      map[uint16]bool{1: true, 3: true},
+			maxExports:     2,
+			expectedResult: false,
+			expectError:    false,
+		},
+		{
+			name:           "max export limit not reached",
+			exportIDs:      map[uint16]bool{1: true},
+			maxExports:     2,
+			expectedResult: true,
+			expectError:    false,
+		},
+	}
+	for _, test := range tests {
+		client := fake.NewSimpleClientset()
+		p := newNFSProvisionerInternal(tmpDir+"/", client, false, &testExporter{exportMap: &exportMap{exportIDs: test.exportIDs}}, newDummyQuotaer(), "", test.maxExports)
+		ok := p.checkExportLimit()
+		evaluate(t, test.name, test.expectError, nil, test.expectedResult, ok, "checkExportLimit")
 	}
 }
 
@@ -354,7 +446,7 @@ func TestCreateDirectory(t *testing.T) {
 	}
 
 	client := fake.NewSimpleClientset()
-	p := newNFSProvisionerInternal(tmpDir+"/", client, false, &testExporter{}, newDummyQuotaer(), "")
+	p := newNFSProvisionerInternal(tmpDir+"/", client, false, &testExporter{}, newDummyQuotaer(), "", -1)
 
 	for _, test := range tests {
 		path := p.exportDir + test.directory
@@ -635,7 +727,7 @@ func TestGetServer(t *testing.T) {
 		}
 
 		client := fake.NewSimpleClientset(test.objs...)
-		p := newNFSProvisionerInternal(tmpDir+"/", client, test.outOfCluster, &testExporter{}, newDummyQuotaer(), test.serverHostname)
+		p := newNFSProvisionerInternal(tmpDir+"/", client, test.outOfCluster, &testExporter{}, newDummyQuotaer(), test.serverHostname, -1)
 
 		server, err := p.getServer()
 
@@ -707,13 +799,28 @@ func newEndpoints(name string, ips []string, ports []endpointPort) *v1.Endpoints
 }
 
 type testExporter struct {
+	*exportMap
+
 	config string
 }
 
 var _ exporter = &testExporter{}
 
+func (e *testExporter) CanExport(limit int) bool {
+	if e.exportMap != nil {
+		return e.exportMap.CanExport(limit)
+	}
+	return true
+}
+
 func (e *testExporter) AddExportBlock(path string, _ bool) (string, uint16, error) {
-	return "\nExport_Id = 0;\n", 0, nil
+	id := uint16(1)
+	for ; id <= math.MaxUint16; id++ {
+		if _, ok := e.exportIDs[id]; !ok {
+			break
+		}
+	}
+	return fmt.Sprintf("\nExport_Id = %d;\n", id), id, nil
 }
 
 func (e *testExporter) RemoveExportBlock(block string, exportID uint16) error {

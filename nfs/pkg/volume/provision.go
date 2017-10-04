@@ -78,7 +78,7 @@ const (
 
 // NewNFSProvisioner creates a Provisioner that provisions NFS PVs backed by
 // the given directory.
-func NewNFSProvisioner(exportDir string, client kubernetes.Interface, outOfCluster bool, useGanesha bool, ganeshaConfig string, enableXfsQuota bool, serverHostname string) controller.Provisioner {
+func NewNFSProvisioner(exportDir string, client kubernetes.Interface, outOfCluster bool, useGanesha bool, ganeshaConfig string, enableXfsQuota bool, serverHostname string, maxExports int) controller.Provisioner {
 	var exp exporter
 	if useGanesha {
 		exp = newGaneshaExporter(ganeshaConfig)
@@ -95,10 +95,10 @@ func NewNFSProvisioner(exportDir string, client kubernetes.Interface, outOfClust
 	} else {
 		quotaer = newDummyQuotaer()
 	}
-	return newNFSProvisionerInternal(exportDir, client, outOfCluster, exp, quotaer, serverHostname)
+	return newNFSProvisionerInternal(exportDir, client, outOfCluster, exp, quotaer, serverHostname, maxExports)
 }
 
-func newNFSProvisionerInternal(exportDir string, client kubernetes.Interface, outOfCluster bool, exporter exporter, quotaer quotaer, serverHostname string) *nfsProvisioner {
+func newNFSProvisionerInternal(exportDir string, client kubernetes.Interface, outOfCluster bool, exporter exporter, quotaer quotaer, serverHostname string, maxExports int) *nfsProvisioner {
 	if _, err := os.Stat(exportDir); os.IsNotExist(err) {
 		glog.Fatalf("exportDir %s does not exist!", exportDir)
 	}
@@ -126,6 +126,7 @@ func newNFSProvisionerInternal(exportDir string, client kubernetes.Interface, ou
 		exporter:       exporter,
 		quotaer:        quotaer,
 		serverHostname: serverHostname,
+		maxExports:     maxExports,
 		identity:       identity,
 		podIPEnv:       podIPEnv,
 		serviceEnv:     serviceEnv,
@@ -157,6 +158,9 @@ type nfsProvisioner struct {
 	// The hostname for the NFS server to export from. Only applicable when
 	// running as a Docker container
 	serverHostname string
+
+	// The maximum number of volumes to be exported by the provisioner
+	maxExports int
 
 	// Identity of this nfsProvisioner, generated & persisted to exportDir or
 	// recovered from there. Used to mark provisioned PVs
@@ -245,6 +249,10 @@ func (p *nfsProvisioner) createVolume(options controller.VolumeOptions) (volume,
 	server, err := p.getServer()
 	if err != nil {
 		return volume{}, fmt.Errorf("error getting NFS server IP for volume: %v", err)
+	}
+
+	if ok := p.checkExportLimit(); !ok {
+		return volume{}, &controller.IgnoredError{Reason: fmt.Sprintf("export limit of %v has been reached", p.maxExports)}
 	}
 
 	path := path.Join(p.exportDir, options.PVName)
@@ -412,6 +420,10 @@ func (p *nfsProvisioner) getServer() (string, error) {
 
 	glog.Infof("using service %s=%s cluster IP %s as NFS server IP", p.serviceEnv, serviceName, service.Spec.ClusterIP)
 	return service.Spec.ClusterIP, nil
+}
+
+func (p *nfsProvisioner) checkExportLimit() bool {
+	return p.exporter.CanExport(p.maxExports)
 }
 
 // createDirectory creates the given directory in exportDir with appropriate
