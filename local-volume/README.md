@@ -245,6 +245,13 @@ go run hack/e2e.go -- -v --test --test_args="--ginkgo.focus=\[Feature:LocalPersi
   Additionally, this practice will ensure that if another node with the
   same name is created, that any volumes on that node are unique and not
   mistaken for a volume on another node with the same name.
+* For raw block volumes without a filesystem, use a unique ID as the symlink
+  name. Depending on your environment, the volume's ID in `/dev/disk/by-id/`
+  may contain a unique hardware serial number. Otherwise, a unique ID should be 
+  generated. The uniqueness of the symlink name will ensure that if another 
+  node with the same name is created, that any volumes on that node are 
+  unique and not mistaken for a volume on another node with the same name.
+
 
 ### Deleting/removing the underlying volume
 
