@@ -2906,8 +2906,8 @@ func (gce *Cloud) getSnapshotByName(snapshotName string) (*gceSnapshot, error) {
 }
 
 // CreateSnapshot creates a snapshot
-// TODO: CreateSnapshot should return snapshot status
-func (gce *Cloud) CreateSnapshot(diskName string, zone string, snapshotName string, tags map[string]string) error {
+// it returns snapshot id and status
+func (gce *Cloud) CreateSnapshot(diskName string, zone string, snapshotName string, tags map[string]string) (string, string, error) {
 	isManaged := false
 	for _, managedZone := range gce.managedZones {
 		if zone == managedZone {
@@ -2916,11 +2916,11 @@ func (gce *Cloud) CreateSnapshot(diskName string, zone string, snapshotName stri
 		}
 	}
 	if !isManaged {
-		return fmt.Errorf("kubernetes does not manage zone %q", zone)
+		return "", "", fmt.Errorf("kubernetes does not manage zone %q", zone)
 	}
 	tagsStr, err := gce.encodeDiskTags(tags)
 	if err != nil {
-		return err
+		return "", "", err
 	}
 
 	snapshotToCreate := &compute.Snapshot{
@@ -2930,16 +2930,15 @@ func (gce *Cloud) CreateSnapshot(diskName string, zone string, snapshotName stri
 
 	createOp, err := gce.service.Disks.CreateSnapshot(gce.projectID, zone, diskName, snapshotToCreate).Do()
 	if err != nil {
-		return err
+		return "", "", err
 	}
 
-	err = gce.waitForZoneOp(createOp, zone)
-	if isGCEError(err, "alreadyExists") {
-		glog.Warningf("GCE PD Snapshot %q already exists, reusing", snapshotName)
-		return nil
+	if opIsDone(createOp) && getErrorFromOp(createOp) != nil {
+		return "", "", getErrorFromOp(createOp)
 	}
-	return err
 
+	status, _, err := gce.DescribeSnapshot(snapshotName)
+	return snapshotName, status, err
 }
 
 func (gce *Cloud) listClustersInZone(zone string) ([]string, error) {

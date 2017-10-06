@@ -27,6 +27,7 @@ import (
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/cloudprovider/providers/gce"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume"
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubelet/apis"
 	k8svol "k8s.io/kubernetes/pkg/volume"
 )
@@ -63,14 +64,9 @@ func (plugin *gcePersistentDiskPlugin) SnapshotCreate(pv *v1.PersistentVolume, t
 	diskName := spec.GCEPersistentDisk.PDName
 	zone := pv.Labels[apis.LabelZoneFailureDomain]
 	snapshotName := createSnapshotName(string(pv.Name))
-	glog.Infof("Jing snapshotName %s", snapshotName)
-	// Gather provisioning options
-	//tags := make(map[string]string)
-	//tags["kubernetes.io/created-for/snapshot/namespace"] = claim.Namespace
-	//tags[CloudVolumeCreatedForClaimNameTag] = claim.Name
-	//tags[CloudVolumeCreatedForVolumeNameTag] = pvName
+	glog.V(4).Infof("Create snapshot %s", snapshotName)
 
-	err := plugin.cloud.CreateSnapshot(diskName, zone, snapshotName, *tags)
+	snapshotName, status, err := plugin.cloud.CreateSnapshot(diskName, zone, snapshotName, *tags)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -78,7 +74,7 @@ func (plugin *gcePersistentDiskPlugin) SnapshotCreate(pv *v1.PersistentVolume, t
 		GCEPersistentDiskSnapshot: &crdv1.GCEPersistentDiskSnapshotSource{
 			SnapshotName: snapshotName,
 		},
-	}, nil, nil
+	}, convertPDStatus(status), nil
 }
 
 func (plugin *gcePersistentDiskPlugin) SnapshotRestore(snapshotData *crdv1.VolumeSnapshotData, pvc *v1.PersistentVolumeClaim, pvName string, parameters map[string]string) (*v1.PersistentVolumeSource, map[string]string, error) {
@@ -196,4 +192,56 @@ func (plugin *gcePersistentDiskPlugin) VolumeDelete(pv *v1.PersistentVolume) err
 	}
 	diskName := pv.Spec.GCEPersistentDisk.PDName
 	return plugin.cloud.DeleteDisk(diskName)
+}
+
+func convertPDStatus(status string) *[]crdv1.VolumeSnapshotCondition {
+	var snapConditions []crdv1.VolumeSnapshotCondition
+	if status == "CREATING" {
+		snapConditions = []crdv1.VolumeSnapshotCondition{
+			{
+				Type:               crdv1.VolumeSnapshotConditionPending,
+				Status:             v1.ConditionUnknown,
+				Message:            "Snapshot is being created",
+				LastTransitionTime: metav1.Now(),
+			},
+		}
+	} else if status == "DELETING" {
+		snapConditions = []crdv1.VolumeSnapshotCondition{
+			{
+				Type:               crdv1.VolumeSnapshotConditionPending,
+				Status:             v1.ConditionUnknown,
+				Message:            "Snapshot is being deleting",
+				LastTransitionTime: metav1.Now(),
+			},
+		}
+	} else if status == "UPLOADING" {
+		snapConditions = []crdv1.VolumeSnapshotCondition{
+			{
+				Type:               crdv1.VolumeSnapshotConditionPending,
+				Status:             v1.ConditionTrue,
+				Message:            "Snapshot is being uploading",
+				LastTransitionTime: metav1.Now(),
+			},
+		}
+	} else if status == "READY" {
+		snapConditions = []crdv1.VolumeSnapshotCondition{
+			{
+				Type:               crdv1.VolumeSnapshotConditionReady,
+				Status:             v1.ConditionTrue,
+				Message:            "Snapshot created succsessfully and it is ready",
+				LastTransitionTime: metav1.Now(),
+			},
+		}
+	} else if status == "FAILED" {
+		snapConditions = []crdv1.VolumeSnapshotCondition{
+			{
+				Type:               crdv1.VolumeSnapshotConditionError,
+				Status:             v1.ConditionTrue,
+				Message:            "Snapshot failed",
+				LastTransitionTime: metav1.Now(),
+			},
+		}
+	}
+
+	return &snapConditions
 }
