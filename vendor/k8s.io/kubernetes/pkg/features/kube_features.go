@@ -28,7 +28,7 @@ const (
 	// // alpha: v1.X
 	// MyFeature utilfeature.Feature = "MyFeature"
 
-	// owner: @timstclair
+	// owner: @tallclair
 	// beta: v1.4
 	AppArmor utilfeature.Feature = "AppArmor"
 
@@ -44,7 +44,7 @@ const (
 	// alpha: v1.4
 	DynamicKubeletConfig utilfeature.Feature = "DynamicKubeletConfig"
 
-	// owner: timstclair
+	// owner: tallclair
 	// alpha: v1.5
 	//
 	// StreamingProxyRedirects controls whether the apiserver should intercept (and follow)
@@ -114,6 +114,25 @@ const (
 	//
 	// Allows running a "debug container" in a pod namespaces to troubleshoot a running pod.
 	DebugContainers utilfeature.Feature = "DebugContainers"
+
+	// owner: @bsalamat
+	// alpha: v1.8
+	//
+	// Add priority to pods. Priority affects scheduling and preemption of pods.
+	PodPriority utilfeature.Feature = "PodPriority"
+
+	// owner: @resouer
+	// alpha: v1.8
+	//
+	// Enable equivalence class cache for scheduler.
+	EnableEquivalenceClassCache utilfeature.Feature = "EnableEquivalenceClassCache"
+
+	// owner: @k82cn
+	// alpha: v1.8
+	//
+	// Taint nodes based on their condition status for 'NetworkUnavailable',
+	// 'MemoryPressure', 'OutOfDisk' and 'DiskPressure'.
+	TaintNodesByCondition utilfeature.Feature = "TaintNodesByCondition"
 )
 
 func init() {
@@ -137,9 +156,12 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	PersistentLocalVolumes:                      {Default: false, PreRelease: utilfeature.Alpha},
 	LocalStorageCapacityIsolation:               {Default: false, PreRelease: utilfeature.Alpha},
 	DebugContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
+	PodPriority:                                 {Default: false, PreRelease: utilfeature.Alpha},
+	EnableEquivalenceClassCache:                 {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
 	StreamingProxyRedirects:          {Default: true, PreRelease: utilfeature.Beta},
 	genericfeatures.AdvancedAuditing: {Default: false, PreRelease: utilfeature.Alpha},
+	TaintNodesByCondition:            {Default: false, PreRelease: utilfeature.Alpha},
 }

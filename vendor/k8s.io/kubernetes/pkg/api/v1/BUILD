@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -11,20 +9,19 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "builder.go",
         "conversion.go",
         "defaults.go",
         "doc.go",
         "generate.go",
+        "register.go",
         "zz_generated.conversion.go",
         "zz_generated.defaults.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/extensions:go_default_library",
-        "//pkg/util:go_default_library",
         "//pkg/util/parsers:go_default_library",
+        "//pkg/util/pointer:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
@@ -44,12 +41,11 @@ go_test(
         "conversion_test.go",
         "defaults_test.go",
     ],
-    tags = ["automanaged"],
     deps = [
+        ":go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",
         "//pkg/api/testing/compat:go_default_library",
-        "//pkg/api/v1:go_default_library",
         "//pkg/api/validation:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
@@ -77,7 +73,6 @@ filegroup(
         "//pkg/api/v1/helper:all-srcs",
         "//pkg/api/v1/node:all-srcs",
         "//pkg/api/v1/pod:all-srcs",
-        "//pkg/api/v1/ref:all-srcs",
         "//pkg/api/v1/resource:all-srcs",
         "//pkg/api/v1/service:all-srcs",
         "//pkg/api/v1/validation:all-srcs",

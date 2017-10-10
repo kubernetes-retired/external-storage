@@ -188,6 +188,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 				"metadata.labels",
 				"metadata.name",
 				"metadata.namespace",
+				"metadata.uid",
 				"spec.nodeName",
 				"spec.restartPolicy",
 				"spec.serviceAccountName",
@@ -672,6 +673,30 @@ func Convert_v1_Secret_To_api_Secret(in *v1.Secret, out *api.Secret, s conversio
 		}
 	}
 
+	return nil
+}
+func Convert_api_SecurityContext_To_v1_SecurityContext(in *api.SecurityContext, out *v1.SecurityContext, s conversion.Scope) error {
+	if in.Capabilities != nil {
+		out.Capabilities = new(v1.Capabilities)
+		if err := Convert_api_Capabilities_To_v1_Capabilities(in.Capabilities, out.Capabilities, s); err != nil {
+			return err
+		}
+	} else {
+		out.Capabilities = nil
+	}
+	out.Privileged = in.Privileged
+	if in.SELinuxOptions != nil {
+		out.SELinuxOptions = new(v1.SELinuxOptions)
+		if err := Convert_api_SELinuxOptions_To_v1_SELinuxOptions(in.SELinuxOptions, out.SELinuxOptions, s); err != nil {
+			return err
+		}
+	} else {
+		out.SELinuxOptions = nil
+	}
+	out.RunAsUser = in.RunAsUser
+	out.RunAsNonRoot = in.RunAsNonRoot
+	out.ReadOnlyRootFilesystem = in.ReadOnlyRootFilesystem
+	out.AllowPrivilegeEscalation = in.AllowPrivilegeEscalation
 	return nil
 }
 

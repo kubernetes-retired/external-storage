@@ -1,5 +1,6 @@
 package: github.com/kubernetes-incubator/external-storage
 excludeDirs:
+- docs/demo/hostpath-provisioner
 - nfs/test/e2e
 - repo-infra
 import:
@@ -18,13 +19,13 @@ import:
 - package: k8s.io/apiextensions-apiserver
   version: be41f5093e2b05c7a0befe35b04b715eb325ab43
 - package: k8s.io/apimachinery
-  version: 728b986edb9bd4bb8a022a8cc13573a97ecc2239
+  version: 5e8e01482b92ae171c6554f8e4706a1d8908e1a7
 - package: k8s.io/client-go
-  version: 42a124578af9e61f5c6902fa7b6b2cb6538f17d2
+  version: 660679d0b8e37df597721830b470e09a5ea1ce8e
 - package: k8s.io/api
-  version: e24ed681f56165befbea50a24f7e9f1c079ac366
+  version: e0b719701c32c0510fc6fb9a2d46ccdf1798aadd
 - package: k8s.io/kubernetes
-  version: df7f4b3526a580ef122aaeef61ab52842a60a88b
+  version: e3a3d108fb382caaa64503254bcd98ab29ba6a96
 - package: github.com/heketi/heketi
   version: 300752517908f3456e90d1ee2a773e7dd8ce1afe
   subpackages:
