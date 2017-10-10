@@ -20,8 +20,8 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/parsers"
+	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -67,7 +67,7 @@ func SetDefaults_ReplicationController(obj *v1.ReplicationController) {
 	}
 }
 func SetDefaults_Volume(obj *v1.Volume) {
-	if util.AllPtrFieldsNil(&obj.VolumeSource) {
+	if utilpointer.AllPtrFieldsNil(&obj.VolumeSource) {
 		obj.VolumeSource = v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		}
@@ -101,6 +101,19 @@ func SetDefaults_Service(obj *v1.Service) {
 	if obj.Spec.SessionAffinity == "" {
 		obj.Spec.SessionAffinity = v1.ServiceAffinityNone
 	}
+	if obj.Spec.SessionAffinity == v1.ServiceAffinityNone {
+		obj.Spec.SessionAffinityConfig = nil
+	}
+	if obj.Spec.SessionAffinity == v1.ServiceAffinityClientIP {
+		if obj.Spec.SessionAffinityConfig == nil || obj.Spec.SessionAffinityConfig.ClientIP == nil || obj.Spec.SessionAffinityConfig.ClientIP.TimeoutSeconds == nil {
+			timeoutSeconds := v1.DefaultClientIPServiceAffinitySeconds
+			obj.Spec.SessionAffinityConfig = &v1.SessionAffinityConfig{
+				ClientIP: &v1.ClientIPConfig{
+					TimeoutSeconds: &timeoutSeconds,
+				},
+			}
+		}
+	}
 	if obj.Spec.Type == "" {
 		obj.Spec.Type = v1.ServiceTypeClusterIP
 	}
@@ -115,10 +128,7 @@ func SetDefaults_Service(obj *v1.Service) {
 	}
 	// Defaults ExternalTrafficPolicy field for NodePort / LoadBalancer service
 	// to Global for consistency.
-	if _, ok := obj.Annotations[v1.BetaAnnotationExternalTraffic]; ok {
-		// Don't default this field if beta annotation exists.
-		return
-	} else if (obj.Spec.Type == v1.ServiceTypeNodePort ||
+	if (obj.Spec.Type == v1.ServiceTypeNodePort ||
 		obj.Spec.Type == v1.ServiceTypeLoadBalancer) &&
 		obj.Spec.ExternalTrafficPolicy == "" {
 		obj.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeCluster
@@ -370,5 +380,12 @@ func SetDefaults_ScaleIOVolumeSource(obj *v1.ScaleIOVolumeSource) {
 	}
 	if obj.FSType == "" {
 		obj.FSType = "xfs"
+	}
+}
+
+func SetDefaults_HostPathVolumeSource(obj *v1.HostPathVolumeSource) {
+	typeVol := v1.HostPathUnset
+	if obj.Type == nil {
+		obj.Type = &typeVol
 	}
 }

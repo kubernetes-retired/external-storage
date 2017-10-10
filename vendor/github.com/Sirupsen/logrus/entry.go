@@ -126,10 +126,6 @@ func (entry *Entry) Warn(args ...interface{}) {
 	}
 }
 
-func (entry *Entry) Warning(args ...interface{}) {
-	entry.Warn(args...)
-}
-
 func (entry *Entry) Error(args ...interface{}) {
 	if entry.Logger.Level >= ErrorLevel {
 		entry.log(ErrorLevel, fmt.Sprint(args...))
