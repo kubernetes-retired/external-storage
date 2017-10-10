@@ -172,7 +172,7 @@ func (c *cinderPlugin) convertSnapshotStatus(status string) *[]crdv1.VolumeSnaps
 			{
 				Type:               crdv1.VolumeSnapshotConditionReady,
 				Status:             v1.ConditionTrue,
-				Message:            "Snapshot created succsessfully and it is ready",
+				Message:            "Snapshot created successfully and it is ready",
 				LastTransitionTime: metav1.Now(),
 			},
 		}

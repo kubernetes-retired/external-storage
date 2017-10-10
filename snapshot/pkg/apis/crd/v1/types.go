@@ -37,7 +37,7 @@ type VolumeSnapshotStatus struct {
 	// +optional
 	CreationTimestamp metav1.Time `json:"creationTimestamp" protobuf:"bytes,1,opt,name=creationTimestamp"`
 
-	// Representes the latest available observations about the volume snapshot
+	// Represent the latest available observations about the volume snapshot
 	Conditions []VolumeSnapshotCondition `json:"conditions" protobuf:"bytes,2,rep,name=conditions"`
 }
 
