@@ -429,7 +429,7 @@ func Test_createSnapshotData(t *testing.T) {
 			Type:               crdv1.VolumeSnapshotConditionReady,
 		},
 	}
-	retData, err := vs.createVolumeSnapshotData("default/new-snapshot-test-1", fakeNewVolumeSnapshot(), &snapDataSource, &snapConditions)
+	retData, err := vs.createVolumeSnapshotData("default/new-snapshot-test-1", "fake-pv-1", &snapDataSource, &snapConditions)
 	if err != nil {
 		t.Errorf("Test failed, unexpected error: %v", err)
 	}

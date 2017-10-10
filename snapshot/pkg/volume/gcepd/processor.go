@@ -27,6 +27,7 @@ import (
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/cloudprovider/providers/gce"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume"
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubelet/apis"
 	k8svol "k8s.io/kubernetes/pkg/volume"
 )
@@ -63,22 +64,24 @@ func (plugin *gcePersistentDiskPlugin) SnapshotCreate(pv *v1.PersistentVolume, t
 	diskName := spec.GCEPersistentDisk.PDName
 	zone := pv.Labels[apis.LabelZoneFailureDomain]
 	snapshotName := createSnapshotName(string(pv.Name))
-	glog.Infof("Jing snapshotName %s", snapshotName)
-	// Gather provisioning options
-	//tags := make(map[string]string)
-	//tags["kubernetes.io/created-for/snapshot/namespace"] = claim.Namespace
-	//tags[CloudVolumeCreatedForClaimNameTag] = claim.Name
-	//tags[CloudVolumeCreatedForVolumeNameTag] = pvName
 
 	err := plugin.cloud.CreateSnapshot(diskName, zone, snapshotName, *tags)
 	if err != nil {
 		return nil, nil, err
 	}
+	initConditions := []crdv1.VolumeSnapshotCondition{
+		{
+			Type:               crdv1.VolumeSnapshotConditionPending,
+			Status:             v1.ConditionUnknown,
+			Message:            "Snapshot creation is triggered",
+			LastTransitionTime: metav1.Now(),
+		},
+	}
 	return &crdv1.VolumeSnapshotDataSource{
 		GCEPersistentDiskSnapshot: &crdv1.GCEPersistentDiskSnapshotSource{
 			SnapshotName: snapshotName,
 		},
-	}, nil, nil
+	}, &initConditions, nil
 }
 
 func (plugin *gcePersistentDiskPlugin) SnapshotRestore(snapshotData *crdv1.VolumeSnapshotData, pvc *v1.PersistentVolumeClaim, pvName string, parameters map[string]string) (*v1.PersistentVolumeSource, map[string]string, error) {
@@ -88,7 +91,7 @@ func (plugin *gcePersistentDiskPlugin) SnapshotRestore(snapshotData *crdv1.Volum
 		return nil, nil, fmt.Errorf("failed to retrieve Snapshot spec")
 	}
 	if pvc == nil {
-		return nil, nil, fmt.Errorf("nil pvc")
+		return nil, nil, fmt.Errorf("pvc is nil")
 	}
 
 	snapID := snapshotData.Spec.GCEPersistentDiskSnapshot.SnapshotName
@@ -124,7 +127,8 @@ func (plugin *gcePersistentDiskPlugin) SnapshotRestore(snapshotData *crdv1.Volum
 		}
 		zone = k8svol.ChooseZoneForVolume(zones, pvc.Name)
 	}
-
+	tags["source"] = k8svol.GenerateVolumeName("Created from snapshot "+snapID+" ", pvName, 255)
+	glog.Infof("Provisioning disk %s from snapshot %s, zone %s requestGB %d tags %v", diskName, snapID, zone, requestGB, tags)
 	err = plugin.cloud.CreateDiskFromSnapshot(snapID, diskName, diskType, zone, requestGB, tags)
 	if err != nil {
 		glog.Infof("Error creating GCE PD volume: %v", err)
@@ -173,9 +177,8 @@ func (plugin *gcePersistentDiskPlugin) DescribeSnapshot(snapshotData *crdv1.Volu
 		return nil, false, fmt.Errorf("invalid VolumeSnapshotDataSource: %v", snapshotData)
 	}
 	snapshotID := snapshotData.Spec.GCEPersistentDiskSnapshot.SnapshotName
-	_, isCompleted, err = plugin.cloud.DescribeSnapshot(snapshotID)
-	// TODO: Convert GCE status to []crdv1.VolumeSnapshotCondition
-	return nil, isCompleted, err
+	status, isCompleted, err := plugin.cloud.DescribeSnapshot(snapshotID)
+	return convertGCEStatus(status), isCompleted, err
 }
 
 // FindSnapshot finds a VolumeSnapshot by matching metadata
@@ -196,4 +199,59 @@ func (plugin *gcePersistentDiskPlugin) VolumeDelete(pv *v1.PersistentVolume) err
 	}
 	diskName := pv.Spec.GCEPersistentDisk.PDName
 	return plugin.cloud.DeleteDisk(diskName)
+}
+
+func convertGCEStatus(status string) *[]crdv1.VolumeSnapshotCondition {
+	var snapConditions []crdv1.VolumeSnapshotCondition
+
+	switch status {
+	case "READY":
+		snapConditions = []crdv1.VolumeSnapshotCondition{
+			{
+				Type:               crdv1.VolumeSnapshotConditionReady,
+				Status:             v1.ConditionTrue,
+				Message:            "Snapshot created successfully and it is ready",
+				LastTransitionTime: metav1.Now(),
+			},
+		}
+	case "FAILED":
+		snapConditions = []crdv1.VolumeSnapshotCondition{
+			{
+				Type:               crdv1.VolumeSnapshotConditionError,
+				Status:             v1.ConditionTrue,
+				Message:            "Snapshot creation failed",
+				LastTransitionTime: metav1.Now(),
+			},
+		}
+	case "UPLOADING":
+		snapConditions = []crdv1.VolumeSnapshotCondition{
+			{
+				Type:               crdv1.VolumeSnapshotConditionPending,
+				Status:             v1.ConditionTrue,
+				Message:            "Snapshot is uploading",
+				LastTransitionTime: metav1.Now(),
+			},
+		}
+	case "CREATING":
+		snapConditions = []crdv1.VolumeSnapshotCondition{
+			{
+				Type:               crdv1.VolumeSnapshotConditionPending,
+				Status:             v1.ConditionUnknown,
+				Message:            "Snapshot is creating",
+				LastTransitionTime: metav1.Now(),
+			},
+		}
+	case "Deleting":
+		snapConditions = []crdv1.VolumeSnapshotCondition{
+			{
+				Type:               crdv1.VolumeSnapshotConditionReady,
+				Status:             v1.ConditionUnknown,
+				Message:            "Snapshot is deleting",
+				LastTransitionTime: metav1.Now(),
+			},
+		}
+
+	}
+	return &snapConditions
+
 }

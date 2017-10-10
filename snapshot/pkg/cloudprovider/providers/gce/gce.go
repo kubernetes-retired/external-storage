@@ -2812,7 +2812,7 @@ func (gce *Cloud) CreateDiskFromSnapshot(snapshot string,
 
 	tagsStr, err := gce.encodeDiskTags(tags)
 	if err != nil {
-		return err
+		return fmt.Errorf("encode disk tag error %v", err)
 	}
 
 	switch diskType {
@@ -2833,11 +2833,15 @@ func (gce *Cloud) CreateDiskFromSnapshot(snapshot string,
 		Type:           diskTypeURI,
 		SourceSnapshot: snapshotName,
 	}
-
+	glog.Infof("Create disk from snapshot diskToCreate %+v", diskToCreate)
 	createOp, err := gce.service.Disks.Insert(gce.projectID, zone, diskToCreate).Do()
-	if isGCEError(err, "alreadyExists") {
-		glog.Warningf("GCE PD %q already exists, reusing", name)
-		return nil
+	glog.Infof("Create disk from snapshot operation %v, err %v", createOp, err)
+	if err != nil {
+		if isGCEError(err, "alreadyExists") {
+			glog.Warningf("GCE PD %q already exists, reusing", name)
+			return nil
+		}
+		return err
 	}
 
 	err = gce.waitForZoneOp(createOp, zone)
@@ -2856,7 +2860,7 @@ func (gce *Cloud) DescribeSnapshot(snapshotToGet string) (status string, isCompl
 	}
 	//no snapshot is found
 	if snapshot == nil {
-		return "", false, fmt.Errorf("snapshot %s is found", snapshotToGet)
+		return "", false, fmt.Errorf("snapshot %s is not found", snapshotToGet)
 	}
 	if snapshot.Status == "READY" {
 		return snapshot.Status, true, nil
@@ -2906,7 +2910,6 @@ func (gce *Cloud) getSnapshotByName(snapshotName string) (*gceSnapshot, error) {
 }
 
 // CreateSnapshot creates a snapshot
-// TODO: CreateSnapshot should return snapshot status
 func (gce *Cloud) CreateSnapshot(diskName string, zone string, snapshotName string, tags map[string]string) error {
 	isManaged := false
 	for _, managedZone := range gce.managedZones {
@@ -2920,6 +2923,7 @@ func (gce *Cloud) CreateSnapshot(diskName string, zone string, snapshotName stri
 	}
 	tagsStr, err := gce.encodeDiskTags(tags)
 	if err != nil {
+		glog.Infof("CreateSnapshot err %v", err)
 		return err
 	}
 
@@ -2927,19 +2931,10 @@ func (gce *Cloud) CreateSnapshot(diskName string, zone string, snapshotName stri
 		Name:        snapshotName,
 		Description: tagsStr,
 	}
-
+	glog.V(4).Infof("Create snapshot project %s, zone %s, diskName %s, snapshotToCreate %+v", gce.projectID, zone, diskName, snapshotToCreate)
 	createOp, err := gce.service.Disks.CreateSnapshot(gce.projectID, zone, diskName, snapshotToCreate).Do()
-	if err != nil {
-		return err
-	}
-
-	err = gce.waitForZoneOp(createOp, zone)
-	if isGCEError(err, "alreadyExists") {
-		glog.Warningf("GCE PD Snapshot %q already exists, reusing", snapshotName)
-		return nil
-	}
+	glog.V(4).Infof("Create snapshot operation %v", createOp)
 	return err
-
 }
 
 func (gce *Cloud) listClustersInZone(zone string) ([]string, error) {
