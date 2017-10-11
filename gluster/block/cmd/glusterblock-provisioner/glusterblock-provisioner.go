@@ -361,7 +361,7 @@ func (p *glusterBlockProvisioner) createVolume(volSizeInt int, blockVol string, 
 		// Execute gluster-block command.
 		cmd := exec.Command(
 			config.opMode, "create", config.blockModeArgs["glustervol"]+"/"+blockVol,
-			"ha", haCountStr, config.blockModeArgs["hosts"], sizeStr, "--json")
+			"ha", haCountStr, config.blockModeArgs["hosts"], sizeStr+"GB", "--json")
 
 		out, cmdErr := cmd.CombinedOutput()
 		if cmdErr != nil {
