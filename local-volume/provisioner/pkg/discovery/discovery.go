@@ -24,6 +24,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
 
+	esUtil "github.com/kubernetes-incubator/external-storage/lib/util"
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/api/v1/helper"
 )
@@ -177,7 +178,7 @@ func (d *Discoverer) createPV(file, class string, config common.MountConfig, cap
 	pvSpec := common.CreateLocalPVSpec(&common.LocalPVConfig{
 		Name:            pvName,
 		HostPath:        outsidePath,
-		Capacity:        capacityByte,
+		Capacity:        roundDownCapacityPretty(capacityByte),
 		StorageClass:    class,
 		ProvisionerName: d.Name,
 		AffinityAnn:     d.nodeAffinityAnn,
@@ -190,4 +191,21 @@ func (d *Discoverer) createPV(file, class string, config common.MountConfig, cap
 		return
 	}
 	glog.Infof("Created PV %q for volume at %q", pvName, outsidePath)
+}
+
+// Round down the capacity to an easy to read value.
+func roundDownCapacityPretty(capacityBytes int64) int64 {
+
+	easyToReadUnitsBytes := []int64{esUtil.GiB, esUtil.MiB}
+
+	// Round down to the nearest easy to read unit
+	// such that there are at least 10 units at that size.
+	for _, easyToReadUnitBytes := range easyToReadUnitsBytes {
+		// Round down the capacity to the nearest unit.
+		size := capacityBytes / easyToReadUnitBytes
+		if size >= 10 {
+			return size * easyToReadUnitBytes
+		}
+	}
+	return capacityBytes
 }
