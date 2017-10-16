@@ -18,7 +18,6 @@ package main
 
 import (
 	"errors"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
