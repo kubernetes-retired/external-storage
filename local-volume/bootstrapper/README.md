@@ -63,6 +63,33 @@ data:
 
 An example of using the bootstraper is included [here](../README.md).
 
+### PV Label Config (optional)
+
+One can (optionally) also configure the provisioner to copy certain labels from the node to the PVs of
+the local volumes on that node. For example in the config below, the admin has chosen to copy the labels
+failure-domain.beta.kubernetes.io/zone and failure-domain.beta.kubernetes.io/region from the node to the
+PVs as those zone and region labels are quite applicable to the local volume PVs of that node.
+
+```yaml
+kind: ConfigMap
+metadata:
+  name: local-volume-config
+  namespace: kube-system
+data:
+  nodeLabelsForPV: |
+    - failure-domain.beta.kubernetes.io/zone
+    - failure-domain.beta.kubernetes.io/region
+  storageClassMap: |
+    local-fast: 
+       hostDir: "/mnt/ssds"
+       mountDir: "/local-ssds"
+    local-slow:
+       hostDir: "/mnt/hdds"
+       mountDir: "/local-hdds"
+    local-storage:
+      hostDir: "/mnt/disks"
+```
+
 ### Command line options
 
 To see all options, compile bootstrapper and use `-h` option, below is a curated

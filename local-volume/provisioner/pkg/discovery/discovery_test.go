@@ -27,6 +27,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1/helper"
+	"reflect"
 )
 
 const (
@@ -36,12 +37,27 @@ const (
 	testProvisionerName = "test-provisioner"
 )
 
+var nodeLabels = map[string]string{
+	"failure-domain.beta.kubernetes.io/zone":   "west-1",
+	"failure-domain.beta.kubernetes.io/region": "west",
+	common.NodeLabelKey:                        testNodeName,
+	"label-that-pv-does-not-inherit":           "foo"}
+
+var nodeLabelsForPV = []string{
+	"failure-domain.beta.kubernetes.io/zone",
+	"failure-domain.beta.kubernetes.io/region",
+	common.NodeLabelKey,
+	"non-existent-label-that-pv-will-not-get"}
+
+var expectedPVLabels = map[string]string{
+	"failure-domain.beta.kubernetes.io/zone":   "west-1",
+	"failure-domain.beta.kubernetes.io/region": "west",
+	common.NodeLabelKey:                        testNodeName}
+
 var testNode = &v1.Node{
 	ObjectMeta: metav1.ObjectMeta{
-		Name: testNodeName,
-		Labels: map[string]string{
-			common.NodeLabelKey: testNodeName,
-		},
+		Name:   testNodeName,
+		Labels: nodeLabels,
 	},
 }
 
@@ -229,8 +245,9 @@ func testSetup(t *testing.T, test *testConfig) *Discoverer {
 	test.apiUtil = util.NewFakeAPIUtil(test.apiShouldFail, test.cache)
 
 	userConfig := &common.UserConfig{
-		Node:         testNode,
-		DiscoveryMap: scMapping,
+		Node:            testNode,
+		DiscoveryMap:    scMapping,
+		NodeLabelsForPV: nodeLabelsForPV,
 	}
 	runConfig := &common.RuntimeConfig{
 		UserConfig: userConfig,
@@ -297,6 +314,17 @@ func verifyNodeAffinity(t *testing.T, pv *v1.PersistentVolume) {
 	}
 	if req.Values[0] != testNodeName {
 		t.Errorf("Node selector requirement value is %v, expected %v", req.Values[0], testNodeName)
+	}
+}
+
+func verifyPVLabels(t *testing.T, pv *v1.PersistentVolume) {
+	if len(pv.Labels) == 0 {
+		t.Errorf("Labels not set")
+		return
+	}
+	eq := reflect.DeepEqual(pv.Labels, expectedPVLabels)
+	if !eq {
+		t.Errorf("Labels not as expected %v != %v", pv.Labels, expectedPVLabels)
 	}
 }
 
@@ -377,6 +405,7 @@ func verifyCreatedPVs(t *testing.T, test *testConfig) {
 
 		verifyProvisionerName(t, createdPV)
 		verifyNodeAffinity(t, createdPV)
+		verifyPVLabels(t, createdPV)
 		verifyCapacity(t, createdPV, expectedPV)
 		// TODO: Verify volume type once that is supported in the API.
 	}
