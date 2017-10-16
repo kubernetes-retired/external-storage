@@ -112,7 +112,7 @@ func (p *cinderProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 
 	mapper, err = p.mb.newVolumeMapperFromConnection(connection)
 	if err != nil {
-		glog.Errorf("Unable to create volume mapper: %f", err)
+		glog.Errorf("Unable to create volume mapper: %v", err)
 		goto ERROR_DISCONNECT
 	}
 
