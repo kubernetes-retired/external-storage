@@ -36,17 +36,17 @@ import (
 const (
 	provisionerNameKey = "PROVISIONER_NAME"
 
-	annCreatedBy = "kubernetes.io/createdby"
-	createdBy    = "nfs-client-dynamic-provisioner"
-	mountOptionAnnotation = "volume.beta.kubernetes.io/mount-options"
+	annCreatedBy           = "kubernetes.io/createdby"
+	createdBy              = "nfs-client-dynamic-provisioner"
+	mountOptionAnnotation  = "volume.beta.kubernetes.io/mount-options"
 	storageClassAnnotation = "volume.beta.kubernetes.io/storage-class"
 )
 
 type nfsProvisioner struct {
-	client kubernetes.Interface
-	server string
-	path   string
-	pvc_annot bool
+	client   kubernetes.Interface
+	server   string
+	path     string
+	pvcAnnot bool
 }
 
 const (
@@ -57,9 +57,9 @@ var _ controller.Provisioner = &nfsProvisioner{}
 
 // This function will gather the annotations we want from the PVC
 // only volume.beta.kubernetes.io/mount-options is supported at the moment
-func (p *nfsProvisioner) getAnnotationsFromVolumClaim(options controller.VolumeOptions) (map[string]string) {
+func (p *nfsProvisioner) getAnnotationsFromVolumClaim(options controller.VolumeOptions) map[string]string {
 	annotations := make(map[string]string)
-	if p.pvc_annot {
+	if p.pvcAnnot {
 		if val, ok := options.PVC.Annotations[mountOptionAnnotation]; ok {
 			annotations[mountOptionAnnotation] = val
 		}
@@ -69,8 +69,8 @@ func (p *nfsProvisioner) getAnnotationsFromVolumClaim(options controller.VolumeO
 
 // This function will gather the annotations we want from the storage class
 // only volume.beta.kubernetes.io/mount-options is supported at the moment
-// It will only gathers them if PVC_ANNOT is set to 1
-func (p *nfsProvisioner) getAnnotationsFromStorageClass(options controller.VolumeOptions) (map[string]string) {
+// It will only gathers them if pvcAnnot is set to 1
+func (p *nfsProvisioner) getAnnotationsFromStorageClass(options controller.VolumeOptions) map[string]string {
 	annotations := make(map[string]string)
 	if val, ok := options.PVC.Annotations[storageClassAnnotation]; ok {
 		glog.Infof("Handling storage class annotations")
@@ -88,16 +88,16 @@ func (p *nfsProvisioner) getAnnotationsFromStorageClass(options controller.Volum
 
 // This function will gather the annotations we want from the PVC and the storage class to merge it
 // In the merge operation if an annotations is present in both of them the storage class one will prevail
-func (p *nfsProvisioner) getAnnotations(options controller.VolumeOptions) (map[string]string) {
+func (p *nfsProvisioner) getAnnotations(options controller.VolumeOptions) map[string]string {
 	glog.Infof("Handling annotations")
 	annotations := make(map[string]string)
 	annotations[annCreatedBy] = createdBy
-	pvc_annotations := p.getAnnotationsFromVolumClaim(options)
-	sc_annotations := p.getAnnotationsFromStorageClass(options)
-	for k, v := range pvc_annotations {
+	pvcAnnotations := p.getAnnotationsFromVolumClaim(options)
+	scAnnotations := p.getAnnotationsFromStorageClass(options)
+	for k, v := range pvcAnnotations {
 		annotations[k] = v
 	}
-	for k, v := range sc_annotations {
+	for k, v := range scAnnotations {
 		annotations[k] = v
 	}
 	return annotations
@@ -123,10 +123,9 @@ func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 
 	path := filepath.Join(p.path, pvName)
 
-
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: options.PVName,
+			Name:        options.PVName,
 			Annotations: p.getAnnotations(options),
 		},
 		Spec: v1.PersistentVolumeSpec{
@@ -170,10 +169,10 @@ func main() {
 	}
 
 	// By default gathering annotations from the PVC is disabled
-	use_pvc_annot := false
-	pvc_annot_env := os.Getenv("PVC_ANNOT")
-	if pvc_annot_env == "1" {
-		use_pvc_annot = true
+	usePvcAnnot := false
+	pvcAnnotEnv := os.Getenv("pvcAnnot")
+	if pvcAnnotEnv == "1" {
+		usePvcAnnot = true
 	}
 	provisionerName := os.Getenv(provisionerNameKey)
 	if provisionerName == "" {
@@ -199,10 +198,10 @@ func main() {
 	}
 
 	clientNFSProvisioner := &nfsProvisioner{
-		server: server,
-		path:   path,
-		client: clientset,
-		pvc_annot: use_pvc_annot,
+		server:   server,
+		path:     path,
+		client:   clientset,
+		pvcAnnot: usePvcAnnot,
 	}
 	// Start the provision controller which will dynamically provision efs NFS
 	// PVs
