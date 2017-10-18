@@ -69,8 +69,9 @@ func main() {
 
 	glog.Info("Starting controller\n")
 	controller.StartLocalController(client, &common.UserConfig{
-		Node:         node,
-		DiscoveryMap: provisionerConfig.StorageClassConfig,
+		Node:            node,
+		DiscoveryMap:    provisionerConfig.StorageClassConfig,
+		NodeLabelsForPV: provisionerConfig.NodeLabelsForPV,
 	})
 }
 

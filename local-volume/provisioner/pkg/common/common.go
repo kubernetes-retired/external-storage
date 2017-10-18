@@ -58,6 +58,8 @@ const (
 	// ProvisonerStorageClassConfig defines file name of the file which stores storage class
 	// configuration. The file name must match to the key name used in configuration map.
 	ProvisonerStorageClassConfig = "storageClassMap"
+	// ProvisionerNodeLabelsForPV contains a list of node labels to be copied to the PVs created by the provisioner
+	ProvisionerNodeLabelsForPV = "nodeLabelsForPV"
 )
 
 // UserConfig stores all the user-defined parameters to the provisioner
@@ -66,6 +68,8 @@ type UserConfig struct {
 	Node *v1.Node
 	// key = storageclass, value = mount configuration for the storageclass
 	DiscoveryMap map[string]MountConfig
+	// Labels and their values that are added to PVs created by the provisioner
+	NodeLabelsForPV []string
 }
 
 // MountConfig stores a configuration for discoverying a specific storageclass
@@ -101,6 +105,7 @@ type LocalPVConfig struct {
 	StorageClass    string
 	ProvisionerName string
 	AffinityAnn     string
+	Labels          map[string]string
 }
 
 // ProvisionerConfiguration defines Provisioner configuration objects
@@ -110,13 +115,16 @@ type LocalPVConfig struct {
 type ProvisionerConfiguration struct {
 	// StorageClassConfig defines configuration of Provisioner's storage classes
 	StorageClassConfig map[string]MountConfig `json:"storageClassMap" yaml:"storageClassMap"`
+	// NodeLabelsForPV contains a list of node labels to be copied to the PVs created by the provisioner
+	NodeLabelsForPV []string `json:"nodeLabelsForPV" yaml:"nodeLabelsForPV"`
 }
 
 // CreateLocalPVSpec returns a PV spec that can be used for PV creation
 func CreateLocalPVSpec(config *LocalPVConfig) *v1.PersistentVolume {
 	return &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: config.Name,
+			Name:   config.Name,
+			Labels: config.Labels,
 			Annotations: map[string]string{
 				AnnProvisionedBy:                      config.ProvisionerName,
 				v1.AlphaStorageNodeAffinityAnnotation: config.AffinityAnn,
@@ -168,6 +176,13 @@ func VolumeConfigToConfigMapData(config *ProvisionerConfiguration) (map[string]s
 		return nil, fmt.Errorf("unable to Marshal volume config: %v", err)
 	}
 	configMapData[ProvisonerStorageClassConfig] = string(val)
+	if len(config.NodeLabelsForPV) > 0 {
+		nodeLabels, err := yaml.Marshal(config.NodeLabelsForPV)
+		if err != nil {
+			return nil, fmt.Errorf("unable to Marshal node label: %v", err)
+		}
+		configMapData[ProvisionerNodeLabelsForPV] = string(nodeLabels)
+	}
 	return configMapData, nil
 }
 

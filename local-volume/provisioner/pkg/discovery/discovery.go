@@ -32,6 +32,7 @@ import (
 // It looks for volumes in the directories specified in the discoveryMap
 type Discoverer struct {
 	*common.RuntimeConfig
+	Labels          map[string]string
 	nodeAffinityAnn string
 }
 
@@ -47,7 +48,19 @@ func NewDiscoverer(config *common.RuntimeConfig) (*Discoverer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Failed to convert node affinity to alpha annotation: %v", err)
 	}
-	return &Discoverer{RuntimeConfig: config, nodeAffinityAnn: tmpAnnotations[v1.AlphaStorageNodeAffinityAnnotation]}, nil
+
+	labelMap := make(map[string]string)
+	for _, labelName := range config.NodeLabelsForPV {
+		labelVal, ok := config.Node.Labels[labelName]
+		if ok {
+			labelMap[labelName] = labelVal
+		}
+	}
+
+	return &Discoverer{
+		RuntimeConfig:   config,
+		Labels:          labelMap,
+		nodeAffinityAnn: tmpAnnotations[v1.AlphaStorageNodeAffinityAnnotation]}, nil
 }
 
 func generateNodeAffinity(node *v1.Node) (*v1.NodeAffinity, error) {
@@ -168,6 +181,7 @@ func (d *Discoverer) createPV(file, class string, config common.MountConfig, cap
 		StorageClass:    class,
 		ProvisionerName: d.Name,
 		AffinityAnn:     d.nodeAffinityAnn,
+		Labels:          d.Labels,
 	})
 
 	_, err := d.APIUtil.CreatePV(pvSpec)
