@@ -25,7 +25,6 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/volume/util"
-	"unsafe"
 )
 
 // VolumeUtil is an interface for local filesystem operations
@@ -129,25 +128,6 @@ func (u *volumeUtil) DeleteContents(fullPath string) error {
 func (u *volumeUtil) GetFsCapacityByte(fullPath string) (int64, error) {
 	_, capacity, _, _, _, _, err := util.FsInfo(fullPath)
 	return capacity, err
-}
-
-// GetBlockCapacityByte returns  capacity in bytes of a block device.
-// fullPath is the pathname of block device.
-func (u *volumeUtil) GetBlockCapacityByte(fullPath string) (int64, error) {
-	file, err := os.OpenFile(fullPath, os.O_RDONLY, 0)
-	if err != nil {
-		return 0, err
-	}
-	defer file.Close()
-
-	var size int64
-	// Get size of block device into 64 bit int.
-	// Ref: http://www.microhowto.info/howto/get_the_size_of_a_linux_block_special_device_in_c.html
-	if _, _, err := unix.Syscall(unix.SYS_IOCTL, file.Fd(), unix.BLKGETSIZE64, uintptr(unsafe.Pointer(&size))); err != 0 {
-		return 0, err
-	}
-
-	return size, err
 }
 
 var _ VolumeUtil = &FakeVolumeUtil{}
