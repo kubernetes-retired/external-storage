@@ -18,6 +18,14 @@ package util
 
 import "k8s.io/api/core/v1"
 
+// Common allocation units
+const (
+	KiB int64 = 1024
+	MiB int64 = 1024 * KiB
+	GiB int64 = 1024 * MiB
+	TiB int64 = 1024 * GiB
+)
+
 // RoundUpSize calculates how many allocation units are needed to accommodate
 // a volume of given size. E.g. when user wants 1500MiB volume, while AWS EBS
 // allocates volumes in gibibyte-sized chunks,
