@@ -11,10 +11,11 @@ Pre-alpha
 
 ## Quick Howto
 
- - [Host Path](examples/hostpath/README.md)
+ - [Host Path](doc/examples/hostpath/README.md)
 
- - [AWS EBS](examples/aws/README.md)
+ - [AWS EBS](doc/examples/aws/README.md)
 
+ - [GCE PD](doc/examples/gce/README.md)
 
 ## Snapshot Volume Plugin Interface
 
