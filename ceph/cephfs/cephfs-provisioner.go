@@ -137,11 +137,12 @@ func (p *cephFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 				v1.ResourceName(v1.ResourceStorage): options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)],
 			},
 			PersistentVolumeSource: v1.PersistentVolumeSource{
-				CephFS: &v1.CephFSVolumeSource{
+				CephFS: &v1.CephFSPersistentVolumeSource{
 					Monitors: mon,
 					Path:     res.Path[strings.Index(res.Path, "/"):],
-					SecretRef: &v1.LocalObjectReference{
+					SecretRef: &v1.SecretReference{
 						Name: secretName,
+						// TODO https://github.com/kubernetes-incubator/external-storage/issues/309
 					},
 					User: user,
 				},
