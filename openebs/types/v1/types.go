@@ -23,7 +23,8 @@ type VsmSpec struct {
 	Metadata   struct {
 		Name   string `yaml:"name"`
 		Labels struct {
-			Storage string `yaml:"volumeprovisioner.mapi.openebs.io/storage-size"`
+			Storage      string `yaml:"volumeprovisioner.mapi.openebs.io/storage-size"`
+			StorageClass string `yaml:"k8s.io/storage-class"`
 		}
 	} `yaml:"metadata"`
 }

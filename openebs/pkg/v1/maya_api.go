@@ -68,7 +68,7 @@ func (v OpenEBSVolume) GetMayaClusterIP(client kubernetes.Interface) (string, er
 }
 
 // CreateVsm to create the Vsm through a API call to m-apiserver
-func (v OpenEBSVolume) CreateVsm(vname string, size string) (string, error) {
+func (v OpenEBSVolume) CreateVsm(vname, size, storageClassName string) (string, error) {
 
 	var vs mayav1.VsmSpec
 
@@ -84,6 +84,7 @@ func (v OpenEBSVolume) CreateVsm(vname string, size string) (string, error) {
 	vs.APIVersion = "v1"
 	vs.Metadata.Name = vname
 	vs.Metadata.Labels.Storage = size
+	vs.Metadata.Labels.StorageClass = storageClassName
 
 	//Marshal serializes the value provided into a YAML document
 	yamlValue, _ := yaml.Marshal(vs)
