@@ -85,8 +85,9 @@ func (p *openEBSProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 	var openebsVol mApiv1.OpenEBSVolume
 
 	volSize := options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
+	storageClassName := *options.PVC.Spec.StorageClassName
 
-	_, err := openebsVol.CreateVsm(options.PVName, volSize.String())
+	_, err := openebsVol.CreateVsm(options.PVName, volSize.String(), storageClassName)
 	if err != nil {
 		glog.Fatalf("Error creating volume: %v", err)
 		return nil, err
