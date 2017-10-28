@@ -440,7 +440,7 @@ func (p *iscsiProvisioner) setInitiatorAuth(initiator string, inUser string, inP
 		OutPassword:  outPassword,
 	}
 	//call remote procedure with args
-	err = client.Call("initiator_set_auth", args, null)
+	err = client.Call("initiator_set_auth", args, nil)
 	return err
 }
 
