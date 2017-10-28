@@ -99,26 +99,40 @@ func (u *RBDUtil) rbdStatus(image string, pOpts *rbdProvisionOptions) (bool, err
 	for i := start; i < start+l; i++ {
 		mon := pOpts.monitors[i%l]
 		// cmd "rbd status" list the rbd client watch with the following output:
+		//
+		// # there is a watcher (exit=0)
 		// Watchers:
 		//   watcher=10.16.153.105:0/710245699 client.14163 cookie=1
+		//
+		// # there is no watcher (exit=0)
+		// Watchers: none
+		//
+		// Otherwise, exit is non-zero, for example:
+		//
+		// # image does not exist (exit=2)
+		// rbd: error opening image kubernetes-dynamic-pvc-<UUID>: (2) No such file or directory
+		//
 		glog.V(4).Infof("rbd: status %s using mon %s, pool %s id %s key %s", image, mon, pOpts.pool, pOpts.adminID, pOpts.adminSecret)
 		args := []string{"status", image, "--pool", pOpts.pool, "-m", mon, "--id", pOpts.adminID, "--key=" + pOpts.adminSecret}
 		cmd, err = u.execCommand("rbd", args)
 		output = string(cmd)
 
-		if err != nil {
-			// ignore error code, just checkout output for watcher string
-			// TODO: Why should we ignore error code here? Igorning error code here cause we only try first monitor.
-			glog.Warningf("failed to execute rbd status on mon %s", mon)
+		// break if command succeeds
+		if err == nil {
+			break
 		}
-
-		if strings.Contains(output, imageWatcherStr) {
-			glog.V(4).Infof("rbd: watchers on %s: %s", image, output)
-			return true, nil
-		}
-		glog.Warningf("rbd: no watchers on %s", image)
-		return false, nil
 	}
+
+	// If command never succeed, returns its last error.
+	if err != nil {
+		return false, err
+	}
+
+	if strings.Contains(output, imageWatcherStr) {
+		glog.V(4).Infof("rbd: watchers on %s: %s", image, output)
+		return true, nil
+	}
+	glog.Warningf("rbd: no watchers on %s", image)
 	return false, nil
 }
 
