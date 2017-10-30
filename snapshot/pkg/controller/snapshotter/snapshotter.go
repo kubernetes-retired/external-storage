@@ -764,7 +764,7 @@ func (vs *volumeSnapshotter) UpdateVolumeSnapshotStatus(snapshot *crdv1.VolumeSn
 			condition.Status == oldCondition.Status &&
 			condition.Reason == oldCondition.Reason &&
 			condition.Message == oldCondition.Message &&
-			condition.LastTransitionTime.Equal(oldCondition.LastTransitionTime)
+			condition.LastTransitionTime.Equal(&oldCondition.LastTransitionTime)
 	}
 
 	if !isEqual {

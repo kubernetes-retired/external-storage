@@ -65,15 +65,11 @@ func (logger *Logger) WithFields(fields Fields) *Entry {
 }
 
 func (logger *Logger) Debugf(format string, args ...interface{}) {
-	if logger.Level >= DebugLevel {
-		NewEntry(logger).Debugf(format, args...)
-	}
+	NewEntry(logger).Debugf(format, args...)
 }
 
 func (logger *Logger) Infof(format string, args ...interface{}) {
-	if logger.Level >= InfoLevel {
-		NewEntry(logger).Infof(format, args...)
-	}
+	NewEntry(logger).Infof(format, args...)
 }
 
 func (logger *Logger) Printf(format string, args ...interface{}) {
@@ -81,45 +77,31 @@ func (logger *Logger) Printf(format string, args ...interface{}) {
 }
 
 func (logger *Logger) Warnf(format string, args ...interface{}) {
-	if logger.Level >= WarnLevel {
-		NewEntry(logger).Warnf(format, args...)
-	}
+	NewEntry(logger).Warnf(format, args...)
 }
 
 func (logger *Logger) Warningf(format string, args ...interface{}) {
-	if logger.Level >= WarnLevel {
-		NewEntry(logger).Warnf(format, args...)
-	}
+	NewEntry(logger).Warnf(format, args...)
 }
 
 func (logger *Logger) Errorf(format string, args ...interface{}) {
-	if logger.Level >= ErrorLevel {
-		NewEntry(logger).Errorf(format, args...)
-	}
+	NewEntry(logger).Errorf(format, args...)
 }
 
 func (logger *Logger) Fatalf(format string, args ...interface{}) {
-	if logger.Level >= FatalLevel {
-		NewEntry(logger).Fatalf(format, args...)
-	}
+	NewEntry(logger).Fatalf(format, args...)
 }
 
 func (logger *Logger) Panicf(format string, args ...interface{}) {
-	if logger.Level >= PanicLevel {
-		NewEntry(logger).Panicf(format, args...)
-	}
+	NewEntry(logger).Panicf(format, args...)
 }
 
 func (logger *Logger) Debug(args ...interface{}) {
-	if logger.Level >= DebugLevel {
-		NewEntry(logger).Debug(args...)
-	}
+	NewEntry(logger).Debug(args...)
 }
 
 func (logger *Logger) Info(args ...interface{}) {
-	if logger.Level >= InfoLevel {
-		NewEntry(logger).Info(args...)
-	}
+	NewEntry(logger).Info(args...)
 }
 
 func (logger *Logger) Print(args ...interface{}) {
@@ -127,45 +109,31 @@ func (logger *Logger) Print(args ...interface{}) {
 }
 
 func (logger *Logger) Warn(args ...interface{}) {
-	if logger.Level >= WarnLevel {
-		NewEntry(logger).Warn(args...)
-	}
+	NewEntry(logger).Warn(args...)
 }
 
 func (logger *Logger) Warning(args ...interface{}) {
-	if logger.Level >= WarnLevel {
-		NewEntry(logger).Warn(args...)
-	}
+	NewEntry(logger).Warn(args...)
 }
 
 func (logger *Logger) Error(args ...interface{}) {
-	if logger.Level >= ErrorLevel {
-		NewEntry(logger).Error(args...)
-	}
+	NewEntry(logger).Error(args...)
 }
 
 func (logger *Logger) Fatal(args ...interface{}) {
-	if logger.Level >= FatalLevel {
-		NewEntry(logger).Fatal(args...)
-	}
+	NewEntry(logger).Fatal(args...)
 }
 
 func (logger *Logger) Panic(args ...interface{}) {
-	if logger.Level >= PanicLevel {
-		NewEntry(logger).Panic(args...)
-	}
+	NewEntry(logger).Panic(args...)
 }
 
 func (logger *Logger) Debugln(args ...interface{}) {
-	if logger.Level >= DebugLevel {
-		NewEntry(logger).Debugln(args...)
-	}
+	NewEntry(logger).Debugln(args...)
 }
 
 func (logger *Logger) Infoln(args ...interface{}) {
-	if logger.Level >= InfoLevel {
-		NewEntry(logger).Infoln(args...)
-	}
+	NewEntry(logger).Infoln(args...)
 }
 
 func (logger *Logger) Println(args ...interface{}) {
@@ -173,31 +141,21 @@ func (logger *Logger) Println(args ...interface{}) {
 }
 
 func (logger *Logger) Warnln(args ...interface{}) {
-	if logger.Level >= WarnLevel {
-		NewEntry(logger).Warnln(args...)
-	}
+	NewEntry(logger).Warnln(args...)
 }
 
 func (logger *Logger) Warningln(args ...interface{}) {
-	if logger.Level >= WarnLevel {
-		NewEntry(logger).Warnln(args...)
-	}
+	NewEntry(logger).Warnln(args...)
 }
 
 func (logger *Logger) Errorln(args ...interface{}) {
-	if logger.Level >= ErrorLevel {
-		NewEntry(logger).Errorln(args...)
-	}
+	NewEntry(logger).Errorln(args...)
 }
 
 func (logger *Logger) Fatalln(args ...interface{}) {
-	if logger.Level >= FatalLevel {
-		NewEntry(logger).Fatalln(args...)
-	}
+	NewEntry(logger).Fatalln(args...)
 }
 
 func (logger *Logger) Panicln(args ...interface{}) {
-	if logger.Level >= PanicLevel {
-		NewEntry(logger).Panicln(args...)
-	}
+	NewEntry(logger).Panicln(args...)
 }

@@ -38,9 +38,9 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/pkg/api/v1/ref"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
@@ -410,7 +410,7 @@ func (ctrl *ProvisionController) Run(stopCh <-chan struct{}) {
 	ctrl.hasRunLock.Unlock()
 	go ctrl.claimController.Run(stopCh)
 	go ctrl.volumeController.Run(stopCh)
-	go ctrl.classReflector.RunUntil(stopCh)
+	go ctrl.classReflector.Run(stopCh)
 	<-stopCh
 }
 
@@ -780,9 +780,16 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 		return nil
 	}
 
+	reclaimPolicy := v1.PersistentVolumeReclaimDelete
+	if ctrl.kubeVersion.AtLeast(utilversion.MustParseSemantic("v1.8.0")) {
+		reclaimPolicy, err = ctrl.fetchReclaimPolicy(claimClass)
+		if err != nil {
+			return err
+		}
+	}
+
 	options := VolumeOptions{
-		// TODO SHOULD be set to `Delete` unless user manually congiures other reclaim policy.
-		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
+		PersistentVolumeReclaimPolicy: reclaimPolicy,
 		PVName:     pvName,
 		PVC:        claim,
 		Parameters: parameters,
@@ -1105,4 +1112,23 @@ func (ctrl *ProvisionController) getStorageClassFields(name string) (string, map
 
 func claimToClaimKey(claim *v1.PersistentVolumeClaim) string {
 	return fmt.Sprintf("%s/%s", claim.Namespace, claim.Name)
+}
+
+func (ctrl *ProvisionController) fetchReclaimPolicy(storageClassName string) (v1.PersistentVolumeReclaimPolicy, error) {
+	classObj, found, err := ctrl.classes.GetByKey(storageClassName)
+	if err != nil {
+		return "", err
+	}
+	if !found {
+		return "", fmt.Errorf("StorageClass %q not found", storageClassName)
+	}
+
+	switch class := classObj.(type) {
+	case *storage.StorageClass:
+		return *class.ReclaimPolicy, nil
+	case *storagebeta.StorageClass:
+		return *class.ReclaimPolicy, nil
+	}
+
+	return v1.PersistentVolumeReclaimDelete, fmt.Errorf("Cannot convert object to StorageClass: %+v", classObj)
 }
