@@ -24,7 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	clientset "k8s.io/client-go/kubernetes"
 
 	"hash/fnv"
 	"math/rand"
@@ -180,7 +180,10 @@ func (c *realRecyclerClient) Event(eventtype, message string) {
 }
 
 func (c *realRecyclerClient) WatchPod(name, namespace string, stopChannel chan struct{}) (<-chan watch.Event, error) {
-	podSelector, _ := fields.ParseSelector("metadata.name=" + name)
+	podSelector, err := fields.ParseSelector("metadata.name=" + name)
+	if err != nil {
+		return nil, err
+	}
 	options := metav1.ListOptions{
 		FieldSelector: podSelector.String(),
 		Watch:         true,

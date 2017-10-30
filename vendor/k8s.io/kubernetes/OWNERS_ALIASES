@@ -3,12 +3,15 @@ aliases:
     - davidopp
     - timothysc
     - wojtek-t
+    - k82cn
   sig-scheduling:
     - davidopp
+    - bsalamat
     - timothysc
     - wojtek-t
-    - k82cn 
+    - k82cn
     - jayunit100
+    - resouer
   sig-cli-maintainers:
     - adohe
     - brendandburns
@@ -28,16 +31,23 @@ aliases:
     - ericchiang
     - fabianofranz
     - ghodss
-    - pwittrock
+    - mengqiy
     - rootfs
+    - shiywang
     - smarterclayton
     - soltysh
     - sttts
-    - ymqytw
-  test-infra-maintainers:
+  sig-testing-reviewers:
     - fejta
     - ixdy
     - rmmh
+    - spiffxp
+    - spxtr
+  sig-testing-approvers:
+    - fejta
+    - ixdy
+    - rmmh
+    - spiffxp
     - spxtr
   sig-node-reviewers:
     - Random-Liu
@@ -45,26 +55,37 @@ aliases:
     - dchen1107
     - derekwaynecarr
     - dims
-    - euank
     - feiskyer
     - mtaufen
     - ncdc
     - pmorie
     - resouer
     - sjpotter
-    - timstclair
+    - tallclair
     - tmrts
     - vishh
     - yifan-gu
     - yujuhong
-  sig-network-reviewers:
-    - thockin
-    - freehan
+  sig-network-approvers:
     - bowei
-    - mrhohn
-    - dcbw
-    - danwinship
     - caseydavenport
+    - danwinship
+    - dcbw
+    - dnardo
+    - freehan
+    - mrhohn
+    - nicksardo
+    - thockin
+  sig-network-reviewers:
+    - bowei
+    - caseydavenport
+    - danwinship
+    - dcbw
+    - dnardo
+    - freehan
+    - mrhohn
+    - nicksardo
+    - thockin
   sig-apps-reviewers:
     - enisoc
     - erictune

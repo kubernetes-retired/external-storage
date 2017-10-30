@@ -28,7 +28,8 @@ import (
 // See https://cloud.google.com/appengine/docs/flexible/custom-runtimes#health_check_requests
 // for details on how to do your own health checking.
 //
-// Main is not yet supported on App Engine Standard.
+// On App Engine Standard it ensures the server has started and is prepared to
+// receive requests.
 //
 // Main never returns.
 //

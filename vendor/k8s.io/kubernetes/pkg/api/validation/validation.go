@@ -24,7 +24,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/golang/glog"
@@ -275,6 +274,10 @@ var ValidateClusterName = genericvalidation.ValidateClusterName
 // It is defined here to avoid import cycle between pkg/apis/storage/validation
 // (where it should be) and this file.
 var ValidateClassName = NameIsDNSSubdomain
+
+// ValidatePiorityClassName can be used to check whether the given priority
+// class name is valid.
+var ValidatePriorityClassName = NameIsDNSSubdomain
 
 // TODO update all references to these functions to point to the genericvalidation ones
 // NameIsDNSSubdomain is a ValidateNameFunc for names that must be a DNS subdomain.
@@ -644,15 +647,21 @@ func validateISCSIVolumeSource(iscsi *api.ISCSIVolumeSource, fldPath *field.Path
 
 func validateFCVolumeSource(fc *api.FCVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if len(fc.TargetWWNs) < 1 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("targetWWNs"), ""))
+	if len(fc.TargetWWNs) < 1 && len(fc.WWIDs) < 1 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("targetWWNs"), "must specify either targetWWNs or wwids, but not both"))
 	}
 
-	if fc.Lun == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("lun"), ""))
-	} else {
-		if *fc.Lun < 0 || *fc.Lun > 255 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("lun"), fc.Lun, validation.InclusiveRangeError(0, 255)))
+	if len(fc.TargetWWNs) != 0 && len(fc.WWIDs) != 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("targetWWNs"), fc.TargetWWNs, "targetWWNs and wwids can not be specified simultaneously"))
+	}
+
+	if len(fc.TargetWWNs) != 0 {
+		if fc.Lun == nil {
+			allErrs = append(allErrs, field.Required(fldPath.Child("lun"), "lun is required if targetWWNs is specified"))
+		} else {
+			if *fc.Lun < 0 || *fc.Lun > 255 {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("lun"), fc.Lun, validation.InclusiveRangeError(0, 255)))
+			}
 		}
 	}
 	return allErrs
@@ -804,7 +813,8 @@ var validDownwardAPIFieldPathExpressions = sets.NewString(
 	"metadata.name",
 	"metadata.namespace",
 	"metadata.labels",
-	"metadata.annotations")
+	"metadata.annotations",
+	"metadata.uid")
 
 func validateDownwardAPIVolumeFile(file *api.DownwardAPIVolumeFile, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -1543,7 +1553,7 @@ func ValidateEnv(vars []api.EnvVar, fldPath *field.Path) field.ErrorList {
 		if len(ev.Name) == 0 {
 			allErrs = append(allErrs, field.Required(idxPath.Child("name"), ""))
 		} else {
-			for _, msg := range validation.IsCIdentifier(ev.Name) {
+			for _, msg := range validation.IsEnvVarName(ev.Name) {
 				allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), ev.Name, msg))
 			}
 		}
@@ -1552,7 +1562,7 @@ func ValidateEnv(vars []api.EnvVar, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
-var validFieldPathExpressionsEnv = sets.NewString("metadata.name", "metadata.namespace", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.podIP")
+var validFieldPathExpressionsEnv = sets.NewString("metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.podIP")
 var validContainerResourceFieldPathExpressions = sets.NewString("limits.cpu", "limits.memory", "requests.cpu", "requests.memory")
 
 func validateEnvVarValueFrom(ev api.EnvVar, fldPath *field.Path) field.ErrorList {
@@ -1632,7 +1642,7 @@ func ValidateEnvFrom(vars []api.EnvFromSource, fldPath *field.Path) field.ErrorL
 	for i, ev := range vars {
 		idxPath := fldPath.Index(i)
 		if len(ev.Prefix) > 0 {
-			for _, msg := range validation.IsCIdentifier(ev.Prefix) {
+			for _, msg := range validation.IsEnvVarName(ev.Prefix) {
 				allErrs = append(allErrs, field.Invalid(idxPath.Child("prefix"), ev.Prefix, msg))
 			}
 		}
@@ -1754,6 +1764,9 @@ func ValidateVolumeMounts(mounts []api.VolumeMount, volumes sets.String, fldPath
 		}
 		if mountpoints.Has(mnt.MountPath) {
 			allErrs = append(allErrs, field.Invalid(idxPath.Child("mountPath"), mnt.MountPath, "must be unique"))
+		}
+		if !path.IsAbs(mnt.MountPath) {
+			allErrs = append(allErrs, field.Invalid(idxPath.Child("mountPath"), mnt.MountPath, "must be an absolute path"))
 		}
 		mountpoints.Insert(mnt.MountPath)
 		if len(mnt.SubPath) > 0 {
@@ -2294,6 +2307,20 @@ func ValidatePodSpec(spec *api.PodSpec, fldPath *field.Path) field.ErrorList {
 
 	if len(spec.HostAliases) > 0 {
 		allErrs = append(allErrs, ValidateHostAliases(spec.HostAliases, fldPath.Child("hostAliases"))...)
+	}
+
+	if len(spec.PriorityClassName) > 0 {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("priorityClassName"), "Pod priority is disabled by feature-gate"))
+		} else {
+			for _, msg := range ValidatePriorityClassName(spec.PriorityClassName, false) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("priorityClassName"), spec.PriorityClassName, msg))
+			}
+		}
+	}
+
+	if spec.Priority != nil && !utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("priority"), "Pod priority is disabled by feature-gate"))
 	}
 
 	return allErrs
@@ -2891,6 +2918,35 @@ func ValidateService(service *api.Service) field.ErrorList {
 		nodePorts[key] = true
 	}
 
+	// Check for duplicate Ports, considering (protocol,port) pairs
+	portsPath = specPath.Child("ports")
+	ports := make(map[api.ServicePort]bool)
+	for i, port := range service.Spec.Ports {
+		portPath := portsPath.Index(i)
+		key := api.ServicePort{Protocol: port.Protocol, Port: port.Port}
+		_, found := ports[key]
+		if found {
+			allErrs = append(allErrs, field.Duplicate(portPath, key))
+		}
+		ports[key] = true
+	}
+
+	// Check for duplicate TargetPort
+	portsPath = specPath.Child("ports")
+	targetPorts := make(map[api.ServicePort]bool)
+	for i, port := range service.Spec.Ports {
+		if (port.TargetPort.Type == intstr.Int && port.TargetPort.IntVal == 0) || (port.TargetPort.Type == intstr.String && port.TargetPort.StrVal == "") {
+			continue
+		}
+		portPath := portsPath.Index(i)
+		key := api.ServicePort{Protocol: port.Protocol, TargetPort: port.TargetPort}
+		_, found := targetPorts[key]
+		if found {
+			allErrs = append(allErrs, field.Duplicate(portPath.Child("targetPort"), port.TargetPort))
+		}
+		targetPorts[key] = true
+	}
+
 	// Validate SourceRange field and annotation
 	_, ok := service.Annotations[api.AnnotationLoadBalancerSourceRangesKey]
 	if len(service.Spec.LoadBalancerSourceRanges) > 0 || ok {
@@ -2913,7 +2969,6 @@ func ValidateService(service *api.Service) field.ErrorList {
 	}
 
 	allErrs = append(allErrs, validateServiceExternalTrafficFieldsValue(service)...)
-	allErrs = append(allErrs, validateServiceExternalTrafficAPIVersion(service)...)
 
 	return allErrs
 }
@@ -2961,25 +3016,6 @@ func validateServicePort(sp *api.ServicePort, requireName, isHeadlessService boo
 func validateServiceExternalTrafficFieldsValue(service *api.Service) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	// Check beta annotations.
-	if l, ok := service.Annotations[api.BetaAnnotationExternalTraffic]; ok {
-		if l != api.AnnotationValueExternalTrafficLocal &&
-			l != api.AnnotationValueExternalTrafficGlobal {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "annotations").Key(api.BetaAnnotationExternalTraffic), l,
-				fmt.Sprintf("ExternalTraffic must be %v or %v", api.AnnotationValueExternalTrafficLocal, api.AnnotationValueExternalTrafficGlobal)))
-		}
-	}
-	if l, ok := service.Annotations[api.BetaAnnotationHealthCheckNodePort]; ok {
-		p, err := strconv.Atoi(l)
-		if err != nil {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "annotations").Key(api.BetaAnnotationHealthCheckNodePort), l,
-				"HealthCheckNodePort must be a valid port number"))
-		} else if p <= 0 {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "annotations").Key(api.BetaAnnotationHealthCheckNodePort), l,
-				"HealthCheckNodePort must be greater than 0"))
-		}
-	}
-
 	// Check first class fields.
 	if service.Spec.ExternalTrafficPolicy != "" &&
 		service.Spec.ExternalTrafficPolicy != api.ServiceExternalTrafficPolicyTypeCluster &&
@@ -2990,54 +3026,6 @@ func validateServiceExternalTrafficFieldsValue(service *api.Service) field.Error
 	if service.Spec.HealthCheckNodePort < 0 {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("spec").Child("healthCheckNodePort"), service.Spec.HealthCheckNodePort,
 			"HealthCheckNodePort must be not less than 0"))
-	}
-
-	return allErrs
-}
-
-// serviceExternalTrafficStatus stores flags indicating whether ExternalTraffic
-// related beta annotations and GA fields are set on service.
-type serviceExternalTrafficStatus struct {
-	betaExternalTrafficIsSet bool
-	betaHealthCheckIsSet     bool
-	gaExternalTrafficIsSet   bool
-	gaHealthCheckIsSet       bool
-}
-
-func (s *serviceExternalTrafficStatus) useBetaExternalTrafficWithGA() bool {
-	return s.betaExternalTrafficIsSet && (s.gaExternalTrafficIsSet || s.gaHealthCheckIsSet)
-}
-
-func (s *serviceExternalTrafficStatus) useBetaHealthCheckWithGA() bool {
-	return s.betaHealthCheckIsSet && (s.gaExternalTrafficIsSet || s.gaHealthCheckIsSet)
-}
-
-func getServiceExternalTrafficStatus(service *api.Service) *serviceExternalTrafficStatus {
-	s := serviceExternalTrafficStatus{}
-	_, s.betaExternalTrafficIsSet = service.Annotations[api.BetaAnnotationExternalTraffic]
-	_, s.betaHealthCheckIsSet = service.Annotations[api.BetaAnnotationHealthCheckNodePort]
-	s.gaExternalTrafficIsSet = service.Spec.ExternalTrafficPolicy != ""
-	s.gaHealthCheckIsSet = service.Spec.HealthCheckNodePort != 0
-	return &s
-}
-
-// validateServiceExternalTrafficAPIVersion checks if user mixes ExternalTraffic
-// API versions.
-func validateServiceExternalTrafficAPIVersion(service *api.Service) field.ErrorList {
-	allErrs := field.ErrorList{}
-
-	status := getServiceExternalTrafficStatus(service)
-
-	if status.useBetaExternalTrafficWithGA() {
-		fieldPath := field.NewPath("metadata", "annotations").Key(api.BetaAnnotationExternalTraffic)
-		msg := fmt.Sprintf("please replace the beta annotation with 'ExternalTrafficPolicy' field")
-		allErrs = append(allErrs, field.Invalid(fieldPath, api.BetaAnnotationExternalTraffic, msg))
-	}
-
-	if status.useBetaHealthCheckWithGA() {
-		fieldPath := field.NewPath("metadata", "annotations").Key(api.BetaAnnotationHealthCheckNodePort)
-		msg := fmt.Sprintf("please replace the beta annotation with 'HealthCheckNodePort' field")
-		allErrs = append(allErrs, field.Invalid(fieldPath, api.BetaAnnotationHealthCheckNodePort, msg))
 	}
 
 	return allErrs
@@ -3287,6 +3275,11 @@ func ValidateNode(node *api.Node) field.ErrorList {
 		allErrs = append(allErrs, field.Required(field.NewPath("spec", "externalID"), ""))
 	}
 
+	// Only allow Node.Spec.ConfigSource to be set if the DynamicKubeletConfig feature gate is enabled
+	if node.Spec.ConfigSource != nil && !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "configSource"), "configSource may only be set if the DynamicKubeletConfig feature gate is enabled)"))
+	}
+
 	// TODO(rjnagal): Ignore PodCIDR till its completely implemented.
 	return allErrs
 }
@@ -3314,7 +3307,7 @@ func ValidateNodeUpdate(node, oldNode *api.Node) field.ErrorList {
 		allErrs = append(allErrs, ValidateResourceQuantityValue(string(k), v, resPath)...)
 	}
 
-	// Validte no duplicate addresses in node status.
+	// Validate no duplicate addresses in node status.
 	addresses := make(map[api.NodeAddress]bool)
 	for i, address := range node.Status.Addresses {
 		if _, ok := addresses[address]; ok {
@@ -3347,10 +3340,16 @@ func ValidateNodeUpdate(node, oldNode *api.Node) field.ErrorList {
 	}
 	oldNode.Spec.Taints = node.Spec.Taints
 
+	// Allow updates to Node.Spec.ConfigSource if DynamicKubeletConfig feature gate is enabled
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
+		oldNode.Spec.ConfigSource = node.Spec.ConfigSource
+	}
+
+	// We made allowed changes to oldNode, and now we compare oldNode to node. Any remaining differences indicate changes to protected fields.
 	// TODO: Add a 'real' error type for this error and provide print actual diffs.
 	if !apiequality.Semantic.DeepEqual(oldNode, node) {
 		glog.V(4).Infof("Update failed validation %#v vs %#v", oldNode, node)
-		allErrs = append(allErrs, field.Forbidden(field.NewPath(""), "node updates may only change labels, taints or capacity"))
+		allErrs = append(allErrs, field.Forbidden(field.NewPath(""), "node updates may only change labels, taints, or capacity (or configSource, if the DynamicKubeletConfig feature gate is enabled)"))
 	}
 
 	return allErrs
@@ -3359,6 +3358,12 @@ func ValidateNodeUpdate(node, oldNode *api.Node) field.ErrorList {
 // Validate compute resource typename.
 // Refer to docs/design/resources.md for more details.
 func validateResourceName(value string, fldPath *field.Path) field.ErrorList {
+	// Opaque integer resources (OIR) deprecation began in v1.8
+	// TODO: Remove warning after OIR deprecation cycle.
+	if helper.IsOpaqueIntResourceName(api.ResourceName(value)) {
+		glog.Errorf("DEPRECATION WARNING! Opaque integer resources are deprecated starting with v1.8: %s", value)
+	}
+
 	allErrs := field.ErrorList{}
 	for _, msg := range validation.IsQualifiedName(value) {
 		allErrs = append(allErrs, field.Invalid(fldPath, value, msg))
@@ -3716,9 +3721,9 @@ func ValidateResourceRequirements(requirements *api.ResourceRequirements, fldPat
 		// Check that request <= limit.
 		requestQuantity, exists := requirements.Requests[resourceName]
 		if exists {
-			// For GPUs, not only requests can't exceed limits, they also can't be lower, i.e. must be equal.
-			if resourceName == api.ResourceNvidiaGPU && quantity.Cmp(requestQuantity) != 0 {
-				allErrs = append(allErrs, field.Invalid(reqPath, requestQuantity.String(), fmt.Sprintf("must be equal to %s limit", api.ResourceNvidiaGPU)))
+			// Ensure overcommit is allowed for the resource if request != limit
+			if quantity.Cmp(requestQuantity) != 0 && !helper.IsOvercommitAllowed(resourceName) {
+				allErrs = append(allErrs, field.Invalid(reqPath, requestQuantity.String(), fmt.Sprintf("must be equal to %s limit", resourceName)))
 			} else if quantity.Cmp(requestQuantity) < 0 {
 				allErrs = append(allErrs, field.Invalid(limPath, quantity.String(), fmt.Sprintf("must be greater than or equal to %s request", resourceName)))
 			}
@@ -3994,12 +3999,10 @@ func validateEndpointSubsets(subsets []api.EndpointSubset, oldSubsets []api.Endp
 		ss := &subsets[i]
 		idxPath := fldPath.Index(i)
 
+		// EndpointSubsets must include endpoint address. For headless service, we allow its endpoints not to have ports.
 		if len(ss.Addresses) == 0 && len(ss.NotReadyAddresses) == 0 {
 			//TODO: consider adding a RequiredOneOf() error for this and similar cases
 			allErrs = append(allErrs, field.Required(idxPath, "must specify `addresses` or `notReadyAddresses`"))
-		}
-		if len(ss.Ports) == 0 {
-			allErrs = append(allErrs, field.Required(idxPath.Child("ports"), ""))
 		}
 		for addr := range ss.Addresses {
 			allErrs = append(allErrs, validateEndpointAddress(&ss.Addresses[addr], idxPath.Child("addresses").Index(addr), ipToNodeName)...)
