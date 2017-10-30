@@ -51,3 +51,23 @@
       name: targetd
       enabled: yes
       state: started
+
+  - name: disable discovery auth, if necessary
+    command: targetcli iscsi/ set discovery_auth enable=0
+    when: chap_auth_discovery == false
+
+  - name: enable discovery auth, if necessary
+    command: targetcli iscsi/ set discovery_auth enable=1
+    when: chap_auth_discovery == true
+  - name: setup initiator username for discovery, if necessary
+    command: targetcli iscsi/ set discovery_auth userid={{ discovery_sendtargets_auth_username }}
+    when: chap_auth_discovery == true
+  - name: setup initiator password for discovery, if necessary
+    command: targetcli iscsi/ set discovery_auth password={{ discovery_sendtargets_auth_password }}
+    when: chap_auth_discovery == true
+  - name: setup target username for discovery, if necessary
+    command: targetcli iscsi/ set discovery_auth mutual_userid={{ discovery_sendtargets_auth_username_in }}
+    when: chap_auth_discovery == true
+  - name: setup target password for discovery, if necessary
+    command: targetcli iscsi/ set discovery_auth mutual_password={{ discovery_sendtargets_auth_password_in }}
+    when: chap_auth_discovery == true

@@ -109,7 +109,30 @@
            create -f /tmp/iscsi-provisioner-class.yaml
            -n iscsi-provisioner
        when: class_test.rc != 0
-   
+
+     - name: create chap credential file, if necessary
+       template:
+         src: ./session-chap-credential.properties.j2
+         dest:  /tmp/session-chap-credential.properties
+       when: chap_auth_session == true
+
+     - name: test if chap secret exists, if necessary
+       command: >
+          /usr/bin/oc --config=/etc/origin/master/admin.kubeconfig
+                     get secret chap-auth-secret -n iscsi-provisioner
+       when: chap_auth_session == true
+       failed_when: false
+       changed_when: false
+       register: class_test
+
+     - name: create chap secret, if necessary
+       shell: >
+           /usr/bin/oc --config=/etc/origin/master/admin.kubeconfig
+           create secret generic chap-auth-secret --from-file=/tmp/session-chap-credential.properties
+           -n iscsi-provisioner
+       when: (chap_auth_session == true) and (class_test.rc != 0)
+
+
      - name: create iscsi provisioner deployment config template
        template: 
          src: ./iscsi-provisioner-dc.yaml.j2

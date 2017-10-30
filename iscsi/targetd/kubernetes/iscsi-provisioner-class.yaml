@@ -21,6 +21,12 @@ parameters:
 
 # this is a comma separated list of initiators that will be give access to the created volumes, they must correspond to what you have configured in your nodes.
   initiators: iqn.2017-04.com.example:node1
+  
+# whether or not to use chap authentication for discovery operations  
+  chapAuthDiscovery: "true"
+ 
+# whether or not to use chap authentication for session operations  
+  chapAuthSession: "true"  
 
 # This is the filesystem you want your volume to be formatted with, default xfs
 # fsType: xfs
