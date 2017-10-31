@@ -1,0 +1,4 @@
+---
+- hosts: targetd
+  roles:
+  - role: ../roles/prepare-iscsi-server

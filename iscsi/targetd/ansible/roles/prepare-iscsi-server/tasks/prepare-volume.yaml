@@ -1,0 +1,14 @@
+---
+  - name: Fail if lvm names is empty
+    fail:
+      msg: "'targetd_lvm_physical_volume' must contain a list of comma-separated available volumes"
+    when: targetd_lvm_physical_volumes is not defined  
+  - name: Install lvm2
+    yum: 
+      name: lvm2
+      state: latest
+  - name: Create Volume Group
+    lvg:
+      vg: "{{ targetd_lvm_volume_group }}"
+      pvs:  "{{ targetd_lvm_physical_volume }}" 
+# here we could enable thinly prvisioned volumes           

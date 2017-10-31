@@ -1,0 +1,5 @@
+---
+  - name: gather facts
+    setup:
+  - name: deploy provisioner
+    include: deploy-provisioner.yaml  

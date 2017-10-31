@@ -1,0 +1,4 @@
+---
+- include: prepare-iscsi-server.yaml
+- include: prepare-nodes.yaml
+- include: deploy-provisioner.yaml

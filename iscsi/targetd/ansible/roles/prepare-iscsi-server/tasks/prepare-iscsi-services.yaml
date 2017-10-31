@@ -1,0 +1,44 @@
+---
+
+  - name: Install targetd
+    yum: 
+      name: targetd
+      state: latest
+  - name: Install targetcli
+    yum:
+      name: targetcli
+      state: latest
+  - name: Install Firewalld 
+    yum:
+      name: firewalld
+      state: latest
+  - name: Ensure firewalld is running
+    service:
+      name: firewalld
+      state: started
+      enabled: yes
+  - name: Firewalld allow iscsi traffic
+    firewalld: 
+      service: iscsi-target
+      permanent: true 
+      state: enabled
+  - name: Firewalld allow targetd traffic
+    firewalld: 
+      port: 18700/tcp
+      permanent: true 
+      state: enabled
+  - name: Enable target Service
+    service:
+      name: target
+      enabled: yes
+      state: started
+  - name: Write targetd.yaml file
+    template:
+      src:  ../templates/targetd.yaml.j2
+      dest: /etc/target/targetd.yaml
+      mode: 0644
+  - name: Enable targetd Service
+    service:
+      name: targetd
+      enabled: yes
+      state: started
