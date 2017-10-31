@@ -16,8 +16,8 @@ limitations under the License.
 
 package v1
 
-//VsmSpec holds the config for creating a VSM
-type VsmSpec struct {
+//VolumeSpec holds the config for creating a VSM
+type VolumeSpec struct {
 	Kind       string `yaml:"kind"`
 	APIVersion string `yaml:"apiVersion"`
 	Metadata   struct {
@@ -25,6 +25,7 @@ type VsmSpec struct {
 		Labels struct {
 			Storage      string `yaml:"volumeprovisioner.mapi.openebs.io/storage-size"`
 			StorageClass string `yaml:"k8s.io/storage-class"`
+			Namespace    string `yaml:"k8s.io/namespace"`
 		}
 	} `yaml:"metadata"`
 }
