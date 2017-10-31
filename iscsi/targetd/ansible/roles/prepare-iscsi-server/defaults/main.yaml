@@ -1,0 +1,5 @@
+---
+targetd_lvm_volume_group: vg-targetd
+chap_auth_discovery: false
+targetd_user: admin
+targetd_password: admin
