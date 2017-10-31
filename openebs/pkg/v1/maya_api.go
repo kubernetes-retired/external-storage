@@ -38,9 +38,9 @@ const (
 
 //OpenEBSVolumeInterface Interface to bind methods
 type OpenEBSVolumeInterface interface {
-	CreateVsm(string, string) (string, error)
-	ListVsm(string, interface{}) error
-	DeleteVsm(string) error
+	CreateVolume(mayav1.VolumeSpec) (string, error)
+	ListVolume(string, interface{}) error
+	DeleteVolume(string) error
 }
 
 //MayaInterface interface to hold maya specific methods
@@ -68,9 +68,7 @@ func (v OpenEBSVolume) GetMayaClusterIP(client kubernetes.Interface) (string, er
 }
 
 // CreateVsm to create the Vsm through a API call to m-apiserver
-func (v OpenEBSVolume) CreateVsm(vname, size, storageClassName string) (string, error) {
-
-	var vs mayav1.VsmSpec
+func (v OpenEBSVolume) CreateVolume(vs mayav1.VolumeSpec) (string, error) {
 
 	addr := os.Getenv("MAPI_ADDR")
 	if addr == "" {
@@ -82,14 +80,11 @@ func (v OpenEBSVolume) CreateVsm(vname, size, storageClassName string) (string, 
 
 	vs.Kind = "PersistentVolumeClaim"
 	vs.APIVersion = "v1"
-	vs.Metadata.Name = vname
-	vs.Metadata.Labels.Storage = size
-	vs.Metadata.Labels.StorageClass = storageClassName
 
 	//Marshal serializes the value provided into a YAML document
 	yamlValue, _ := yaml.Marshal(vs)
 
-	glog.Infof("VSM Spec Created:\n%v\n", string(yamlValue))
+	glog.Infof("Volume Spec Created:\n%v\n", string(yamlValue))
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(yamlValue))
 
@@ -117,12 +112,12 @@ func (v OpenEBSVolume) CreateVsm(vname, size, storageClassName string) (string, 
 		return "HTTP Status error from maya-apiserver", err
 	}
 
-	glog.Infof("VSM Successfully Created:\n%v\n", string(data))
-	return "VSM Successfully Created", nil
+	glog.Infof("Volume Successfully Created:\n%v\n", string(data))
+	return "Volume Successfully Created", nil
 }
 
 // ListVsm to get the info of Vsm through a API call to m-apiserver
-func (v OpenEBSVolume) ListVsm(vname string, obj interface{}) error {
+func (v OpenEBSVolume) ListVolume(vname string, obj interface{}) error {
 
 	addr := os.Getenv("MAPI_ADDR")
 	if addr == "" {
@@ -132,7 +127,7 @@ func (v OpenEBSVolume) ListVsm(vname string, obj interface{}) error {
 	}
 	url := addr + "/latest/volumes/info/" + vname
 
-	glog.Infof("Get details for VSM :%v", string(vname))
+	glog.Infof("Get details for Volume :%v", string(vname))
 
 	req, err := http.NewRequest("GET", url, nil)
 	c := &http.Client{
@@ -150,12 +145,12 @@ func (v OpenEBSVolume) ListVsm(vname string, obj interface{}) error {
 		glog.Errorf("HTTP Status error from maya-apiserver: %v\n", http.StatusText(code))
 		return err
 	}
-	glog.Info("VSM Details Successfully Retrieved")
+	glog.Info("Volume Details Successfully Retrieved")
 	return json.NewDecoder(resp.Body).Decode(obj)
 }
 
 // DeleteVsm to get delete Vsm through a API call to m-apiserver
-func (v OpenEBSVolume) DeleteVsm(vname string) error {
+func (v OpenEBSVolume) DeleteVolume(vname string) error {
 
 	addr := os.Getenv("MAPI_ADDR")
 	if addr == "" {
@@ -165,7 +160,7 @@ func (v OpenEBSVolume) DeleteVsm(vname string) error {
 	}
 	url := addr + "/latest/volumes/delete/" + vname
 
-	glog.Infof("Delete VSM :%v", string(vname))
+	glog.Infof("Delete Volume :%v", string(vname))
 
 	req, err := http.NewRequest("GET", url, nil)
 	c := &http.Client{
@@ -183,6 +178,6 @@ func (v OpenEBSVolume) DeleteVsm(vname string) error {
 		glog.Errorf("HTTP Status error from maya-apiserver: %v\n", http.StatusText(code))
 		return err
 	}
-	glog.Info("VSM Deleted Successfully initiated")
+	glog.Info("Volume Deleted Successfully initiated")
 	return nil
 }

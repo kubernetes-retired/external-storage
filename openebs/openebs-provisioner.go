@@ -51,9 +51,10 @@ type openEBSProvisioner struct {
 
 // NewOpenEBSProvisioner creates a new openebs provisioner
 func NewOpenEBSProvisioner(client kubernetes.Interface) controller.Provisioner {
+
 	nodeName := os.Getenv("NODE_NAME")
 	if nodeName == "" {
-		glog.Errorf("env variable NODE_NAME must be set so that this provisioner can identify itself")
+		glog.Errorf("ENV variable 'NODE_NAME' is not set")
 	}
 	var openebsObj mApiv1.OpenEBSVolume
 
@@ -83,18 +84,22 @@ func (p *openEBSProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 	//Issue a request to Maya API Server to create a volume
 	var volume mayav1.Volume
 	var openebsVol mApiv1.OpenEBSVolume
+	volumeSpec := mayav1.VolumeSpec{}
 
 	volSize := options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-  
-	storageClassName := *options.PVC.Spec.StorageClassName
+	volumeSpec.Metadata.Labels.Storage = volSize.String()
 
-	_, err := openebsVol.CreateVsm(options.PVName, volSize.String(), storageClassName)
+	volumeSpec.Metadata.Labels.StorageClass = *options.PVC.Spec.StorageClassName
+	volumeSpec.Metadata.Labels.Namespace = options.PVC.Namespace
+	volumeSpec.Metadata.Name = options.PVName
+
+	_, err := openebsVol.CreateVolume(volumeSpec)
 	if err != nil {
 		glog.Errorf("Error creating volume: %v", err)
 		return nil, err
 	}
 
-	err = openebsVol.ListVsm(options.PVName, &volume)
+	err = openebsVol.ListVolume(options.PVName, &volume)
 	if err != nil {
 		glog.Errorf("Error getting volume details: %v", err)
 		return nil, err
@@ -161,7 +166,7 @@ func (p *openEBSProvisioner) Delete(volume *v1.PersistentVolume) error {
 	}
 
 	// Issue a delete request to Maya API Server
-	err := openebsVol.DeleteVsm(volume.Name)
+	err := openebsVol.DeleteVolume(volume.Name)
 	if err != nil {
 		glog.Errorf("Error while deleting volume: %v", err)
 		return err
