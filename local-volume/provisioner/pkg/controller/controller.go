@@ -47,24 +47,26 @@ func StartLocalController(client *kubernetes.Clientset, config *common.UserConfi
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: provisionerName})
 
 	runtimeConfig := &common.RuntimeConfig{
-		UserConfig: config,
-		Cache:      cache.NewVolumeCache(),
-		VolUtil:    util.NewVolumeUtil(),
-		APIUtil:    util.NewAPIUtil(client),
-		Client:     client,
-		Name:       provisionerName,
-		Recorder:   recorder,
+		UserConfig:    config,
+		Cache:         cache.NewVolumeCache(),
+		VolUtil:       util.NewVolumeUtil(),
+		APIUtil:       util.NewAPIUtil(client),
+		Client:        client,
+		Name:          provisionerName,
+		Recorder:      recorder,
+		BlockDisabled: true, // TODO: Block discovery currently disabled.
 	}
 
 	populator := populator.NewPopulator(runtimeConfig)
 	populator.Start()
 
-	discoverer, err := discovery.NewDiscoverer(runtimeConfig)
+	ptable := deleter.NewProcTable()
+	discoverer, err := discovery.NewDiscoverer(runtimeConfig, ptable)
 	if err != nil {
 		glog.Fatalf("Error starting discoverer: %v", err)
 	}
 
-	deleter := deleter.NewDeleter(runtimeConfig)
+	deleter := deleter.NewDeleter(runtimeConfig, ptable)
 
 	glog.Info("Controller started\n")
 	for {

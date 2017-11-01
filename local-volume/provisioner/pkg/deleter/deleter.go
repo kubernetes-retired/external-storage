@@ -18,25 +18,31 @@ package deleter
 
 import (
 	"fmt"
-	"path/filepath"
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
 
+	"bufio"
 	"k8s.io/api/core/v1"
+	"os"
+	"os/exec"
+	"strings"
+	"sync"
 )
 
 // Deleter handles PV cleanup and object deletion
 // For file-based volumes, it deletes the contents of the directory
 type Deleter struct {
 	*common.RuntimeConfig
+	ProcTable ProcTable
 }
 
 // NewDeleter creates a Deleter object to handle the cleanup and deletion of local PVs
 // allocated by this provisioner
-func NewDeleter(config *common.RuntimeConfig) *Deleter {
+func NewDeleter(config *common.RuntimeConfig, procTable ProcTable) *Deleter {
 	return &Deleter{
 		RuntimeConfig: config,
+		ProcTable:     procTable,
 	}
 }
 
@@ -46,60 +52,171 @@ func (d *Deleter) DeletePVs() {
 	for _, pv := range d.Cache.ListPVs() {
 		if pv.Status.Phase == v1.VolumeReleased {
 			name := pv.Name
-			glog.Infof("Deleting PV %q", name)
-
 			// Cleanup volume
-			err := d.cleanupPV(pv)
+			err := d.deletePV(pv)
 			if err != nil {
 				cleaningLocalPVErr := fmt.Errorf("Error cleaning PV %q: %v", name, err.Error())
 				d.RuntimeConfig.Recorder.Eventf(pv, v1.EventTypeWarning, common.EventVolumeFailedDelete, cleaningLocalPVErr.Error())
+				glog.Error(err)
 				continue
 			}
-
-			// Remove API object
-			err = d.APIUtil.DeletePV(name)
-			if err != nil {
-				// TODO: Does delete return an error if object has already been deleted?
-				deletingLocalPVErr := fmt.Errorf("Error deleting PV %q: %v", name, err.Error())
-				d.RuntimeConfig.Recorder.Eventf(pv, v1.EventTypeWarning, common.EventVolumeFailedDelete, deletingLocalPVErr.Error())
-				continue
-			}
-			glog.Infof("Deleted PV %q", name)
 		}
 	}
 }
 
-func (d *Deleter) cleanupPV(pv *v1.PersistentVolume) error {
+func (d *Deleter) deletePV(pv *v1.PersistentVolume) error {
 	if pv.Spec.Local == nil {
 		return fmt.Errorf("Unsupported volume type")
 	}
 
 	config, ok := d.DiscoveryMap[pv.Spec.StorageClassName]
 	if !ok {
-		return fmt.Errorf("Unknown storage class name %v", pv.Spec.StorageClassName)
+		return fmt.Errorf("Unknown storage class name %s", pv.Spec.StorageClassName)
+	}
+
+	mountPath, err := common.GetContainerPath(pv, config)
+	if err != nil {
+		return err
 	}
 
 	// TODO: Get volType from PV.
 	volType := common.VolumeTypeFile
-	switch volType {
-	case common.VolumeTypeFile:
-		return d.cleanupFileVolume(pv, config)
-	case common.VolumeTypeBlock:
-		return fmt.Errorf("Not yet implemented")
-	default:
-		return fmt.Errorf("Unexpected volume type %q for deleting path %q", volType, pv.Spec.Local.Path)
+	isblk, _ := d.VolUtil.IsBlock(mountPath)
+	if isblk {
+		volType = common.VolumeTypeBlock
 	}
+
+	if d.ProcTable.IsRunning(pv.Name) {
+		// Run in progress, nothing to do,
+		return nil
+	}
+
+	err = d.ProcTable.MarkRunning(pv.Name)
+	if err != nil {
+		return err
+	}
+
+	go d.asyncDeletePV(pv, volType, mountPath, config)
+
+	return nil
 }
 
-func (d *Deleter) cleanupFileVolume(pv *v1.PersistentVolume, config common.MountConfig) error {
-	specPath := pv.Spec.Local.Path
-	relativePath, err := filepath.Rel(config.HostDir, specPath)
-	if err != nil {
-		return fmt.Errorf("Could not get relative path: %v", err)
+func (d *Deleter) asyncDeletePV(pv *v1.PersistentVolume, volType string, mountPath string, config common.MountConfig) {
+	defer d.ProcTable.MarkDone(pv.Name)
+
+	// Make absolutely sure here that we are not deleting anything outside of mounted dir
+	if !strings.HasPrefix(mountPath, config.MountDir) {
+		err := fmt.Errorf("Unexpected error pv %q mountPath %s but mount dir is %s", pv.Name, mountPath,
+			config.MountDir)
+		glog.Error(err)
+		return
 	}
 
-	mountPath := filepath.Join(config.MountDir, relativePath)
+	var err error
+	switch volType {
+	case common.VolumeTypeFile:
+		err = d.deleteFilePV(pv, mountPath, config)
+	case common.VolumeTypeBlock:
+		err = d.cleanupBlockPV(pv, mountPath, config)
+	default:
+		err = fmt.Errorf("Unexpected volume type %q for deleting path %q", volType, pv.Spec.Local.Path)
+	}
 
-	glog.Infof("Deleting PV %q contents at hostpath %q, mountpath %q", pv.Name, specPath, mountPath)
+	if err != nil {
+		glog.Error(err)
+		return
+	}
+
+	// Remove API object
+	if err := d.APIUtil.DeletePV(pv.Name); err != nil {
+		// TODO: Does delete return an error if object has already been deleted?
+		deletingLocalPVErr := fmt.Errorf("Error deleting PV %q: %v", pv.Name, err.Error())
+		d.RuntimeConfig.Recorder.Eventf(pv, v1.EventTypeWarning, common.EventVolumeFailedDelete,
+			deletingLocalPVErr.Error())
+		glog.Error(deletingLocalPVErr)
+		return
+	}
+
+	glog.Infof("Deleted PV %q", pv.Name)
+
+}
+
+func (d *Deleter) deleteFilePV(pv *v1.PersistentVolume, mountPath string, config common.MountConfig) error {
+	glog.Infof("Deleting PV file volume %q contents at hostpath %q, mountpath %q", pv.Name, pv.Spec.Local.Path,
+		mountPath)
+
 	return d.VolUtil.DeleteContents(mountPath)
+}
+
+func (d *Deleter) cleanupBlockPV(pv *v1.PersistentVolume, blkdevPath string, config common.MountConfig) error {
+
+	if len(config.BlockCleanerCommand) < 1 {
+		err := fmt.Errorf("Blockcleaner command was empty for pv %q ountPath %s but mount dir is %s", pv.Name,
+			blkdevPath, config.MountDir)
+		glog.Error(err)
+		return err
+	}
+
+	cleaningInfo := fmt.Errorf("Starting cleanup of Block PV %q, this may take a while", pv.Name)
+	d.RuntimeConfig.Recorder.Eventf(pv, v1.EventTypeNormal, common.VolumeDelete, cleaningInfo.Error())
+	glog.Infof("Deleting PV block volume %q device hostpath %q, mountpath %q", pv.Name, pv.Spec.Local.Path,
+		blkdevPath)
+
+	err := d.execScript(pv.Name, blkdevPath, config.BlockCleanerCommand[0], config.BlockCleanerCommand[1:]...)
+	if err != nil {
+		glog.Error(err)
+		return err
+	}
+	glog.Infof("Completed cleanup of pv %q", pv.Name)
+
+	return nil
+}
+
+func (d *Deleter) execScript(pvName string, blkdevPath string, exe string, exeArgs ...string) error {
+	cmd := exec.Command(exe, exeArgs...)
+	cmd.Env = append(os.Environ(), fmt.Sprintf("%s=%s", common.LocalPVEnv, blkdevPath))
+	var wg sync.WaitGroup
+	// Wait for stderr & stdout  go routines
+	wg.Add(2)
+
+	outReader, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+
+	go func() {
+		defer wg.Done()
+		outScanner := bufio.NewScanner(outReader)
+		for outScanner.Scan() {
+			outstr := outScanner.Text()
+			glog.Infof("Cleanup pv %q: StdoutBuf - %q", pvName, outstr)
+		}
+	}()
+
+	errReader, err := cmd.StderrPipe()
+	if err != nil {
+		return err
+	}
+
+	go func() {
+		defer wg.Done()
+		errScanner := bufio.NewScanner(errReader)
+		for errScanner.Scan() {
+			errstr := errScanner.Text()
+			glog.Infof("Cleanup pv %q: StderrBuf - %q", pvName, errstr)
+		}
+	}()
+
+	err = cmd.Start()
+	if err != nil {
+		return err
+	}
+
+	wg.Wait()
+	err = cmd.Wait()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
