@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/kubelet/apis"
+	"path/filepath"
 )
 
 const (
@@ -50,6 +51,8 @@ const (
 	DefaultHostDir = "/mnt/disks"
 	// DefaultMountDir is the container mount point for the default host dir.
 	DefaultMountDir = "/local-disks"
+	// DefaultBlockCleanerCommand is the default block device cleaning command
+	DefaultBlockCleanerCommand = "/scripts/quick_reset.sh"
 
 	// EventVolumeFailedDelete copied from k8s.io/kubernetes/pkg/controller/volume/events
 	EventVolumeFailedDelete = "VolumeFailedDelete"
@@ -60,6 +63,11 @@ const (
 	ProvisonerStorageClassConfig = "storageClassMap"
 	// ProvisionerNodeLabelsForPV contains a list of node labels to be copied to the PVs created by the provisioner
 	ProvisionerNodeLabelsForPV = "nodeLabelsForPV"
+	// VolumeDelete copied from k8s.io/kubernetes/pkg/controller/volume/events
+	VolumeDelete = "VolumeDelete"
+
+	// LocalPVEnv will contain the device path when script is invoked
+	LocalPVEnv = "LOCAL_PV_BLKDEVICE"
 )
 
 // UserConfig stores all the user-defined parameters to the provisioner
@@ -78,6 +86,8 @@ type MountConfig struct {
 	HostDir string `json:"hostDir" yaml:"hostDir"`
 	// The mount point of the hostpath volume
 	MountDir string `json:"mountDir" yaml:"mountDir"`
+	// The type of block cleaner to use
+	BlockCleanerCommand []string `json:"blockCleanerCommand" yaml:"blockCleanerCommand"`
 }
 
 // RuntimeConfig stores all the objects that the provisioner needs to run
@@ -95,6 +105,8 @@ type RuntimeConfig struct {
 	VolUtil util.VolumeUtil
 	// Recorder is used to record events in the API server
 	Recorder record.EventRecorder
+	// Disable block device discovery and management if true
+	BlockDisabled bool
 }
 
 // LocalPVConfig defines the parameters for creating a local PV
@@ -148,6 +160,16 @@ func CreateLocalPVSpec(config *LocalPVConfig) *v1.PersistentVolume {
 	}
 }
 
+// GetContainerPath gets the local path (within provisioner container) of the PV
+func GetContainerPath(pv *v1.PersistentVolume, config MountConfig) (string, error) {
+	relativePath, err := filepath.Rel(config.HostDir, pv.Spec.Local.Path)
+	if err != nil {
+		return "", fmt.Errorf("Could not get relative path for pv %q: %v", pv.Name, err)
+	}
+
+	return filepath.Join(config.MountDir, relativePath), nil
+}
+
 // GetVolumeConfigFromConfigMap gets volume configuration from given configmap,
 func GetVolumeConfigFromConfigMap(client *kubernetes.Clientset, namespace, name string, provisionerConfig *ProvisionerConfiguration) error {
 	configMap, err := client.CoreV1().ConfigMaps(namespace).Get(name, metav1.GetOptions{})
@@ -162,8 +184,9 @@ func GetVolumeConfigFromConfigMap(client *kubernetes.Clientset, namespace, name 
 func GetDefaultVolumeConfig(provisionerConfig *ProvisionerConfiguration) {
 	provisionerConfig.StorageClassConfig = map[string]MountConfig{
 		"local-storage": {
-			HostDir:  DefaultHostDir,
-			MountDir: DefaultMountDir,
+			HostDir:             DefaultHostDir,
+			MountDir:            DefaultMountDir,
+			BlockCleanerCommand: []string{DefaultBlockCleanerCommand},
 		},
 	}
 }
@@ -196,6 +219,18 @@ func ConfigMapDataToVolumeConfig(data map[string]string, provisionerConfig *Prov
 	}
 	if err := yaml.Unmarshal([]byte(rawYaml), provisionerConfig); err != nil {
 		return fmt.Errorf("fail to Unmarshal yaml due to: %#v", err)
+	}
+	for class, config := range provisionerConfig.StorageClassConfig {
+		if config.BlockCleanerCommand == nil {
+			// supply a default block cleaner command.
+			config.BlockCleanerCommand = []string{DefaultBlockCleanerCommand}
+		} else {
+			// Validate that array is non empty
+			if len(config.BlockCleanerCommand) < 1 {
+				return fmt.Errorf("Invalid empty block cleaner command for class %v", class)
+			}
+		}
+		provisionerConfig.StorageClassConfig[class] = config
 	}
 	return nil
 }

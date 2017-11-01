@@ -21,6 +21,7 @@ import (
 	esUtil "github.com/kubernetes-incubator/external-storage/lib/util"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/cache"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
+	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/deleter"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/util"
 	"path/filepath"
 	"testing"
@@ -83,9 +84,10 @@ type testConfig struct {
 	// True if testing api failure
 	apiShouldFail bool
 	// The rest are set during setup
-	volUtil *util.FakeVolumeUtil
-	apiUtil *util.FakeAPIUtil
-	cache   *cache.VolumeCache
+	volUtil   *util.FakeVolumeUtil
+	apiUtil   *util.FakeAPIUtil
+	cache     *cache.VolumeCache
+	procTable *deleter.ProcTableImpl
 }
 
 func TestDiscoverVolumes_Basic(t *testing.T) {
@@ -239,11 +241,48 @@ func TestDiscoverVolumes_BadVolume(t *testing.T) {
 	verifyPVsNotInCache(t, test)
 }
 
+func TestDiscoverVolumes_CleaningInProgress(t *testing.T) {
+	vols := map[string][]*util.FakeDirEntry{
+		"dir1": {
+			{Name: "mount1", Hash: 0xaaaafef5, VolumeType: util.FakeEntryFile, Capacity: 100 * 1024},
+			{Name: "mount2", Hash: 0x79412c38, VolumeType: util.FakeEntryBlock, Capacity: 100 * 1024 * 1024},
+		},
+		"dir2": {
+			{Name: "mount1", Hash: 0xa7aafa3c, VolumeType: util.FakeEntryFile},
+			{Name: "mount2", Hash: 0x7c4130f1, VolumeType: util.FakeEntryBlock},
+		},
+	}
+
+	// Don't expect dir1/mount2 to be created
+	expectedVols := map[string][]*util.FakeDirEntry{
+		"dir1": {
+			{Name: "mount1", Hash: 0xaaaafef5, VolumeType: util.FakeEntryFile, Capacity: 100 * 1024},
+		},
+		"dir2": {
+			{Name: "mount1", Hash: 0xa7aafa3c, VolumeType: util.FakeEntryFile},
+			{Name: "mount2", Hash: 0x7c4130f1, VolumeType: util.FakeEntryBlock},
+		},
+	}
+	test := &testConfig{
+		dirLayout:       vols,
+		expectedVolumes: expectedVols,
+	}
+	d := testSetup(t, test)
+
+	// Mark dir1/mount2 PV as being cleaned. This one should not get created
+	pvName := getPVName(vols["dir1"][1])
+	test.procTable.MarkRunning(pvName)
+
+	d.DiscoverLocalVolumes()
+	verifyCreatedPVs(t, test)
+}
+
 func testSetup(t *testing.T, test *testConfig) *Discoverer {
 	test.cache = cache.NewVolumeCache()
-	test.volUtil = util.NewFakeVolumeUtil(false /*deleteShouldFail*/)
+	test.volUtil = util.NewFakeVolumeUtil(false /*deleteShouldFail*/, map[string][]*util.FakeDirEntry{})
 	test.volUtil.AddNewDirEntries(testMountDir, test.dirLayout)
 	test.apiUtil = util.NewFakeAPIUtil(test.apiShouldFail, test.cache)
+	test.procTable = deleter.NewProcTable()
 
 	userConfig := &common.UserConfig{
 		Node:            testNode,
@@ -251,13 +290,14 @@ func testSetup(t *testing.T, test *testConfig) *Discoverer {
 		NodeLabelsForPV: nodeLabelsForPV,
 	}
 	runConfig := &common.RuntimeConfig{
-		UserConfig: userConfig,
-		Cache:      test.cache,
-		VolUtil:    test.volUtil,
-		APIUtil:    test.apiUtil,
-		Name:       testProvisionerName,
+		UserConfig:    userConfig,
+		Cache:         test.cache,
+		VolUtil:       test.volUtil,
+		APIUtil:       test.apiUtil,
+		Name:          testProvisionerName,
+		BlockDisabled: false,
 	}
-	d, err := NewDiscoverer(runConfig)
+	d, err := NewDiscoverer(runConfig, test.procTable)
 	if err != nil {
 		t.Fatalf("Error setting up test discoverer: %v", err)
 	}
@@ -366,11 +406,15 @@ type testPVInfo struct {
 	storageClass string
 }
 
+func getPVName(entry *util.FakeDirEntry) string {
+	return fmt.Sprintf("local-pv-%x", entry.Hash)
+}
+
 func verifyCreatedPVs(t *testing.T, test *testConfig) {
 	expectedPVs := map[string]*testPVInfo{}
 	for dir, files := range test.expectedVolumes {
 		for _, file := range files {
-			pvName := fmt.Sprintf("local-pv-%x", file.Hash)
+			pvName := getPVName(file)
 			path := filepath.Join(testHostDir, dir, file.Name)
 			expectedPVs[pvName] = &testPVInfo{
 				pvName:       pvName,
