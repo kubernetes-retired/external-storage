@@ -1,4 +1,6 @@
 ---
-- include: prepare-iscsi-server.yaml
-- include: prepare-nodes.yaml
-- include: deploy-provisioner.yaml
+- hosts: nodes,targetd
+  roles:
+  - role: deploy-provisioner 
+    run_once: true
+    delegate_to: "{{ groups['masters'] | first }}"

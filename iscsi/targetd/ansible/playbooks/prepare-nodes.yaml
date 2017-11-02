@@ -1,4 +1,4 @@
 ---
 - hosts: nodes
   roles:
-  - role: ../roles/prepare-nodes
+  - role: prepare-nodes
