@@ -63,3 +63,6 @@ flycheck_*.el
 
 # snapshot binaries
 /snapshot/_output
+
+# cinder binary
+/openstack/standalone-cinder/cinder-provisioner
