@@ -1,0 +1,15 @@
+---
+  - name: enable discovery auth
+    command: targetcli iscsi/ set discovery_auth enable=1
+  - name: setup initiator username for discovery
+    command: targetcli iscsi/ set discovery_auth userid={{ discovery_sendtargets_auth_username }}
+    when: discovery_sendtargets_auth_username is defined
+  - name: setup initiator password for discovery
+    command: targetcli iscsi/ set discovery_auth password={{ discovery_sendtargets_auth_password }}
+    when: discovery_sendtargets_auth_password is defined
+  - name: setup target username for discovery, if necessary
+    command: targetcli iscsi/ set discovery_auth mutual_userid={{ discovery_sendtargets_auth_username_in }}
+    when: discovery_sendtargets_auth_username_in is defined
+  - name: setup target password for discovery, if necessary
+    command: targetcli iscsi/ set discovery_auth mutual_password={{ discovery_sendtargets_auth_password_in }}
+    when: discovery_sendtargets_auth_password_in is defined

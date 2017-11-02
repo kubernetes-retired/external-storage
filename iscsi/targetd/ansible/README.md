@@ -8,16 +8,11 @@ to OpenShift Container Platform 3.4+ or OpenShift Origin 1.4+
 
 ## Playbooks:
 
-* targetd-playbook.yaml - Configures the targetd server, including LVM
-* initiator-playbook.yaml - Configures the initiators
-* provisioner-playbook.yaml - Configures OpenShift project and provisioner
+* prepare-iscsi-server.yaml - Configures the targetd server, including LVM
+* prepare-nodes.yaml - Configures the initiators
+* deploy-provisioner.yaml - Configures OpenShift project and provisioner
+* main.yaml - Executes all the above steps
 
-These should be run in order above.
-
-## Bugs
-
-Currently, it appears that the targetd server needs to be rebooted if 
-firewalld is not currently installed.
 
 ## Example Host File
 
@@ -29,14 +24,8 @@ etcd
 targetd
 
 [OSEv3:vars]
-targetd_lvm_volume_group=vg-targetd
-targetd_lvm_physical_volume=/dev/vdb
-targetd_password=ciao
-targetd_user=admin
+targetd_lvm_physical_volumes=/dev/vdb
 targetd_iscsi_target=iqn.2003-01.org.example.mach1:1234
-iscsi_provisioner_pullspec=raffaelespazzoli/iscsi-controller:0.0.1
-iscsi_provisioner_default_storage_class=true
-iscsi_provisioner_portals=192.168.99.10:3620
 
 [targetd]
 targetd.cscc

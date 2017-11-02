@@ -1,0 +1,11 @@
+---
+  - name: prepare the volume group
+    include: prepare-volume.yaml
+  - name: prepare iscsi services
+    include: prepare-iscsi-services.yaml
+  - name: set up security
+    include: setup-security.yaml
+    when: chap_auth_discovery == true 
+  - name: disable security
+    include: disable-security.yaml
+    when: chap_auth_discovery == false            
