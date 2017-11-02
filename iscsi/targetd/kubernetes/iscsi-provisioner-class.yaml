@@ -8,7 +8,7 @@ parameters:
   targetPortal: 192.168.99.100:3260
 
 # if you are using multipath, you can specify additional IPs here, default empty
-# portals: [192.168.99.101:3260]
+# portals: 192.168.99.101:3260,192.168.99.102:3260
 
 # this is the iscsi server iqn  
   iqn: iqn.2003-01.org.linux-iscsi.minishift:targetd
