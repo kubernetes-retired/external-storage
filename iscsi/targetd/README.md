@@ -343,7 +343,7 @@ All the nodes should have a label with their defining the initiator name for tha
 ose-node1.cscc openshift_node_labels="{'region': 'primary', 'zone': 'default'}" iscsi_initiator_name=iqn.2003-03.net.deadvax:ose-node1
 ose-node2.cscc openshift_node_labels="{'region': 'primary', 'zone': 'default'}" iscsi_initiator_name=iqn.2003-03.net.deadvax:ose-node2
 ```
-see also the individual roles documentation
+see also the individual [roles documentation](./ansible)
 
 To install iSCSI provisioner using ansible, run the following
 ```
