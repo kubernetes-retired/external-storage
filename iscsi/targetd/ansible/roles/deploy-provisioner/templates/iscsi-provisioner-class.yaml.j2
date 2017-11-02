@@ -2,12 +2,12 @@
 kind: StorageClass
 apiVersion: storage.k8s.io/v1beta1
 metadata:
-  name: iscsi
+  name: {{ storage_class_name }}
 {% if iscsi_provisioner_default_storage_class | bool %}
   annotations:
     storageclass.beta.kubernetes.io/is-default-class: "true"
 {% endif %}
-provisioner: iscsi
+provisioner: {{ provisioner_name }}
 parameters:
 # this id where the iscsi server is running
  targetPortal: {{ hostvars[groups['targetd'][0]]['ansible_default_ipv4']['address'] }}:3260

@@ -10,7 +10,6 @@
   - name: setup target username for discovery, if necessary
     command: targetcli iscsi/ set discovery_auth mutual_userid={{ discovery_sendtargets_auth_username_in }}
     when: discovery_sendtargets_auth_username_in is defined
-    when: chap_auth_discovery == true
   - name: setup target password for discovery, if necessary
     command: targetcli iscsi/ set discovery_auth mutual_password={{ discovery_sendtargets_auth_password_in }}
     when: discovery_sendtargets_auth_password_in is defined

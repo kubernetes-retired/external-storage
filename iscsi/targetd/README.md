@@ -319,7 +319,7 @@ before running the playbooks you need to annotate the inventory file with some a
 | Variable Name  | Description  |
 |---|---|
 | targetd_lvm_volume_group |  the volume group to be created |
-| targetd_lvm_physical_volume| comma separated list of devices to add to the volume group  |
+| targetd_lvm_physical_volumes | comma separated list of devices to add to the volume group  |
 | targetd_password  | the password used to authenticate the connection to targetd, you may want to not store this on your inventory file, you can pass this as `{{ lookup('env','TARGETD_PASSWORD') }}`  |
 | targetd_user |  the username used to authenticate the connection to targetd, you may want to not store this on your inventory file, you can pass this as `{{ lookup('env','TARGETD_USERNAME') }}` |
 | targetd_iscsi_target | the name of the target to be created in the target server  |
@@ -332,10 +332,10 @@ before running the playbooks you need to annotate the inventory file with some a
 | discovery_sendtargets_auth_username_in | target username |
 | discovery_sendtargets_auth_password_in | target password, you can pass this as `{{ lookup('env','SENDTARGET_PASSWORD_IN') }}` |
 | chap_auth_session | true/false  whether to use chap authentication for session operations |
-| discovery_session_auth_username | initiator username |
-| discovery_session_auth_password | initiator password, you can pass this as `{{ lookup('env','SESSION_PASSWORD') }}` |
-| discovery_session_auth_username_in | target username |
-| discovery_session_auth_password_in | target password, you can pass this as `{{ lookup('env','SESSION_PASSWORD_IN') }}` |
+| session_auth_username | initiator username |
+| session_auth_password | initiator password, you can pass this as `{{ lookup('env','SESSION_PASSWORD') }}` |
+| session_auth_username_in | target username |
+| session_auth_password_in | target password, you can pass this as `{{ lookup('env','SESSION_PASSWORD_IN') }}` |
 
 All the nodes should have a label with their defining the initiator name for that node, here is an example:
 
@@ -343,20 +343,19 @@ All the nodes should have a label with their defining the initiator name for tha
 ose-node1.cscc openshift_node_labels="{'region': 'primary', 'zone': 'default'}" iscsi_initiator_name=iqn.2003-03.net.deadvax:ose-node1
 ose-node2.cscc openshift_node_labels="{'region': 'primary', 'zone': 'default'}" iscsi_initiator_name=iqn.2003-03.net.deadvax:ose-node2
 ```
-
+see also the individual roles documentation
 
 To install iSCSI provisioner using ansible, run the following
 ```
-ansible-playbook -i <your inventory file> ansible/targetd-playbook.yaml
-ansible-playbook -i <your inventory file> ansible/initiator-playbook.yaml
-ansible-playbook -i <your inventory file> ansible/provisioner-playbook.yaml
+ansible-playbook -i <your inventory file> ansible/playbook/all.yaml
 ```
 
 
 ## on iSCSI authentication
 
-If you enable iSCSI CHAP-based authentication, the ansible installer will set the target configuration consinstently and also the storage class.
-However at provisioning time the provisioner will not setup the set secret. Having the permissions to setup secret in any manepsace would make the provisioner too powerful and insecure.
-So it is up to the project administrator to setup the secret.
-The name of the expected secret will be `<provisioner-name>-chap-secret` 
+If you enable iSCSI CHAP-based authentication, the ansible installer will set the target configuration consinstently and also configure the storage class.
+However at provisioning time the provisioner will not setup the chap secret. Having the permissions to setup a secret in any namespace would make the provisioner too powerful and insecure.
+So, it is up to the project administrator to setup the secret.
+The name of the expected secret name will be `<provisioner-name>-chap-secret` 
+An example of the secret format can be found [here](./openshift/iscsi-chap-secret.yaml)
 

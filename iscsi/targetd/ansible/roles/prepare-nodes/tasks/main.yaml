@@ -1,30 +1,30 @@
 ---
-  - name: Install iscsi-initiator-utils
-    yum: 
-      name: iscsi-initiator-utils
-      state: latest
-  - name: Install device-mapper-multipath
-    yum:
-      name: device-mapper-multipath
-      state: latest
-  - name: Write iscsi initiator name
-    lineinfile:
-      regexp: '^(InitiatorName=).*'
-      dest: /etc/iscsi/initiatorname.iscsi
-      line: '\1{{ iscsi_initiator_name }}'
-      state: present
-      backrefs: yes
-  - name: Write multipath conf file
-    copy:
-      src: ../templates/multipath.conf
-      dest: /etc/multipath.conf
-  - name: Enable iscsid Service
-    service:
-      name: iscsid
-      enabled: yes
-      state: started
-  - name: enable multipathd service
-    service:
-      state: started
-      enabled: yes
-      name: multipathd
+- name: Install required packages
+  package:
+    name: '{{ item }}'
+    state: latest
+  with_items:
+  - iscsi-initiator-utils
+  - device-mapper-multipath
+  
+- name: Write iscsi initiator name
+  lineinfile:
+    regexp: '^(InitiatorName=).*'
+    dest: /etc/iscsi/initiatorname.iscsi
+    line: '\1{{ iscsi_initiator_name }}'
+    state: present
+    backrefs: yes
+    
+- name: Write multipath conf file
+  copy:
+    src: ../templates/multipath.conf
+    dest: /etc/multipath.conf
+      
+- name: Enable and Start neccessary services
+  service:
+    name: '{{ item }}'
+    state: started
+    enabled: yes
+  with_items:
+  - iscsid
+  - multipathd
