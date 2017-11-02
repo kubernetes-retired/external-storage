@@ -24,7 +24,7 @@ etcd
 targetd
 
 [OSEv3:vars]
-targetd_lvm_physical_volume=/dev/vdb
+targetd_lvm_physical_volumes=/dev/vdb
 targetd_iscsi_target=iqn.2003-01.org.example.mach1:1234
 
 [targetd]
