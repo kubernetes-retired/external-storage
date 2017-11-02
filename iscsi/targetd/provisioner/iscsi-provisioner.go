@@ -127,7 +127,7 @@ func (p *iscsiProvisioner) Provision(options controller.VolumeOptions) (*v1.Pers
 
 	var portals []string
 	if len(options.Parameters["portals"]) > 0 {
-		portals = strings.Split(options.Parameters["portals"], "'")
+		portals = strings.Split(options.Parameters["portals"], ",")
 	}
 
 	pv := &v1.PersistentVolume{
