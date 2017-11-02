@@ -119,3 +119,45 @@ A Volume Snapshot `snapshot-demo` can be deleted as shown below:
 $ kubectl delete -f volumesnapshot/snapshot-demo
 ```
 The Volume Snapshot Data that are bound to the Volume Snapshot are also automatically deleted.
+
+## Managing Snapshot Users
+Depending on the cluster configuration it might be necessary to allow non-admin users to manipulate the VolumeSnapshot objects on the API server. This might be done by creating a ClusterRole bound to a particular user or group.
+
+Assume the user 'alice' needs to be able to work with snapshots in the cluster. The cluster admin needs to define a new ClusterRole.
+```yaml
+apiVersion: v1
+kind: ClusterRole
+metatadata:
+  name: volumesnapshot-admin
+rules:
+- apiGroups:
+  - "volumesnapshot.external-storage.k8s.io"
+  attributeRestrictions: null
+  resources:
+  - volumesnapshots
+  verbs:
+  - create
+  - delete
+  - deletecollection
+  - get
+  - list
+  - patch
+  - update
+  - watch
+
+```
+Now the cluster role has to be bound to the user 'alice' by creating a ClusterRole binding object.
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: volumesnapsot-admin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: volumesnapshot-admin
+subjects:
+- kind: User
+  name: alice
+```
+This is only an example of API access configuration. Note the VolumeSnapshot objects behave just like any other Kubernetes API objects. Please refer to the [API access control documentation](https://kubernetes.io/docs/admin/accessing-the-api/) for complete guide on managing the API RBAC.
