@@ -1,0 +1,38 @@
+---
+
+- name: Install required packages
+  package:
+    name: '{{ item }}'
+    state: latest
+  with_items:
+  - targetd
+  - targetcli
+  - firewalld
+
+- name: Write targetd.yaml file
+  template:
+    src:  ../templates/targetd.yaml.j2
+    dest: /etc/target/targetd.yaml
+    mode: 0644
+    
+- name: Enable and Start neccessary services
+  service:
+    name: '{{ item }}'
+    state: started
+    enabled: yes
+  with_items:
+  - firewalld
+  - target
+  - targetd
+    
+- name: Firewalld allow iscsi traffic
+  firewalld: 
+    service: iscsi-target
+    permanent: true 
+    state: enabled
+
+- name: Firewalld allow targetd traffic
+  firewalld: 
+    port: 18700/tcp
+    permanent: true 
+    state: enabled

@@ -1,0 +1,10 @@
+iscsi_provisioner_project: iscsi-provisioner
+iscsi_provisioner_default_storage_class: false
+targetd_lvm_volume_group: vg-targetd
+chap_auth_discovery: false
+chap_auth_session: false
+iscsi_provisioner_pullspec: quay.io/external_storage/iscsi-controller:latest
+provisioner_name: iscsi-targetd
+storage_class_name: "{{ provisioner_name }}-{{ targetd_lvm_volume_group }}"
+targetd_user: admin
+targetd_password: admin
