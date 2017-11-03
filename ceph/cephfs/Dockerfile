@@ -22,4 +22,5 @@ RUN rpm -Uvh https://download.ceph.com/rpm-$CEPH_VERSION/el7/noarch/ceph-release
 
 COPY cephfs-provisioner /usr/local/bin/cephfs-provisioner
 COPY cephfs_provisioner/cephfs_provisioner.py /usr/local/bin/cephfs_provisioner
-CMD ["chmod", "o+x", "/usr/local/bin/cephfs_provisioner"]
+RUN chmod -v o+x /usr/local/bin/cephfs_provisioner
+
