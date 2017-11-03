@@ -125,6 +125,11 @@ func (p *iscsiProvisioner) Provision(options controller.VolumeOptions) (*v1.Pers
 	annotations["pool"] = pool
 	annotations["initiators"] = options.Parameters["initiators"]
 
+	var portals []string
+	if len(options.Parameters["portals"]) > 0 {
+		portals = strings.Split(options.Parameters["portals"], ",")
+	}
+
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        options.PVName,
@@ -140,7 +145,7 @@ func (p *iscsiProvisioner) Provision(options controller.VolumeOptions) (*v1.Pers
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				ISCSI: &v1.ISCSIVolumeSource{
 					TargetPortal:      options.Parameters["targetPortal"],
-					Portals:           strings.Split(options.Parameters["portals"], "'"),
+					Portals:           portals,
 					IQN:               options.Parameters["iqn"],
 					ISCSIInterface:    options.Parameters["iscsiInterface"],
 					Lun:               lun,
