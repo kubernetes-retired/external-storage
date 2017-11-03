@@ -2,12 +2,12 @@
 kind: StorageClass
 apiVersion: storage.k8s.io/v1beta1
 metadata:
-  name: iscsi
+  name: {{ storage_class_name }}
 {% if iscsi_provisioner_default_storage_class | bool %}
   annotations:
     storageclass.beta.kubernetes.io/is-default-class: "true"
 {% endif %}
-provisioner: iscsi
+provisioner: {{ provisioner_name }}
 parameters:
 # this id where the iscsi server is running
  targetPortal: {{ hostvars[groups['targetd'][0]]['ansible_default_ipv4']['address'] }}:3260
@@ -28,11 +28,15 @@ parameters:
 # this is a comma separated list of initiators that will be give access to the created volumes, they must correspond to what you have configured in your nodes.
  initiators: {% for host in groups['nodes'] %}{{ hostvars[host]['iscsi_initiator_name'] }},{% endfor %}
 
+{% if chap_auth_discovery | bool %}
 # whether or not to use chap authentication for discovery operations
- chapAuthDiscovery: {% if chap_auth_discovery | bool %} "true" {% endif %}
+ chapAuthDiscovery:  "true"
+{% endif %}
 
+{% if chap_auth_session | bool %}
 # whether or not to use chap authentication for session operations
- chapAuthSession: {% if chap_auth_session | bool %} "true" {% endif %}
+ chapAuthSession:  "true" 
+{% endif %}
 
    
 

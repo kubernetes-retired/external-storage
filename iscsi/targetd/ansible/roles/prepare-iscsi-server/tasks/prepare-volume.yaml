@@ -1,0 +1,14 @@
+---
+  - name: Fail if lvm names is empty
+    fail:
+      msg: "'targetd_lvm_physical_volumes' must contain a list of comma-separated available devices"
+    when: targetd_lvm_physical_volumes is not defined  
+  - name: Install lvm2
+    package: 
+      name: lvm2
+      state: latest
+  - name: Create Volume Group
+    lvg:
+      vg: "{{ targetd_lvm_volume_group }}"
+      pvs:  "{{ targetd_lvm_physical_volumes }}" 
+# here we could enable thinly provisioned volumes           

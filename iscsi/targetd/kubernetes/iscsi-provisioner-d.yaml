@@ -53,7 +53,7 @@ spec:
             - "start"
           env:
             - name: PROVISIONER_NAME
-              value: iscsi
+              value: iscsi-targetd
             - name: LOG_LEVEL
               value: debug
             - name: TARGETD_USERNAME
