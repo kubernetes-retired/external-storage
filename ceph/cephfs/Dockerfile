@@ -17,8 +17,10 @@ FROM centos:7
 ENV CEPH_VERSION "jewel"
 RUN rpm -Uvh https://download.ceph.com/rpm-$CEPH_VERSION/el7/noarch/ceph-release-1-1.el7.noarch.rpm && \
   yum install -y epel-release && \
-  yum install -y ceph-common python-cephfs
+  yum install -y ceph-common python-cephfs && \
+  yum clean all
 
 COPY cephfs-provisioner /usr/local/bin/cephfs-provisioner
 COPY cephfs_provisioner/cephfs_provisioner.py /usr/local/bin/cephfs_provisioner
-CMD ["chmod", "o+x", "/usr/local/bin/cephfs_provisioner"]
+RUN chmod -v o+x /usr/local/bin/cephfs_provisioner
+
