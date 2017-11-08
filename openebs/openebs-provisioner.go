@@ -116,7 +116,7 @@ func (p *openEBSProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 		}
 	}
 
-	glog.V(1).Infof("Volume IQN: %v , Volume Target: %v", iqn, targetPortal)
+	glog.V(2).Infof("Volume IQN: %v , Volume Target: %v", iqn, targetPortal)
 
 	if !util.AccessModesContainedInAll(p.GetAccessModes(), options.PVC.Spec.AccessModes) {
 		glog.V(1).Info("Invalid Access Modes: %v, Supported Access Modes: %v", options.PVC.Spec.AccessModes, p.GetAccessModes())
