@@ -62,7 +62,7 @@ func (v OpenEBSVolume) GetMayaClusterIP(client kubernetes.Interface) (string, er
 	}
 
 	clusterIP = sc.Spec.ClusterIP
-	glog.Infof("Maya Cluster IP: %v", clusterIP)
+	glog.V(2).Infof("Maya Cluster IP: %v", clusterIP)
 
 	return clusterIP, err
 }
@@ -84,7 +84,7 @@ func (v OpenEBSVolume) CreateVolume(vs mayav1.VolumeSpec) (string, error) {
 	//Marshal serializes the value provided into a YAML document
 	yamlValue, _ := yaml.Marshal(vs)
 
-	glog.Infof("Volume Spec Created:\n%v\n", string(yamlValue))
+	glog.V(2).Infof("[DEBUG] volume Spec Created:\n%v\n", string(yamlValue))
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(yamlValue))
 
@@ -112,8 +112,8 @@ func (v OpenEBSVolume) CreateVolume(vs mayav1.VolumeSpec) (string, error) {
 		return "HTTP Status error from maya-apiserver", err
 	}
 
-	glog.Infof("Volume Successfully Created:\n%v\n", string(data))
-	return "Volume Successfully Created", nil
+	glog.Infof("volume Successfully Created:\n%v\n", string(data))
+	return "volume Successfully Created", nil
 }
 
 // ListVsm to get the info of Vsm through a API call to m-apiserver
@@ -127,7 +127,7 @@ func (v OpenEBSVolume) ListVolume(vname string, obj interface{}) error {
 	}
 	url := addr + "/latest/volumes/info/" + vname
 
-	glog.Infof("Get details for Volume :%v", string(vname))
+	glog.V(2).Infof("[DEBUG] Get details for Volume :%v", string(vname))
 
 	req, err := http.NewRequest("GET", url, nil)
 	c := &http.Client{
@@ -145,7 +145,7 @@ func (v OpenEBSVolume) ListVolume(vname string, obj interface{}) error {
 		glog.Errorf("HTTP Status error from maya-apiserver: %v\n", http.StatusText(code))
 		return err
 	}
-	glog.Info("Volume Details Successfully Retrieved")
+	glog.V(2).Info("volume Details Successfully Retrieved")
 	return json.NewDecoder(resp.Body).Decode(obj)
 }
 
@@ -160,7 +160,7 @@ func (v OpenEBSVolume) DeleteVolume(vname string) error {
 	}
 	url := addr + "/latest/volumes/delete/" + vname
 
-	glog.Infof("Delete Volume :%v", string(vname))
+	glog.V(2).Infof("[DEBUG] Delete Volume :%v", string(vname))
 
 	req, err := http.NewRequest("GET", url, nil)
 	c := &http.Client{
@@ -178,6 +178,6 @@ func (v OpenEBSVolume) DeleteVolume(vname string) error {
 		glog.Errorf("HTTP Status error from maya-apiserver: %v\n", http.StatusText(code))
 		return err
 	}
-	glog.Info("Volume Deleted Successfully initiated")
+	glog.Info("volume Deleted Successfully initiated")
 	return nil
 }
