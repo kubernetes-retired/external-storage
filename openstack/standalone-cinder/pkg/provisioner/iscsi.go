@@ -22,9 +22,16 @@ import (
 	"github.com/kubernetes-incubator/external-storage/openstack/standalone-cinder/pkg/volumeservice"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/rand"
 )
 
 const iscsiType = "iscsi"
+
+var (
+	secretLabel = map[string]string{"type": "iscsi"}
+	chap_sess   = []string{"node.session.auth.username", "node.session.auth.password"}
+)
 
 type iscsiMapper struct {
 	volumeMapper
@@ -33,12 +40,12 @@ type iscsiMapper struct {
 
 func getChapSecretName(connection volumeservice.VolumeConnection, options controller.VolumeOptions) string {
 	if connection.Data.AuthMethod == "CHAP" {
-		return options.PVName + "-secret"
+		return "iscsi-secret-" + rand.String(3)
 	}
 	return ""
 }
 
-func (m *iscsiMapper) BuildPVSource(conn volumeservice.VolumeConnection, options controller.VolumeOptions) (*v1.PersistentVolumeSource, error) {
+func (m *iscsiMapper) BuildPVSource(conn volumeservice.VolumeConnection, options controller.VolumeOptions, secret *v1.Secret) (*v1.PersistentVolumeSource, error) {
 	ret := &v1.PersistentVolumeSource{
 		ISCSI: &v1.ISCSIVolumeSource{
 			// TODO: Need some way to specify the initiator name
@@ -48,26 +55,38 @@ func (m *iscsiMapper) BuildPVSource(conn volumeservice.VolumeConnection, options
 			SessionCHAPAuth: false,
 		},
 	}
-	secretName := getChapSecretName(conn, options)
-	if secretName != "" {
-		ret.ISCSI.SessionCHAPAuth = true
-		ret.ISCSI.SecretRef = &v1.LocalObjectReference{
-			Name: secretName,
-		}
+	ret.ISCSI.SessionCHAPAuth = true
+	ret.ISCSI.SecretRef = &v1.LocalObjectReference{
+		Name: secret.Name,
 	}
 	return ret, nil
 }
 
-func (m *iscsiMapper) AuthSetup(p *cinderProvisioner, options controller.VolumeOptions, conn volumeservice.VolumeConnection) error {
+func (m *iscsiMapper) AuthSetup(p *cinderProvisioner, options controller.VolumeOptions, conn volumeservice.VolumeConnection) (*v1.Secret, error) {
+	namespace := options.PVC.Namespace
+
+	labelSelector := labels.SelectorFromSet(labels.Set(secretLabel))
+	opts := metav1.ListOptions{LabelSelector: labelSelector.String()}
+	secrets, err := p.Client.Core().Secrets(namespace).List(opts)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, sec := range secrets.Items {
+		if m.sameSecretData(sec.Data, conn.Data) {
+			return &sec, nil
+		}
+	}
 	// Create a secret for the CHAP credentials
 	secretName := getChapSecretName(conn, options)
 	if secretName == "" {
 		glog.V(3).Info("No CHAP authentication secret necessary")
-		return nil
+		return nil, nil
 	}
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: secretName,
+			Name:   secretName,
+			Labels: secretLabel,
 		},
 		Type: "kubernetes.io/iscsi-chap",
 		Data: map[string][]byte{
@@ -75,18 +94,25 @@ func (m *iscsiMapper) AuthSetup(p *cinderProvisioner, options controller.VolumeO
 			"node.session.auth.password": []byte(conn.Data.AuthPassword),
 		},
 	}
-	namespace := options.PVC.Namespace
-	return m.cb.createSecret(p, namespace, secret)
+	return secret, m.cb.createSecret(p, namespace, secret)
 }
 
 func (m *iscsiMapper) AuthTeardown(p *cinderProvisioner, pv *v1.PersistentVolume) error {
 	// Delete the CHAP credentials
-	if pv.Spec.ISCSI.SecretRef == nil {
-		glog.V(3).Info("No associated secret to delete")
-		return nil
-	}
+	//if pv.Spec.ISCSI.SecretRef == nil {
+	//	glog.V(3).Info("No associated secret to delete")
+	//	return nil
+	//}
+	//
+	//secretName := pv.Spec.ISCSI.SecretRef.Name
+	//secretNamespace := pv.Spec.ClaimRef.Namespace
+	//return m.cb.deleteSecret(p, secretNamespace, secretName)
+	return nil
+}
 
-	secretName := pv.Spec.ISCSI.SecretRef.Name
-	secretNamespace := pv.Spec.ClaimRef.Namespace
-	return m.cb.deleteSecret(p, secretNamespace, secretName)
+func (m *iscsiMapper) sameSecretData(secretData map[string][]byte, data volumeservice.VolumeConnectionDetails) bool {
+	if string(secretData[chap_sess[0]]) == data.AuthUsername && string(secretData[chap_sess[1]]) == data.AuthPassword {
+		return true
+	}
+	return false
 }

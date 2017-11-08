@@ -110,7 +110,7 @@ func CreateCinderVolume(vs *gophercloud.ServiceClient, options controller.Volume
 func WaitForAvailableCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
 	// TODO: Implement proper polling instead of brain-dead timers
 	c := make(chan error)
-	go time.AfterFunc(5*time.Second, func() {
+	go time.AfterFunc(3*time.Second, func() {
 		c <- nil
 	})
 	return <-c

@@ -77,6 +77,7 @@ func (p *cinderProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 		connection volumeservice.VolumeConnection
 		mapper     volumeMapper
 		pv         *v1.PersistentVolume
+		secret     *v1.Secret
 		cleanupErr error
 	)
 
@@ -116,13 +117,13 @@ func (p *cinderProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 		goto ERROR_DISCONNECT
 	}
 
-	err = mapper.AuthSetup(p, options, connection)
+	secret, err = mapper.AuthSetup(p, options, connection)
 	if err != nil {
 		glog.Errorf("Failed to prepare volume auth: %v", err)
 		goto ERROR_DISCONNECT
 	}
 
-	pv, err = p.mb.buildPV(mapper, p, options, connection, volumeID)
+	pv, err = p.mb.buildPV(mapper, p, options, connection, volumeID, secret)
 	if err != nil {
 		glog.Errorf("Failed to build PV: %v", err)
 		goto ERROR_DISCONNECT

@@ -25,7 +25,7 @@ import (
 type mapperBroker interface {
 	newVolumeMapperFromConnection(conn volumeservice.VolumeConnection) (volumeMapper, error)
 	newVolumeMapperFromPV(pv *v1.PersistentVolume) (volumeMapper, error)
-	buildPV(m volumeMapper, p *cinderProvisioner, options controller.VolumeOptions, conn volumeservice.VolumeConnection, volumeID string) (*v1.PersistentVolume, error)
+	buildPV(m volumeMapper, p *cinderProvisioner, options controller.VolumeOptions, conn volumeservice.VolumeConnection, volumeID string, secret *v1.Secret) (*v1.PersistentVolume, error)
 }
 
 type volumeMapperBroker struct {
@@ -40,6 +40,6 @@ func (mb *volumeMapperBroker) newVolumeMapperFromPV(pv *v1.PersistentVolume) (vo
 	return newVolumeMapperFromPV(pv)
 }
 
-func (mb *volumeMapperBroker) buildPV(m volumeMapper, p *cinderProvisioner, options controller.VolumeOptions, conn volumeservice.VolumeConnection, volumeID string) (*v1.PersistentVolume, error) {
-	return buildPV(m, p, options, conn, volumeID)
+func (mb *volumeMapperBroker) buildPV(m volumeMapper, p *cinderProvisioner, options controller.VolumeOptions, conn volumeservice.VolumeConnection, volumeID string, secret *v1.Secret) (*v1.PersistentVolume, error) {
+	return buildPV(m, p, options, conn, volumeID, secret)
 }

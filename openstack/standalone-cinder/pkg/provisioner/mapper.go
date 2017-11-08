@@ -30,10 +30,10 @@ import (
 type volumeMapper interface {
 	// BuildPVSource should build a PersistentVolumeSource from cinder connection
 	// information and context from the cluster such as the PVC.
-	BuildPVSource(conn volumeservice.VolumeConnection, options controller.VolumeOptions) (*v1.PersistentVolumeSource, error)
+	BuildPVSource(conn volumeservice.VolumeConnection, options controller.VolumeOptions, secret *v1.Secret) (*v1.PersistentVolumeSource, error)
 	// AuthSetup should perform any authentication setup such as secret creation
 	// that would be required before a host can connect to the volume.
-	AuthSetup(p *cinderProvisioner, options controller.VolumeOptions, conn volumeservice.VolumeConnection) error
+	AuthSetup(p *cinderProvisioner, options controller.VolumeOptions, conn volumeservice.VolumeConnection) (*v1.Secret, error)
 	// AuthTeardown should perform any necessary cleanup related to authentication
 	// as the volume is being deleted.
 	AuthTeardown(p *cinderProvisioner, pv *v1.PersistentVolume) error
@@ -61,8 +61,8 @@ func newVolumeMapperFromPV(pv *v1.PersistentVolume) (volumeMapper, error) {
 	}
 }
 
-func buildPV(m volumeMapper, p *cinderProvisioner, options controller.VolumeOptions, conn volumeservice.VolumeConnection, volumeID string) (*v1.PersistentVolume, error) {
-	pvSource, err := m.BuildPVSource(conn, options)
+func buildPV(m volumeMapper, p *cinderProvisioner, options controller.VolumeOptions, conn volumeservice.VolumeConnection, volumeID string, secret *v1.Secret) (*v1.PersistentVolume, error) {
+	pvSource, err := m.BuildPVSource(conn, options, secret)
 	if err != nil {
 		glog.Errorf("Failed to build PV Source element: %v", err)
 		return nil, err
