@@ -151,7 +151,7 @@ func DeleteCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
 func GetCinderVolumeStatus(vs *gophercloud.ServiceClient, volumeID string) (string, error) {
 	volume, err := volumes_v2.Get(vs, volumeID).Extract()
 	if err != nil {
-		glog.Errorf("Failed to get volume:%v ", volumeID)
+		glog.Errorf("Failed to get volume %s: %v", volumeID, err)
 		return "", err
 	}
 	return volume.Status, nil
