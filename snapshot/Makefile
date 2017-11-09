@@ -28,10 +28,10 @@ MUTABLE_IMAGE_PROVISIONER = $(REGISTRY)snapshot-provisioner:latest
 all: controller provisioner
 
 controller:
-	go build -o _output/bin/snapshot-controller cmd/snapshot-controller/snapshot-controller.go
+	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o _output/bin/snapshot-controller cmd/snapshot-controller/snapshot-controller.go
 
 provisioner:
-	go build -o _output/bin/snapshot-provisioner cmd/snapshot-pv-provisioner/snapshot-pv-provisioner.go
+	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o _output/bin/snapshot-provisioner cmd/snapshot-pv-provisioner/snapshot-pv-provisioner.go
 
 clean:
 	-rm -f deploy/controller/snapshot-controller
