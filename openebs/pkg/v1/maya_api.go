@@ -67,7 +67,7 @@ func (v OpenEBSVolume) GetMayaClusterIP(client kubernetes.Interface) (string, er
 	return clusterIP, err
 }
 
-// CreateVsm to create the Vsm through a API call to m-apiserver
+// CreateVolume to create the Vsm through a API call to m-apiserver
 func (v OpenEBSVolume) CreateVolume(vs mayav1.VolumeSpec) (string, error) {
 
 	addr := os.Getenv("MAPI_ADDR")
@@ -116,7 +116,7 @@ func (v OpenEBSVolume) CreateVolume(vs mayav1.VolumeSpec) (string, error) {
 	return "volume Successfully Created", nil
 }
 
-// ListVsm to get the info of Vsm through a API call to m-apiserver
+// ListVolume to get the info of Vsm through a API call to m-apiserver
 func (v OpenEBSVolume) ListVolume(vname string, obj interface{}) error {
 
 	addr := os.Getenv("MAPI_ADDR")
@@ -149,7 +149,7 @@ func (v OpenEBSVolume) ListVolume(vname string, obj interface{}) error {
 	return json.NewDecoder(resp.Body).Decode(obj)
 }
 
-// DeleteVsm to get delete Vsm through a API call to m-apiserver
+// DeleteVolume to get delete Vsm through a API call to m-apiserver
 func (v OpenEBSVolume) DeleteVolume(vname string) error {
 
 	addr := os.Getenv("MAPI_ADDR")
