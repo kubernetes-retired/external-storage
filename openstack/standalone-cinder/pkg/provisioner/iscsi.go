@@ -17,20 +17,29 @@ limitations under the License.
 package provisioner
 
 import (
+	"fmt"
+	"strconv"
+
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	"github.com/kubernetes-incubator/external-storage/openstack/standalone-cinder/pkg/volumeservice"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 )
 
-const iscsiType = "iscsi"
+const (
+	iscsiType      = "iscsi"
+	secretRefCount = "secretRefCount"
+)
 
 var (
 	secretLabel = map[string]string{"type": "iscsi"}
-	chap_sess   = []string{"node.session.auth.username", "node.session.auth.password"}
+	chapSess    = []string{"node.session.auth.username", "node.session.auth.password"}
 )
 
 type iscsiMapper struct {
@@ -40,7 +49,7 @@ type iscsiMapper struct {
 
 func getChapSecretName(connection volumeservice.VolumeConnection, options controller.VolumeOptions) string {
 	if connection.Data.AuthMethod == "CHAP" {
-		return "iscsi-secret-" + rand.String(3)
+		return "iscsi-secret-" + rand.String(5)
 	}
 	return ""
 }
@@ -74,6 +83,10 @@ func (m *iscsiMapper) AuthSetup(p *cinderProvisioner, options controller.VolumeO
 
 	for _, sec := range secrets.Items {
 		if m.sameSecretData(sec.Data, conn.Data) {
+			err = m.handleSecretAnnotation(p, &sec, true)
+			if err != nil {
+				return nil, err
+			}
 			return &sec, nil
 		}
 	}
@@ -85,13 +98,14 @@ func (m *iscsiMapper) AuthSetup(p *cinderProvisioner, options controller.VolumeO
 	}
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   secretName,
-			Labels: secretLabel,
+			Annotations: map[string]string{secretRefCount: strconv.Itoa(1)},
+			Name:        secretName,
+			Labels:      secretLabel,
 		},
 		Type: "kubernetes.io/iscsi-chap",
 		Data: map[string][]byte{
-			"node.session.auth.username": []byte(conn.Data.AuthUsername),
-			"node.session.auth.password": []byte(conn.Data.AuthPassword),
+			chapSess[0]: []byte(conn.Data.AuthUsername),
+			chapSess[1]: []byte(conn.Data.AuthPassword),
 		},
 	}
 	return secret, m.cb.createSecret(p, namespace, secret)
@@ -99,20 +113,61 @@ func (m *iscsiMapper) AuthSetup(p *cinderProvisioner, options controller.VolumeO
 
 func (m *iscsiMapper) AuthTeardown(p *cinderProvisioner, pv *v1.PersistentVolume) error {
 	// Delete the CHAP credentials
-	//if pv.Spec.ISCSI.SecretRef == nil {
-	//	glog.V(3).Info("No associated secret to delete")
-	//	return nil
-	//}
-	//
-	//secretName := pv.Spec.ISCSI.SecretRef.Name
-	//secretNamespace := pv.Spec.ClaimRef.Namespace
-	//return m.cb.deleteSecret(p, secretNamespace, secretName)
-	return nil
+	if pv.Spec.ISCSI.SecretRef == nil {
+		glog.V(3).Info("No associated secret to delete")
+		return nil
+	}
+
+	secretName := pv.Spec.ISCSI.SecretRef.Name
+	secretNamespace := pv.Spec.ClaimRef.Namespace
+	secret, err := p.Client.CoreV1().Secrets(secretNamespace).Get(secretName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	return m.handleSecretAnnotation(p, secret, false)
 }
 
 func (m *iscsiMapper) sameSecretData(secretData map[string][]byte, data volumeservice.VolumeConnectionDetails) bool {
-	if string(secretData[chap_sess[0]]) == data.AuthUsername && string(secretData[chap_sess[1]]) == data.AuthPassword {
+	if string(secretData[chapSess[0]]) == data.AuthUsername && string(secretData[chapSess[1]]) == data.AuthPassword {
 		return true
 	}
 	return false
+}
+
+func (m *iscsiMapper) handleSecretAnnotation(p *cinderProvisioner, secret *v1.Secret, add bool) error {
+	oldData, err := json.Marshal(secret)
+	if err != nil {
+		return err
+	}
+	if secret.Annotations == nil || secret.Annotations[secretRefCount] == "" {
+		return fmt.Errorf("secret %s should have secretRefCount annotation", secret.Namespace+"/"+secret.Name)
+	}
+	count, err := strconv.Atoi(secret.Annotations[secretRefCount])
+	if err != nil {
+		return err
+	}
+	if add {
+		count++
+	} else if count == 1 {
+		glog.V(2).Infof("secret %s no reference, delete it", secret.Namespace+"/"+secret.Name)
+		return m.cb.deleteSecret(p, secret.Namespace, secret.Name)
+	} else {
+		count--
+	}
+	secret.Annotations[secretRefCount] = strconv.Itoa(count)
+	newData, err := json.Marshal(secret)
+	if err != nil {
+		return err
+	}
+	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &v1.Secret{})
+	if err != nil {
+		return err
+	}
+	_, err = p.Client.CoreV1().Secrets(secret.Namespace).Patch(secret.Name, types.StrategicMergePatchType, patchBytes)
+	if err != nil {
+		glog.V(2).Infof("Failed to change annotation for secret %s: %v", secret.Name, err)
+		return err
+	}
+	glog.V(2).Infof("Changed secretRefCount annotation for secret %s to %d", secret.Name, count)
+	return nil
 }
