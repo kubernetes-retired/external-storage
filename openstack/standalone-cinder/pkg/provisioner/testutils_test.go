@@ -113,15 +113,15 @@ type fakeMapper struct {
 	failBuildPVSource bool
 }
 
-func (m *fakeMapper) BuildPVSource(conn volumeservice.VolumeConnection, options controller.VolumeOptions) (*v1.PersistentVolumeSource, error) {
+func (m *fakeMapper) BuildPVSource(conn volumeservice.VolumeConnection, options controller.VolumeOptions, secretName string) (*v1.PersistentVolumeSource, error) {
 	if m.failBuildPVSource {
 		return nil, errors.New("Injected error for testing")
 	}
 	return &v1.PersistentVolumeSource{}, nil
 }
 
-func (m *fakeMapper) AuthSetup(p *cinderProvisioner, options controller.VolumeOptions, conn volumeservice.VolumeConnection) error {
-	return m.mightFail.ret("AuthSetup")
+func (m *fakeMapper) AuthSetup(p *cinderProvisioner, options controller.VolumeOptions, conn volumeservice.VolumeConnection) (string, error) {
+	return "", m.mightFail.ret("AuthSetup")
 }
 
 func (m *fakeMapper) AuthTeardown(p *cinderProvisioner, pv *v1.PersistentVolume) error {

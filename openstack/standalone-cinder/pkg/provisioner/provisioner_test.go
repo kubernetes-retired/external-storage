@@ -333,7 +333,7 @@ func (mb *fakeMapperBroker) newVolumeMapperFromPV(pv *v1.PersistentVolume) (volu
 	return mb.FakeVolumeMapper, nil
 }
 
-func (mb *fakeMapperBroker) buildPV(m volumeMapper, p *cinderProvisioner, options controller.VolumeOptions, conn volumeservice.VolumeConnection, volumeID string) (*v1.PersistentVolume, error) {
+func (mb *fakeMapperBroker) buildPV(m volumeMapper, p *cinderProvisioner, options controller.VolumeOptions, conn volumeservice.VolumeConnection, volumeID string, secretName string) (*v1.PersistentVolume, error) {
 	if mb.mightFail.isSet("buildPV") {
 		return nil, errors.New("injected error for testing")
 	}

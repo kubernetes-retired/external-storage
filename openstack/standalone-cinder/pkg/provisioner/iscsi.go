@@ -54,7 +54,7 @@ func getChapSecretName(connection volumeservice.VolumeConnection, options contro
 	return ""
 }
 
-func (m *iscsiMapper) BuildPVSource(conn volumeservice.VolumeConnection, options controller.VolumeOptions, secret *v1.Secret) (*v1.PersistentVolumeSource, error) {
+func (m *iscsiMapper) BuildPVSource(conn volumeservice.VolumeConnection, options controller.VolumeOptions, secretName string) (*v1.PersistentVolumeSource, error) {
 	ret := &v1.PersistentVolumeSource{
 		ISCSI: &v1.ISCSIVolumeSource{
 			// TODO: Need some way to specify the initiator name
@@ -66,35 +66,35 @@ func (m *iscsiMapper) BuildPVSource(conn volumeservice.VolumeConnection, options
 	}
 	ret.ISCSI.SessionCHAPAuth = true
 	ret.ISCSI.SecretRef = &v1.LocalObjectReference{
-		Name: secret.Name,
+		Name: secretName,
 	}
 	return ret, nil
 }
 
-func (m *iscsiMapper) AuthSetup(p *cinderProvisioner, options controller.VolumeOptions, conn volumeservice.VolumeConnection) (*v1.Secret, error) {
+func (m *iscsiMapper) AuthSetup(p *cinderProvisioner, options controller.VolumeOptions, conn volumeservice.VolumeConnection) (string, error) {
 	namespace := options.PVC.Namespace
 
 	labelSelector := labels.SelectorFromSet(labels.Set(secretLabel))
 	opts := metav1.ListOptions{LabelSelector: labelSelector.String()}
 	secrets, err := p.Client.Core().Secrets(namespace).List(opts)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	for _, sec := range secrets.Items {
 		if m.sameSecretData(sec.Data, conn.Data) {
-			err = m.handleSecretAnnotation(p, &sec, true)
+			err = m.handleSecretRefAndDeletion(p, &sec, nil, true)
 			if err != nil {
-				return nil, err
+				return "", err
 			}
-			return &sec, nil
+			return sec.Name, nil
 		}
 	}
 	// Create a secret for the CHAP credentials
 	secretName := getChapSecretName(conn, options)
 	if secretName == "" {
 		glog.V(3).Info("No CHAP authentication secret necessary")
-		return nil, nil
+		return "", nil
 	}
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -108,7 +108,7 @@ func (m *iscsiMapper) AuthSetup(p *cinderProvisioner, options controller.VolumeO
 			chapSess[1]: []byte(conn.Data.AuthPassword),
 		},
 	}
-	return secret, m.cb.createSecret(p, namespace, secret)
+	return secret.Name, m.cb.createSecret(p, namespace, secret)
 }
 
 func (m *iscsiMapper) AuthTeardown(p *cinderProvisioner, pv *v1.PersistentVolume) error {
@@ -118,13 +118,19 @@ func (m *iscsiMapper) AuthTeardown(p *cinderProvisioner, pv *v1.PersistentVolume
 		return nil
 	}
 
+	if pv.Annotations == nil || pv.Annotations[SecretRefered] == "" || pv.Annotations[SecretRefered] != "yes" {
+		glog.V(3).Infof("SecretRef not refered by pv %s, no action", pv.Name)
+		return nil
+	}
+
 	secretName := pv.Spec.ISCSI.SecretRef.Name
 	secretNamespace := pv.Spec.ClaimRef.Namespace
 	secret, err := p.Client.CoreV1().Secrets(secretNamespace).Get(secretName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
-	return m.handleSecretAnnotation(p, secret, false)
+
+	return m.handleSecretRefAndDeletion(p, secret, pv, false)
 }
 
 func (m *iscsiMapper) sameSecretData(secretData map[string][]byte, data volumeservice.VolumeConnectionDetails) bool {
@@ -134,8 +140,8 @@ func (m *iscsiMapper) sameSecretData(secretData map[string][]byte, data volumese
 	return false
 }
 
-func (m *iscsiMapper) handleSecretAnnotation(p *cinderProvisioner, secret *v1.Secret, add bool) error {
-	oldData, err := json.Marshal(secret)
+func (m *iscsiMapper) handleSecretRefAndDeletion(p *cinderProvisioner, secret *v1.Secret, pv *v1.PersistentVolume, add bool) error {
+	oldSecret, err := json.Marshal(secret)
 	if err != nil {
 		return err
 	}
@@ -150,16 +156,26 @@ func (m *iscsiMapper) handleSecretAnnotation(p *cinderProvisioner, secret *v1.Se
 		count++
 	} else if count == 1 {
 		glog.V(2).Infof("secret %s no reference, delete it", secret.Namespace+"/"+secret.Name)
+		if err != nil {
+			return err
+		}
+		// update pv annotation 'SecretRefered' to "no"
+		if err = m.updatePvSecretReferedAnnotation(p, pv); err != nil {
+			return err
+		}
 		return m.cb.deleteSecret(p, secret.Namespace, secret.Name)
 	} else {
 		count--
+		if err = m.updatePvSecretReferedAnnotation(p, pv); err != nil {
+			return err
+		}
 	}
 	secret.Annotations[secretRefCount] = strconv.Itoa(count)
-	newData, err := json.Marshal(secret)
+	newSecret, err := json.Marshal(secret)
 	if err != nil {
 		return err
 	}
-	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &v1.Secret{})
+	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldSecret, newSecret, &v1.Secret{})
 	if err != nil {
 		return err
 	}
@@ -169,5 +185,30 @@ func (m *iscsiMapper) handleSecretAnnotation(p *cinderProvisioner, secret *v1.Se
 		return err
 	}
 	glog.V(2).Infof("Changed secretRefCount annotation for secret %s to %d", secret.Name, count)
+	return nil
+}
+
+func (m *iscsiMapper) updatePvSecretReferedAnnotation(p *cinderProvisioner, pv *v1.PersistentVolume) error {
+	if _, ok := pv.Annotations[SecretRefered]; !ok {
+		return fmt.Errorf("no secretRefered in pv %s annotation", pv.Name)
+	}
+	oldPv, err := json.Marshal(pv)
+	if err != nil {
+		return err
+	}
+	pv.Annotations[SecretRefered] = "no"
+	newPv, err := json.Marshal(pv)
+	if err != nil {
+		return err
+	}
+	patch, err := strategicpatch.CreateTwoWayMergePatch(oldPv, newPv, &v1.PersistentVolume{})
+	if err != nil {
+		return err
+	}
+	_, err = p.Client.Core().PersistentVolumes().Patch(pv.Name, types.StrategicMergePatchType, patch)
+	if err != nil {
+		glog.V(2).Infof("Failed to change annotation for pv %s: %v", pv.Name, err)
+		return err
+	}
 	return nil
 }

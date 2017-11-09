@@ -152,7 +152,7 @@ var _ = Describe("Mapper", func() {
 		})
 
 		JustBeforeEach(func() {
-			pv, err = buildPV(mapper, p, options, conn, volumeID)
+			pv, err = buildPV(mapper, p, options, conn, volumeID, "")
 		})
 
 		Context("when building the PV source fails", func() {
