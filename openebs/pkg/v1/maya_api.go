@@ -38,9 +38,9 @@ const (
 
 //OpenEBSVolumeInterface Interface to bind methods
 type OpenEBSVolumeInterface interface {
-	CreateVsm(string, string) (string, error)
-	ListVsm(string, interface{}) error
-	DeleteVsm(string) error
+	CreateVolume(mayav1.VolumeSpec) (string, error)
+	ListVolume(string, interface{}) error
+	DeleteVolume(string) error
 }
 
 //MayaInterface interface to hold maya specific methods
@@ -58,37 +58,33 @@ func (v OpenEBSVolume) GetMayaClusterIP(client kubernetes.Interface) (string, er
 	//Fetch the Maya ClusterIP using the Maya API Server Service
 	sc, err := client.CoreV1().Services("default").Get("maya-apiserver-service", metav1.GetOptions{})
 	if err != nil {
-		glog.Fatalf("Error getting maya-api-server IP Address: %v", err)
+		glog.Errorf("Error getting maya-apiserver IP Address: %v", err)
 	}
 
 	clusterIP = sc.Spec.ClusterIP
-	glog.Infof("Maya Cluster IP: %v", clusterIP)
+	glog.V(2).Infof("Maya Cluster IP: %v", clusterIP)
 
 	return clusterIP, err
 }
 
-// CreateVsm to create the Vsm through a API call to m-apiserver
-func (v OpenEBSVolume) CreateVsm(vname string, size string) (string, error) {
-
-	var vs mayav1.VsmSpec
+// CreateVolume to create the Vsm through a API call to m-apiserver
+func (v OpenEBSVolume) CreateVolume(vs mayav1.VolumeSpec) (string, error) {
 
 	addr := os.Getenv("MAPI_ADDR")
 	if addr == "" {
 		err := errors.New("MAPI_ADDR environment variable not set")
-		glog.Fatalf("Error getting maya-api-server IP Address: %v", err)
-		return "Error getting maya-api-server IP Address", err
+		glog.Errorf("Error getting maya-apiserver IP Address: %v", err)
+		return "Error getting maya-apiserver IP Address", err
 	}
 	url := addr + "/latest/volumes/"
 
 	vs.Kind = "PersistentVolumeClaim"
 	vs.APIVersion = "v1"
-	vs.Metadata.Name = vname
-	vs.Metadata.Labels.Storage = size
 
 	//Marshal serializes the value provided into a YAML document
 	yamlValue, _ := yaml.Marshal(vs)
 
-	glog.Infof("VSM Spec Created:\n%v\n", string(yamlValue))
+	glog.V(2).Infof("[DEBUG] volume Spec Created:\n%v\n", string(yamlValue))
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(yamlValue))
 
@@ -99,39 +95,39 @@ func (v OpenEBSVolume) CreateVsm(vname string, size string) (string, error) {
 	}
 	resp, err := c.Do(req)
 	if err != nil {
-		glog.Fatalf("http.Do() error: : %v", err)
-		return "Could not connect to maya-api-server", err
+		glog.Errorf("Error when connecting maya-apiserver %v", err)
+		return "Could not connect to maya-apiserver", err
 	}
 	defer resp.Body.Close()
 
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		glog.Fatalf("ioutil.ReadAll() error: : %v", err)
-		return "Unable to read response from maya-api-server", err
+		glog.Errorf("Unable to read response from maya-apiserver %v", err)
+		return "Unable to read response from maya-apiserver", err
 	}
 
 	code := resp.StatusCode
 	if code != http.StatusOK {
-		glog.Fatalf("Status error: %v\n", http.StatusText(code))
-		return "HTTP Status error from maya-api-server", err
+		glog.Errorf("Status error: %v\n", http.StatusText(code))
+		return "HTTP Status error from maya-apiserver", err
 	}
 
-	glog.Infof("VSM Successfully Created:\n%v\n", string(data))
-	return "VSM Successfully Created", nil
+	glog.Infof("volume Successfully Created:\n%v\n", string(data))
+	return "volume Successfully Created", nil
 }
 
-// ListVsm to get the info of Vsm through a API call to m-apiserver
-func (v OpenEBSVolume) ListVsm(vname string, obj interface{}) error {
+// ListVolume to get the info of Vsm through a API call to m-apiserver
+func (v OpenEBSVolume) ListVolume(vname string, obj interface{}) error {
 
 	addr := os.Getenv("MAPI_ADDR")
 	if addr == "" {
 		err := errors.New("MAPI_ADDR environment variable not set")
-		glog.Fatalf("Error getting maya-api-server IP Address: %v", err)
+		glog.Errorf("Error getting mayaapi-server IP Address: %v", err)
 		return err
 	}
 	url := addr + "/latest/volumes/info/" + vname
 
-	glog.Infof("Get details for VSM :%v", string(vname))
+	glog.V(2).Infof("[DEBUG] Get details for Volume :%v", string(vname))
 
 	req, err := http.NewRequest("GET", url, nil)
 	c := &http.Client{
@@ -139,32 +135,32 @@ func (v OpenEBSVolume) ListVsm(vname string, obj interface{}) error {
 	}
 	resp, err := c.Do(req)
 	if err != nil {
-		glog.Fatalf("http.Do() error: : %v", err)
+		glog.Errorf("Error when connecting to maya-apiserver %v", err)
 		return err
 	}
 	defer resp.Body.Close()
 
 	code := resp.StatusCode
 	if code != http.StatusOK {
-		glog.Fatalf("Status error: %v\n", http.StatusText(code))
+		glog.Errorf("HTTP Status error from maya-apiserver: %v\n", http.StatusText(code))
 		return err
 	}
-	glog.Info("VSM Details Successfully Retrieved")
+	glog.V(2).Info("volume Details Successfully Retrieved")
 	return json.NewDecoder(resp.Body).Decode(obj)
 }
 
-// DeleteVsm to get delete Vsm through a API call to m-apiserver
-func (v OpenEBSVolume) DeleteVsm(vname string) error {
+// DeleteVolume to get delete Vsm through a API call to m-apiserver
+func (v OpenEBSVolume) DeleteVolume(vname string) error {
 
 	addr := os.Getenv("MAPI_ADDR")
 	if addr == "" {
 		err := errors.New("MAPI_ADDR environment variable not set")
-		glog.Fatalf("Error getting maya-api-server IP Address: %v", err)
+		glog.Errorf("Error getting maya-api-server IP Address: %v", err)
 		return err
 	}
 	url := addr + "/latest/volumes/delete/" + vname
 
-	glog.Infof("Delete VSM :%v", string(vname))
+	glog.V(2).Infof("[DEBUG] Delete Volume :%v", string(vname))
 
 	req, err := http.NewRequest("GET", url, nil)
 	c := &http.Client{
@@ -172,16 +168,16 @@ func (v OpenEBSVolume) DeleteVsm(vname string) error {
 	}
 	resp, err := c.Do(req)
 	if err != nil {
-		glog.Fatalf("http.Do() error: : %v", err)
+		glog.Errorf("Error when connecting to maya-apiserver  %v", err)
 		return err
 	}
 	defer resp.Body.Close()
 
 	code := resp.StatusCode
 	if code != http.StatusOK {
-		glog.Fatalf("Status error: %v\n", http.StatusText(code))
+		glog.Errorf("HTTP Status error from maya-apiserver: %v\n", http.StatusText(code))
 		return err
 	}
-	glog.Info("VSM Deleted Successfully initiated")
+	glog.Info("volume Deleted Successfully initiated")
 	return nil
 }
