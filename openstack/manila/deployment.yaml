@@ -1,0 +1,19 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: manila-provisioner
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: manila-provisioner
+    spec:
+      containers:
+      - name: manila-provisioner
+        image: "quay.io/external_storage/manila-provisioner:latest"
+        imagePullPolicy: IfNotPresent
+        args:
+        - --cloudconfig=/etc/openstack_config

@@ -1,0 +1,10 @@
+[Global]
+auth-url=http://172.20.0.2:5000/v3
+user-id=47af5d8b9fd0496ca7897204e3002153
+password=mTcbJfKTALygP85DGg
+trust-id=d2f666858d7845a2a714bb5719afa05a
+Region=RegionOne
+[Manila]
+share-networkid=f62a0d21-020f-4bb8-9ee5-a3f5b9adbc1f
+share-protocol=NFS
+share-type=575067bf-ec32-4132-bd36-4ba8a646da5d
