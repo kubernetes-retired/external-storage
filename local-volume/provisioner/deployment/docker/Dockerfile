@@ -16,7 +16,8 @@ FROM centos:7
 
 RUN yum update -y && \
     yum install -y e2fsprogs && \
-    yum install -y hdparm
+    yum install -y hdparm && \
+    yum clean all
 
 ADD local-volume-provisioner /local-provisioner
 ADD scripts /scripts

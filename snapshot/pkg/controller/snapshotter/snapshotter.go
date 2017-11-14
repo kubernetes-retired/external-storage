@@ -695,6 +695,9 @@ func (vs *volumeSnapshotter) updateVolumeSnapshotMetadata(snapshot *crdv1.Volume
 		Resource(crdv1.VolumeSnapshotResourcePlural).
 		Namespace(snapshot.Metadata.Namespace).
 		Do().Into(&snapshotObj)
+	if err != nil {
+		return nil, fmt.Errorf("Error retrieving VolumeSnapshot %s from API server: %v", snapshot.Metadata.Name, err)
+	}
 
 	// Copy the snapshot object before updating it
 	objCopy, err := vs.scheme.DeepCopy(&snapshotObj)
@@ -718,11 +721,11 @@ func (vs *volumeSnapshotter) updateVolumeSnapshotMetadata(snapshot *crdv1.Volume
 	err = vs.restClient.Put().
 		Name(snapshot.Metadata.Name).
 		Resource(crdv1.VolumeSnapshotResourcePlural).
-		Namespace(snapshotCopy.Metadata.Namespace).
+		Namespace(snapshot.Metadata.Namespace).
 		Body(snapshotCopy).
 		Do().Into(&result)
 	if err != nil {
-		return nil, fmt.Errorf("Error updating snapshot object %s on the API server: %v", snapshot.Metadata.Name, err)
+		return nil, fmt.Errorf("Error updating snapshot object %s/%s on the API server: %v", snapshot.Metadata.Namespace, snapshot.Metadata.Name, err)
 	}
 
 	cloudTags := make(map[string]string)

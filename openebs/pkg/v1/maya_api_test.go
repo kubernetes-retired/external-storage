@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	mayav1 "github.com/kubernetes-incubator/external-storage/openebs/types/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 )
@@ -42,21 +43,21 @@ func (mIP MayaClusterIPTest) GetMayaClusterIP(client kubernetes.Interface) (stri
 	return mIP.ClusterIP, nil
 }
 
-func (ov OpenEBSVolumeTest) CreateVsm(vaname string, size string) (string, error) {
+func (ov OpenEBSVolumeTest) CreateVolume(mayav1.VolumeSpec) (string, error) {
 	if ov.Err != nil {
 		return ov.Message, ov.Err
 	}
 	return ov.Message, nil
 }
 
-func (ov OpenEBSVolumeTest) ListVsm(vaname string, size interface{}) error {
+func (ov OpenEBSVolumeTest) ListVolume(vaname string, size interface{}) error {
 	if ov.Err != nil {
 		return ov.Err
 	}
 	return nil
 }
 
-func (ov OpenEBSVolumeTest) DeleteVsm(vname string) error {
+func (ov OpenEBSVolumeTest) DeleteVolume(vname string) error {
 	if ov.Err != nil {
 		return ov.Err
 	}
@@ -68,16 +69,16 @@ func EvaluateGetMayaClusterIP(mi MayaInterface) (string, error) {
 	return mi.GetMayaClusterIP(client)
 }
 
-func EvaluateCreateVsm(ovi OpenEBSVolumeInterface, vname string, size string) (string, error) {
-	return ovi.CreateVsm(vname, size)
+func EvaluateCreateVolume(ovi OpenEBSVolumeInterface, vs mayav1.VolumeSpec) (string, error) {
+	return ovi.CreateVolume(vs)
 }
 
-func EvaluateListVsm(ovi OpenEBSVolumeInterface, vname string, obj interface{}) error {
-	return ovi.ListVsm(vname, obj)
+func EvaluateListVolume(ovi OpenEBSVolumeInterface, vname string, obj interface{}) error {
+	return ovi.ListVolume(vname, obj)
 }
 
-func EvaluateDeleteVsm(ovi OpenEBSVolumeInterface, vname string) error {
-	return ovi.DeleteVsm(vname)
+func EvaluateDeleteVolume(ovi OpenEBSVolumeInterface, vname string) error {
+	return ovi.DeleteVolume(vname)
 }
 
 func TestGetMayaClusterIP(t *testing.T) {
@@ -133,8 +134,10 @@ func TestCreateVsm(t *testing.T) {
 	}
 
 	for _, c := range cases {
-
-		message, err := EvaluateCreateVsm(c.ovt, c.vname, c.size)
+		vs := mayav1.VolumeSpec{}
+		vs.Metadata.Name = c.vname
+		vs.Metadata.Labels.Storage = c.size
+		message, err := EvaluateCreateVolume(c.ovt, c.vname, c.size)
 
 		if !reflect.DeepEqual(err, c.expectedErr) {
 			t.Fatalf("Expected error %v got %v", c.expectedErr, err)
@@ -145,7 +148,7 @@ func TestCreateVsm(t *testing.T) {
 	}
 }
 
-func TestListVsm(t *testing.T) {
+func TestListVolume(t *testing.T) {
 	cases := []struct {
 		name        string
 		vname       string
@@ -174,7 +177,7 @@ func TestListVsm(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		err := EvaluateListVsm(c.ovt, c.vname, nil)
+		err := EvaluateListVolume(c.ovt, c.vname, nil)
 		if !reflect.DeepEqual(err, c.expectedErr) {
 			t.Fatalf("Expected error %v  got %v", c.expectedErr, err)
 		}
@@ -210,7 +213,7 @@ func TestDeleteVsm(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		err := EvaluateListVsm(c.ovt, c.vname, nil)
+		err := EvaluateListVolume(c.ovt, c.vname, nil)
 		if !reflect.DeepEqual(err, c.expectedErr) {
 			t.Fatalf("Expected error %v  got %v", c.expectedErr, err)
 		}

@@ -1,0 +1,6 @@
+---
+- hosts: nodes,targetd
+  roles:
+  - role: deploy-provisioner 
+    run_once: true
+    delegate_to: "{{ groups['masters'] | first }}"

@@ -63,6 +63,8 @@ flycheck_*.el
 
 # snapshot binaries
 /snapshot/_output
+/snapshot/deploy/docker/controller/snapshot-controller
+/snapshot/deploy/docker/provisioner/snapshot-provisioner
 
 # cinder binary
 /openstack/standalone-cinder/cinder-provisioner
