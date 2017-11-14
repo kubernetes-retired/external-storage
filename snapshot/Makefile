@@ -12,16 +12,47 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-.PHONY: all controller clean test
+ifeq ($(REGISTRY),)
+	REGISTRY = quay.io/external_storage/
+endif
+ifeq ($(VERSION),)
+	VERSION = latest
+endif
+IMAGE_CONTROLLER = $(REGISTRY)snapshot-controller:$(VERSION)
+MUTABLE_IMAGE_CONTROLLER = $(REGISTRY)snapshot-controller:latest
+IMAGE_PROVISIONER = $(REGISTRY)snapshot-provisioner:$(VERSION)
+MUTABLE_IMAGE_PROVISIONER = $(REGISTRY)snapshot-provisioner:latest
 
-all: controller
+.PHONY: all controller provisioner clean container container-quick push test
+
+all: controller provisioner
 
 controller:
-	go build -o _output/bin/snapshot-controller cmd/snapshot-controller/snapshot-controller.go
-	go build -o _output/bin/snapshot-provisioner cmd/snapshot-pv-provisioner/snapshot-pv-provisioner.go
+	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o _output/bin/snapshot-controller cmd/snapshot-controller/snapshot-controller.go
+
+provisioner:
+	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o _output/bin/snapshot-provisioner cmd/snapshot-pv-provisioner/snapshot-pv-provisioner.go
 
 clean:
+	-rm -f deploy/controller/snapshot-controller
+	-rm -f deploy/provisioner/snapshot-provisioner
 	-rm -rf _output
 
 test:
 	go test `go list ./... | grep -v 'vendor'`
+
+container: controller provisioner container-quick
+
+container-quick:
+	cp _output/bin/snapshot-controller deploy/docker/controller
+	cp _output/bin/snapshot-provisioner deploy/docker/provisioner
+	docker build -t $(MUTABLE_IMAGE_CONTROLLER) deploy/docker/controller
+	docker tag $(MUTABLE_IMAGE_CONTROLLER) $(IMAGE_CONTROLLER)
+	docker build -t $(MUTABLE_IMAGE_PROVISIONER) deploy/docker/provisioner
+	docker tag $(MUTABLE_IMAGE_PROVISIONER) $(IMAGE_PROVISIONER)
+
+push: container
+	docker push $(IMAGE_CONTROLLER)
+	docker push $(MUTABLE_IMAGE_CONTROLLER)
+	docker push $(IMAGE_PROVISIONER)
+	docker push $(MUTABLE_IMAGE_PROVISIONER)
