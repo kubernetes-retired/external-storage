@@ -45,27 +45,30 @@ class CephFSNativeDriver(object):
 
 
     def _create_conf(self, cluster_name, mons):
-        """ Create conf using monitors 
+        """ Create conf using monitors
         Create a minimal ceph conf with monitors and cephx
         """
         conf_path = CONF_PATH + cluster_name + ".conf"
-        conf = open(conf_path, 'w')
-        conf.write("[global]\n")
-        conf.write("mon_host = " + mons + "\n")
-        conf.write("auth_cluster_required = cephx\nauth_service_required = cephx\nauth_client_required = cephx\n")
-        conf.close()
+        if not os.path.isfile(conf_path) or os.access(conf_path, os.W_OK):
+            conf = open(conf_path, 'w')
+            conf.write("[global]\n")
+            conf.write("mon_host = " + mons + "\n")
+            conf.write("auth_cluster_required = cephx\nauth_service_required = cephx\nauth_client_required = cephx\n")
+            conf.close()
         return conf_path
 
     def _create_keyring(self, cluster_name, id, key):
         """ Create client keyring using id and key
         """
-        keyring = open(CONF_PATH + cluster_name + "." + "client." + id + ".keyring", 'w')
-        keyring.write("[client." + id + "]\n")
-        keyring.write("key = " + key  + "\n")
-        keyring.write("caps mds = \"allow *\"\n")
-        keyring.write("caps mon = \"allow *\"\n")
-        keyring.write("caps osd = \"allow *\"\n")
-        keyring.close()
+        keyring_path = CONF_PATH + cluster_name + "." + "client." + id + ".keyring"
+        if not os.path.isfile(keyring_path) or os.access(keyring_path, os.W_OK):
+            keyring = open(keyring_path, 'w')
+            keyring.write("[client." + id + "]\n")
+            keyring.write("key = " + key  + "\n")
+            keyring.write("caps mds = \"allow *\"\n")
+            keyring.write("caps mon = \"allow *\"\n")
+            keyring.write("caps osd = \"allow *\"\n")
+            keyring.close()
 
     @property
     def volume_client(self):
