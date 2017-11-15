@@ -136,6 +136,7 @@ imports:
   subpackages:
   - openstack
   - openstack/blockstorage/extensions/volumeactions
+  - openstack/blockstorage/noauth
   - openstack/blockstorage/v2/snapshots
   - openstack/blockstorage/v2/volumes
   - openstack/common/extensions
