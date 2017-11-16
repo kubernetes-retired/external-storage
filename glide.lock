@@ -132,10 +132,11 @@ imports:
   - compiler
   - extensions
 - name: github.com/gophercloud/gophercloud
-  version: b4c2377fa77951a0e08163f52dc9b3e206355194
+  version: 6e5b7d64ea59ae3b8fdf0456e73e6c7638200e31
   subpackages:
   - openstack
   - openstack/blockstorage/extensions/volumeactions
+  - openstack/blockstorage/noauth
   - openstack/blockstorage/v2/snapshots
   - openstack/blockstorage/v2/volumes
   - openstack/common/extensions
