@@ -196,6 +196,17 @@ class CephFSNativeDriver(object):
         assert caps[0]['entity'] == client_entity
         return caps[0]
 
+    def _remove_ceph_user(self, user_id):
+        client_entity = "client.{0}".format(user_id)
+        try:
+            ret = self._volume_client._rados_command(
+                'auth del',
+                {
+                    'entity': client_entity
+                }
+            )
+        except rados.Error:
+            pass
 
     def create_share(self, path, user_id, size=None):
         """Create a CephFS volume.
@@ -227,6 +238,9 @@ class CephFSNativeDriver(object):
     def delete_share(self, path, user_id):
         volume_path = ceph_volume_client.VolumePath(VOlUME_GROUP, path)
         self.volume_client._deauthorize(volume_path, user_id)
+        # Remove the user if it's a dynamic created user
+        if user_id.startswith('kubernetes-dynamic-user-'):
+            self._remove_ceph_user(user_id)
         self.volume_client.delete_volume(volume_path)
         self.volume_client.purge_volume(volume_path)
 
