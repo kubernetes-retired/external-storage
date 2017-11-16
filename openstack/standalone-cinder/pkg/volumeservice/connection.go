@@ -91,11 +91,12 @@ func getConfigFromEnv() cinderConfig {
 
 	return cinderConfig{
 		Global: cinderConfigGlobal{
-			AuthURL:  authURL,
-			Username: os.Getenv("OS_USERNAME"),
-			Password: os.Getenv("OS_PASSWORD"), // TODO: Replace with secret
-			TenantID: os.Getenv("OS_TENANT_ID"),
-			Region:   os.Getenv("OS_REGION_NAME"),
+			AuthURL:    authURL,
+			Username:   os.Getenv("OS_USERNAME"),
+			Password:   os.Getenv("OS_PASSWORD"), // TODO: Replace with secret
+			TenantID:   os.Getenv("OS_TENANT_ID"),
+			Region:     os.Getenv("OS_REGION_NAME"),
+			DomainName: os.Getenv("OS_USER_DOMAIN_NAME"),
 		},
 	}
 }
