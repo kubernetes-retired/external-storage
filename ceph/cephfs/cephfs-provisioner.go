@@ -68,6 +68,10 @@ func newCephFSProvisioner(client kubernetes.Interface, id string) controller.Pro
 
 var _ controller.Provisioner = &cephFSProvisioner{}
 
+func generateSecretName(user string) string {
+	return "ceph-" + user + "-secret"
+}
+
 // Provision creates a storage asset and returns a PV object representing it.
 func (p *cephFSProvisioner) Provision(options controller.VolumeOptions) (*v1.PersistentVolume, error) {
 	if options.PVC.Spec.Selector != nil {
@@ -104,7 +108,7 @@ func (p *cephFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 	}
 	// create secret in PVC's namespace
 	nameSpace := options.PVC.Namespace
-	secretName := "ceph-" + user + "-secret"
+	secretName := generateSecretName(user)
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: nameSpace,
@@ -143,6 +147,7 @@ func (p *cephFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 					SecretRef: &v1.SecretReference{
 						Name: secretName,
 						// TODO https://github.com/kubernetes-incubator/external-storage/issues/309
+						Namespace: nameSpace,
 					},
 					User: user,
 				},
@@ -194,6 +199,15 @@ func (p *cephFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 	if cmdErr != nil {
 		glog.Errorf("failed to delete share %q for %q, err: %v, output: %v", share, user, cmdErr, string(output))
 		return cmdErr
+	}
+
+	// Remove dynamic user secret
+	secretName := generateSecretName(user)
+	secretNamespace := volume.Spec.PersistentVolumeSource.CephFS.SecretRef.Namespace
+	err = p.client.Core().Secrets(secretNamespace).Delete(secretName, &metav1.DeleteOptions{})
+	if err != nil {
+		glog.Errorf("Cephfs Provisioner: delete secret failed, err: %v", err)
+		return fmt.Errorf("failed to delete secret")
 	}
 
 	return nil
