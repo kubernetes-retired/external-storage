@@ -55,8 +55,14 @@ type OpenEBSVolume struct{}
 func (v OpenEBSVolume) GetMayaClusterIP(client kubernetes.Interface) (string, error) {
 	clusterIP := "127.0.0.1"
 
+	namespace := os.Getenv("OPENEBS_NAMESPACE")
+	if namespace == "" {
+		namespace = "default"
+	}
+
+	glog.Info("OpenEBS volume provisioner namespace ", namespace)
 	//Fetch the Maya ClusterIP using the Maya API Server Service
-	sc, err := client.CoreV1().Services("default").Get("maya-apiserver-service", metav1.GetOptions{})
+	sc, err := client.CoreV1().Services(namespace).Get("maya-apiserver-service", metav1.GetOptions{})
 	if err != nil {
 		glog.Errorf("Error getting maya-apiserver IP Address: %v", err)
 	}
