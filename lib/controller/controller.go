@@ -41,7 +41,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	ref "k8s.io/client-go/tools/reference"
-	"k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
 )
@@ -578,7 +577,7 @@ func (ctrl *ProvisionController) shouldProvision(claim *v1.PersistentVolumeClaim
 	}
 
 	// Kubernetes 1.4 provisioning, evaluating class.Provisioner
-	claimClass := helper.GetPersistentVolumeClaimClass(claim)
+	claimClass := GetPersistentVolumeClaimClass(claim)
 	provisioner, _, err := ctrl.getStorageClassFields(claimClass)
 	if err != nil {
 		glog.Errorf("Error getting claim %q's StorageClass's fields: %v", claimToClaimKey(claim), err)
@@ -745,7 +744,7 @@ func (ctrl *ProvisionController) updateDeleteStats(volume *v1.PersistentVolume, 
 // the operation is deleted, else the operation may be retried with expbackoff.
 func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVolumeClaim) error {
 	// Most code here is identical to that found in controller.go of kube's PV controller...
-	claimClass := helper.GetPersistentVolumeClaimClass(claim)
+	claimClass := GetPersistentVolumeClaimClass(claim)
 	glog.V(4).Infof("provisionClaimOperation [%s] started, class: %q", claimToClaimKey(claim), claimClass)
 
 	//  A previous doProvisionClaim may just have finished while we were waiting for
