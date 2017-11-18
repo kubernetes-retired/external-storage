@@ -20,6 +20,6 @@ This is an simple provisioner for DigitalOcean [Block Storage](https://www.digit
 
 **TODO**
  - [ ] Support multi zones
- - [ ] Rewrite flexvolume plugin in Go
+ - [x] Rewrite flexvolume plugin in Go
  - [ ] Prevent k8s from scheduling more than 5 disks to a single droplet
  - [ ] Improve documentation

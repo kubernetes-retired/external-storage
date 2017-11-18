@@ -32,13 +32,12 @@ fi
 
 if [ -n "$DIGITALOCEAN_ACCESS_TOKEN" ]; then
 	(umask 077
-	echo "$DIGITALOCEAN_ACCESS_TOKEN" > "/$DRIVER/do_token")
+	echo "$DIGITALOCEAN_ACCESS_TOKEN" > "/flexmnt/$driver_dir/do_token")
 fi
 
-rm -fr "/flexmnt/.$driver_dir"
-cp -r "/$DRIVER" "/flexmnt/.$driver_dir"
-rm -fr "/flexmnt/$driver_dir"
-mv -f "/flexmnt/.$driver_dir" "/flexmnt/$driver_dir"
+
+cp "/$DRIVER" "/flexmnt/$driver_dir/.$DRIVER"
+mv -f "/flexmnt/$driver_dir/.$DRIVER" "/flexmnt/$driver_dir/$DRIVER"
 
 while : ; do
   sleep 3600 &
