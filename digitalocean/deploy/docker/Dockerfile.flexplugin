@@ -14,24 +14,8 @@
 
 FROM alpine:3.6
 MAINTAINER Kristian Klausen, klausenbusk@hotmail.com
-RUN apk add --no-cache curl && \
-    mkdir /digitalocean
 
-ENV DOCTL_VERSION="1.7.1"
-ENV DOCTL_SHA256="48ce63e156f65922f73678011279cf6d13e0971a76fcc87a3a7ff17eed33db78"
-RUN curl -sL "https://github.com/digitalocean/doctl/releases/download/v${DOCTL_VERSION}/doctl-${DOCTL_VERSION}-linux-amd64.tar.gz" > doctl.tar.gz && \
-    echo "${DOCTL_SHA256}  doctl.tar.gz" | sha256sum -c && \
-    tar -C /digitalocean -xf doctl.tar.gz && \
-    rm doctl.tar.gz
-
-ENV BUSYBOX_VERSION="1.27.1-i686"
-ENV BUSYBOX_SHA256="b51b9328eb4e60748912e1c1867954a5cf7e9d5294781cae59ce225ed110523c"
-RUN curl -sO "https://busybox.net/downloads/binaries/${BUSYBOX_VERSION}/busybox" && \
-    echo "${BUSYBOX_SHA256}  busybox" | sha256sum -c && \
-    chmod +x busybox && \
-    mv busybox /digitalocean
-
-COPY /digitalocean-flexplugin.sh /digitalocean/digitalocean
+COPY /digitalocean-flexplugin /digitalocean
 COPY /flex-installer.sh /
 
 ENTRYPOINT ["/flex-installer.sh"]
