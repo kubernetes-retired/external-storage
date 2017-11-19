@@ -30,7 +30,14 @@ import (
 	"time"
 )
 
-type driverStatus struct {
+// Stolen from: https://github.com/digitalocean/digitalocean-cloud-controller-manager/blob/5a64f9a0729ece886c65c59dcc2a0ecbe7f3b6eb/do/cloud.go#L47
+type cloud struct {
+	client *godo.Client
+	ctx    context.Context
+}
+
+// Stolen from: https://github.com/kubernetes-csi/drivers/blob/51296163df54a46e84fe0a8ad64f7540346498d1/flexadapter/driver-call.go#L180
+type result struct {
 	// Status of the callout. One of "Success", "Failure" or "Not supported".
 	Status string `json:"status"`
 	// Reason for success/failure.
@@ -45,7 +52,7 @@ type driverStatus struct {
 	// Returns capabilities of the driver.
 	// By default we assume all the capabilities are supported.
 	// If the plugin does not support a capability, it can return false for that capability.
-	Capabilities driverCapabilities `json:",omitempty"`
+	Capabilities *driverCapabilities `json:",omitempty"`
 }
 
 type driverCapabilities struct {
@@ -53,7 +60,7 @@ type driverCapabilities struct {
 	SELinuxRelabel bool `json:"selinuxRelabel"`
 }
 
-func findNode(ctx context.Context, client *godo.Client, nodeName string) (int, error) {
+func (c *cloud) findNode(nodeName string) (int, error) {
 	if nodeName == "" {
 		// https://github.com/digitalocean/go-metadata/blob/master/client.go#L86
 		resp, err := http.Get("http://169.254.169.254/metadata/v1/id")
@@ -67,7 +74,7 @@ func findNode(ctx context.Context, client *godo.Client, nodeName string) (int, e
 
 	opt := &godo.ListOptions{}
 	for {
-		droplets, resp, err := client.Droplets.List(ctx, opt)
+		droplets, resp, err := c.client.Droplets.List(c.ctx, opt)
 		if err != nil {
 			return 0, err
 		}
@@ -102,8 +109,8 @@ func findNode(ctx context.Context, client *godo.Client, nodeName string) (int, e
 	return 0, fmt.Errorf("Error: No droplet matching nodeName %s found", nodeName)
 }
 
-func getVolumeByName(ctx context.Context, client *godo.Client, volumeName string) (string, error) {
-	volumes, _, err := client.Storage.ListVolumes(ctx, nil)
+func (c *cloud) getVolumeByName(volumeName string) (string, error) {
+	volumes, _, err := c.client.Storage.ListVolumes(c.ctx, nil)
 	if err != nil {
 		return "", err
 	}
@@ -115,10 +122,10 @@ func getVolumeByName(ctx context.Context, client *godo.Client, volumeName string
 	return "", fmt.Errorf("Error: No volume found with volumeName: %s", volumeName)
 }
 
-func waitForAction(ctx context.Context, client *godo.Client, action *godo.Action) error {
+func (c *cloud) waitForAction(action *godo.Action) error {
 	completed := false
 	for !completed {
-		a, _, err := client.Actions.Get(ctx, action.ID)
+		a, _, err := c.client.Actions.Get(c.ctx, action.ID)
 		if err != nil {
 			return err
 		}
@@ -135,28 +142,28 @@ func waitForAction(ctx context.Context, client *godo.Client, action *godo.Action
 	return nil
 }
 
-func attach(ctx context.Context, client *godo.Client, options string, nodeName string) (string, error) {
-	dropletID, err := findNode(ctx, client, nodeName)
+func (c *cloud) attach(options string, nodeName string) (result, error) {
+	dropletID, err := c.findNode(nodeName)
 	if err != nil {
-		return "", err
+		return result{}, err
 	}
 
 	var f struct {
 		PvOrVolumeName string `json:"kubernetes.io/pvOrVolumeName"`
 	}
 	if err = json.Unmarshal([]byte(options), &f); err != nil {
-		return "", err
+		return result{}, err
 	}
 	volumeName := f.PvOrVolumeName
 
-	volumeID, err := getVolumeByName(ctx, client, volumeName)
+	volumeID, err := c.getVolumeByName(volumeName)
 	if err != nil {
-		return "", err
+		return result{}, err
 	}
 
-	vol, _, err := client.Storage.GetVolume(ctx, volumeID)
+	vol, _, err := c.client.Storage.GetVolume(c.ctx, volumeID)
 	if err != nil {
-		return "", err
+		return result{}, err
 	}
 	var attached bool
 	for _, id := range vol.DropletIDs {
@@ -164,38 +171,41 @@ func attach(ctx context.Context, client *godo.Client, options string, nodeName s
 			attached = true
 			break
 		} else {
-			return "", fmt.Errorf("Error: Volume already attached to: %d", id)
+			return result{}, fmt.Errorf("Error: Volume already attached to: %d", id)
 		}
 	}
 
 	if !attached {
-		action, _, err := client.StorageActions.Attach(ctx, volumeID, dropletID)
+		action, _, err := c.client.StorageActions.Attach(c.ctx, volumeID, dropletID)
 		if err != nil {
-			return "", err
+			return result{}, err
 		}
-		if err := waitForAction(ctx, client, action); err != nil {
-			return "", err
+		if err := c.waitForAction(action); err != nil {
+			return result{}, err
 		}
 	}
 
-	return fmt.Sprintf("/dev/disk/by-id/scsi-0DO_Volume_%s", volumeName), nil
+	return result{
+		Status:     "Success",
+		DevicePath: fmt.Sprintf("/dev/disk/by-id/scsi-0DO_Volume_%s", volumeName),
+	}, nil
 }
 
-func detach(ctx context.Context, client *godo.Client, options string, nodeName string) error {
-	dropletID, err := findNode(ctx, client, nodeName)
+func (c *cloud) detach(options string, nodeName string) (result, error) {
+	dropletID, err := c.findNode(nodeName)
 	if err != nil {
-		return err
+		return result{}, err
 	}
 
 	volumeName := options
-	volumeID, err := getVolumeByName(ctx, client, volumeName)
+	volumeID, err := c.getVolumeByName(volumeName)
 	if err != nil {
-		return err
+		return result{}, err
 	}
 
-	vol, _, err := client.Storage.GetVolume(ctx, volumeID)
+	vol, _, err := c.client.Storage.GetVolume(c.ctx, volumeID)
 	if err != nil {
-		return err
+		return result{}, err
 	}
 	var attached bool
 	for _, id := range vol.DropletIDs {
@@ -203,19 +213,26 @@ func detach(ctx context.Context, client *godo.Client, options string, nodeName s
 			attached = true
 			break
 		} else {
-			return fmt.Errorf("Error: The volume %s is attached to another node (%d)", volumeName, id)
+			return result{}, fmt.Errorf("Error: The volume %s is attached to another node (%d)", volumeName, id)
 		}
 	}
 
 	if !attached {
-		return nil
+		return result{}, nil
 	}
 
-	action, _, err := client.StorageActions.DetachByDropletID(ctx, volumeID, dropletID)
+	action, _, err := c.client.StorageActions.DetachByDropletID(c.ctx, volumeID, dropletID)
 	if err != nil {
-		return err
+		return result{}, err
 	}
-	return waitForAction(ctx, client, action)
+
+	if err = c.waitForAction(action); err != nil {
+		return result{}, err
+	}
+
+	return result{
+		Status: "Success",
+	}, nil
 }
 
 func newDoClient() (*godo.Client, error) {
@@ -240,14 +257,6 @@ func newDoClient() (*godo.Client, error) {
 }
 
 func main() {
-	ctx := context.TODO()
-
-	doClient, err := newDoClient()
-	if err != nil {
-		writedriverStatus(driverStatus{Status: "Failure", Message: err.Error()})
-		return
-	}
-
 	args := os.Args
 	argsLen := len(args)
 	var command string
@@ -256,50 +265,56 @@ func main() {
 		args = args[2:]
 		argsLen--
 	}
-	switch command {
-	case "init":
-		ds := driverStatus{
-			Status: "Success",
-			Capabilities: driverCapabilities{
-				Attach:         true,
-				SELinuxRelabel: true,
-			},
-		}
-		writedriverStatus(ds)
-	case "attach":
-		var nodeName string
-		if argsLen > 2 {
-			nodeName = args[1]
-		}
-
-		devicePath, err := attach(ctx, doClient, args[0], nodeName)
+	r := func() (result, error) {
+		doClient, err := newDoClient()
 		if err != nil {
-			writedriverStatus(driverStatus{Status: "Failure", Message: err.Error()})
-		} else {
-			writedriverStatus(driverStatus{Status: "Success", DevicePath: devicePath})
-		}
-	case "detach":
-		var nodeName string
-		if argsLen > 2 {
-			nodeName = args[1]
+			return result{}, err
 		}
 
-		if err := detach(ctx, doClient, args[0], nodeName); err != nil {
-			writedriverStatus(driverStatus{Status: "Failure", Message: err.Error()})
-		} else {
-			writedriverStatus(driverStatus{Status: "Success"})
+		c := &cloud{
+			client: doClient,
+			ctx:    context.TODO(),
 		}
-	default:
-		writedriverStatus(driverStatus{Status: "Not supported"})
+		switch command {
+		case "init":
+			return result{
+				Status: "Success",
+				Capabilities: &driverCapabilities{
+					Attach:         true,
+					SELinuxRelabel: true,
+				},
+			}, nil
+		case "attach":
+			var nodeName string
+			if argsLen > 2 {
+				nodeName = args[1]
+			}
+
+			return c.attach(args[0], nodeName)
+		case "detach":
+			var nodeName string
+			if argsLen > 2 {
+				nodeName = args[1]
+			}
+
+			return c.detach(args[0], nodeName)
+		}
+		return result{
+			Status: "Not supported",
+		}, nil
 	}
-}
 
-func writedriverStatus(ds driverStatus) error {
-	j, err := json.Marshal(ds)
+	result, err := r()
 	if err != nil {
-		return fmt.Errorf("error encoding driver status to JSON: %s", err.Error())
+		result.Status = "Failure"
+		result.Message = err.Error()
 	}
 
-	fmt.Println(string(j))
-	return nil
+	var j []byte
+	j, err = json.Marshal(result)
+	if err != nil {
+		fmt.Println("Error encoding result to JSON:", err.Error())
+	} else {
+		fmt.Println(string(j))
+	}
 }
