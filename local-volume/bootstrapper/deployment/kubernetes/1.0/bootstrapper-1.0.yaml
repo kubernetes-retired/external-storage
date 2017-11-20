@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: local-volume-provisioner-bootstrap
+  namespace: kube-system
+  labels:
+    app: local-volume-provisioner-bootstrap
+spec:
+  restartPolicy: Never
+  serviceAccountName: local-storage-bootstrapper
+  containers:
+  - name: bootstrapper
+    image: quay.io/external_storage/local-volume-provisioner-bootstrap:v1.0.1
+    env:
+    - name: MY_NAMESPACE
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.namespace
+    args:
+    - --image=quay.io/external_storage/local-volume-provisioner:v1.0.1
+    - --volume-config=local-volume-config
