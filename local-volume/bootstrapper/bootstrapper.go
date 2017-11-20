@@ -90,28 +90,6 @@ func generateMountDir(mount *common.MountConfig) string {
 	return path.Join(*mountRoot, strings.Replace(strings.TrimPrefix(mount.HostDir, "/"), "/", "~", -1))
 }
 
-// ensureVolumeConfig reads volume configurations from given configmap, and create a default one
-// if not already exist.
-func ensureVolumeConfig(client *kubernetes.Clientset, namespace string, config *common.ProvisionerConfiguration) error {
-	// Get config map from user or from a default configmap (if created before).
-	err := common.GetVolumeConfigFromConfigMap(client, namespace, *volumeConfigName, config)
-	if err != nil && *volumeConfigName != defaultVolumeConfigName {
-		// If configmap is provided by user but we have problem getting it, fail fast.
-		return fmt.Errorf("could not get config map: %v", err)
-	} else if err != nil && errors.IsNotFound(err) {
-		// configmap is not provided by user and default configmap doesn't exist, create one.
-		glog.Infof("No config is given, creating default configmap %v", *volumeConfigName)
-		common.GetDefaultVolumeConfig(config)
-		if err = createConfigMap(client, namespace, config); err != nil {
-			return fmt.Errorf("unable to create configmap: %v", err)
-		}
-	} else if err != nil {
-		// error exists, it might be that default configmap is damanged, fail fast.
-		return fmt.Errorf("could not get default config map: %v", err)
-	}
-	return nil
-}
-
 // ensureMountDir checks if each storageclass's mount config has 'MountDir' set; if not, it will
 // automatically generate one and informs an update on configmap is required.
 func ensureMountDir(config *common.ProvisionerConfiguration) bool {
@@ -139,27 +117,6 @@ func updateConfigMap(client *kubernetes.Clientset, namespace string, config *com
 		return err
 	}
 	_, err = client.CoreV1().ConfigMaps(namespace).Update(configMap)
-	return err
-}
-
-// createConfigMap ...
-func createConfigMap(client *kubernetes.Clientset, namespace string, config *common.ProvisionerConfiguration) error {
-	data, err := common.VolumeConfigToConfigMapData(config)
-	if err != nil {
-		glog.Fatalf("Unable to convert volume config to configmap %v\n", err)
-	}
-	configMap := v1.ConfigMap{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "ConfigMap",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      *volumeConfigName,
-			Namespace: namespace,
-		},
-		Data: data,
-	}
-	_, err = client.CoreV1().ConfigMaps(namespace).Create(&configMap)
 	return err
 }
 
@@ -345,8 +302,10 @@ func main() {
 	provisionerConfig = common.ProvisionerConfiguration{
 		StorageClassConfig: make(map[string]common.MountConfig),
 	}
-	if err = ensureVolumeConfig(client, namespace, &provisionerConfig); err != nil {
-		glog.Fatalf("Unable to ensure volume config: %v", err)
+
+	err = common.GetVolumeConfigFromConfigMap(client, namespace, *volumeConfigName, &provisionerConfig)
+	if err != nil {
+		glog.Fatalf("Could not get config map: %v", err)
 	}
 	if ensureMountDir(&provisionerConfig) {
 		if err = updateConfigMap(client, namespace, &provisionerConfig); err != nil {

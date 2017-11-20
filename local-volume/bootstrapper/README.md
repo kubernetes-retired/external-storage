@@ -4,8 +4,8 @@ local-volume-provisioner-bootstrap is used to bootstrap provisioner. The main us
 case of bootstrapper is to make provisioner configurable. Below is a detailed flow
 of how the bootstrap process works:
 
-- looks for a configmap passed in via flag `-volume-config`; otherwise, a default
-  configmap named `local-volume-default-config` will be created
+- looks for a configmap passed in via flag `-volume-config`. By default it looks for the configmap
+  named `local-volume-default-config`. A valid configmap must be present for the bootstrap process to run.
 - reads and validates the configmap, then auto-generates missing configurations,
   see below
 - looks for a service account passed in via flag `-serviceaccount`; otherwise, a
@@ -117,10 +117,22 @@ make push
 Deploy to existing cluster:
 
 ```console
-kubectl create -f deployment/kubernetes/example-config.yaml
-kubectl create -f deployment/kubernetes/admin-account.yaml
-kubectl create -f deployment/kubernetes/bootstrapper.yaml
+kubectl create -f deployment/kubernetes/<version>/example-config.yaml
+kubectl create -f deployment/kubernetes/<version>/admin-account.yaml
+kubectl create -f deployment/kubernetes/<version>/bootstrapper.yaml
 ```
+
+The version in the path above can be `latest` for the latest provsioner or one of the earlier images.
+
+**Note:** The configmap (as shown in example-config.yam) is required to run the Bootstrap process.
+
+The compatibility matrix between the bootstrap container image, local volume provisioner constainer image
+and Kubernetes is as follows:
+
+| Bootstrap | Provisioner | Kubernetes |
+|:---------:|:-----------:|:----------:|
+| v1.0.1    | v1.0.1      | 1.9 and earlier |
+| latest    | latest      | 1.9 and earlier |
 
 ## Future improvements
 
