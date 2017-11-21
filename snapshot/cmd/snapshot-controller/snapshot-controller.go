@@ -39,6 +39,7 @@ import (
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume/awsebs"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume/cinder"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume/gcepd"
+	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume/gluster"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume/hostpath"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 )
@@ -136,6 +137,6 @@ func buildVolumePlugins() {
 			glog.Warningf("failed to initialize cloudprovider: %v, supported cloudproviders are %#v", err, cloudprovider.CloudProviders())
 		}
 	}
-
+	volumePlugins[gluster.GetPluginName()] = gluster.RegisterPlugin()
 	volumePlugins[hostpath.GetPluginName()] = hostpath.RegisterPlugin()
 }
