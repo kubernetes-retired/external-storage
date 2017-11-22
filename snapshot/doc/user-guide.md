@@ -116,7 +116,7 @@ A Persistent Volume will be created and bound to the Persistent Volume Claim. Th
 ## Deleting Snapshot
 A Volume Snapshot `snapshot-demo` can be deleted as shown below:
 ```
-$ kubectl delete -f volumesnapshot/snapshot-demo
+$ kubectl delete volumesnapshot/snapshot-demo
 ```
 The Volume Snapshot Data that are bound to the Volume Snapshot are also automatically deleted.
 
