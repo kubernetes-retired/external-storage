@@ -40,6 +40,8 @@ const (
 )
 
 func main() {
+	supportedFeatures := provision.NewDefaultSupportedImageFeatures()
+	flag.Var(&supportedFeatures, "supported-image-features", "List of supported image features to allow.")
 	flag.Parse()
 	flag.Set("logtostderr", "true")
 
@@ -82,7 +84,7 @@ func main() {
 	// Create the provisioner: it implements the Provisioner interface expected by
 	// the controller
 	glog.Infof("Creating RBD provisioner %s with identity: %s", prName, prID)
-	rbdProvisioner := provision.NewRBDProvisioner(clientset, prID)
+	rbdProvisioner := provision.NewRBDProvisioner(clientset, prID, supportedFeatures)
 
 	// Start the provision controller which will dynamically provision rbd
 	// PVs
