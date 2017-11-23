@@ -22,6 +22,11 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
+      # If you want provisioner to use a kubeconfig file to access API server, instead of the default
+      #  in-cluster config, then specify the following environment variable:
+      # - name: KUBECONFIG
+      #   value: /path/to/kubeconfig
+      
       volumes:
       - name: discovery-vol
         hostPath:

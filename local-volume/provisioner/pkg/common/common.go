@@ -31,8 +31,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/kubelet/apis"
+	"os"
 	"path/filepath"
 )
 
@@ -68,6 +71,8 @@ const (
 
 	// LocalPVEnv will contain the device path when script is invoked
 	LocalPVEnv = "LOCAL_PV_BLKDEVICE"
+	// KubeConfigEnv will (optionally) specify the location of kubeconfig file on the node.
+	KubeConfigEnv = "KUBECONFIG"
 )
 
 // UserConfig stores all the user-defined parameters to the provisioner
@@ -120,6 +125,12 @@ type LocalPVConfig struct {
 	Labels          map[string]string
 }
 
+// BuildConfigFromFlags being defined to enable mocking during unit testing
+var BuildConfigFromFlags = clientcmd.BuildConfigFromFlags
+
+// InClusterConfig being defined to enable mocking during unit testing
+var InClusterConfig = rest.InClusterConfig
+
 // ProvisionerConfiguration defines Provisioner configuration objects
 // Each configuration key of the struct e.g StorageClassConfig is individually
 // marshaled in VolumeConfigToConfigMapData.
@@ -128,6 +139,7 @@ type ProvisionerConfiguration struct {
 	// StorageClassConfig defines configuration of Provisioner's storage classes
 	StorageClassConfig map[string]MountConfig `json:"storageClassMap" yaml:"storageClassMap"`
 	// NodeLabelsForPV contains a list of node labels to be copied to the PVs created by the provisioner
+	// +optional
 	NodeLabelsForPV []string `json:"nodeLabelsForPV" yaml:"nodeLabelsForPV"`
 }
 
@@ -206,6 +218,7 @@ func VolumeConfigToConfigMapData(config *ProvisionerConfiguration) (map[string]s
 		}
 		configMapData[ProvisionerNodeLabelsForPV] = string(nodeLabels)
 	}
+
 	return configMapData, nil
 }
 
@@ -217,6 +230,7 @@ func ConfigMapDataToVolumeConfig(data map[string]string, provisionerConfig *Prov
 		rawYaml += ": \n"
 		rawYaml += insertSpaces(string(val))
 	}
+
 	if err := yaml.Unmarshal([]byte(rawYaml), provisionerConfig); err != nil {
 		return fmt.Errorf("fail to Unmarshal yaml due to: %#v", err)
 	}
@@ -268,4 +282,32 @@ func LoadProvisionerConfigs(provisionerConfig *ProvisionerConfiguration) error {
 		}
 	}
 	return ConfigMapDataToVolumeConfig(data, provisionerConfig)
+}
+
+// SetupClient created client using either in-cluster configuration or if KUBECONFIG environment variable is specified then using that config.
+func SetupClient() *kubernetes.Clientset {
+	var config *rest.Config
+	var err error
+
+	kubeconfigFile := os.Getenv(KubeConfigEnv)
+	if kubeconfigFile != "" {
+		config, err = BuildConfigFromFlags("", kubeconfigFile)
+		if err != nil {
+			glog.Fatalf("Error creating config from %s specified file: %s %v\n", KubeConfigEnv,
+				kubeconfigFile, err)
+		}
+		glog.Infof("Creating client using kubeconfig file %s", kubeconfigFile)
+	} else {
+		config, err = InClusterConfig()
+		if err != nil {
+			glog.Fatalf("Error creating InCluster config: %v\n", err)
+		}
+		glog.Infof("Creating client using in-cluster config")
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		glog.Fatalf("Error creating clientset: %v\n", err)
+	}
+	return clientset
 }
