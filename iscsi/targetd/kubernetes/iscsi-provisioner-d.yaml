@@ -50,12 +50,11 @@ spec:
           imagePullPolicy: Always
           image: quay.io/external_storage/iscsi-controller:latest
           args:
+            - "-v=2"
             - "start"
           env:
             - name: PROVISIONER_NAME
               value: iscsi-targetd
-            - name: LOG_LEVEL
-              value: debug
             - name: TARGETD_USERNAME
               valueFrom:
                 secretKeyRef:
