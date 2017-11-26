@@ -18,8 +18,7 @@ package cmd
 
 import (
 	"fmt"
-
-	"github.com/Sirupsen/logrus"
+	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/iscsi/targetd/provisioner"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	"github.com/spf13/cobra"
@@ -30,7 +29,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-var log = logrus.New()
+//var log = logrus.New()
 
 // start-controllerCmd represents the start-controller command
 var startcontrollerCmd = &cobra.Command{
@@ -38,47 +37,44 @@ var startcontrollerCmd = &cobra.Command{
 	Short: "Start an iscsi dynamic provisioner",
 	Long:  `Start an iscsi dynamic provisioner`,
 	Run: func(cmd *cobra.Command, args []string) {
-		initLog()
-		log.Debugln("start called")
+		glog.V(2).Infoln("start called")
 		var config *rest.Config
 		var err error
 		master := viper.GetString("master")
 		kubeconfig := viper.GetString("kubeconfig")
 		// creates the in-cluster config
-		log.Debugln("creating in cluster default kube client config")
+		glog.V(2).Infoln("creating in cluster default kube client config")
 		if master != "" || kubeconfig != "" {
 			config, err = clientcmd.BuildConfigFromFlags(master, kubeconfig)
 		} else {
 			config, err = rest.InClusterConfig()
 		}
 		if err != nil {
-			log.Fatalln(err)
+			glog.Fatalln(err)
 		}
-		log.WithFields(logrus.Fields{
-			"config-host": config.Host,
-		}).Debugln("kube client config created")
+		glog.V(2).Infoln("kube client config created: ", config.Host)
 
 		// creates the clientset
-		log.Debugln("creating kube client set")
+		glog.V(2).Infoln("creating kube client set")
 		kubernetesClientSet, err := kubernetes.NewForConfig(config)
 		if err != nil {
-			log.Fatalln(err)
+			glog.Fatalln(err)
 		}
-		log.Debugln("kube client set created")
+		glog.V(2).Infoln("kube client set created")
 
 		// The controller needs to know what the server version is because out-of-tree
 		// provisioners aren't officially supported until 1.5
 		serverVersion, err := kubernetesClientSet.Discovery().ServerVersion()
 		if err != nil {
-			log.Fatalf("Error getting server version: %v", err)
+			glog.Fatalf("Error getting server version: %v", err)
 		}
 
 		url := fmt.Sprintf("%s://%s:%s@%s:%d/targetrpc", viper.GetString("targetd-scheme"), viper.GetString("targetd-username"), viper.GetString("targetd-password"), viper.GetString("targetd-address"), viper.GetInt("targetd-port"))
 
-		log.Debugln("targed URL", url)
+		glog.V(2).Infoln("targed URL", url)
 
 		iscsiProvisioner := provisioner.NewiscsiProvisioner(url)
-		log.Debugln("iscsi provisioner created")
+		glog.Infoln("iscsi provisioner created")
 
 		pc := controller.NewProvisionController(kubernetesClientSet, viper.GetString("provisioner-name"), iscsiProvisioner, serverVersion.GitVersion)
 		controller.ResyncPeriod(viper.GetDuration("resync-period"))
@@ -89,7 +85,7 @@ var startcontrollerCmd = &cobra.Command{
 		controller.RenewDeadline(viper.GetDuration("renew-deadline"))
 		controller.TermLimit(viper.GetDuration("term-limit"))
 		controller.RetryPeriod(viper.GetDuration("retry-period"))
-		log.Debugln("iscsi controller created, running forever...")
+		glog.Infoln("iscsi controller running...")
 		pc.Run(wait.NeverStop)
 	},
 }
@@ -141,12 +137,4 @@ func init() {
 	// is called directly, e.g.:
 	// start-controllerCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 
-}
-
-func initLog() {
-	var err error
-	log.Level, err = logrus.ParseLevel(viper.GetString("log-level"))
-	if err != nil {
-		log.Fatalln(err)
-	}
 }

@@ -17,8 +17,10 @@ limitations under the License.
 package cmd
 
 import (
+	"flag"
 	"fmt"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"os"
 	"strings"
@@ -41,10 +43,41 @@ func Execute() {
 }
 
 func init() {
+	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
+	flag.CommandLine.Parse([]string{})
 	cobra.OnInitialize(initConfig)
 
-	RootCmd.PersistentFlags().String("log-level", "info", "log level")
-	viper.BindPFlag("log-level", RootCmd.PersistentFlags().Lookup("log-level"))
+	//RootCmd.PersistentFlags().String("log-level", "info", "log level")
+	//viper.BindPFlag("log-level", RootCmd.PersistentFlags().Lookup("log-level"))
+
+	//	-logtostderr=false
+	//		Logs are written to standard error instead of to files.
+	//	-alsologtostderr=false
+	//		Logs are written to standard error as well as to files.
+	//	-stderrthreshold=ERROR
+	//		Log events at or above this severity are logged to standard
+	//		error as well as to files.
+	//	-log_dir=""
+	//		Log files will be written to this directory instead of the
+	//		default temporary directory.
+	//
+	//	Other flags provide aids to debugging.
+	//
+	//	-log_backtrace_at=""
+	//		When set to a file and line number holding a logging statement,
+	//		such as
+	//			-log_backtrace_at=gopherflakes.go:234
+	//		a stack trace will be written to the Info log whenever execution
+	//		hits that statement. (Unlike with -vmodule, the ".go" must be
+	//		present.)
+	//	-v=0
+	//		Enable V-leveled logging at the specified level.
+	//	-vmodule=""
+	//		The syntax of the argument is a comma-separated list of pattern=N,
+	//		where pattern is a literal file name (minus the ".go" suffix) or
+	//		"glob" pattern and N is a V level. For instance,
+	//			-vmodule=gopher*=3
+	//		sets the V level to 3 in all Go files whose names begin "gopher".
 
 }
 
