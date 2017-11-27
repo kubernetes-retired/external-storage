@@ -17,13 +17,10 @@ limitations under the License.
 package provisioner
 
 import (
-	"github.com/spf13/viper"
 	"testing"
 )
 
 func TestZeroExports(t *testing.T) {
-	viper.SetDefault("log-level", "debug")
-	initLog()
 	var emptyExportList exportList
 	lun, err := getFirstAvailableLun(emptyExportList)
 	if err != nil {
