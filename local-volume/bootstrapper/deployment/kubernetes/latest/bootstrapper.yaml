@@ -19,5 +19,5 @@ spec:
             fieldRef:
               fieldPath: metadata.namespace
         args:
-        - --image=quay.io/external_storage/local-volume-provisioner:v1.0.0
+        - --image=quay.io/external_storage/local-volume-provisioner:latest
         - --volume-config=local-volume-config
