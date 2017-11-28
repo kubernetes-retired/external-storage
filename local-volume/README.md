@@ -106,17 +106,19 @@ sample configuration files.
 
 1. Create an admin account with cluster admin priviledge:
 ``` console
-$ kubectl create -f bootstrapper/deployment/kubernetes/admin-account.yaml
+$ kubectl create -f bootstrapper/deployment/kubernetes/<version>/admin-account.yaml
 ```
 
-2. Create a ConfigMap with your local storage configuration details:
-```console
-$ kubectl create -f bootstrapper/deployment/kubernetes/example-config.yaml
+2. Create a ConfigMap with your local storage configuration details.
+``` console
+$ kubectl create -f bootstrapper/deployment/kubernetes/<version>/example-config.yaml
 ```
+**Note**: This configmap is required in order to run the bootstrapper.
+
 
 3. Launch the bootstrapper, which in turn creates static provisioner daemonset:
 ``` console
-$ kubectl create -f bootstrapper/deployment/kubernetes/bootstrapper.yaml
+$ kubectl create -f bootstrapper/deployment/kubernetes/<version>/bootstrapper.yaml
 ```
 
 The bootstrapper launches the external static provisioner, that discovers and creates local-volume PVs.
