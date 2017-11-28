@@ -14,10 +14,9 @@ spec:
       serviceAccountName: snapshot-controller-runner
       containers:
         - name: snapshot-controller
-          image: snapshot-controller
+          image: "quay.io/external_storage/snapshot-controller:latest"
           imagePullPolicy: "IfNotPresent"
-          args:
-            - "-cloudprovider aws"
+          args: ["-cloudprovider", "aws"]
           env:
             - name: AWS_ACCESS_KEY_ID
               valueFrom:
@@ -30,10 +29,9 @@ spec:
                   name: awskeys
                   key: secret-access-key
         - name: snapshot-provisioner
-          image: snapshot-provisioner
+          image: "quay.io/external_storage/snapshot-provisioner:latest"
           imagePullPolicy: "IfNotPresent"
-          args:
-            - "-cloudprovider aws"
+          args: ["-cloudprovider", "aws"]
           env:
             - name: AWS_ACCESS_KEY_ID
               valueFrom:
