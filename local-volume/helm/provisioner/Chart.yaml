@@ -1,0 +1,8 @@
+apiVersion: v1
+version: 2.0.0
+description: local provisioner chart 
+name: provisioner
+keywords:
+  - storage
+  - local
+engine: gotpl
