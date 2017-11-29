@@ -44,7 +44,7 @@ binding failure.  Manual recovery is needed in this situation.
 What works:
 * Create a PV specifying a directory with node affinity.
 * Pod using the PVC that is bound to this PV will always get scheduled to that node.
-* External static provisioner daemonset that discovers local directories,
+* External static provisioner DaemonSet that discovers local directories,
   creates, cleans up and deletes PVs.
 
 What doesn't work and workarounds:
@@ -132,7 +132,7 @@ $ kubectl create -f bootstrapper/deployment/kubernetes/latest/gce/class-local-ss
 1. Partition and format the disks on each node according to your application's
    requirements.
 2. Mount all the filesystems under one directory per StorageClass. The directories
-   are specified in a configmap, see below. By default, the discovery directory is
+   are specified in a ConfigMap, see below. By default, the discovery directory is
    `/mnt/disks` and storage class is `local-storage`.
 3. Configure the Kubernetes API Server, controller-manager, scheduler, and all kubelets
    with `KUBE_FEATURE_GATES` as described [above](#enabling-the-alpha-feature-gates).
@@ -170,30 +170,34 @@ $ kubectl create -f bootstrapper/deployment/kubernetes/example-storageclass.yaml
 
 ### Step 3: Creating local persistent volumes
 
-#### Option 1: Bootstrapping the external static provisioner
+#### Option 1: Using the local volume static provisioner 
 
-This is optional, only for automated creation and cleanup of local volumes. See
-[bootstrapper/](./bootstrapper) and [provisioner/](./provisioner) for details and
-sample configuration files.
-
-1. Create an admin account with cluster admin priviledge:
+	1. Create an admin account with cluster admin privilege:
 ``` console
-$ kubectl create -f bootstrapper/deployment/kubernetes/<version>/admin-account.yaml
+$ kubectl create -f ./provisioner/deployment/kubernetes/admin_account.yaml  
+```
+	2. Generate Provisioner's DaemonSet and ConfigMap spec, and customize it.
+This step uses helm templates to generate the specs.  See the [helm README](helm) for setup instructions.
+To generate the provisioner's specs using the [default values](helm/provisioner/values.yaml), run:
+
+``` console
+helm template ./helm/provisioner > ./provisioner/deployment/kubernetes/provisioner_generated.yaml 
 ```
 
-2. Create a ConfigMap with your local storage configuration details.
+You can also provide a custom values file instead:
+
 ``` console
-$ kubectl create -f bootstrapper/deployment/kubernetes/<version>/example-config.yaml
+helm template ./helm/provisioner --values custom-values.yaml > ./provisioner/deployment/kubernetes/provisioner_generated.yaml
 ```
-**Note**: This configmap is required in order to run the bootstrapper.
-
-
-3. Launch the bootstrapper, which in turn creates static provisioner daemonset:
+	3. Deploy Provisioner 
+Once a user is satisfied with the content of Provisioner's yaml file, **kubectl** can be used
+to create Provisioner's DaemonSet and ConfigMap.
+ 
 ``` console
-$ kubectl create -f bootstrapper/deployment/kubernetes/<version>/bootstrapper.yaml
+$ kubectl create -f ./provisioner/deployment/kubernetes/provisioner_generated.yaml 
 ```
-
-The bootstrapper launches the external static provisioner, that discovers and creates local-volume PVs.
+	4. Check discovered local volumes
+Once launched, the external static provisioner will discover and create local-volume PVs.
 
 For example, if the directory `/mnt/disks/` contained one directory `/mnt/disks/vol1` then the following
 local-volume PV would be created by the static provisioner:
