@@ -18,6 +18,7 @@ Many storage systems provide the ability to create "snapshots" of a persistent v
     * GCE PD
     * HostPath
     * OpenStack Cinder
+    * GlusterFS
 
 # Lifecycle of a Volume Snapshot and Volume Snapshot Data
 
