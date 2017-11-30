@@ -204,6 +204,12 @@ type HostPathVolumeSnapshotSource struct {
 	Path string `json:"snapshot"`
 }
 
+// GlusterVolumeSnapshotSource is Gluster volume snapshot source
+type GlusterVolumeSnapshotSource struct {
+	// UniqueID represents a snapshot resource.
+	SnapshotID string `json:"snapshotId"`
+}
+
 // AWSElasticBlockStoreVolumeSnapshotSource is AWS EBS volume snapshot source
 type AWSElasticBlockStoreVolumeSnapshotSource struct {
 	// Unique id of the persistent disk snapshot resource. Used to identify the disk snapshot in AWS
@@ -235,6 +241,9 @@ type VolumeSnapshotDataSource struct {
 	// kubelet's host machine and then exposed to the pod.
 	// More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore
 	// +optional
+	//GlusterSnapshotSource represents a gluster snapshot resource
+	GlusterSnapshotVolume *GlusterVolumeSnapshotSource `json:"glusterSnapshotVolume,omitempty"`
+	// +optional
 	AWSElasticBlockStore *AWSElasticBlockStoreVolumeSnapshotSource `json:"awsElasticBlockStore,omitempty"`
 	// GCEPersistentDiskSnapshotSource represents an GCE PD snapshot resource
 	// +optional
@@ -258,6 +267,9 @@ func GetSupportedVolumeFromPVSpec(spec *core_v1.PersistentVolumeSpec) string {
 	if spec.Cinder != nil {
 		return "cinder"
 	}
+	if spec.Glusterfs != nil {
+		return "glusterfs"
+	}
 	return ""
 }
 
@@ -274,6 +286,9 @@ func GetSupportedVolumeFromSnapshotDataSpec(spec *VolumeSnapshotDataSpec) string
 	}
 	if spec.CinderSnapshot != nil {
 		return "cinder"
+	}
+	if spec.GlusterSnapshotVolume != nil {
+		return "glusterfs"
 	}
 	return ""
 }
