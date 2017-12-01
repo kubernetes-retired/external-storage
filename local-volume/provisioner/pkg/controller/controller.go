@@ -26,10 +26,12 @@ import (
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/deleter"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/discovery"
+	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/monitor"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/populator"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/util"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -38,7 +40,7 @@ import (
 )
 
 // StartLocalController starts the sync loop for the local PV discovery and deleter
-func StartLocalController(client *kubernetes.Clientset, config *common.UserConfig) {
+func StartLocalController(client *kubernetes.Clientset, config *common.UserConfig, enableMonitor, enableProvisioner bool) {
 	glog.Info("Initializing volume cache\n")
 
 	provisionerName := fmt.Sprintf("local-volume-provisioner-%v-%v", config.Node.Name, config.Node.UID)
@@ -59,21 +61,30 @@ func StartLocalController(client *kubernetes.Clientset, config *common.UserConfi
 		Mounter:       mount.New("" /* default mount path */),
 	}
 
-	populator := populator.NewPopulator(runtimeConfig)
-	populator.Start()
-
-	ptable := deleter.NewProcTable()
-	discoverer, err := discovery.NewDiscoverer(runtimeConfig, ptable)
-	if err != nil {
-		glog.Fatalf("Error starting discoverer: %v", err)
+	if enableMonitor {
+		glog.Info("Monitor started\n")
+		monitor := monitor.NewMonitor(runtimeConfig)
+		go monitor.Run(wait.NeverStop)
 	}
 
-	deleter := deleter.NewDeleter(runtimeConfig, ptable)
+	if enableProvisioner {
+		populator := populator.NewPopulator(runtimeConfig)
+		populator.Start()
 
-	glog.Info("Controller started\n")
-	for {
-		deleter.DeletePVs()
-		discoverer.DiscoverLocalVolumes()
-		time.Sleep(10 * time.Second)
+		ptable := deleter.NewProcTable()
+		discoverer, err := discovery.NewDiscoverer(runtimeConfig, ptable)
+		if err != nil {
+			glog.Fatalf("Error starting discoverer: %v", err)
+		}
+
+		deleter := deleter.NewDeleter(runtimeConfig, ptable)
+
+		glog.Info("Controller started\n")
+		for {
+			deleter.DeletePVs()
+			discoverer.DiscoverLocalVolumes()
+			time.Sleep(10 * time.Second)
+		}
 	}
+
 }

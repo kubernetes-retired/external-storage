@@ -31,6 +31,9 @@ type APIUtil interface {
 	// Create PersistentVolume object
 	CreatePV(pv *v1.PersistentVolume) (*v1.PersistentVolume, error)
 
+	// UpdatePV updates PersistentVolume object
+	UpdatePV(pv *v1.PersistentVolume) (*v1.PersistentVolume, error)
+
 	// Delete PersistentVolume object
 	DeletePV(pvName string) error
 }
@@ -49,6 +52,11 @@ func NewAPIUtil(client *kubernetes.Clientset) APIUtil {
 // CreatePV will create a PersistentVolume
 func (u *apiUtil) CreatePV(pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
 	return u.client.Core().PersistentVolumes().Create(pv)
+}
+
+// UpdatePV will update a PersistentVolume
+func (u *apiUtil) UpdatePV(pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
+	return u.client.Core().PersistentVolumes().Update(pv)
 }
 
 // DeletePV will delete a PersistentVolume
@@ -84,6 +92,21 @@ func (u *FakeAPIUtil) CreatePV(pv *v1.PersistentVolume) (*v1.PersistentVolume, e
 
 	u.createdPVs[pv.Name] = pv
 	u.cache.AddPV(pv)
+	return pv, nil
+}
+
+// UpdatePV will update the PV from the created list and cache
+func (u *FakeAPIUtil) UpdatePV(pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
+	if u.shouldFail {
+		return nil, fmt.Errorf("API failed")
+	}
+
+	pv, exists := u.cache.GetPV(pv.Name)
+	if !exists {
+		u.createdPVs[pv.Name] = pv
+	}
+
+	u.cache.UpdatePV(pv)
 	return pv, nil
 }
 

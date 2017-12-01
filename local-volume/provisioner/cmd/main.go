@@ -29,9 +29,22 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+const (
+	defaultEnableMonitor     = false
+	defaultEnableProvisioner = true
+)
+
+var (
+	enableMonitor     *bool
+	enableProvisioner *bool
+)
+
 var provisionerConfig common.ProvisionerConfiguration
 
 func init() {
+	enableMonitor = flag.Bool("enable-monitor", defaultEnableMonitor, "If the monitor is enabled")
+	enableProvisioner = flag.Bool("enable-provisioner", defaultEnableProvisioner, "If the provisioner is enabled")
+
 	provisionerConfig = common.ProvisionerConfiguration{
 		StorageClassConfig: make(map[string]common.MountConfig),
 	}
@@ -55,10 +68,13 @@ func main() {
 
 	glog.Info("Starting controller\n")
 	controller.StartLocalController(client, &common.UserConfig{
-		Node:            node,
-		DiscoveryMap:    provisionerConfig.StorageClassConfig,
-		NodeLabelsForPV: provisionerConfig.NodeLabelsForPV,
-	})
+		Node:               node,
+		DiscoveryMap:       provisionerConfig.StorageClassConfig,
+		NodeLabelsForPV:    provisionerConfig.NodeLabelsForPV,
+		LabelSelectorForPV: provisionerConfig.LabelSelectorForPV,
+	},
+		*enableMonitor,
+		*enableProvisioner)
 }
 
 func getNode(client *kubernetes.Clientset, name string) *v1.Node {

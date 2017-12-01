@@ -408,7 +408,7 @@ func verifyCapacity(t *testing.T, createdPV *v1.PersistentVolume, expectedPV *te
 	if !ok {
 		t.Errorf("Unable to convert resource storage into int64")
 	}
-	if roundDownCapacityPretty(capacityInt) != expectedPV.capacity {
+	if util.RoundDownCapacityPretty(capacityInt) != expectedPV.capacity {
 		t.Errorf("Expected capacity %d, got %d", expectedPV.capacity, capacityInt)
 	}
 }
@@ -504,7 +504,7 @@ func TestRoundDownCapacityPretty(t *testing.T) {
 		{3*esUtil.TiB + 2*esUtil.GiB + 1*esUtil.MiB, 3*esUtil.TiB + 2*esUtil.GiB},
 	}
 	for _, tt := range capTests {
-		actual := roundDownCapacityPretty(tt.n)
+		actual := util.RoundDownCapacityPretty(tt.n)
 		if actual != tt.expected {
 			t.Errorf("roundDownCapacityPretty(%d): expected %d, actual %d", tt.n, tt.expected, actual)
 		}

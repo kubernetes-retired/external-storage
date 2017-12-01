@@ -67,6 +67,8 @@ const (
 	ProvisonerStorageClassConfig = "storageClassMap"
 	// ProvisionerNodeLabelsForPV contains a list of node labels to be copied to the PVs created by the provisioner
 	ProvisionerNodeLabelsForPV = "nodeLabelsForPV"
+	// MonitorLabelSelectorForPV is the label selector for monitor to filter PVs
+	MonitorLabelSelectorForPV = "labelSelectorForPV"
 	// VolumeDelete copied from k8s.io/kubernetes/pkg/controller/volume/events
 	VolumeDelete = "VolumeDelete"
 
@@ -84,6 +86,8 @@ type UserConfig struct {
 	DiscoveryMap map[string]MountConfig
 	// Labels and their values that are added to PVs created by the provisioner
 	NodeLabelsForPV []string
+	// LabelSelectorForPV is the label selector for monitor to filter PVs
+	LabelSelectorForPV string
 }
 
 // MountConfig stores a configuration for discoverying a specific storageclass
@@ -144,6 +148,9 @@ type ProvisionerConfiguration struct {
 	// NodeLabelsForPV contains a list of node labels to be copied to the PVs created by the provisioner
 	// +optional
 	NodeLabelsForPV []string `json:"nodeLabelsForPV" yaml:"nodeLabelsForPV"`
+	// LabelSelectorForPV is the label selector for monitor to filter PVs
+	// +optional
+	LabelSelectorForPV string `json:"labelSelectorForPV" yaml:"labelSelectorForPV"`
 }
 
 // CreateLocalPVSpec returns a PV spec that can be used for PV creation
@@ -220,6 +227,9 @@ func VolumeConfigToConfigMapData(config *ProvisionerConfiguration) (map[string]s
 			return nil, fmt.Errorf("unable to Marshal node label: %v", err)
 		}
 		configMapData[ProvisionerNodeLabelsForPV] = string(nodeLabels)
+	}
+	if len(config.LabelSelectorForPV) > 0 {
+		configMapData[MonitorLabelSelectorForPV] = config.LabelSelectorForPV
 	}
 
 	return configMapData, nil
