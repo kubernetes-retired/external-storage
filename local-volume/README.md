@@ -37,11 +37,15 @@ What doesn't work and workarounds:
         * Give your pods high priority.
         * Run a workaround controller that unbinds PVCs for pods that are
           stuck pending. TODO: add link
-* External provisioner cannot correctly detect capacity of mounts added after it
-  has been started.
-    * This requires mount propagation to work, which is targeted for 1.9.
-    * Workaround: Before adding any new mount points, stop the daemonset, add
-      the new mount points, start the daemonset.
+* The provisioner will not correctly detect mounts added after it
+  has been started due to lack of mount propogation.
+  * The provisioner will detect the existance of a new directory in the
+  discovery directory. Then, it will incorrectly create a local PV with
+  the root filesystem capacity. 
+  * Planned resolution of new mount point discovery requires mount propagation,
+  which is targeted for 1.9.
+  * Workaround: Before adding any new mount points, stop the provisioner
+  daemonset, add the new mount points, start the daemonset.
 
 Future features:
 * Local block devices as a volume source, with partitioning and fs formatting
