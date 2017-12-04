@@ -19,12 +19,12 @@ package gluster
 import (
 	"fmt"
 	"os/exec"
-	"time"
 
 	"github.com/golang/glog"
 	crdv1 "github.com/kubernetes-incubator/external-storage/snapshot/pkg/apis/crd/v1"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/cloudprovider"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume"
+	"github.com/pborman/uuid"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -32,7 +32,6 @@ import (
 const (
 	glusterfsBinary = "gluster"
 	glusterfsEp     = "glusterfs-cluster"
-	snapTimeFormat  = "29-11-2017_12-00-00"
 )
 
 type glusterfsPlugin struct {
@@ -60,8 +59,7 @@ func (h *glusterfsPlugin) SnapshotCreate(pv *v1.PersistentVolume, tags *map[stri
 	}
 
 	volumePath := spec.Glusterfs.Path
-	t := time.Now()
-	snapshotName := volumePath + "_" + t.Format(snapTimeFormat)
+	snapshotName := volumePath + "_" + uuid.New()
 
 	cmd := exec.Command(glusterfsBinary, "snapshot", "create", snapshotName, volumePath, "no-timestamp")
 	out, err := cmd.CombinedOutput()
