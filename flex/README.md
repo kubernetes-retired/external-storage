@@ -25,7 +25,9 @@ mkdir -p /usr/libexec/kubernetes/kubelet-plugins/volume/exec/flex
 cp deploy/flex-provision.sh /usr/libexec/kubernetes/kubelet-plugins/volume/exec/flex/flex
 chmod ugo+x /usr/libexec/kubernetes/kubelet-plugins/volume/exec/flex/flex
 
-kubectl create -f examples/pod-provisioner.yaml -f examples/rbac.yaml -f examples/sc.yaml
+kubectl create -f deploy/manifests/pod-provisioner.yaml \
+               -f deploy/manifests/rbac.yaml \
+               -f deploy/manifests/sc.yaml
 ```
 
 You can test it with:
