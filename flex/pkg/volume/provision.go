@@ -36,16 +36,17 @@ const (
 )
 
 // NewFlexProvisioner creates a new flex provisioner
-func NewFlexProvisioner(client kubernetes.Interface, execCommand string) controller.Provisioner {
-	return newFlexProvisionerInternal(client, execCommand)
+func NewFlexProvisioner(client kubernetes.Interface, execCommand string, flexDriver string) controller.Provisioner {
+	return newFlexProvisionerInternal(client, execCommand, flexDriver)
 }
 
-func newFlexProvisionerInternal(client kubernetes.Interface, execCommand string) *flexProvisioner {
+func newFlexProvisionerInternal(client kubernetes.Interface, execCommand string, flexDriver string) *flexProvisioner {
 	var identity types.UID
 
 	provisioner := &flexProvisioner{
 		client:      client,
 		execCommand: execCommand,
+		flexDriver:  flexDriver,
 		identity:    identity,
 		runner:      exec.New(),
 	}
@@ -56,6 +57,7 @@ func newFlexProvisionerInternal(client kubernetes.Interface, execCommand string)
 type flexProvisioner struct {
 	client      kubernetes.Interface
 	execCommand string
+	flexDriver  string
 	identity    types.UID
 	runner      exec.Interface
 }
@@ -75,8 +77,8 @@ func (p *flexProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 
 	annotations[annProvisionerID] = string(p.identity)
 	/*
-		This PV won't work since there's nothing backing it.  the flex script
-		is in flex/flex/flex  (that many layers are required for the flex volume plugin)
+		The flex script for flexDriver=<vendor>/<driver> is in
+		/usr/libexec/kubernetes/kubelet-plugins/volume/exec/<vendor>~<driver>/<driver>
 	*/
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
@@ -92,7 +94,7 @@ func (p *flexProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 			},
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				FlexVolume: &v1.FlexVolumeSource{
-					Driver:   "flex",
+					Driver:   p.flexDriver,
 					Options:  map[string]string{},
 					ReadOnly: false,
 				},
