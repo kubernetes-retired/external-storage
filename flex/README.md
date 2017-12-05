@@ -21,6 +21,10 @@ make
 You can use the example provisioner pod to deploy:
 
 ```
+mkdir -p /usr/libexec/kubernetes/kubelet-plugins/volume/exec/flex
+cp deploy/flex-provision.sh /usr/libexec/kubernetes/kubelet-plugins/volume/exec/flex/flex
+chmod ugo+x /usr/libexec/kubernetes/kubelet-plugins/volume/exec/flex/flex
+
 kubectl create -f examples/pod-provisioner.yaml -f examples/rbac.yaml -f examples/sc.yaml
 ```
 
