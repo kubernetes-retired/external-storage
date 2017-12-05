@@ -14,10 +14,6 @@
 
 FROM gcr.io/google-containers/debian-base-amd64:0.3
 
-# install the shell flex script that the provisioner uses.
-RUN mkdir -p  /opt/storage_drivers
-COPY flex-provision.sh /opt/storage/flex-provision.sh
-
 # install the go kube piece of provisioner
 COPY flex-provisioner /opt/storage_drivers/flex-provisioner
 
