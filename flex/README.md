@@ -18,5 +18,13 @@ make
 
 **To Deploy**
 
-You can use the example provisioner pod to deploy ```kubectl create -f examples/pod-provisioner.yaml```
+You can use the example provisioner pod to deploy:
 
+```
+kubectl create -f examples/pod-provisioner.yaml -f examples/rbac.yaml -f examples/sc.yaml
+```
+
+You can test it with:
+```
+kubectl create -f examples/pvc.yaml -f examples/pod-application.yaml
+```
