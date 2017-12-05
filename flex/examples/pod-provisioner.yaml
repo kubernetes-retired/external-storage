@@ -3,6 +3,7 @@ apiVersion: v1
 metadata:
   name: flex-provisioner
 spec:
+  serviceAccountName: flex-provisioner
   containers:
     - name: flex-provisioner
       image: childsb/flex-provisioner
