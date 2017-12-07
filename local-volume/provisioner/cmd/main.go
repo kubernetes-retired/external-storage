@@ -27,7 +27,6 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 )
 
 var provisionerConfig common.ProvisionerConfiguration
@@ -42,19 +41,6 @@ func init() {
 	glog.Infof("Configuration parsing has been completed, ready to run...")
 }
 
-func setupClient() *kubernetes.Clientset {
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		glog.Fatalf("Error creating InCluster config: %v\n", err)
-	}
-
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		glog.Fatalf("Error creating clientset: %v\n", err)
-	}
-	return clientset
-}
-
 func main() {
 	flag.Set("logtostderr", "true")
 	flag.Parse()
@@ -64,7 +50,7 @@ func main() {
 		glog.Fatalf("MY_NODE_NAME environment variable not set\n")
 	}
 
-	client := setupClient()
+	client := common.SetupClient()
 	node := getNode(client, nodeName)
 
 	glog.Info("Starting controller\n")
