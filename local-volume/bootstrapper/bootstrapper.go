@@ -235,14 +235,6 @@ func createDaemonSet(client *kubernetes.Clientset, namespace string, config *com
 				},
 			},
 		},
-		{
-			Name: "MY_NAMESPACE",
-			ValueFrom: &v1.EnvVarSource{
-				FieldRef: &v1.ObjectFieldSelector{
-					FieldPath: "metadata.namespace",
-				},
-			},
-		},
 	}
 
 	var priv = true
