@@ -19,8 +19,8 @@ directories by creating and cleaning up PersistentVolumes for each volume.
 
 ### 1.9: Alpha
 
-**Important:** Both `PersistentLocalVolumes` and `VolumeScheduling` feature gates
-must be enabled starting in 1.9.
+**Important:** Both `PersistentLocalVolumes` and `VolumeScheduling` [feature gates
+must be enabled starting in 1.9](#enabling-the-alpha-feature-gates).
 
 What works:
 * Everything in 1.7.
@@ -60,14 +60,14 @@ What doesn't work and workarounds:
         * Run a workaround controller that unbinds PVCs for pods that are
           stuck pending. TODO: add link
 * The provisioner will not correctly detect mounts added after it
-  has been started due to lack of mount propogation.
-  * The provisioner will detect the existance of a new directory in the
+  has been started without mount propogation.
+  * This issue is resolved in provisioner 2.0 when the mount propagation
+  alpha feature gate is enabled, which is available in Kubernetes 1.8+.
+  * The provisioner 1.x will detect the existance of a new directory in the
   discovery directory. Then, it will incorrectly create a local PV with
   the root filesystem capacity. 
-  * Planned resolution of new mount point discovery requires mount propagation,
-  which is targeted for 1.9.
-  * Workaround: Before adding any new mount points, stop the provisioner
-  daemonset, add the new mount points, start the daemonset.
+  * Provisioner 1.x workaround: Before adding any new mount points, stop
+  the provisioner daemonset, add the new mount points, start the daemonset.
 
 ### Future features
 * Local block devices as a volume source, with partitioning and fs formatting
@@ -82,14 +82,19 @@ What doesn't work and workarounds:
 
 #### Enabling the alpha feature gates
 
-##### Pre-1.9
+##### 1.7
 ```
 $ export KUBE_FEATURE_GATES="PersistentLocalVolumes=true"
 ```
 
+##### 1.8
+```
+$ export KUBE_FEATURE_GATES="PersistentLocalVolumes=true,MountPropagation=true"
+```
+
 ##### 1.9+
 ```
-$ export KUBE_FEATURE_GATES="PersistentLocalVolumes=true,VolumeScheduling=true"
+$ export KUBE_FEATURE_GATES="PersistentLocalVolumes=true,VolumeScheduling=true,MountPropagation=true"
 ```
 
 #### Option 1: GCE
