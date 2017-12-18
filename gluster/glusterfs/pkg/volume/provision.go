@@ -184,6 +184,7 @@ func (p *glusterfsProvisioner) createBricks(
 		cmds = []string{
 			fmt.Sprintf("mkdir -p %s", path),
 			fmt.Sprintf("chown :%v %s", gid, path),
+			fmt.Sprintf("chmod 0771 %s", path),
 		}
 		err := p.ExecuteCommands(host, cmds, cfg)
 		if err != nil {
