@@ -111,6 +111,13 @@ func (d *Discoverer) discoverVolumesAtPath(class string, config common.MountConf
 		return
 	}
 
+	// Retreive list of mount points to iterate through discovered paths (aka files) below
+	mountPoints, mountPointsErr := d.RuntimeConfig.Mounter.List()
+	if mountPointsErr != nil {
+		glog.Errorf("Error retreiving mountpoints: %v", err)
+		return
+	}
+
 	for _, file := range files {
 		// Check if PV already exists for it
 		pvName := generatePVName(file, d.Node.Name, class)
@@ -154,6 +161,18 @@ func (d *Discoverer) discoverVolumesAtPath(class string, config common.MountConf
 			continue
 		}
 
+		// Validate that this path is an actual mountpoint
+		isMnt := false
+		for _, mp := range mountPoints {
+			if d.RuntimeConfig.Mounter.IsMountPointMatch(mp, filePath) {
+				isMnt = true
+				break
+			}
+		}
+		if isMnt == false {
+			glog.Errorf("Path %q is not an actual mountpoint", filePath)
+			continue
+		}
 		d.createPV(file, class, config, capacityByte, volType)
 	}
 }

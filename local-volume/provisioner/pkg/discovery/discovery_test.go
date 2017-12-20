@@ -29,6 +29,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/api/v1/helper"
+	"k8s.io/kubernetes/pkg/util/mount"
 	"reflect"
 )
 
@@ -284,6 +285,19 @@ func testSetup(t *testing.T, test *testConfig) *Discoverer {
 	test.apiUtil = util.NewFakeAPIUtil(test.apiShouldFail, test.cache)
 	test.procTable = deleter.NewProcTable()
 
+	fm := &mount.FakeMounter{
+		MountPoints: []mount.MountPoint{
+			{Path: "/discoveryPath/dir1/mount1"},
+			{Path: "/discoveryPath/dir1/mount2"},
+			{Path: "/discoveryPath/dir2/mount1"},
+			{Path: "/discoveryPath/dir2/mount2"},
+			{Path: "/discoveryPath/dir1"},
+			{Path: "/discoveryPath/dir2"},
+			{Path: "/discoveryPath/dir1/mount3"},
+			{Path: "/discoveryPath/dir1/mount4"},
+		},
+	}
+
 	userConfig := &common.UserConfig{
 		Node:            testNode,
 		DiscoveryMap:    scMapping,
@@ -296,6 +310,7 @@ func testSetup(t *testing.T, test *testConfig) *Discoverer {
 		APIUtil:       test.apiUtil,
 		Name:          testProvisionerName,
 		BlockDisabled: false,
+		Mounter:       fm,
 	}
 	d, err := NewDiscoverer(runConfig, test.procTable)
 	if err != nil {
@@ -494,4 +509,27 @@ func TestRoundDownCapacityPretty(t *testing.T) {
 			t.Errorf("roundDownCapacityPretty(%d): expected %d, actual %d", tt.n, tt.expected, actual)
 		}
 	}
+}
+
+func TestDiscoverVolumes_NotMountPoint(t *testing.T) {
+	vols := map[string][]*util.FakeDirEntry{
+		"dir1": {
+			{Name: "mount1", Hash: 0xaaaafef5, VolumeType: util.FakeEntryFile, Capacity: 100 * 1024},
+			// mount5 is not listed in the FakeMounter MountPoints setup for testing
+			{Name: "mount5", Hash: 0x79412c38, VolumeType: util.FakeEntryBlock, Capacity: 100 * 1024 * 1024},
+		},
+	}
+	expectedVols := map[string][]*util.FakeDirEntry{
+		"dir1": {
+			{Name: "mount1", Hash: 0xaaaafef5, VolumeType: util.FakeEntryFile, Capacity: 100 * 1024},
+		},
+	}
+	test := &testConfig{
+		dirLayout:       vols,
+		expectedVolumes: expectedVols,
+	}
+	d := testSetup(t, test)
+
+	d.DiscoverLocalVolumes()
+	verifyCreatedPVs(t, test)
 }
