@@ -117,6 +117,12 @@ func (d *Discoverer) discoverVolumesAtPath(class string, config common.MountConf
 		glog.Errorf("Error retreiving mountpoints: %v", err)
 		return
 	}
+	// Put mount moints into set for faster checks below
+	type empty struct{}
+	mountPointMap := make(map[string]empty)
+	for _, mp := range mountPoints {
+		mountPointMap[mp.Path] = empty{}
+	}
 
 	for _, file := range files {
 		// Check if PV already exists for it
@@ -162,14 +168,7 @@ func (d *Discoverer) discoverVolumesAtPath(class string, config common.MountConf
 		}
 
 		// Validate that this path is an actual mountpoint
-		isMnt := false
-		for _, mp := range mountPoints {
-			if d.RuntimeConfig.Mounter.IsMountPointMatch(mp, filePath) {
-				isMnt = true
-				break
-			}
-		}
-		if isMnt == false {
+		if _, isMntPnt := mountPointMap[filePath]; isMntPnt == false {
 			glog.Errorf("Path %q is not an actual mountpoint", filePath)
 			continue
 		}
