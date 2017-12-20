@@ -1,3 +1,151 @@
+Release v1.12.30 (2017-11-17)
+===
+
+### Service Client Updates
+* `service/application-autoscaling`: Updates service API and documentation
+* `service/dms`: Updates service API, documentation, and paginators
+  * Support for migration task assessment. Support for data validation after the migration.
+* `service/elasticloadbalancingv2`: Updates service API and documentation
+* `aws/endpoints`: Updated Regions and Endpoints metadata.
+* `service/rds`: Updates service API and documentation
+  * Amazon RDS now supports importing MySQL databases by using backup files from Amazon S3.
+* `service/s3`: Updates service API
+  * Added ORC to the supported S3 Inventory formats.
+
+### SDK Bugs
+* `private/protocol/restjson`: Define JSONValue marshaling for body and querystring ([#1640](https://github.com/aws/aws-sdk-go/pull/1640))
+  * Adds support for APIs which use JSONValue for body and querystring targets.
+  * Fixes [#1636](https://github.com/aws/aws-sdk-go/issues/1636)
+Release v1.12.29 (2017-11-16)
+===
+
+### Service Client Updates
+* `service/application-autoscaling`: Updates service API and documentation
+* `service/ec2`: Updates service API
+  * You are now able to create and launch EC2 x1e smaller instance sizes
+* `service/glue`: Updates service API and documentation
+  * API update for AWS Glue. New crawler configuration attribute enables customers to specify crawler behavior. New XML classifier enables classification of XML data.
+* `service/opsworkscm`: Updates service API, documentation, and waiters
+  * Documentation updates for OpsWorks-cm: a new feature, OpsWorks for Puppet Enterprise, that allows users to create and manage OpsWorks-hosted Puppet Enterprise servers.
+* `service/organizations`: Updates service API, documentation, and paginators
+  * This release adds APIs that you can use to enable and disable integration with AWS services designed to work with AWS Organizations. This integration allows the AWS service to perform operations on your behalf on all of the accounts in your organization. Although you can use these APIs yourself, we recommend that you instead use the commands provided in the other AWS service to enable integration with AWS Organizations.
+* `service/route53`: Updates service API and documentation
+  * You can use Route 53's GetAccountLimit/GetHostedZoneLimit/GetReusableDelegationSetLimit APIs to view your current limits (including custom set limits) on Route 53 resources such as hosted zones and health checks. These APIs also return the number of each resource you're currently using to enable comparison against your current limits.
+
+Release v1.12.28 (2017-11-15)
+===
+
+### Service Client Updates
+* `service/apigateway`: Updates service API and documentation
+  * 1. Extended GetDocumentationParts operation to support retrieving documentation parts resources without contents.  2. Added hosted zone ID in the custom domain response.
+* `service/email`: Updates service API, documentation, and examples
+  * SES launches Configuration Set Reputation Metrics and Email Pausing Today, two features that build upon the capabilities of the reputation dashboard. The first is the ability to export reputation metrics for individual configuration sets. The second is the ability to temporarily pause email sending, either at the configuration set level, or across your entire Amazon SES account.
+* `service/polly`: Updates service API
+  * Amazon Polly adds Korean language support with new female voice - "Seoyeon" and new Indian English female voice - "Aditi"
+* `service/states`: Updates service API and documentation
+  * You can now use the UpdateStateMachine API to update your state machine definition and role ARN. Existing executions will continue to use the previous definition and role ARN. You can use the DescribeStateMachineForExecution API to determine which state machine definition and role ARN is associated with an execution
+
+Release v1.12.27 (2017-11-14)
+===
+
+### Service Client Updates
+* `service/ecs`: Updates service API and documentation
+  * Added new mode for Task Networking in ECS, called awsvpc mode. Mode configuration parameters to be passed in via awsvpcConfiguration. Updated APIs now use/show this new mode - RegisterTaskDefinition, CreateService, UpdateService, RunTask, StartTask.
+* `aws/endpoints`: Updated Regions and Endpoints metadata.
+* `service/lightsail`: Updates service API and documentation
+  * Lightsail now supports attached block storage, which allows you to scale your applications and protect application data with additional SSD-backed storage disks. This feature allows Lightsail customers to attach secure storage disks to their Lightsail instances and manage their attached disks, including creating and deleting disks, attaching and detaching disks from instances, and backing up disks via snapshot.
+* `service/route53`: Updates service API and documentation
+  * When a Route 53 health check or hosted zone is created by a linked AWS service, the object now includes information about the service that created it. Hosted zones or health checks that are created by a linked service can't be updated or deleted using Route 53.
+* `service/ssm`: Updates service API and documentation
+  * EC2 Systems Manager GetInventory API adds support for aggregation.
+
+### SDK Enhancements
+* `aws/request`: Remove default port from HTTP host header ([#1618](https://github.com/aws/aws-sdk-go/pull/1618))
+  * Updates the SDK to automatically remove default ports based on the URL's scheme when setting the HTTP Host header's value.
+  * Fixes [#1537](https://github.com/aws/aws-sdk-go/issues/1537)
+
+Release v1.12.26 (2017-11-09)
+===
+
+### Service Client Updates
+* `service/ec2`: Updates service API and documentation
+  * Introduces the following features: 1. Create a default subnet in an Availability Zone if no default subnet exists. 2. Spot Fleet integrates with Elastic Load Balancing to enable you to attach one or more load balancers to a Spot Fleet request. When you attach the load balancer, it automatically registers the instance in the Spot Fleet to the load balancers which distributes incoming traffic across the instances.
+* `aws/endpoints`: Updated Regions and Endpoints metadata.
+
+Release v1.12.25 (2017-11-08)
+===
+
+### Service Client Updates
+* `service/application-autoscaling`: Updates service API and documentation
+* `service/batch`: Updates service documentation
+  * Documentation updates for AWS Batch.
+* `service/ec2`: Updates service API and documentation
+  * AWS PrivateLink for Amazon Services - Customers can now privately access Amazon services from their Amazon Virtual Private Cloud (VPC), without using public IPs, and without requiring the traffic to traverse across the Internet.
+* `service/elasticache`: Updates service API and documentation
+  * This release adds online resharding for ElastiCache for Redis offering, providing the ability to add and remove shards from a running cluster. Developers can now dynamically scale-out or scale-in their Redis cluster workloads to adapt to changes in demand. ElastiCache will resize the cluster by adding or removing shards and redistribute hash slots uniformly across the new shard configuration, all while the cluster continues to stay online and serves requests.
+* `aws/endpoints`: Updated Regions and Endpoints metadata.
+
+Release v1.12.24 (2017-11-07)
+===
+
+### Service Client Updates
+* `service/elasticloadbalancingv2`: Updates service documentation
+* `aws/endpoints`: Updated Regions and Endpoints metadata.
+* `service/rds`: Updates service API and documentation
+  * DescribeOrderableDBInstanceOptions now returns the minimum and maximum allowed values for storage size, total provisioned IOPS, and provisioned IOPS per GiB for a DB instance.
+* `service/s3`: Updates service API, documentation, and examples
+  * This releases adds support for 4 features: 1. Default encryption for S3 Bucket, 2. Encryption status in inventory and Encryption support for inventory.  3. Cross region replication of KMS-encrypted objects, and 4. ownership overwrite for CRR.
+
+Release v1.12.23 (2017-11-07)
+===
+
+### Service Client Updates
+* `service/api.pricing`: Adds new service
+* `service/ec2`: Updates service API
+  * You are now able to create and launch EC2 C5 instances, the next generation of EC2's compute-optimized instances, in us-east-1, us-west-2 and eu-west-1. C5 instances offer up to 72 vCPUs, 144 GiB of DDR4 instance memory, 25 Gbps in Network bandwidth and improved EBS and Networking bandwidth on smaller instance sizes to deliver improved performance for compute-intensive workloads.
+* `aws/endpoints`: Updated Regions and Endpoints metadata.
+* `service/kms`: Updates service API, documentation, and examples
+  * Documentation updates for AWS KMS.
+* `service/organizations`: Updates service documentation
+  * This release updates permission statements for several API operations, and corrects some other minor errors.
+* `service/states`: Updates service API, documentation, and paginators
+  * Documentation update.
+
+Release v1.12.22 (2017-11-03)
+===
+
+### Service Client Updates
+* `service/ecs`: Updates service API and documentation
+  * Amazon ECS users can now add devices to their containers and enable init process in containers through the use of docker's 'devices' and 'init' features. These fields can be specified under linuxParameters in ContainerDefinition in the Task Definition Template.
+* `aws/endpoints`: Updated Regions and Endpoints metadata.
+
+Release v1.12.21 (2017-11-02)
+===
+
+### Service Client Updates
+* `service/apigateway`: Updates service API and documentation
+  * This release supports creating and managing Regional and Edge-Optimized API endpoints.
+* `aws/endpoints`: Updated Regions and Endpoints metadata.
+
+### SDK Bugs
+* `aws/request`: Fix bug in request presign creating invalide URL ([#1624](https://github.com/aws/aws-sdk-go/pull/1624))
+  * Fixes a bug the Request Presign and PresignRequest methods that would allow a invalid expire duration as input. A expire time of 0 would be interpreted by the SDK to generate a normal request signature, not a presigned URL. This caused the returned URL unusable.
+  * Fixes [#1617](https://github.com/aws/aws-sdk-go/issues/1617)
+Release v1.12.20 (2017-11-01)
+===
+
+### Service Client Updates
+* `service/acm`: Updates service documentation
+  * Documentation updates for ACM
+* `service/cloudhsmv2`: Updates service documentation
+  * Minor documentation update for AWS CloudHSM (cloudhsmv2).
+* `service/directconnect`: Updates service API and documentation
+  * AWS DirectConnect now provides support for Global Access for Virtual Private Cloud (VPC) via a new feature called Direct Connect Gateway. A Direct Connect Gateway will allow you to group multiple Direct Connect Private Virtual Interfaces (DX-VIF) and Private Virtual Gateways (VGW) from different AWS regions (but belonging to the same AWS Account) and pass traffic from any DX-VIF to any VPC in the grouping.
+* `aws/endpoints`: Updated Regions and Endpoints metadata.
+
+### SDK Enhancements
+* `aws/client`: Adding status code 429 to throttlable status codes in default retryer (#1621)
+
 Release v1.12.19 (2017-10-26)
 ===
 

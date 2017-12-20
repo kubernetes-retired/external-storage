@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: busy-pod
+spec:
+  containers:
+  - command:
+    - /bin/sleep
+    - 7d
+    image: busybox
+    name: busy-container1
+    volumeMounts:
+    - mountPath: /mnt/pv-1
+      name: vol1
+  volumes:
+  - name: vol1
+    persistentVolumeClaim:
+      claimName: pv1
