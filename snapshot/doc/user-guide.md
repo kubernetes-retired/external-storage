@@ -85,7 +85,7 @@ apiVersion: volumesnapshot.external-storage.k8s.io/v1
     selfLink: /apis/volumesnapshot.external-storage.k8s.io/v1/namespaces/default/volumesnapshots/snapshot-demo
     uid: 9cc5da57-9d42-11e7-9b25-90b11c132b3f
   spec:
-    persistentVolumeClaimName: pvc-hostpath
+    persistentVolumeClaimName: ebs-pvc
     snapshotDataName: k8s-volume-snapshot-9cc8813e-9d42-11e7-8bed-90b11c132b3f
   status:
     conditions:
