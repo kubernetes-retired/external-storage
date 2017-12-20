@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-REGISTRY = quay.io/kubernetes_incubator
+REGISTRY = quay.io/external_storage
 IMAGE_FLEXPLUGIN = $(REGISTRY)/digitalocean-flexplugin
 IMAGE_PROVISONER = $(REGISTRY)/digitalocean-provisioner
 

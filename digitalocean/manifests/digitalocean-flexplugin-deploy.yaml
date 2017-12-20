@@ -22,7 +22,7 @@ spec:
             secretKeyRef:
               key: access-token
               name: digitalocean
-        image: quay.io/kubernetes_incubator/digitalocean-flexplugin
+        image: quay.io/external_storage/digitalocean-flexplugin
         imagePullPolicy: Always
         name: flex-deploy
         resources:
