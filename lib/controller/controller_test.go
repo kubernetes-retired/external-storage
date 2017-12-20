@@ -344,7 +344,7 @@ func TestShouldProvision(t *testing.T) {
 		// Kubernetes 1.5 provisioning - annStorageProvisioner is set
 		// and only this annotation is evaluated
 		{
-			name:            "unknown provisioner 1.5",
+			name:            "unknown provisioner annotation 1.5",
 			provisionerName: "foo.bar/baz",
 			class:           newStorageClass("class-1", "foo.bar/baz"),
 			claim: newClaim("claim-1", "1-1", "class-1", "", "",
@@ -360,6 +360,14 @@ func TestShouldProvision(t *testing.T) {
 				map[string]string{annStorageProvisioner: "abc.def/ghi"}),
 			serverGitVersion: "v1.4.0",
 			expectedShould:   true,
+		},
+		// Kubernetes 1.5 provisioning - annStorageProvisioner is not set
+		{
+			name:            "no provisioner annotation 1.5",
+			provisionerName: "foo.bar/baz",
+			class:           newStorageClass("class-1", "foo.bar/baz"),
+			claim:           newClaim("claim-1", "1-1", "class-1", "", "", nil),
+			expectedShould:  false,
 		},
 		// Kubernetes 1.4 provisioning - annStorageProvisioner is not set nor needed
 		{
