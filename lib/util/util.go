@@ -35,6 +35,11 @@ func RoundUpSize(volumeSizeBytes int64, allocationUnitBytes int64) int64 {
 	return (volumeSizeBytes + allocationUnitBytes - 1) / allocationUnitBytes
 }
 
+// RoundUpToGiB rounds up given quantity upto chunks of GiB
+func RoundUpToGiB(sizeBytes int64) int64 {
+	return RoundUpSize(sizeBytes, GiB)
+}
+
 // AccessModesContains returns whether the requested mode is contained by modes
 func AccessModesContains(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAccessMode) bool {
 	for _, m := range modes {

@@ -181,7 +181,7 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 	// Calculate the size
 	volSize := options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	volSizeBytes := volSize.Value()
-	volszInt := int(util.RoundUpSize(volSizeBytes, 1000*1000*1000))
+	volszInt := int(util.RoundUpToGiB(volSizeBytes))
 
 	// Create gluster block Volume
 	blockVolName := ""
