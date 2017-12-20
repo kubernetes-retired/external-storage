@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/kubernetes/pkg/util/mount"
 )
 
 // StartLocalController starts the sync loop for the local PV discovery and deleter
@@ -55,6 +56,7 @@ func StartLocalController(client *kubernetes.Clientset, config *common.UserConfi
 		Name:          provisionerName,
 		Recorder:      recorder,
 		BlockDisabled: true, // TODO: Block discovery currently disabled.
+		Mounter:       mount.New("" /* default mount path */),
 	}
 
 	populator := populator.NewPopulator(runtimeConfig)

@@ -19,6 +19,7 @@ package common
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path"
 	"strings"
 
@@ -35,7 +36,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/kubelet/apis"
-	"os"
+	"k8s.io/kubernetes/pkg/util/mount"
 	"path/filepath"
 )
 
@@ -112,6 +113,8 @@ type RuntimeConfig struct {
 	Recorder record.EventRecorder
 	// Disable block device discovery and management if true
 	BlockDisabled bool
+	// Mounter used to verify mountpoints
+	Mounter mount.Interface
 }
 
 // LocalPVConfig defines the parameters for creating a local PV
