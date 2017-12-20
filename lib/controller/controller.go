@@ -570,25 +570,29 @@ func (ctrl *ProvisionController) shouldProvision(claim *v1.PersistentVolumeClaim
 	}
 
 	// Kubernetes 1.5 provisioning with annStorageProvisioner
-	if provisioner, found := claim.Annotations[annStorageProvisioner]; found {
-		if provisioner == ctrl.provisionerName {
-			return true
+	if ctrl.kubeVersion.AtLeast(utilversion.MustParseSemantic("v1.5.0")) {
+		if provisioner, found := claim.Annotations[annStorageProvisioner]; found {
+			if provisioner == ctrl.provisionerName {
+				return true
+			}
+			return false
 		}
-		return false
+	} else {
+		// Kubernetes 1.4 provisioning, evaluating class.Provisioner
+		claimClass := helper.GetPersistentVolumeClaimClass(claim)
+		provisioner, _, err := ctrl.getStorageClassFields(claimClass)
+		if err != nil {
+			glog.Errorf("Error getting claim %q's StorageClass's fields: %v", claimToClaimKey(claim), err)
+			return false
+		}
+		if provisioner != ctrl.provisionerName {
+			return false
+		}
+
+		return true
 	}
 
-	// Kubernetes 1.4 provisioning, evaluating class.Provisioner
-	claimClass := helper.GetPersistentVolumeClaimClass(claim)
-	provisioner, _, err := ctrl.getStorageClassFields(claimClass)
-	if err != nil {
-		glog.Errorf("Error getting claim %q's StorageClass's fields: %v", claimToClaimKey(claim), err)
-		return false
-	}
-	if provisioner != ctrl.provisionerName {
-		return false
-	}
-
-	return true
+	return false
 }
 
 func (ctrl *ProvisionController) shouldDelete(volume *v1.PersistentVolume) bool {
