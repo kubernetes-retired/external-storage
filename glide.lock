@@ -1,5 +1,5 @@
-hash: 1978c56baf7e45d013c9a8396fff480532b09d0c495f1c7eea17d12e9459fdc1
-updated: 2017-10-27T22:02:49.265783375-04:00
+hash: 308ca3a281d9e935456af511e49c0390f65804a4d76d121eb31770c0e5bbc791
+updated: 2017-11-20T18:25:48.093609352+01:00
 imports:
 - name: cloud.google.com/go
   version: 3b1ae45394a234c385be014e9a488f2bb6eef821
@@ -7,7 +7,7 @@ imports:
   - compute/metadata
   - internal
 - name: github.com/aws/aws-sdk-go
-  version: ee1f179877b2daf2aaabf71fa900773bf8842253
+  version: e4f7e38b704e3ed0acc4a7f8196b777696f6f1f3
   subpackages:
   - aws
   - aws/awserr
@@ -51,6 +51,10 @@ imports:
   - spew
 - name: github.com/dgrijalva/jwt-go
   version: 01aeca54ebda6e0fbfafd0a524d234159c05ec20
+- name: github.com/digitalocean/godo
+  version: 77ea48de76a7b31b234d854f15d003c68bb2fb90
+  subpackages:
+  - context
 - name: github.com/docker/distribution
   version: edc3ab29cdff8694dd6feb85cfeb4b5f1b38ed9c
   subpackages:
@@ -123,6 +127,10 @@ imports:
   - ptypes/timestamp
 - name: github.com/google/btree
   version: 7d79101e329e5a3adf994758c578dab82b90c017
+- name: github.com/google/go-querystring
+  version: 9235644dd9e52eeae6fa48efd539fdc351a0af53
+  subpackages:
+  - query
 - name: github.com/google/gofuzz
   version: 44d81051d367757e1c7c6a5a86423ece9afcf63c
 - name: github.com/googleapis/gnostic
@@ -313,6 +321,8 @@ imports:
   version: 5ccb023bc27df288a957c5e994cd44fd19619465
 - name: github.com/spf13/viper
   version: 7fb2782df3d83e0036cc89f461ed0422628776f4
+- name: github.com/tent/http-link-go
+  version: ac974c61c2f990f4115b119354b5e0b47550e888
 - name: golang.org/x/crypto
   version: 81e90905daefcd6fd217b62423c0908922eadb30
   subpackages:

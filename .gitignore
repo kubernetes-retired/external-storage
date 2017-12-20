@@ -68,3 +68,9 @@ flycheck_*.el
 
 # cinder binary
 /openstack/standalone-cinder/cinder-provisioner
+
+# digitalocean binaries
+/digitalocean/digitalocean-flexplugin
+/digitalocean/deploy/docker/digitalocean-flexplugin
+/digitalocean/digitalocean-provisioner
+/digitalocean/deploy/docker/digitalocean-provisioner
