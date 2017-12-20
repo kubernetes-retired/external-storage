@@ -17,14 +17,13 @@ limitations under the License.
 package volume
 
 import (
-	"os/exec"
-
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/utils/exec"
 )
 
 const (
@@ -32,7 +31,7 @@ const (
 	annCreatedBy = "kubernetes.io/createdby"
 	createdBy    = "flex-dynamic-provisioner"
 
-	// A PV annotation for the identity of the s3fsProvisioner that provisioned it
+	// A PV annotation for the identity of the flexProvisioner that provisioned it
 	annProvisionerID = "Provisioner_Id"
 )
 
@@ -48,6 +47,7 @@ func newFlexProvisionerInternal(client kubernetes.Interface, execCommand string)
 		client:      client,
 		execCommand: execCommand,
 		identity:    identity,
+		runner:      exec.New(),
 	}
 
 	return provisioner
@@ -57,6 +57,7 @@ type flexProvisioner struct {
 	client      kubernetes.Interface
 	execCommand string
 	identity    types.UID
+	runner      exec.Interface
 }
 
 var _ controller.Provisioner = &flexProvisioner{}
@@ -90,11 +91,9 @@ func (p *flexProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 				v1.ResourceName(v1.ResourceStorage): options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)],
 			},
 			PersistentVolumeSource: v1.PersistentVolumeSource{
-
 				FlexVolume: &v1.FlexVolumeSource{
-					Driver:  "flex",
-					Options: map[string]string{},
-
+					Driver:   "flex",
+					Options:  map[string]string{},
 					ReadOnly: false,
 				},
 			},
@@ -105,12 +104,15 @@ func (p *flexProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 }
 
 func (p *flexProvisioner) createVolume(volumeOptions controller.VolumeOptions) error {
-	cmd := exec.Command(p.execCommand, "provision")
-	output, err := cmd.CombinedOutput()
+	extraOptions := map[string]string{}
+	extraOptions[optionPVorVolumeName] = volumeOptions.PVName
+
+	call := p.NewDriverCall(p.execCommand, provisionCmd)
+	call.AppendSpec(volumeOptions.Parameters, extraOptions)
+	output, err := call.Run()
 	if err != nil {
-		glog.Errorf("Failed to create volume %s, output: %s, error: %s", volumeOptions, output, err.Error())
+		glog.Errorf("Failed to create volume %s, output: %s, error: %s", volumeOptions, output.Message, err.Error())
 		return err
 	}
-
 	return nil
 }
