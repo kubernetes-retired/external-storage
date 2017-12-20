@@ -171,7 +171,6 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 
 	glog.V(4).Infof(" VolumeOptions %v", options)
 
-	//Parse Class Parameters
 	cfg, parseErr := parseClassParameters(options.Parameters, p.client)
 	if parseErr != nil {
 		return nil, fmt.Errorf(" failed to parse storage class parameters: %v", parseErr)
@@ -216,13 +215,11 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 		return nil, fmt.Errorf(" failed to parse blockvol : [%v] for opmode [%v] response", *blockVol, cfg.opMode)
 	}
 
-	//Sort Target Portal from portal.
 	sortErr := p.sortTargetPortal(iscsiVol)
 	if sortErr != nil {
 		return nil, fmt.Errorf(" failed to fetch Target Portal: %v from iscsi volume spec", sortErr)
 	}
 
-	// Target Portal and IQN should not be null
 	if iscsiVol.TargetPortal == "" || iscsiVol.Iqn == "" {
 		return nil, fmt.Errorf(" failed to create volume: Target portal/IQN is nil in iscsi volume spec")
 	}
@@ -345,7 +342,6 @@ func (p *glusterBlockProvisioner) createSecretRef(nameSpace string, secretName s
 func (p *glusterBlockProvisioner) createVolume(volSizeInt int, blockVol string, config *provisionerConfig) (*glusterBlockVolume, error) {
 
 	blockRes := &glusterBlockVolume{}
-	// Convert sizeStr and hacount to string
 	sizeStr := strconv.Itoa(volSizeInt)
 	haCountStr := strconv.Itoa(config.haCount)
 
@@ -358,7 +354,6 @@ func (p *glusterBlockProvisioner) createVolume(volSizeInt int, blockVol string, 
 	case glusterBlockOpmode:
 		blockRes.heketiBlockVolRes = nil
 
-		// Execute gluster-block command.
 		cmd := exec.Command(
 			config.opMode, "create", config.blockModeArgs["glustervol"]+"/"+blockVol,
 			"ha", haCountStr, config.blockModeArgs["hosts"], sizeStr+"GB", "--json")
@@ -404,7 +399,6 @@ func (p *glusterBlockProvisioner) createVolume(volSizeInt int, blockVol string, 
 
 		}
 
-	// Heketi Opmode
 	case heketiOpmode:
 		var clusterIDs []string
 		var heketiBlockRes heketiBlockVolRes
@@ -420,8 +414,6 @@ func (p *glusterBlockProvisioner) createVolume(volSizeInt int, blockVol string, 
 			glog.V(4).Infof(" provided clusterIDs: %v", clusterIDs)
 		}
 
-		//make request
-
 		blockVolumeReq := &gapi.BlockVolumeCreateRequest{
 			Size:     volSizeInt,
 			Clusters: clusterIDs,
@@ -429,7 +421,6 @@ func (p *glusterBlockProvisioner) createVolume(volSizeInt int, blockVol string, 
 			Auth:     config.chapAuthEnabled,
 		}
 
-		// Call volumecreate
 		blockVolumeInfoRes, err := cli.BlockVolumeCreate(blockVolumeReq)
 
 		if err != nil {
@@ -514,7 +505,6 @@ func (p *glusterBlockProvisioner) Delete(volume *v1.PersistentVolume) error {
 	//Call subjected volume delete operation.
 	switch config.opMode {
 
-	//gluster-block Opmode
 	case glusterBlockOpmode:
 		glog.V(1).Infof(" Deleting Volume %v ", delBlockVolName)
 		deleteCmd := exec.Command(
@@ -527,7 +517,6 @@ func (p *glusterBlockProvisioner) Delete(volume *v1.PersistentVolume) error {
 		}
 		glog.V(1).Infof(" successfully deleted Volume %v ", delBlockVolName)
 
-	// Heketi Opmode
 	case heketiOpmode:
 
 		glog.V(1).Infof(" opmode[heketi]: deleting Volume %v", delBlockVolName)
@@ -691,7 +680,6 @@ func parseClassParameters(params map[string]string, kubeclient kubernetes.Interf
 func parseOpmodeArgs(parseOpmode string, cfg *provisionerConfig, blkmodeArgs string) error {
 	switch parseOpmode {
 
-	// Gluster Block opmode
 	case glusterBlockOpmode:
 		cfg.opMode = glusterBlockOpmode
 		if len(blkmodeArgs) == 0 {
@@ -708,7 +696,6 @@ func parseOpmodeArgs(parseOpmode string, cfg *provisionerConfig, blkmodeArgs str
 			return fmt.Errorf("[gluster-block] wrong number of arguments for opmode [%s]", parseOpmode)
 		}
 
-	// Heketi Opmode
 	case heketiOpmode:
 		cfg.opMode = heketiOpmode
 	default:
