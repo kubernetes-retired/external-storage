@@ -22,7 +22,7 @@ spec:
             secretKeyRef:
               key: access-token
               name: digitalocean
-        image: quay.io/kubernetes_incubator/digitalocean-provisioner
+        image: quay.io/external_storage/digitalocean-provisioner
         imagePullPolicy: Always
         name: digitalocean-provisioner
         resources:
