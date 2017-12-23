@@ -8,7 +8,7 @@ This is an simple provisioner for DigitalOcean [Block Storage](https://www.digit
    `base64` the token and insert it into [manifests/digitalocean-secret.yaml](manifests/digitalocean-secret.yaml).  
    Create the secret: `kubectl create -f manifests/digitalocean-secret.yaml`
 2. Deploy the provisioner: `kubectl create -f manifests/digitalocean-provisioner.yaml`
-3. Adjust the `hostPath` in [manifests/digitalocean-flex-plugin-deploy.yaml](manifests/digitalocean-flex-plugin-deploy.yaml)  
+3. Adjust the `hostPath` in [manifests/digitalocean-flexplugin-deploy.yaml](manifests/digitalocean-flexplugin-deploy.yaml)  
    Deploy the flex plugin "installer": `kubectl create -f manifests/digitalocean-flex-plugin-deploy.yaml`
 4. Modify the zone in [manifests/sc.yaml](manifests/sc.yaml)  
    Deploy the default `StorageClass`: `kubectl create -f manifests/sc.yaml`
