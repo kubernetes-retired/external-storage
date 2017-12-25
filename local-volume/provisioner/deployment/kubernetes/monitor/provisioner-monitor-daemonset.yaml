@@ -1,0 +1,42 @@
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: local-volume-provisioner
+spec:
+  template:
+    metadata:
+      labels:
+        app: local-volume-provisioner
+    spec:
+      containers:
+      - name: provisioner
+        image: "quay.io/external_storage/local-volume-provisioner:latest"
+        args:
+        - "-enable-monitor=true"
+        imagePullPolicy: Always
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: discovery-vol
+          mountPath: "/local-disks"
+        - name: local-volume-config
+          mountPath: "/etc/provisioner/config/"
+        env:
+        - name: MY_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+      # If you want provisioner to use a kubeconfig file to access API server, instead of the default
+      #  in-cluster config, then specify the following environment variable:
+      # - name: KUBECONFIG
+      #   value: /path/to/kubeconfig
+      
+      volumes:
+      - name: discovery-vol
+        hostPath:
+          path: "/mnt/disks/vol"
+      - name: local-volume-config
+        configMap:
+          name: local-volume-config
+      serviceAccount: local-storage-admin
+
