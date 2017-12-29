@@ -24,6 +24,7 @@ import (
 
 	"github.com/golang/glog"
 
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -111,15 +112,15 @@ func (u *volumeUtil) DeleteContents(fullPath string) error {
 	if err != nil {
 		return err
 	}
-
+	errList := []error{}
 	for _, file := range files {
 		err = os.RemoveAll(filepath.Join(fullPath, file))
 		if err != nil {
-			// TODO: accumulate errors
-			return err
+			errList = append(errList, err)
 		}
 	}
-	return nil
+
+	return utilerrors.NewAggregate(errList)
 }
 
 // GetFsCapacityByte returns capacity in bytes about a mounted filesystem.
