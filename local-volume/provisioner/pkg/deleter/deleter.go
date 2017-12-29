@@ -24,6 +24,7 @@ import (
 
 	"bufio"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"os"
 	"os/exec"
 	"strings"
@@ -129,12 +130,13 @@ func (d *Deleter) asyncDeletePV(pv *v1.PersistentVolume, volType string, mountPa
 
 	// Remove API object
 	if err := d.APIUtil.DeletePV(pv.Name); err != nil {
-		// TODO: Does delete return an error if object has already been deleted?
-		deletingLocalPVErr := fmt.Errorf("Error deleting PV %q: %v", pv.Name, err.Error())
-		d.RuntimeConfig.Recorder.Eventf(pv, v1.EventTypeWarning, common.EventVolumeFailedDelete,
-			deletingLocalPVErr.Error())
-		glog.Error(deletingLocalPVErr)
-		return
+		if !errors.IsNotFound(err) {
+			deletingLocalPVErr := fmt.Errorf("Error deleting PV %q: %v", pv.Name, err.Error())
+			d.RuntimeConfig.Recorder.Eventf(pv, v1.EventTypeWarning, common.EventVolumeFailedDelete,
+				deletingLocalPVErr.Error())
+			glog.Error(deletingLocalPVErr)
+			return
+		}
 	}
 
 	glog.Infof("Deleted PV %q", pv.Name)
