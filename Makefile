@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-all: aws/efs ceph/cephfs ceph/rbd flex gluster/block gluster/glusterfs iscsi/targetd local-volume/provisioner local-volume/bootstrapper nfs-client nfs snapshot openstack/standalone-cinder
+all: aws/efs ceph/cephfs ceph/rbd flex gluster/block gluster/glusterfs iscsi/targetd local-volume/provisioner nfs-client nfs snapshot openstack/standalone-cinder
 .PHONY: all
 
-clean: clean-aws/efs clean-ceph/cephfs clean-ceph/rbd clean-flex clean-gluster/block clean-gluster/glusterfs clean-iscsi/targetd clean-local-volume/provisioner clean-local-volume/bootstrapper clean-nfs-client clean-nfs clean-openebs clean-snapshot clean-openstack/standalone-cinder
+clean: clean-aws/efs clean-ceph/cephfs clean-ceph/rbd clean-flex clean-gluster/block clean-gluster/glusterfs clean-iscsi/targetd clean-local-volume/provisioner clean-nfs-client clean-nfs clean-openebs clean-snapshot clean-openstack/standalone-cinder
 .PHONY: clean
 
 
@@ -122,11 +122,6 @@ clean-local-volume/provisioner:
 	make clean
 .PHONY: clean-local-volume/provisioner
 
-clean-local-volume/bootstrapper:
-	cd local-volume/bootstrapper; \
-	make clean
-.PHONY: clean-local-volume/bootstrapper
-
 nfs-client:
 	cd nfs-client; \
 	make container
@@ -221,11 +216,6 @@ push-iscsi-controller:
 	cd iscsi/targetd; \
 	make push
 .PHONY: push-iscsi-controller
-
-push-local-volume-provisioner-bootstrap:
-	cd local-volume/bootstrapper; \
-	make push
-.PHONY: push-local-volume-provisioner-bootstrap
 
 push-local-volume-provisioner:
 	cd local-volume/provisioner; \
