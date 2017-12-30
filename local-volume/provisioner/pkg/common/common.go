@@ -51,10 +51,6 @@ const (
 	// VolumeTypeBlock represents block type volumes
 	VolumeTypeBlock = "block"
 
-	// DefaultHostDir is the default host dir to discover local volumes.
-	DefaultHostDir = "/mnt/disks"
-	// DefaultMountDir is the container mount point for the default host dir.
-	DefaultMountDir = "/local-disks"
 	// DefaultBlockCleanerCommand is the default block device cleaning command
 	DefaultBlockCleanerCommand = "/scripts/quick_reset.sh"
 
@@ -137,7 +133,7 @@ var InClusterConfig = rest.InClusterConfig
 // ProvisionerConfiguration defines Provisioner configuration objects
 // Each configuration key of the struct e.g StorageClassConfig is individually
 // marshaled in VolumeConfigToConfigMapData.
-// TODO Need to find a way to marshal the struct  more efficiently.
+// TODO Need to find a way to marshal the struct more efficiently.
 type ProvisionerConfiguration struct {
 	// StorageClassConfig defines configuration of Provisioner's storage classes
 	StorageClassConfig map[string]MountConfig `json:"storageClassMap" yaml:"storageClassMap"`
@@ -185,7 +181,7 @@ func GetContainerPath(pv *v1.PersistentVolume, config MountConfig) (string, erro
 	return filepath.Join(config.MountDir, relativePath), nil
 }
 
-// GetVolumeConfigFromConfigMap gets volume configuration from given configmap,
+// GetVolumeConfigFromConfigMap gets volume configuration from given configmap.
 func GetVolumeConfigFromConfigMap(client *kubernetes.Clientset, namespace, name string, provisionerConfig *ProvisionerConfiguration) error {
 	configMap, err := client.CoreV1().ConfigMaps(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
@@ -193,17 +189,6 @@ func GetVolumeConfigFromConfigMap(client *kubernetes.Clientset, namespace, name 
 	}
 	err = ConfigMapDataToVolumeConfig(configMap.Data, provisionerConfig)
 	return err
-}
-
-// GetDefaultVolumeConfig returns the default volume configuration.
-func GetDefaultVolumeConfig(provisionerConfig *ProvisionerConfiguration) {
-	provisionerConfig.StorageClassConfig = map[string]MountConfig{
-		"local-storage": {
-			HostDir:             DefaultHostDir,
-			MountDir:            DefaultMountDir,
-			BlockCleanerCommand: []string{DefaultBlockCleanerCommand},
-		},
-	}
 }
 
 // VolumeConfigToConfigMapData converts volume config to configmap data.
@@ -225,7 +210,7 @@ func VolumeConfigToConfigMapData(config *ProvisionerConfiguration) (map[string]s
 	return configMapData, nil
 }
 
-// ConfigMapDataToVolumeConfig converts configmap data to volume config
+// ConfigMapDataToVolumeConfig converts configmap data to volume config.
 func ConfigMapDataToVolumeConfig(data map[string]string, provisionerConfig *ProvisionerConfiguration) error {
 	rawYaml := ""
 	for key, val := range data {
@@ -239,10 +224,10 @@ func ConfigMapDataToVolumeConfig(data map[string]string, provisionerConfig *Prov
 	}
 	for class, config := range provisionerConfig.StorageClassConfig {
 		if config.BlockCleanerCommand == nil {
-			// supply a default block cleaner command.
+			// Supply a default block cleaner command.
 			config.BlockCleanerCommand = []string{DefaultBlockCleanerCommand}
 		} else {
-			// Validate that array is non empty
+			// Validate that array is non empty.
 			if len(config.BlockCleanerCommand) < 1 {
 				return fmt.Errorf("Invalid empty block cleaner command for class %v", class)
 			}
