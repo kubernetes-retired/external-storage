@@ -96,9 +96,9 @@ func ensureMountDir(config *common.ProvisionerConfiguration) bool {
 	needsUpdate := false
 	for class, mount := range config.StorageClassConfig {
 		if mount.MountDir == "" {
-			newMoutConfig := mount
-			newMoutConfig.MountDir = generateMountDir(&mount)
-			config.StorageClassConfig[class] = newMoutConfig
+			newMountConfig := mount
+			newMountConfig.MountDir = generateMountDir(&mount)
+			config.StorageClassConfig[class] = newMountConfig
 			needsUpdate = true
 		}
 	}
