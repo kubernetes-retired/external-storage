@@ -1,0 +1,87 @@
+{{- $configMapName := .Values.configmap.configMapName }}
+{{- $provisionerNamespace := .Values.common.namespace }}
+{{- $provisionerName := .Values.daemonset.name }}
+{{- $imageFull := .Values.daemonset.image }}
+{{- $imagePullPolicy := .Values.daemonset.imagePullPolicy }}
+{{- $serviceAccount := .Values.daemonset.serviceAccount }}
+{{- $kubeConfigEnv := .Values.daemonset.kubeConfigEnv }}
+{{- $nodeLabels := .Values.daemonset.nodeLabels }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $configMapName }} 
+  namespace: {{ $provisionerNamespace }} 
+data:
+{{- if $nodeLabels }}
+  nodeLabelsForPV: |
+   {{- range $label := $nodeLabels }}
+    - {{$label}}
+   {{- end }}
+{{- end }}
+  storageClassMap: |
+#
+# Populating entries with user provided disk discovery directories 
+# and mount directories per storage class.
+#
+{{- range $tmp, $val := .Values.configmap.storageClass }}
+   {{- range $storageClass, $classConfig := $val }}
+      {{ $storageClass }}:     
+          hostDir: {{ $classConfig.hostDir }}
+          mountDir: {{ if $classConfig.mountDir }} {{$classConfig.mountDir }} {{ else }} {{ $classConfig.hostDir }} {{ end }}
+   {{- end}}
+{{- end}}
+
+---
+
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: {{ $provisionerName }}
+  namespace: {{ $provisionerNamespace }}
+  labels:
+    app: local-volume-provisioner
+spec:
+  selector:
+    matchLabels:
+      app: local-volume-provisioner 
+  template:
+    metadata:
+      labels:
+        app: local-volume-provisioner
+    spec:
+      serviceAccountName: {{$serviceAccount}}
+      containers:
+        - image: "{{ $imageFull }}"
+          imagePullPolicy: {{ $imagePullPolicy | quote }}
+          name: provisioner 
+          securityContext:
+            privileged: true
+          env:
+{{- if $kubeConfigEnv }}
+            - name: KUBECONFIG
+              value: {{$kubeConfigEnv}}
+{{- end }}
+          volumeMounts:
+            - mountPath: /etc/provisioner/config 
+              name: provisioner-config
+              readOnly: true
+#
+# Populating entries with user provided disk discovery directories 
+#
+{{- range $tmp, $val := .Values.configmap.storageClass }}
+   {{- range $storageClass, $classConfig := $val }}
+            - mountPath: {{ if $classConfig.mountDir }} {{ $classConfig.mountDir }} {{ else }} {{ $classConfig.hostDir }} {{ end }}
+              name: {{ $storageClass }}
+   {{- end}}
+{{- end}}
+      volumes:
+        - name: provisioner-config
+          configMap:
+            name: {{ $configMapName }}
+{{- range $tmp, $val := .Values.configmap.storageClass }}
+   {{- range $storageClass, $classConfig := $val }}
+        - name: {{ $storageClass }}
+          hostPath:
+            path: {{ $classConfig.hostDir }}
+   {{- end}}
+{{- end}}
