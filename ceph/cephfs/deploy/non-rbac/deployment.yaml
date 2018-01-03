@@ -18,6 +18,6 @@ spec:
         - name: PROVISIONER_NAME
           value: ceph.com/cephfs
         command:
-				- "/usr/local/bin/cephfs-provisioner"
+          - "/usr/local/bin/cephfs-provisioner"
         args:
-				- "-id=cephfs-provisioner-1"
+          - "-id=cephfs-provisioner-1"
