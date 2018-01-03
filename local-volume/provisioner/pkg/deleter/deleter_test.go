@@ -146,6 +146,38 @@ func TestDeleteVolumes_DeletePVFails(t *testing.T) {
 	verifyPVExists(t, test)
 }
 
+func TestDeleteVolumes_DeletePVNotFound(t *testing.T) {
+	vols := map[string]*testVol{
+		"pv4": {
+			pvPhase: v1.VolumeReleased,
+		},
+	}
+	test := &testConfig{
+		apiShouldFail:      false,
+		vols:               vols,
+		expectedDeletedPVs: map[string]string{"pv4": ""},
+	}
+	d := testSetup(t, test, nil)
+
+	d.DeletePVs()
+	waitForAsyncToComplete(t, d)
+	verifyDeletedPVs(t, test)
+
+	// delete not found pv
+	err := d.deletePV(test.generatedPVs["pv4"])
+	if err != nil {
+		t.Error(err)
+	}
+	waitForAsyncToComplete(t, d)
+
+	recorderChan := d.RuntimeConfig.Recorder.(*record.FakeRecorder).Events
+	select {
+	case err := <-recorderChan:
+		t.Errorf("error deletePV %v", err)
+	default:
+	}
+}
+
 func TestDeleteVolumes_CleanupFails(t *testing.T) {
 	vols := map[string]*testVol{
 		"pv4": {
@@ -317,7 +349,9 @@ func testSetup(t *testing.T, config *testConfig, cleanupCmd []string) *Deleter {
 			},
 		},
 	}
-	fakeRecorder := &record.FakeRecorder{}
+
+	// set buffer size big enough, not all cases care about recorder.
+	fakeRecorder := record.NewFakeRecorder(100)
 	runtimeConfig := &common.RuntimeConfig{
 		UserConfig: userConfig,
 		Cache:      config.cache,
