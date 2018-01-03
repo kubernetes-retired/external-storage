@@ -91,7 +91,7 @@ func (p *glusterfsProvisioner) ExecuteCommand(
 func (p *glusterfsProvisioner) selectPod(host string,
 	config *ProvisionerConfig) (*v1.Pod, error) {
 
-	podList, err := p.client.Core().
+	podList, err := p.client.CoreV1().
 		Pods(config.Namespace).
 		List(meta_v1.ListOptions{
 			LabelSelector: config.LabelSelector,
