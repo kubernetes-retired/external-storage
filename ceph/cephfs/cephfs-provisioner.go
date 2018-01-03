@@ -120,7 +120,7 @@ func (p *cephFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 		Type: "Opaque",
 	}
 
-	_, err = p.client.Core().Secrets(nameSpace).Create(secret)
+	_, err = p.client.CoreV1().Secrets(nameSpace).Create(secret)
 	if err != nil {
 		glog.Errorf("Cephfs Provisioner: create volume failed, err: %v", err)
 		return nil, fmt.Errorf("failed to create secret")
@@ -204,7 +204,7 @@ func (p *cephFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 	// Remove dynamic user secret
 	secretName := generateSecretName(user)
 	secretNamespace := volume.Spec.PersistentVolumeSource.CephFS.SecretRef.Namespace
-	err = p.client.Core().Secrets(secretNamespace).Delete(secretName, &metav1.DeleteOptions{})
+	err = p.client.CoreV1().Secrets(secretNamespace).Delete(secretName, &metav1.DeleteOptions{})
 	if err != nil {
 		glog.Errorf("Cephfs Provisioner: delete secret failed, err: %v", err)
 		return fmt.Errorf("failed to delete secret")
@@ -260,7 +260,7 @@ func (p *cephFSProvisioner) parsePVSecret(namespace, secretName string) (string,
 	if p.client == nil {
 		return "", fmt.Errorf("Cannot get kube client")
 	}
-	secrets, err := p.client.Core().Secrets(namespace).Get(secretName, metav1.GetOptions{})
+	secrets, err := p.client.CoreV1().Secrets(namespace).Get(secretName, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
