@@ -22,6 +22,7 @@ import (
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/cache"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -98,8 +99,9 @@ func (u *FakeAPIUtil) DeletePV(pvName string) error {
 		u.deletedPVs[pvName] = pv
 		delete(u.createdPVs, pvName)
 		u.cache.DeletePV(pvName)
+		return nil
 	}
-	return nil
+	return errors.NewNotFound(v1.Resource("persistentvolumes"), pvName)
 }
 
 // GetAndResetCreatedPVs returns createdPVs and resets the map
