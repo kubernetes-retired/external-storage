@@ -29,7 +29,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/noauth"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/extensions/trusts"
 	tokens3 "github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
-	"gopkg.in/gcfg.v1"
+	gcfg "gopkg.in/gcfg.v1"
 
 	"github.com/golang/glog"
 	netutil "k8s.io/apimachinery/pkg/util/net"
@@ -84,20 +84,15 @@ func (cfg cinderConfig) toAuth3Options() tokens3.AuthOptions {
 }
 
 func getConfigFromEnv() cinderConfig {
-	authURL := os.Getenv("OS_AUTH_URL")
-	if authURL == "" {
-		glog.Warning("OS_AUTH_URL missing from environment")
-		return cinderConfig{}
-	}
-
 	return cinderConfig{
 		Global: cinderConfigGlobal{
-			AuthURL:    authURL,
-			Username:   os.Getenv("OS_USERNAME"),
-			Password:   os.Getenv("OS_PASSWORD"), // TODO: Replace with secret
-			TenantID:   os.Getenv("OS_TENANT_ID"),
-			Region:     os.Getenv("OS_REGION_NAME"),
-			DomainName: os.Getenv("OS_USER_DOMAIN_NAME"),
+			AuthURL:        os.Getenv("OS_AUTH_URL"),
+			CinderEndpoint: os.Getenv("OS_CINDER_ENDPOINT"),
+			Username:       os.Getenv("OS_USERNAME"),
+			Password:       os.Getenv("OS_PASSWORD"), // TODO: Replace with secret
+			TenantID:       os.Getenv("OS_TENANT_ID"),
+			Region:         os.Getenv("OS_REGION_NAME"),
+			DomainName:     os.Getenv("OS_USER_DOMAIN_NAME"),
 		},
 	}
 }
@@ -108,7 +103,7 @@ func getConfig(configFilePath string) (cinderConfig, error) {
 		var config cinderConfig
 		configFile, err := os.Open(configFilePath)
 		if err != nil {
-			glog.Fatalf("Couldn't open configuration %s: %#v",
+			glog.Errorf("Couldn't open configuration %s: %#v",
 				configFilePath, err)
 			return cinderConfig{}, err
 		}
@@ -117,7 +112,7 @@ func getConfig(configFilePath string) (cinderConfig, error) {
 
 		err = gcfg.ReadInto(&config, configFile)
 		if err != nil {
-			glog.Fatalf("Couldn't read configuration: %#v", err)
+			glog.Errorf("Couldn't read configuration: %#v", err)
 			return cinderConfig{}, err
 		}
 		return config, nil
