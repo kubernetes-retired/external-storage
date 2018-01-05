@@ -41,6 +41,15 @@ const (
 
 	// CinderVolumeIDAnn is an annotation to store the ID of the associated cinder volume
 	CinderVolumeIDAnn = "cinderVolumeId"
+
+	// CloneRequestAnn is an annotation to request that the PVC be provisioned as a clone of the referenced PVC
+	CloneRequestAnn = "k8s.io/CloneRequest"
+
+	// CloneOfAnn is an annotation to indicate that a PVC is a clone of the referenced PVC
+	CloneOfAnn = "k8s.io/CloneOf"
+
+	// SmartCloneEnabled is a provisioner parameter to enable smart clone mode for a storage class
+	SmartCloneEnabled = "smartclone"
 )
 
 type cinderProvisioner struct {
@@ -55,6 +64,7 @@ type cinderProvisioner struct {
 
 	vsb volumeServiceBroker
 	mb  mapperBroker
+	cb  clusterBroker
 }
 
 // NewCinderProvisioner returns a Provisioner that creates volumes using a
@@ -72,10 +82,11 @@ func NewCinderProvisioner(client kubernetes.Interface, id, configFilePath string
 		Identity:      id,
 		vsb:           &gophercloudBroker{},
 		mb:            &volumeMapperBroker{},
+		cb:            &k8sClusterBroker{},
 	}, nil
 }
 
-func getCreateOptions(options controller.VolumeOptions) (volumes_v2.CreateOpts, error) {
+func (p *cinderProvisioner) getCreateOptions(options controller.VolumeOptions) (volumes_v2.CreateOpts, error) {
 	name := fmt.Sprintf("cinder-dynamic-pvc-%s", uuid.NewUUID())
 	capacity := options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	sizeBytes := capacity.Value()
@@ -83,6 +94,7 @@ func getCreateOptions(options controller.VolumeOptions) (volumes_v2.CreateOpts, 
 	sizeGB := int((sizeBytes + 1024*1024*1024 - 1) / (1024 * 1024 * 1024))
 	volType := ""
 	availability := "nova"
+	cloneEnabled := false
 	// Apply ProvisionerParameters (case-insensitive). We leave validation of
 	// the values to the cloud provider.
 	for k, v := range options.Parameters {
@@ -91,8 +103,34 @@ func getCreateOptions(options controller.VolumeOptions) (volumes_v2.CreateOpts, 
 			volType = v
 		case "availability":
 			availability = v
+		case SmartCloneEnabled:
+			cloneEnabled = true
 		default:
 			return volumes_v2.CreateOpts{}, fmt.Errorf("invalid option %q", k)
+		}
+	}
+
+	sourceVolID := ""
+	if cloneEnabled {
+		if sourcePVCRef, ok := options.PVC.Annotations[CloneRequestAnn]; ok {
+			var ns string
+			parts := strings.SplitN(sourcePVCRef, "/", 2)
+			if len(parts) < 2 {
+				ns = options.PVC.Namespace
+			} else {
+				ns = parts[0]
+			}
+			sourcePVCName := parts[len(parts)-1]
+			sourcePVC, err := p.cb.getPVC(p, ns, sourcePVCName)
+			if err != nil {
+				return volumes_v2.CreateOpts{}, fmt.Errorf("Unable to get PVC %s/%s", ns, sourcePVCName)
+			}
+			if sourceVolID, ok = sourcePVC.Annotations[CinderVolumeIDAnn]; ok {
+				glog.Infof("Requesting clone of cinder volumeID %s", sourceVolID)
+			} else {
+				return volumes_v2.CreateOpts{}, fmt.Errorf("PVC %s/%s missing %s annotation",
+					ns, sourcePVCName, CinderVolumeIDAnn)
+			}
 		}
 	}
 
@@ -101,7 +139,24 @@ func getCreateOptions(options controller.VolumeOptions) (volumes_v2.CreateOpts, 
 		Size:             sizeGB,
 		VolumeType:       volType,
 		AvailabilityZone: availability,
+		SourceVolID:      sourceVolID,
 	}, nil
+}
+
+func (p *cinderProvisioner) annotatePVC(cinderVolID string, pvc *v1.PersistentVolumeClaim, createOptions volumes_v2.CreateOpts) error {
+	annotations := make(map[string]string, 2)
+	annotations[CinderVolumeIDAnn] = cinderVolID
+
+	// Add clone annotation if this is a cloned volume
+	if sourcePVCName, ok := pvc.Annotations[CloneRequestAnn]; ok {
+		if createOptions.SourceVolID != "" {
+			glog.Infof("Annotating PVC %s/%s as a clone of PVC %s/%s",
+				pvc.Namespace, pvc.Name, pvc.Namespace, sourcePVCName)
+			annotations[CloneOfAnn] = sourcePVCName
+		}
+	}
+	err := p.cb.annotatePVC(p, pvc.Namespace, pvc.Name, annotations)
+	return err
 }
 
 // Provision creates a storage asset and returns a PV object representing it.
@@ -119,7 +174,7 @@ func (p *cinderProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 	}
 
 	// TODO: Check access mode
-	createOptions, err := getCreateOptions(options)
+	createOptions, err := p.getCreateOptions(options)
 	if err != nil {
 		glog.Error(err)
 		goto ERROR
@@ -171,6 +226,13 @@ func (p *cinderProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 		glog.Errorf("Failed to build PV: %v", err)
 		goto ERROR_DETACH
 	}
+
+	err = p.annotatePVC(volumeID, options.PVC, createOptions)
+	if err != nil {
+		glog.Errorf("Failed to annotate cloned PVC: %v", err)
+		goto ERROR_DETACH
+	}
+
 	return pv, nil
 
 ERROR_DETACH:

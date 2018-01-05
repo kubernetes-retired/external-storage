@@ -148,9 +148,20 @@ func (m *fakeMapper) AuthTeardown(p *cinderProvisioner, pv *v1.PersistentVolume)
 
 type fakeClusterBroker struct {
 	clusterBroker
+	mightFail     failureInjector
 	CreatedSecret *v1.Secret
 	DeletedSecret string
 	Namespace     string
+	srcPVC        *v1.PersistentVolumeClaim
+	curPVC        *v1.PersistentVolumeClaim
+}
+
+func newFakeClusterBroker() *fakeClusterBroker {
+	return &fakeClusterBroker{
+		CreatedSecret: nil,
+		srcPVC:        nil,
+		curPVC:        nil,
+	}
 }
 
 func (cb *fakeClusterBroker) createSecret(p *cinderProvisioner, ns string, secret *v1.Secret) error {
@@ -163,4 +174,28 @@ func (cb *fakeClusterBroker) deleteSecret(p *cinderProvisioner, ns string, secre
 	cb.DeletedSecret = secretName
 	cb.Namespace = ns
 	return nil
+}
+
+func (cb *fakeClusterBroker) getPVC(p *cinderProvisioner, ns string, name string) (*v1.PersistentVolumeClaim, error) {
+	for _, pvc := range []*v1.PersistentVolumeClaim{cb.srcPVC, cb.curPVC} {
+		if pvc != nil && pvc.Namespace == ns && pvc.Name == name {
+			return pvc, nil
+		}
+	}
+	return nil, errors.New("Cannot find PVC")
+}
+
+func (cb *fakeClusterBroker) annotatePVC(p *cinderProvisioner, ns string, name string, updates map[string]string) error {
+	if cb.mightFail.isSet("annotatePVC") {
+		return errors.New("injected error for testing")
+	}
+	for _, pvc := range []*v1.PersistentVolumeClaim{cb.srcPVC, cb.curPVC} {
+		if pvc != nil && pvc.Namespace == ns && pvc.Name == name {
+			for k, v := range updates {
+				pvc.Annotations[k] = v
+			}
+			return nil
+		}
+	}
+	return errors.New("Cannot find PVC")
 }

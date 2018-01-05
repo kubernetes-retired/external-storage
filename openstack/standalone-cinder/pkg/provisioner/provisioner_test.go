@@ -33,14 +33,22 @@ var _ = Describe("Provisioner", func() {
 	Describe("Create volume options parsing", func() {
 		var (
 			err           error
+			p             cinderProvisioner
+			cb            *fakeClusterBroker
 			options       controller.VolumeOptions
 			createOptions volumes_v2.CreateOpts
+			sourcePVC     *v1.PersistentVolumeClaim
+			sourceVolID   string
 		)
 		BeforeEach(func() {
+			cb = &fakeClusterBroker{}
+			p = cinderProvisioner{cb: cb}
 			options = createVolumeOptions()
+			sourcePVC = createPVC("srcPVC", "1G")
+			sourceVolID = "src-vol-id"
 		})
 		JustBeforeEach(func() {
-			createOptions, err = getCreateOptions(options)
+			createOptions, err = p.getCreateOptions(options)
 		})
 
 		Context("when an unrecognized option is specified in the storage class", func() {
@@ -70,6 +78,68 @@ var _ = Describe("Provisioner", func() {
 				Expect(createOptions.VolumeType).To(Equal("gold"))
 			})
 		})
+
+		Context("when a clone from a different namespace is requested", func() {
+			BeforeEach(func() {
+				options.PVC.Annotations[CloneRequestAnn] = "otherns/srcPVC"
+				options.Parameters[SmartCloneEnabled] = "true"
+				sourcePVC.Annotations[CinderVolumeIDAnn] = sourceVolID
+				sourcePVC.Namespace = "otherns"
+				cb.srcPVC = sourcePVC
+			})
+			It("should add the source volume to the create options", func() {
+				Expect(err).To(BeNil())
+				Expect(createOptions.SourceVolID).To(Equal(sourceVolID))
+			})
+		})
+
+		Context("when a clone is requested", func() {
+			BeforeEach(func() {
+				options.PVC.Annotations[CloneRequestAnn] = "srcPVC"
+			})
+
+			Context("when the storage class is configured for smart clone", func() {
+				BeforeEach(func() {
+					options.Parameters[SmartCloneEnabled] = "true"
+				})
+
+				Context("when a valid source PVC is found", func() {
+					BeforeEach(func() {
+						sourcePVC.Annotations[CinderVolumeIDAnn] = sourceVolID
+						cb.srcPVC = sourcePVC
+					})
+					It("should add the source volume to the create options", func() {
+						Expect(err).To(BeNil())
+						Expect(createOptions.SourceVolID).To(Equal(sourceVolID))
+					})
+				})
+
+				Context("when the source PVC cannot be found", func() {
+					BeforeEach(func() {
+						cb.srcPVC = nil
+					})
+					It("should fail", func() {
+						Expect(err).NotTo(BeNil())
+					})
+				})
+
+				Context("when the source PVC is not associated with this provisioner", func() {
+					BeforeEach(func() {
+						cb.srcPVC = sourcePVC
+						// Note: CinderVolumeIDAnn is missing
+					})
+					It("should fail", func() {
+						Expect(err).NotTo(BeNil())
+					})
+				})
+			})
+
+			Context("when the storage class is configured for host-assisted clone", func() {
+				It("should not add the source volume to the create options", func() {
+					Expect(createOptions.SourceVolID).To(Equal(""))
+				})
+			})
+		})
 	})
 
 	Describe("A provision operation", func() {
@@ -78,6 +148,7 @@ var _ = Describe("Provisioner", func() {
 			p       *cinderProvisioner
 			vsb     *fakeVolumeServiceBroker
 			mb      *fakeMapperBroker
+			cb      *fakeClusterBroker
 			options controller.VolumeOptions
 			cleanup string
 			err     error
@@ -86,10 +157,15 @@ var _ = Describe("Provisioner", func() {
 		BeforeEach(func() {
 			vsb = &fakeVolumeServiceBroker{}
 			mb = newFakeMapperBroker()
+			cb = newFakeClusterBroker()
 			p = createCinderProvisioner()
 			p.vsb = vsb
 			p.mb = mb
+			p.cb = cb
 			options = createVolumeOptions()
+			cb.srcPVC = createPVC("srcPVC", "1G")
+			cb.srcPVC.Annotations[CinderVolumeIDAnn] = "src-vol-id"
+			cb.curPVC = options.PVC
 		})
 
 		JustBeforeEach(func() {
@@ -99,6 +175,7 @@ var _ = Describe("Provisioner", func() {
 		It("should return a persistent volume", func() {
 			Expect(pv).To(Not(BeNil()))
 			Expect(err).To(BeNil())
+			Expect(options.PVC.Annotations[CinderVolumeIDAnn]).To(Equal("cinderVolumeID"))
 		})
 
 		Context("when a claim selector is specified", func() {
@@ -216,6 +293,47 @@ var _ = Describe("Provisioner", func() {
 				Expect(pv).To(BeNil())
 				Expect(err).To(Not(BeNil()))
 				Expect(vsb.mightFail.operationLog.String()).To(Equal(cleanup))
+			})
+		})
+
+		Context("when annotating the PVC fails", func() {
+			BeforeEach(func() {
+				cb.mightFail.set("annotatePVC")
+				cleanup = "detachCinderVolume.disconnectCinderVolume.unreserveCinderVolume.deleteCinderVolume."
+			})
+			It("should fail and the volume should be detached, disconnected, unreserved and deleted", func() {
+				Expect(pv).To(BeNil())
+				Expect(err).To(Not(BeNil()))
+				Expect(vsb.mightFail.operationLog.String()).To(Equal(cleanup))
+			})
+		})
+
+		Context("when a clone is requested", func() {
+			BeforeEach(func() {
+				options.PVC.Annotations[CloneRequestAnn] = "srcPVC"
+			})
+
+			pvcShouldBeAnnotated := func(expected bool) {
+				if val, ok := options.PVC.Annotations[CloneOfAnn]; ok {
+					Expect(expected).To(Equal(true))
+					Expect(val).To(Equal("srcPVC"))
+				} else {
+					Expect(expected).To(Equal(false))
+				}
+			}
+			Context("when the storage class is configured for smart clone", func() {
+				BeforeEach(func() {
+					options.Parameters[SmartCloneEnabled] = "true"
+				})
+				It("should mark the PVC as a clone", func() {
+					pvcShouldBeAnnotated(true)
+				})
+			})
+
+			Context("when the storage class is configured for host-assisted clone", func() {
+				It("should not mark the PVC as a clone", func() {
+					pvcShouldBeAnnotated(false)
+				})
 			})
 		})
 	})

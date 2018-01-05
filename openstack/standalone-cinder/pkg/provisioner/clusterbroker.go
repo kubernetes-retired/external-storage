@@ -17,14 +17,20 @@ limitations under the License.
 package provisioner
 
 import (
+	"fmt"
+
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 )
 
 // clusterBroker provides a mechanism for tests to override calls kubernetes with mocks.
 type clusterBroker interface {
 	createSecret(p *cinderProvisioner, ns string, secret *v1.Secret) error
 	deleteSecret(p *cinderProvisioner, ns string, secretName string) error
+	getPVC(p *cinderProvisioner, ns string, name string) (*v1.PersistentVolumeClaim, error)
+	annotatePVC(p *cinderProvisioner, ns string, name string, updates map[string]string) error
 }
 
 type k8sClusterBroker struct {
@@ -48,5 +54,31 @@ func (*k8sClusterBroker) deleteSecret(p *cinderProvisioner, ns string, secretNam
 		return err
 	}
 	glog.V(3).Infof("Successfully deleted secret %s", secretName)
+	return nil
+}
+
+func (*k8sClusterBroker) getPVC(p *cinderProvisioner, ns string, name string) (*v1.PersistentVolumeClaim, error) {
+	return p.Client.CoreV1().PersistentVolumeClaims(ns).Get(name, metav1.GetOptions{})
+}
+
+func (*k8sClusterBroker) annotatePVC(p *cinderProvisioner, ns string, name string, updates map[string]string) error {
+	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		// Retrieve the latest version of PVC before attempting update
+		// RetryOnConflict uses exponential backoff to avoid exhausting the apiserver
+		result, getErr := p.Client.CoreV1().PersistentVolumeClaims(ns).Get(name, metav1.GetOptions{})
+		if getErr != nil {
+			panic(fmt.Errorf("Failed to get latest version of PVC: %v", getErr))
+		}
+
+		for k, v := range updates {
+			result.Annotations[k] = v
+		}
+		_, updateErr := p.Client.CoreV1().PersistentVolumeClaims(ns).Update(result)
+		return updateErr
+	})
+	if retryErr != nil {
+		glog.Errorf("Update failed: %v", retryErr)
+		return retryErr
+	}
 	return nil
 }
