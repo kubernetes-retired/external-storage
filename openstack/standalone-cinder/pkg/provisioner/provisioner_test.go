@@ -21,6 +21,7 @@ import (
 	"errors"
 
 	"github.com/gophercloud/gophercloud"
+	volumes_v2 "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	"github.com/kubernetes-incubator/external-storage/openstack/standalone-cinder/pkg/volumeservice"
 	. "github.com/onsi/ginkgo"
@@ -30,6 +31,48 @@ import (
 )
 
 var _ = Describe("Provisioner", func() {
+	Describe("Create volume options parsing", func() {
+		var (
+			err           error
+			options       controller.VolumeOptions
+			createOptions volumes_v2.CreateOpts
+		)
+		BeforeEach(func() {
+			options = createVolumeOptions()
+		})
+		JustBeforeEach(func() {
+			createOptions, err = getCreateOptions(options)
+		})
+
+		Context("when an unrecognized option is specified in the storage class", func() {
+			BeforeEach(func() {
+				options.Parameters = map[string]string{
+					"foo": "bar",
+				}
+			})
+
+			It("should fail", func() {
+				Expect(createOptions).To(Equal(volumes_v2.CreateOpts{}))
+				Expect(err).ToNot(BeNil())
+			})
+		})
+
+		Context("when recognized options are used", func() {
+			BeforeEach(func() {
+				options.Parameters = map[string]string{
+					"type":         "gold",
+					"availability": "zone",
+				}
+			})
+
+			It("should be reflected in the create options", func() {
+				Expect(err).To(BeNil())
+				Expect(createOptions.AvailabilityZone).To(Equal("zone"))
+				Expect(createOptions.VolumeType).To(Equal("gold"))
+			})
+		})
+	})
+
 	Describe("A provision operation", func() {
 		var (
 			pv      *v1.PersistentVolume
@@ -62,6 +105,19 @@ var _ = Describe("Provisioner", func() {
 		Context("when a claim selector is specified", func() {
 			BeforeEach(func() {
 				options.PVC.Spec.Selector = &metav1.LabelSelector{}
+			})
+
+			It("should fail", func() {
+				Expect(pv).To(BeNil())
+				Expect(err).To(Not(BeNil()))
+			})
+		})
+
+		Context("when an unrecognized option is specified in the storage class", func() {
+			BeforeEach(func() {
+				options.Parameters = map[string]string{
+					"foo": "bar",
+				}
 			})
 
 			It("should fail", func() {
@@ -263,7 +319,7 @@ type fakeVolumeServiceBroker struct {
 	volumeServiceBroker
 }
 
-func (vsb *fakeVolumeServiceBroker) createCinderVolume(vs *gophercloud.ServiceClient, options controller.VolumeOptions) (string, error) {
+func (vsb *fakeVolumeServiceBroker) createCinderVolume(vs *gophercloud.ServiceClient, options volumes_v2.CreateOpts) (string, error) {
 	if vsb.mightFail.isSet("createCinderVolume") {
 		return "", errors.New("injected error for testing")
 	}
