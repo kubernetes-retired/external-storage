@@ -10,7 +10,7 @@ The recommended way to run nfs-provisioner, which we'll demonstrate here, is as 
 
 There are two main things one can customize here before creating the deployment: the provisioner name and the backing volume.
 
-The provisioner name must follow the naming scheme `<vendor name>/<provisioner name>`, like for example `kubernetes.io/gce-pd`. It's specified here in the `args` field. This is the `provisioner` a `StorageClass` will specify later. We'll use the name `example.com/nfs-tmp`.
+The provisioner name must follow the naming scheme `<vendor name>/<provisioner name>`, like for example `kubernetes.io/gce-pd`. It's specified here in the `args` field. This is the `provisioner` a `StorageClass` will specify later. We'll use the name `example.com/nfs`.
 
 ```yaml
 ...
