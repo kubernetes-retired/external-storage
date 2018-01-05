@@ -21,10 +21,9 @@ FROM fedora:24
 # 2. Set NFS_V4_RECOV_ROOT to /export
 # 3. Use device major/minor as fsid major/minor to work on OverlayFS
 
-COPY nfs-ganesha.patch /nfs-ganesha.patch
-
 RUN dnf install -y tar gcc cmake autoconf libtool bison flex make gcc-c++ krb5-devel dbus-devel jemalloc-devel libnfsidmap-devel patch && dnf clean all \
 	&& curl -L https://github.com/nfs-ganesha/nfs-ganesha/archive/V2.4.0.3.tar.gz | tar zx \
+	&& curl -L https://github.com/nfs-ganesha/nfs-ganesha/commit/c583534b166be198755d905c82a7687d83b458d8.patch -o /nfs-ganesha.patch \
 	&& curl -L https://github.com/nfs-ganesha/ntirpc/archive/v1.4.1.tar.gz | tar zx \
 	&& rm -r nfs-ganesha-2.4.0.3/src/libntirpc \
 	&& mv ntirpc-1.4.1 nfs-ganesha-2.4.0.3/src/libntirpc \
@@ -35,7 +34,7 @@ RUN dnf install -y tar gcc cmake autoconf libtool bison flex make gcc-c++ krb5-d
 	&& make install \
 	&& cp src/scripts/ganeshactl/org.ganesha.nfsd.conf /etc/dbus-1/system.d/ \
 	&& cd .. \
-	&& rm -rf nfs-ganesha-2.4.0.3 \
+	&& rm -rf nfs-ganesha-2.4.0.3 /nfs-ganesha.patch \
 	&& dnf remove -y tar gcc cmake autoconf libtool bison flex make gcc-c++ krb5-devel dbus-devel jemalloc-devel libnfsidmap-devel patch && dnf clean all
 
 RUN dnf install -y dbus-x11 rpcbind-0.2.3-10.rc1.fc24.x86_64 hostname nfs-utils xfsprogs jemalloc libnfsidmap && dnf clean all
