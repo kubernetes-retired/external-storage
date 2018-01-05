@@ -18,13 +18,13 @@ package provisioner
 
 import (
 	"github.com/gophercloud/gophercloud"
-	"github.com/kubernetes-incubator/external-storage/lib/controller"
+	volumes_v2 "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
 	"github.com/kubernetes-incubator/external-storage/openstack/standalone-cinder/pkg/volumeservice"
 )
 
 // volumeServiceBroker provides a mechanism for tests to override calls to cinder with mocks.
 type volumeServiceBroker interface {
-	createCinderVolume(vs *gophercloud.ServiceClient, options controller.VolumeOptions) (string, error)
+	createCinderVolume(vs *gophercloud.ServiceClient, options volumes_v2.CreateOpts) (string, error)
 	waitForAvailableCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error
 	reserveCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error
 	connectCinderVolume(vs *gophercloud.ServiceClient, volumeID string) (volumeservice.VolumeConnection, error)
@@ -37,7 +37,7 @@ type gophercloudBroker struct {
 	volumeServiceBroker
 }
 
-func (vsb *gophercloudBroker) createCinderVolume(vs *gophercloud.ServiceClient, options controller.VolumeOptions) (string, error) {
+func (vsb *gophercloudBroker) createCinderVolume(vs *gophercloud.ServiceClient, options volumes_v2.CreateOpts) (string, error) {
 	return volumeservice.CreateCinderVolume(vs, options)
 }
 
