@@ -17,7 +17,6 @@ limitations under the License.
 package provisioner
 
 import (
-	"bytes"
 	"errors"
 
 	"github.com/gophercloud/gophercloud"
@@ -144,7 +143,7 @@ var _ = Describe("Provisioner", func() {
 			It("should fail and delete the volume", func() {
 				Expect(pv).To(BeNil())
 				Expect(err).To(Not(BeNil()))
-				Expect(vsb.cleanupLog.String()).To(Equal(cleanup))
+				Expect(vsb.mightFail.operationLog.String()).To(Equal(cleanup))
 			})
 		})
 
@@ -156,7 +155,7 @@ var _ = Describe("Provisioner", func() {
 			It("should fail and delete the volume", func() {
 				Expect(pv).To(BeNil())
 				Expect(err).To(Not(BeNil()))
-				Expect(vsb.cleanupLog.String()).To(Equal(cleanup))
+				Expect(vsb.mightFail.operationLog.String()).To(Equal(cleanup))
 			})
 		})
 
@@ -168,7 +167,7 @@ var _ = Describe("Provisioner", func() {
 			It("should fail and the volume should be unreserved and deleted", func() {
 				Expect(pv).To(BeNil())
 				Expect(err).To(Not(BeNil()))
-				Expect(vsb.cleanupLog.String()).To(Equal(cleanup))
+				Expect(vsb.mightFail.operationLog.String()).To(Equal(cleanup))
 			})
 		})
 
@@ -180,7 +179,7 @@ var _ = Describe("Provisioner", func() {
 			It("should fail and the volume should be disconnected, unreserved and deleted", func() {
 				Expect(pv).To(BeNil())
 				Expect(err).To(Not(BeNil()))
-				Expect(vsb.cleanupLog.String()).To(Equal(cleanup))
+				Expect(vsb.mightFail.operationLog.String()).To(Equal(cleanup))
 			})
 		})
 
@@ -192,7 +191,7 @@ var _ = Describe("Provisioner", func() {
 			It("should fail and the volume should be disconnected, unreserved and deleted", func() {
 				Expect(pv).To(BeNil())
 				Expect(err).To(Not(BeNil()))
-				Expect(vsb.cleanupLog.String()).To(Equal(cleanup))
+				Expect(vsb.mightFail.operationLog.String()).To(Equal(cleanup))
 			})
 		})
 
@@ -204,7 +203,7 @@ var _ = Describe("Provisioner", func() {
 			It("should fail and the volume should be disconnected, unreserved and deleted", func() {
 				Expect(pv).To(BeNil())
 				Expect(err).To(Not(BeNil()))
-				Expect(vsb.cleanupLog.String()).To(Equal(cleanup))
+				Expect(vsb.mightFail.operationLog.String()).To(Equal(cleanup))
 			})
 		})
 	})
@@ -314,8 +313,7 @@ var _ = Describe("Provisioner", func() {
 })
 
 type fakeVolumeServiceBroker struct {
-	cleanupLog bytes.Buffer
-	mightFail  failureInjector
+	mightFail failureInjector
 	volumeServiceBroker
 }
 
@@ -341,25 +339,16 @@ func (vsb *fakeVolumeServiceBroker) connectCinderVolume(vs *gophercloud.ServiceC
 	return volumeservice.VolumeConnection{}, nil
 }
 
-func (vsb *fakeVolumeServiceBroker) _cleanupRet(fn string) error {
-	if vsb.mightFail.isSet(fn) {
-		return errors.New("injected error for testing")
-	}
-	vsb.cleanupLog.WriteString(fn)
-	vsb.cleanupLog.WriteString(".")
-	return nil
-}
-
 func (vsb *fakeVolumeServiceBroker) disconnectCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
-	return vsb._cleanupRet("disconnectCinderVolume")
+	return vsb.mightFail.logRet("disconnectCinderVolume")
 }
 
 func (vsb *fakeVolumeServiceBroker) unreserveCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
-	return vsb._cleanupRet("unreserveCinderVolume")
+	return vsb.mightFail.logRet("unreserveCinderVolume")
 }
 
 func (vsb *fakeVolumeServiceBroker) deleteCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
-	return vsb._cleanupRet("deleteCinderVolume")
+	return vsb.mightFail.logRet("deleteCinderVolume")
 }
 
 type fakeMapperBroker struct {
