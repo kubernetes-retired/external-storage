@@ -317,7 +317,7 @@ func (p *glusterBlockProvisioner) createSecretRef(nameSpace string, secretName s
 
 	secretRef := &v1.LocalObjectReference{}
 	if secret != nil {
-		_, err = p.client.Core().Secrets(nameSpace).Create(secret)
+		_, err = p.client.CoreV1().Secrets(nameSpace).Create(secret)
 		if err != nil && errors.IsAlreadyExists(err) {
 
 			glog.V(1).Infof(" secret: %s already exist in namespace: %s", secret, nameSpace)
@@ -550,7 +550,7 @@ func (p *glusterBlockProvisioner) Delete(volume *v1.PersistentVolume) error {
 	}
 
 	if volume.Annotations["AccessKey"] != "" && volume.Annotations["AccessKeyNs"] != "" {
-		deleteSecErr := p.client.Core().Secrets(volume.Annotations["AccessKeyNs"]).Delete(volume.Annotations["AccessKey"], nil)
+		deleteSecErr := p.client.CoreV1().Secrets(volume.Annotations["AccessKeyNs"]).Delete(volume.Annotations["AccessKey"], nil)
 
 		if deleteSecErr != nil && errors.IsNotFound(deleteSecErr) {
 			glog.V(1).Infof(" secret [%s] does not exist in namespace [%s]", volume.Annotations["AccessKey"], volume.Annotations["AccessKeyNs"])

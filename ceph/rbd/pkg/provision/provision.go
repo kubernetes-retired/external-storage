@@ -255,7 +255,7 @@ func (p *rbdProvisioner) parsePVSecret(namespace, secretName string) (string, er
 	if p.client == nil {
 		return "", fmt.Errorf("Cannot get kube client")
 	}
-	secrets, err := p.client.Core().Secrets(namespace).Get(secretName, metav1.GetOptions{})
+	secrets, err := p.client.CoreV1().Secrets(namespace).Get(secretName, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}

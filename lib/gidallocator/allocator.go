@@ -175,7 +175,7 @@ func (a *Allocator) getGidTable(className string, min int, max int) (*allocator.
 // in a given storage class, and mark them in the table.
 //
 func (a *Allocator) collectGids(className string, gidTable *allocator.MinMaxAllocator) error {
-	pvList, err := a.client.Core().PersistentVolumes().List(metav1.ListOptions{})
+	pvList, err := a.client.CoreV1().PersistentVolumes().List(metav1.ListOptions{})
 	if err != nil {
 		glog.Errorf("failed to get existing persistent volumes")
 		return err

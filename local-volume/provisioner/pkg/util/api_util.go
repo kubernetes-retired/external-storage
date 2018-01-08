@@ -49,12 +49,12 @@ func NewAPIUtil(client *kubernetes.Clientset) APIUtil {
 
 // CreatePV will create a PersistentVolume
 func (u *apiUtil) CreatePV(pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
-	return u.client.Core().PersistentVolumes().Create(pv)
+	return u.client.CoreV1().PersistentVolumes().Create(pv)
 }
 
 // DeletePV will delete a PersistentVolume
 func (u *apiUtil) DeletePV(pvName string) error {
-	return u.client.Core().PersistentVolumes().Delete(pvName, &metav1.DeleteOptions{})
+	return u.client.CoreV1().PersistentVolumes().Delete(pvName, &metav1.DeleteOptions{})
 }
 
 var _ APIUtil = &FakeAPIUtil{}
