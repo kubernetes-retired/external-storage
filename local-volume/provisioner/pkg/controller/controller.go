@@ -44,7 +44,7 @@ func StartLocalController(client *kubernetes.Clientset, config *common.UserConfi
 	provisionerName := fmt.Sprintf("local-volume-provisioner-%v-%v", config.Node.Name, config.Node.UID)
 
 	broadcaster := record.NewBroadcaster()
-	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(client.Core().RESTClient()).Events("")})
+	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(client.CoreV1().RESTClient()).Events("")})
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: provisionerName})
 
 	runtimeConfig := &common.RuntimeConfig{

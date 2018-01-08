@@ -75,11 +75,11 @@ func testCreate(client clientset.Interface, claim *v1.PersistentVolumeClaim) *v1
 
 	By("checking the claim")
 	// Get new copy of the claim
-	claim, err = client.Core().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
+	claim, err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 
 	// Get the bound PV
-	pv, err := client.Core().PersistentVolumes().Get(claim.Spec.VolumeName, metav1.GetOptions{})
+	pv, err := client.CoreV1().PersistentVolumes().Get(claim.Spec.VolumeName, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 
 	// Check sizes
@@ -126,7 +126,7 @@ func testRead(client clientset.Interface, claim *v1.PersistentVolumeClaim) {
 
 func testDelete(client clientset.Interface, claim *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) {
 	By("deleting the claim")
-	framework.ExpectNoError(client.Core().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, nil))
+	framework.ExpectNoError(client.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, nil))
 
 	// Wait for the PV to get deleted too.
 	framework.ExpectNoError(framework.WaitForPersistentVolumeDeleted(client, pv.Name, 5*time.Second, 1*time.Minute))

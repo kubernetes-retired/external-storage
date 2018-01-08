@@ -49,7 +49,7 @@ func NewGlusterfsProvisioner(config *rest.Config, client kubernetes.Interface) c
 func newGlusterfsProvisionerInternal(config *rest.Config, client kubernetes.Interface) *glusterfsProvisioner {
 	var identity types.UID
 
-	restClient := client.Core().RESTClient()
+	restClient := client.CoreV1().RESTClient()
 	provisioner := &glusterfsProvisioner{
 		config:     config,
 		client:     client,
