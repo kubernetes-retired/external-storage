@@ -153,6 +153,8 @@ const (
 	DefaultRetryPeriod = 2 * time.Second
 	// DefaultTermLimit is used when option function TermLimit is omitted
 	DefaultTermLimit = 30 * time.Second
+	// DefaultMaxProvisionOperationCount is used to set the max number of provision running provision Operations at the same time
+	DefaultMaxProvisionOperationCount = 20
 )
 
 var errRuntime = fmt.Errorf("cannot call option functions after controller has Run")
@@ -445,6 +447,10 @@ func (ctrl *ProvisionController) addClaim(obj interface{}) {
 	}
 
 	if ctrl.shouldProvision(claim) {
+		if len(ctrl.leaderElectors) >= DefaultMaxProvisionOperationCount {
+			glog.V(4).Infof("Provisioning opearations reach max %v, waiting until complete...", DefaultMaxProvisionOperationCount)
+			return
+		}
 		ctrl.leaderElectorsMutex.Lock()
 		le, ok := ctrl.leaderElectors[claim.UID]
 		ctrl.leaderElectorsMutex.Unlock()
