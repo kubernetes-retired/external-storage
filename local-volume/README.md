@@ -7,9 +7,9 @@ standard PVC interface in a simple and portable way.  The PV contains node
 affinity information that the system uses to schedule pods to the correct
 nodes.
 
-An external static provisioner and a related bootstrapper are available to help
-simplify local storage management once the local volumes are configured.  Note
-that the local storage provisioner is different from most provisioners and does
+An external static provisioner is available to help simplify local storage
+management once the local volumes are configured.  Note that the local
+storage provisioner is different from most provisioners and does
 not support dynamic provisioning.  Instead, it requires that administrators
 preconfigure the local volumes on each node and mount them under discovery
 directories.  The provisioner will manage the volumes under the discovery
@@ -103,17 +103,14 @@ $ export KUBE_FEATURE_GATES="PersistentLocalVolumes=true,VolumeScheduling=true,M
 
 ``` console
 $ NODE_LOCAL_SSDS=<n> cluster/kube-up.sh
-# This handles creating the ConfigMap as described below
-$ kubectl create -f bootstrapper/deployment/kubernetes/latest/gce/config-local-ssd.yaml
 ```
 
 ##### 1.9+
 
 ``` console
 $ NODE_LOCAL_SSDS_EXT=<n>,<scsi|nvme>,fs cluster/kube-up.sh
-# This handles creating the StorageClasses and ConfigMap as described below
-$ kubectl create -f bootstrapper/deployment/kubernetes/latest/gce/config-local-ssd-ext.yaml
-$ kubectl create -f bootstrapper/deployment/kubernetes/latest/gce/class-local-ssds.yaml
+# This handles creating the StorageClasses
+$ kubectl create -f examples/deployment/kubernetes/gce/class-local-ssds.yaml
 ```
 
 #### Option 2: GKE
@@ -121,10 +118,8 @@ $ kubectl create -f bootstrapper/deployment/kubernetes/latest/gce/class-local-ss
 ``` console
 $ gcloud container cluster create ... --local-ssd-count=<n> --enable-kubernetes-alpha
 $ gcloud container node-pools create ... --local-ssd-count=<n>
-# This handles creating ConfigMap as described below
-$ kubectl create -f bootstrapper/deployment/kubernetes/latest/gce/config-local-ssd.yaml
 # If running K8s 1.9+, also create the StorageClasses
-$ kubectl create -f bootstrapper/deployment/kubernetes/latest/gce/class-local-ssds.yaml
+$ kubectl create -f examples/deployment/kubernetes/gce/class-local-ssds.yaml
 ```
 
 #### Option 3: Baremetal environments
@@ -165,7 +160,7 @@ a single pod, a StorageClass must to be created with `volumeBindingMode` set to
 `WaitForFirstConsumer`.
 
 ```console
-$ kubectl create -f bootstrapper/deployment/kubernetes/example-storageclass.yaml
+$ kubectl create -f examples/deployment/kubernetes/example-storageclass.yaml
 ```
 
 ### Step 3: Creating local persistent volumes
@@ -189,6 +184,15 @@ You can also provide a custom values file instead:
 ``` console
 helm template ./helm/provisioner --values custom-values.yaml > ./provisioner/deployment/kubernetes/provisioner_generated.yaml
 ```
+
+In order to generate the environment specific provisioner's spec, **--set engine={gcepre19,gcepost19,gke,baremetal}** parameter
+can be used in helm template command. Example for GKE environment, the command line will look like:
+
+``` console
+helm template ./helm/provisioner --set engine=gke > ./provisioner/deployment/kubernetes/provisioner_generated.yaml
+```
+Parameter **--set engine=** canbe used in conjunction with custom vlues.yaml file in the same command line.
+
 	3. Deploy Provisioner 
 Once a user is satisfied with the content of Provisioner's yaml file, **kubectl** can be used
 to create Provisioner's DaemonSet and ConfigMap.
