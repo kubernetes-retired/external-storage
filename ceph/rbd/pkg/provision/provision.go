@@ -27,7 +27,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/api/v1/helper"
@@ -46,10 +45,6 @@ const (
 	rbdImageFormat2 = "2"
 )
 
-var (
-	supportedFeatures = sets.NewString("layering")
-)
-
 type rbdProvisionOptions struct {
 	monitors       []string
 	pool           string
@@ -66,16 +61,18 @@ type rbdProvisioner struct {
 	client kubernetes.Interface
 	// Identity of this rbdProvisioner, generated. Used to identify "this"
 	// provisioner's PVs.
-	identity string
-	rbdUtil  *RBDUtil
+	identity          string
+	supportedFeatures SupportedImageFeatures
+	rbdUtil           *RBDUtil
 }
 
 // NewRBDProvisioner creates a Provisioner that provisions Ceph RBD PVs backed by Ceph RBD images.
-func NewRBDProvisioner(client kubernetes.Interface, id string) controller.Provisioner {
+func NewRBDProvisioner(client kubernetes.Interface, id string, supportedFeatures SupportedImageFeatures) controller.Provisioner {
 	return &rbdProvisioner{
-		client:   client,
-		identity: id,
-		rbdUtil:  &RBDUtil{},
+		client:            client,
+		identity:          id,
+		supportedFeatures: supportedFeatures,
+		rbdUtil:           &RBDUtil{},
 	}
 }
 
@@ -222,8 +219,8 @@ func (p *rbdProvisioner) parseParameters(parameters map[string]string) (*rbdProv
 		case "imagefeatures":
 			arr := strings.Split(v, ",")
 			for _, f := range arr {
-				if !supportedFeatures.Has(f) {
-					return nil, fmt.Errorf("invalid feature %q for %s provisioner, supported features are: %v", f, ProvisionerName, supportedFeatures)
+				if !p.supportedFeatures.IsSupported(f) {
+					return nil, fmt.Errorf("invalid feature %q for %s provisioner, supported features are: %s", f, ProvisionerName, p.supportedFeatures.String())
 				}
 				opts.imageFeatures = append(opts.imageFeatures, f)
 			}
