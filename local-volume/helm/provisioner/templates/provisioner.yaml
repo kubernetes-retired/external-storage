@@ -2,9 +2,28 @@
 {{- $classPath := . }}
 {{- range $tmp, $val := $classPath }}
    {{- range $storageClass, $classConfig := $val }}
-      {{ $storageClass }}:
-          hostDir: {{ $classConfig.hostDir }}
-          mountDir: {{ if $classConfig.mountDir }} {{$classConfig.mountDir }} {{ else }} {{ $classConfig.hostDir }} {{ end }}
+{{ $storageClass }}:
+   hostDir: {{ $classConfig.hostDir }}
+   mountDir: {{ if $classConfig.mountDir }} {{$classConfig.mountDir }} {{ else }} {{ $classConfig.hostDir }} {{ end }}
+   {{- end}}
+{{- end}}
+{{- end }}
+{{- define "configVolumes" }}
+{{- $classPath := . }}
+{{- range $tmp, $val := $classPath }}
+   {{- range $storageClass, $classConfig := $val }}
+- name: {{ $storageClass }}
+  hostPath:
+    path: {{ $classConfig.hostDir }}
+   {{- end}}
+{{- end}}
+{{- end }}
+{{- define "configVolumeMounts" }}
+{{- $classPath := . }}
+{{- range $tmp, $val := $classPath }}
+   {{- range $storageClass, $classConfig := $val }}
+- mountPath: {{ if $classConfig.mountDir }} {{$classConfig.mountDir }} {{ else }} {{ $classConfig.hostDir }} {{ end }}
+  name: {{ $storageClass }}
    {{- end}}
 {{- end}}
 {{- end }}
@@ -30,14 +49,10 @@ data:
    {{- end }}
 {{- end }}
   storageClassMap: |
-#
-# Populating entries with user provided disk discovery directories 
-# and mount directories per storage class.
-#
-{{- if eq ( $engine | lower ) "gcepre19" }} {{ include "configStorageClass" (.Values.configmap.gcePre19.storageClass) }} {{ end }}
-{{- if eq ( $engine | lower ) "gcepost19" }} {{ include "configStorageClass" (.Values.configmap.gcePost19.storageClass) }} {{ end }}
-{{- if eq ( $engine | lower ) "gke" }} {{ include "configStorageClass" (.Values.configmap.gke.storageClass) }} {{ end }}
-{{- if eq ( $engine | lower ) "baremetal" }} {{ include "configStorageClass" (.Values.configmap.baremetal.storageClass) }} {{ end }}
+{{- if eq ( $engine | lower ) "gcepre19" }} {{ include "configStorageClass" (.Values.configmap.gcePre19.storageClass) | indent 4 }} {{ end }}
+{{- if eq ( $engine | lower ) "gcepost19" }} {{ include "configStorageClass" (.Values.configmap.gcePost19.storageClass) | indent 4 }} {{ end }}
+{{- if eq ( $engine | lower ) "gke" }} {{ include "configStorageClass" (.Values.configmap.gke.storageClass) | indent 4 }} {{ end }}
+{{- if eq ( $engine | lower ) "baremetal" }} {{ include "configStorageClass" (.Values.configmap.baremetal.storageClass) | indent 4 }} {{ end }}
 ---
 apiVersion: extensions/v1beta1
 kind: DaemonSet
@@ -63,6 +78,10 @@ spec:
           securityContext:
             privileged: true
           env:
+          - name: MY_NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
 {{- if $kubeConfigEnv }}
             - name: KUBECONFIG
               value: {{$kubeConfigEnv}}
@@ -71,23 +90,15 @@ spec:
             - mountPath: /etc/provisioner/config 
               name: provisioner-config
               readOnly: true
-#
-# Populating entries with user provided disk discovery directories 
-#
-{{- range $tmp, $val := .Values.configmap.storageClass }}
-   {{- range $storageClass, $classConfig := $val }}
-            - mountPath: {{ if $classConfig.mountDir }} {{ $classConfig.mountDir }} {{ else }} {{ $classConfig.hostDir }} {{ end }}
-              name: {{ $storageClass }}
-   {{- end}}
-{{- end}}
+{{- if eq ( $engine | lower ) "gcepre19" }} {{ include "configVolumeMounts" (.Values.configmap.gcePre19.storageClass) | indent 12 }} {{ end }}
+{{- if eq ( $engine | lower ) "gcepost19" }} {{ include "configVolumeMounts" (.Values.configmap.gcePost19.storageClass) | indent 12 }} {{ end }}
+{{- if eq ( $engine | lower ) "gke" }} {{ include "configVolumeMounts" (.Values.configmap.gke.storageClass) | indent 12 }} {{ end }}
+{{- if eq ( $engine | lower ) "baremetal" }} {{ include "configVolumeMounts" (.Values.configmap.baremetal.storageClass) | indent 12 }} {{ end }}
       volumes:
         - name: provisioner-config
           configMap:
             name: {{ $configMapName }}
-{{- range $tmp, $val := .Values.configmap.storageClass }}
-   {{- range $storageClass, $classConfig := $val }}
-        - name: {{ $storageClass }}
-          hostPath:
-            path: {{ $classConfig.hostDir }}
-   {{- end}}
-{{- end}}
+{{- if eq ( $engine | lower ) "gcepre19" }} {{ include "configVolumes" (.Values.configmap.gcePre19.storageClass) | indent 8 }} {{ end }}
+{{- if eq ( $engine | lower ) "gcepost19" }} {{ include "configVolumes" (.Values.configmap.gcePost19.storageClass) | indent 8 }} {{ end }}
+{{- if eq ( $engine | lower ) "gke" }} {{ include "configVolumes" (.Values.configmap.gke.storageClass) | indent 8 }} {{ end }}
+{{- if eq ( $engine | lower ) "baremetal" }} {{ include "configVolumes" (.Values.configmap.baremetal.storageClass) | indent 8 }} {{ end }}
