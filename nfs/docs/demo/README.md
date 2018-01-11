@@ -1,4 +1,4 @@
-#Demo
+# Demo
 
 The [beta dynamic provisioning feature](http://blog.kubernetes.io/2016/10/dynamic-provisioning-and-storage-in-kubernetes.html) allows administrators to define `StorageClasses` to enable Kubernetes to create `PersistentVolumes` on-demand. Kubernetes includes many [provisioners](http://kubernetes.io/docs/user-guide/persistent-volumes/#provisioner) to specify in `StorageClasses` definitions and now, with Kubernetes 1.5, also includes support for [external or out-of-tree provisioners](https://github.com/kubernetes/kubernetes/pull/30285) like [nfs-provisioner](https://github.com/kubernetes-incubator/external-storage/nfs).
 
@@ -10,7 +10,7 @@ The recommended way to run nfs-provisioner, which we'll demonstrate here, is as 
 
 There are two main things one can customize here before creating the deployment: the provisioner name and the backing volume.
 
-The provisioner name must follow the naming scheme `<vendor name>/<provisioner name>`, like for example `kubernetes.io/gce-pd`. It's specified here in the `args` field. This is the `provisioner` a `StorageClass` will specify later. We'll use the name `example.com/nfs-tmp`.
+The provisioner name must follow the naming scheme `<vendor name>/<provisioner name>`, like for example `kubernetes.io/gce-pd`. It's specified here in the `args` field. This is the `provisioner` a `StorageClass` will specify later. We'll use the name `example.com/nfs`.
 
 ```yaml
 ...
