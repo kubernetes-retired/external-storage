@@ -16,10 +16,32 @@ configmap:
   #        hostDir: "{path on the host where local volume of this storage class are mounted}"
   #        mountDir: "{Optional path where a local volume will be mounted inside of a container}"
   #
-  # Note: At least one storage class must be configured
-  storageClass:
+  # Note: At least one storage class must be configuredi, baremetal is used as default if no
+  # explicit environment is specified in helm template command line.
+  baremetal:
+    storageClass:
     - fast-disks:
         hostDir: /mnt/fast-disks
+  #
+  # Storage classes for GCE Pre-1.9
+  gcePre19:
+    storageClass:
+      - local-scsi:
+          hostDir: "/mnt/disks"
+  #
+  # Storage classes for GCE 1.9+
+  gcePost19:
+    storageClass:
+      - local-scsi:
+          hostDir: "/mnt/disks/by-uuid/google-local-ssds-scsi-fs"
+      - local-nvme:
+          hostDir: "/mnt/disks/by-uuid/google-local-ssds-nvme-fs" 
+  #
+  # Storage classes for GKE
+  gke:
+    storageClass:
+      - local-scsi:
+          hostDir: "/mnt/disks"
   #
 daemonset:
   #
