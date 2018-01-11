@@ -232,6 +232,9 @@ func ConfigMapDataToVolumeConfig(data map[string]string, provisionerConfig *Prov
 				return fmt.Errorf("Invalid empty block cleaner command for class %v", class)
 			}
 		}
+		if config.MountDir == "" || config.HostDir == "" {
+			return fmt.Errorf("Storage Class %v is misconfigured, missing HostDir or MountDir parameter", class)
+		}
 		provisionerConfig.StorageClassConfig[class] = config
 	}
 	return nil
@@ -257,16 +260,14 @@ func LoadProvisionerConfigs(provisionerConfig *ProvisionerConfiguration) error {
 	data := make(map[string]string)
 	for _, file := range files {
 		if !file.IsDir() {
-			fileContents, err := ioutil.ReadFile(path.Join(ProvisionerConfigPath, file.Name()))
-			if err != nil {
-				// TODO Currently errors in reading configuration keys/files are ignored. This is due to
-				// the precense of "..data" file, it is a symbolic link which gets created when kubelet mounts a
-				// configmap inside of a container. It needs to be revisited later for a safer solution, if ignoring read errors
-				// will prove to be causing issues.
-				glog.Infof("Could not read file: %s due to: %v", path.Join(ProvisionerConfigPath, file.Name()), err)
-				continue
+			if strings.Compare(file.Name(), "..data") != 0 {
+				fileContents, err := ioutil.ReadFile(path.Join(ProvisionerConfigPath, file.Name()))
+				if err != nil {
+					glog.Infof("Could not read file: %s due to: %v", path.Join(ProvisionerConfigPath, file.Name()), err)
+					return err
+				}
+				data[file.Name()] = string(fileContents)
 			}
-			data[file.Name()] = string(fileContents)
 		}
 	}
 	return ConfigMapDataToVolumeConfig(data, provisionerConfig)
