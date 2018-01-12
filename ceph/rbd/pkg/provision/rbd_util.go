@@ -18,7 +18,6 @@ package provision
 
 import (
 	"fmt"
-	"math/rand"
 	"os/exec"
 	"strings"
 
@@ -35,6 +34,11 @@ const (
 // RBDUtil is the utility structure to interact with the RBD.
 type RBDUtil struct{}
 
+// See https://github.com/kubernetes/kubernetes/pull/57512.
+func (u *RBDUtil) kernelRBDMonitorsOpt(mons []string) string {
+	return strings.Join(mons, ",")
+}
+
 // CreateImage creates a new ceph image with provision and volume options.
 func (u *RBDUtil) CreateImage(image string, pOpts *rbdProvisionOptions, options controller.VolumeOptions) (*v1.RBDVolumeSource, int, error) {
 	var output []byte
@@ -49,33 +53,22 @@ func (u *RBDUtil) CreateImage(image string, pOpts *rbdProvisionOptions, options 
 	}
 	volSz := fmt.Sprintf("%d", sz)
 	// rbd create
-	l := len(pOpts.monitors)
-	// pick a mon randomly
-	start := rand.Int() % l
-	// iterate all monitors until create succeeds.
-	for i := start; i < start+l; i++ {
-		mon := pOpts.monitors[i%l]
-		if pOpts.imageFormat == rbdImageFormat2 {
-			glog.V(4).Infof("rbd: create %s size %s format %s (features: %s) using mon %s, pool %s id %s key %s", image, volSz, pOpts.imageFormat, pOpts.imageFeatures, mon, pOpts.pool, pOpts.adminID, pOpts.adminSecret)
-		} else {
-			glog.V(4).Infof("rbd: create %s size %s format %s using mon %s, pool %s id %s key %s", image, volSz, pOpts.imageFormat, mon, pOpts.pool, pOpts.adminID, pOpts.adminSecret)
-		}
-		args := []string{"create", image, "--size", volSz, "--pool", pOpts.pool, "--id", pOpts.adminID, "-m", mon, "--key=" + pOpts.adminSecret, "--image-format", pOpts.imageFormat}
-		if pOpts.imageFormat == rbdImageFormat2 {
-			// if no image features is provided, it results in empty string
-			// which disable all RBD image format 2 features as we expected
-			features := strings.Join(pOpts.imageFeatures, ",")
-			args = append(args, "--image-feature", features)
-		}
-		output, err = u.execCommand("rbd", args)
-		if err == nil {
-			break
-		} else {
-			glog.Warningf("failed to create rbd image, output %v", string(output))
-		}
+	mon := u.kernelRBDMonitorsOpt(pOpts.monitors)
+	if pOpts.imageFormat == rbdImageFormat2 {
+		glog.V(4).Infof("rbd: create %s size %s format %s (features: %s) using mon %s, pool %s id %s key %s", image, volSz, pOpts.imageFormat, pOpts.imageFeatures, mon, pOpts.pool, pOpts.adminID, pOpts.adminSecret)
+	} else {
+		glog.V(4).Infof("rbd: create %s size %s format %s using mon %s, pool %s id %s key %s", image, volSz, pOpts.imageFormat, mon, pOpts.pool, pOpts.adminID, pOpts.adminSecret)
 	}
-
+	args := []string{"create", image, "--size", volSz, "--pool", pOpts.pool, "--id", pOpts.adminID, "-m", mon, "--key=" + pOpts.adminSecret, "--image-format", pOpts.imageFormat}
+	if pOpts.imageFormat == rbdImageFormat2 {
+		// if no image features is provided, it results in empty string
+		// which disable all RBD image format 2 features as we expected
+		features := strings.Join(pOpts.imageFeatures, ",")
+		args = append(args, "--image-feature", features)
+	}
+	output, err = u.execCommand("rbd", args)
 	if err != nil {
+		glog.Warningf("failed to create rbd image, output %v", string(output))
 		return nil, 0, fmt.Errorf("failed to create rbd image: %v, command output: %s", err, string(output))
 	}
 
@@ -93,35 +86,25 @@ func (u *RBDUtil) rbdStatus(image string, pOpts *rbdProvisionOptions) (bool, err
 	var output string
 	var cmd []byte
 
-	l := len(pOpts.monitors)
-	start := rand.Int() % l
-	// iterate all hosts until mount succeeds.
-	for i := start; i < start+l; i++ {
-		mon := pOpts.monitors[i%l]
-		// cmd "rbd status" list the rbd client watch with the following output:
-		//
-		// # there is a watcher (exit=0)
-		// Watchers:
-		//   watcher=10.16.153.105:0/710245699 client.14163 cookie=1
-		//
-		// # there is no watcher (exit=0)
-		// Watchers: none
-		//
-		// Otherwise, exit is non-zero, for example:
-		//
-		// # image does not exist (exit=2)
-		// rbd: error opening image kubernetes-dynamic-pvc-<UUID>: (2) No such file or directory
-		//
-		glog.V(4).Infof("rbd: status %s using mon %s, pool %s id %s key %s", image, mon, pOpts.pool, pOpts.adminID, pOpts.adminSecret)
-		args := []string{"status", image, "--pool", pOpts.pool, "-m", mon, "--id", pOpts.adminID, "--key=" + pOpts.adminSecret}
-		cmd, err = u.execCommand("rbd", args)
-		output = string(cmd)
-
-		// break if command succeeds
-		if err == nil {
-			break
-		}
-	}
+	mon := u.kernelRBDMonitorsOpt(pOpts.monitors)
+	// cmd "rbd status" list the rbd client watch with the following output:
+	//
+	// # there is a watcher (exit=0)
+	// Watchers:
+	//   watcher=10.16.153.105:0/710245699 client.14163 cookie=1
+	//
+	// # there is no watcher (exit=0)
+	// Watchers: none
+	//
+	// Otherwise, exit is non-zero, for example:
+	//
+	// # image does not exist (exit=2)
+	// rbd: error opening image kubernetes-dynamic-pvc-<UUID>: (2) No such file or directory
+	//
+	glog.V(4).Infof("rbd: status %s using mon %s, pool %s id %s key %s", image, mon, pOpts.pool, pOpts.adminID, pOpts.adminSecret)
+	args := []string{"status", image, "--pool", pOpts.pool, "-m", mon, "--id", pOpts.adminID, "--key=" + pOpts.adminSecret}
+	cmd, err = u.execCommand("rbd", args)
+	output = string(cmd)
 
 	// If command never succeed, returns its last error.
 	if err != nil {
@@ -148,20 +131,14 @@ func (u *RBDUtil) DeleteImage(image string, pOpts *rbdProvisionOptions) error {
 		return fmt.Errorf("rbd %s is still being used", image)
 	}
 	// rbd rm
-	l := len(pOpts.monitors)
-	// pick a mon randomly
-	start := rand.Int() % l
-	// iterate all monitors until rm succeeds.
-	for i := start; i < start+l; i++ {
-		mon := pOpts.monitors[i%l]
-		glog.V(4).Infof("rbd: rm %s using mon %s, pool %s id %s key %s", image, mon, pOpts.pool, pOpts.adminID, pOpts.adminSecret)
-		args := []string{"rm", image, "--pool", pOpts.pool, "--id", pOpts.adminID, "-m", mon, "--key=" + pOpts.adminSecret}
-		output, err = u.execCommand("rbd", args)
-		if err == nil {
-			return nil
-		}
-		glog.Errorf("failed to delete rbd image: %v, command output: %s", err, string(output))
+	mon := u.kernelRBDMonitorsOpt(pOpts.monitors)
+	glog.V(4).Infof("rbd: rm %s using mon %s, pool %s id %s key %s", image, mon, pOpts.pool, pOpts.adminID, pOpts.adminSecret)
+	args := []string{"rm", image, "--pool", pOpts.pool, "--id", pOpts.adminID, "-m", mon, "--key=" + pOpts.adminSecret}
+	output, err = u.execCommand("rbd", args)
+	if err == nil {
+		return nil
 	}
+	glog.Errorf("failed to delete rbd image: %v, command output: %s", err, string(output))
 	return err
 }
 
