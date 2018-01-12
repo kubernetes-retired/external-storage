@@ -16,7 +16,7 @@ kubectl apply -f ./non-rbac
 
 ```
 cd $GOPATH/src/github.com/kubernetes-incubator/external-storage/ceph/cephfs/deploy
-NAMESPACE=default # change this if you want to deploy it in another namespace
-sed -r -i "s/namespace: [^ ]+/namespace: $NAMESPACE/g" ./rbac/clusterrolebinding.yaml
+NAMESPACE=cephfs # change this if you want to deploy it in another namespace
+sed -r -i "s/namespace: [^ ]+/namespace: $NAMESPACE/g" ./rbac/*.yaml
 kubectl -n $NAMESPACE apply -f ./rbac
 ```

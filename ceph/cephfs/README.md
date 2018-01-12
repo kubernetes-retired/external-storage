@@ -26,7 +26,8 @@ See https://kubernetes.io/.
 
 ```bash
 ceph auth get client.admin 2>&1 |grep "key = " |awk '{print  $3'} |xargs echo -n > /tmp/secret
-kubectl create secret generic ceph-secret-admin --from-file=/tmp/secret --namespace=kube-system
+kubectl create ns cephfs
+kubectl create secret generic ceph-secret-admin --from-file=/tmp/secret --namespace=cephfs
 ```
 
 * Start CephFS provisioner
