@@ -27,6 +27,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
+const attachMountPoint = "/k8s.io/standalone-cinder"
+const attachHostName = "standalone-cinder.k8s.io"
+
 const initiatorName = "iqn.1994-05.com.redhat:a13fc3d1cc22"
 const interval = 3 * time.Second
 const timeout = 60 * time.Second
@@ -109,6 +112,22 @@ func ConnectCinderVolume(vs *gophercloud.ServiceClient, volumeID string) (Volume
 	}
 	glog.V(3).Infof("Received connection info: %v", rcv)
 	return rcv.ConnectionInfo, nil
+}
+
+// AttachCinderVolume marks the volume as attached in the cinder database.
+func AttachCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
+	opts := volumeactions.AttachOpts{
+		MountPoint: attachMountPoint,
+		HostName:   attachHostName,
+		Mode:       volumeactions.ReadWrite,
+	}
+	return volumeactions.Attach(vs, volumeID, opts).ExtractErr()
+}
+
+// DetachCinderVolume marks the volume as detaching in the cinder database and removes
+// attachment information that was added by a previous AttachCinderVolume call.
+func DetachCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
+	return volumeactions.Detach(vs, volumeID, volumeactions.DetachOpts{}).ExtractErr()
 }
 
 // DisconnectCinderVolume removes a connection to a cinder volume.  Depending on
