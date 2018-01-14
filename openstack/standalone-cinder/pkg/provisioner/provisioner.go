@@ -148,25 +148,36 @@ func (p *cinderProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 		goto ERROR_UNRESERVE
 	}
 
+	err = p.vsb.attachCinderVolume(p.VolumeService, volumeID)
+	if err != nil {
+		glog.Errorf("Failed to attach volume %s: %v", volumeID, err)
+		goto ERROR_DISCONNECT
+	}
+
 	mapper, err = p.mb.newVolumeMapperFromConnection(connection)
 	if err != nil {
 		glog.Errorf("Unable to create volume mapper: %v", err)
-		goto ERROR_DISCONNECT
+		goto ERROR_DETACH
 	}
 
 	err = mapper.AuthSetup(p, options, connection)
 	if err != nil {
 		glog.Errorf("Failed to prepare volume auth: %v", err)
-		goto ERROR_DISCONNECT
+		goto ERROR_DETACH
 	}
 
 	pv, err = p.mb.buildPV(mapper, p, options, connection, volumeID)
 	if err != nil {
 		glog.Errorf("Failed to build PV: %v", err)
-		goto ERROR_DISCONNECT
+		goto ERROR_DETACH
 	}
 	return pv, nil
 
+ERROR_DETACH:
+	cleanupErr = p.vsb.detachCinderVolume(p.VolumeService, volumeID)
+	if cleanupErr != nil {
+		glog.Errorf("Failed to detach volume %s: %v", volumeID, cleanupErr)
+	}
 ERROR_DISCONNECT:
 	cleanupErr = p.vsb.disconnectCinderVolume(p.VolumeService, volumeID)
 	if cleanupErr != nil {
@@ -216,6 +227,12 @@ func (p *cinderProvisioner) Delete(pv *v1.PersistentVolume) error {
 	}
 
 	mapper.AuthTeardown(p, pv)
+
+	err = p.vsb.detachCinderVolume(p.VolumeService, volumeID)
+	if err != nil {
+		glog.Errorf("Failed to detach volume %s: %v", volumeID, err)
+		return err
+	}
 
 	err = p.vsb.disconnectCinderVolume(p.VolumeService, volumeID)
 	if err != nil {

@@ -28,6 +28,8 @@ type volumeServiceBroker interface {
 	waitForAvailableCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error
 	reserveCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error
 	connectCinderVolume(vs *gophercloud.ServiceClient, volumeID string) (volumeservice.VolumeConnection, error)
+	attachCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error
+	detachCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error
 	disconnectCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error
 	unreserveCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error
 	deleteCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error
@@ -51,6 +53,14 @@ func (vsb *gophercloudBroker) reserveCinderVolume(vs *gophercloud.ServiceClient,
 
 func (vsb *gophercloudBroker) connectCinderVolume(vs *gophercloud.ServiceClient, volumeID string) (volumeservice.VolumeConnection, error) {
 	return volumeservice.ConnectCinderVolume(vs, volumeID)
+}
+
+func (vsb *gophercloudBroker) attachCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
+	return volumeservice.AttachCinderVolume(vs, volumeID)
+}
+
+func (vsb *gophercloudBroker) detachCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
+	return volumeservice.DetachCinderVolume(vs, volumeID)
 }
 
 func (vsb *gophercloudBroker) disconnectCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
