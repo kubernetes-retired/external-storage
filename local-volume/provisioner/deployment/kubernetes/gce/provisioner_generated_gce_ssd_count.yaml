@@ -1,0 +1,56 @@
+---
+# Source: provisioner/templates/provisioner.yaml
+ 
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: local-provisioner-config 
+  namespace: default 
+data:
+  storageClassMap: |     
+    local-scsi:
+       hostDir: /mnt/disks
+       mountDir:  /mnt/disks  
+---
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: local-volume-provisioner
+  namespace: default
+  labels:
+    app: local-volume-provisioner
+spec:
+  selector:
+    matchLabels:
+      app: local-volume-provisioner 
+  template:
+    metadata:
+      labels:
+        app: local-volume-provisioner
+    spec:
+      serviceAccountName: local-storage-admin
+      containers:
+        - image: "quay.io/external_storage/local-volume-provisioner:latest"
+          imagePullPolicy: "Always"
+          name: provisioner 
+          securityContext:
+            privileged: true
+          env:
+          - name: MY_NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          volumeMounts:
+            - mountPath: /etc/provisioner/config 
+              name: provisioner-config
+              readOnly: true             
+            - mountPath:  /mnt/disks 
+              name: local-scsi 
+      volumes:
+        - name: provisioner-config
+          configMap:
+            name: local-provisioner-config         
+        - name: local-scsi
+          hostPath:
+            path: /mnt/disks 
+
