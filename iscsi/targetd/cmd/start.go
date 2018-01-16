@@ -11,7 +11,6 @@ Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
-limitations under the License.
 */
 
 package cmd
@@ -52,7 +51,7 @@ var startcontrollerCmd = &cobra.Command{
 		if err != nil {
 			glog.Fatalln(err)
 		}
-		glog.V(2).Infoln("kube client config created: ", config.Host)
+		glog.V(2).Infoln("kube client config created:", config.Host)
 
 		// creates the clientset
 		glog.V(2).Infoln("creating kube client set")
@@ -71,7 +70,7 @@ var startcontrollerCmd = &cobra.Command{
 
 		url := fmt.Sprintf("%s://%s:%s@%s:%d/targetrpc", viper.GetString("targetd-scheme"), viper.GetString("targetd-username"), viper.GetString("targetd-password"), viper.GetString("targetd-address"), viper.GetInt("targetd-port"))
 
-		glog.V(2).Infoln("targed URL", url)
+		glog.V(2).Infoln("targed URL:", url)
 
 		iscsiProvisioner := provisioner.NewiscsiProvisioner(url)
 		glog.Infoln("iscsi provisioner created")

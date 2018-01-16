@@ -108,13 +108,13 @@ func (p *iscsiProvisioner) Provision(options controller.VolumeOptions) (*v1.Pers
 	if !util.AccessModesContainedInAll(p.getAccessModes(), options.PVC.Spec.AccessModes) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", options.PVC.Spec.AccessModes, p.getAccessModes())
 	}
-	glog.Infoln("new provision request received for pvc: ", options.PVName)
+	glog.Infoln("new provision request received for pvc:", options.PVName)
 	vol, lun, pool, err := p.createVolume(options)
 	if err != nil {
 		glog.Warningln(err)
 		return nil, err
 	}
-	glog.V(2).Infoln("volume created with vol and lun: ", vol, lun)
+	glog.V(2).Infoln("volume created with vol and lun:", vol, lun)
 
 	annotations := make(map[string]string)
 	annotations["volume_name"] = vol
@@ -154,7 +154,7 @@ func (p *iscsiProvisioner) Provision(options controller.VolumeOptions) (*v1.Pers
 			},
 		},
 	}
-	glog.Infoln("provision request completed pv: ", pv.Name)
+	glog.Infoln("provision request completed pv:", pv.Name)
 	return pv, nil
 }
 
@@ -193,24 +193,24 @@ func getBool(value string) bool {
 // by the given PV.
 func (p *iscsiProvisioner) Delete(volume *v1.PersistentVolume) error {
 	//vol from the annotation
-	glog.Infoln("volume deletion request received: ", volume.GetName())
+	glog.Infoln("volume deletion request received:", volume.GetName())
 	for _, initiator := range strings.Split(volume.Annotations["initiators"], ",") {
-		glog.V(2).Infoln("removing iscsi export: ", volume.Annotations["volume_name"], volume.Annotations["pool"], initiator)
+		glog.V(2).Infoln("removing iscsi export:", volume.Annotations["volume_name"], volume.Annotations["pool"], initiator)
 		err := p.exportDestroy(volume.Annotations["volume_name"], volume.Annotations["pool"], initiator)
 		if err != nil {
 			glog.Warningln(err)
 			return err
 		}
-		glog.V(2).Infoln("iscsi export removed: ", volume.Annotations["volume_name"], volume.Annotations["pool"], initiator)
+		glog.V(2).Infoln("iscsi export removed:", volume.Annotations["volume_name"], volume.Annotations["pool"], initiator)
 	}
-	glog.V(2).Infoln("removing logical volume : ", volume.Annotations["volume_name"], volume.Annotations["pool"])
+	glog.V(2).Infoln("removing logical volume:", volume.Annotations["volume_name"], volume.Annotations["pool"])
 	err := p.volDestroy(volume.Annotations["volume_name"], volume.Annotations["pool"])
 	if err != nil {
 		glog.Warningln(err)
 		return err
 	}
-	glog.V(2).Infoln("logical volume removed: ", volume.Annotations["volume_name"], volume.Annotations["pool"])
-	glog.Infoln("volume deletion request completed: ", volume.GetName())
+	glog.V(2).Infoln("logical volume removed:", volume.Annotations["volume_name"], volume.Annotations["pool"])
+	glog.Infoln("volume deletion request completed:", volume.GetName())
 	return nil
 }
 
@@ -246,29 +246,29 @@ func (p *iscsiProvisioner) createVolume(options controller.VolumeOptions) (vol s
 		glog.Warningln(err)
 		return "", 0, "", err
 	}
-	glog.V(2).Infoln("creating volume name, size, pool: ", vol, size, pool)
+	glog.V(2).Infoln("creating volume name, size, pool:", vol, size, pool)
 	err = p.volCreate(vol, size, pool)
 	if err != nil {
 		glog.Warningln(err)
 		return "", 0, "", err
 	}
-	glog.V(2).Infoln("created volume name, size, pool: ", vol, size, pool)
+	glog.V(2).Infoln("created volume name, size, pool:", vol, size, pool)
 	for _, initiator := range initiators {
-		glog.V(2).Infoln("exporting volume name, lun, pool, initiator: ", vol, lun, pool, initiator)
+		glog.V(2).Infoln("exporting volume name, lun, pool, initiator:", vol, lun, pool, initiator)
 		err = p.exportCreate(vol, lun, pool, initiator)
 		if err != nil {
 			glog.Warningln(err)
 			return "", 0, "", err
 		}
-		glog.V(2).Infoln("exported volume name, lun, pool, initiator ", vol, lun, pool, initiator)
+		glog.V(2).Infoln("exported volume name, lun, pool, initiator:", vol, lun, pool, initiator)
 		if getBool(options.Parameters["chapAuthSession"]) {
-			glog.V(2).Infoln("setting up chap session auth for initiator, initiator, in_user, out_user: ", initiator, chapCredentials.InUser, chapCredentials.OutUser)
+			glog.V(2).Infoln("setting up chap session auth for initiator, initiator, in_user, out_user:", initiator, chapCredentials.InUser, chapCredentials.OutUser)
 			err = p.setInitiatorAuth(initiator, chapCredentials.InUser, chapCredentials.InPassword, chapCredentials.OutUser, chapCredentials.OutPassword)
 			if err != nil {
 				glog.Warningln(err)
 				return "", 0, "", err
 			}
-			glog.V(2).Infoln("set up chap session auth for initiator, initiator, in_user, out_user: ", initiator, chapCredentials.InUser, chapCredentials.OutUser)
+			glog.V(2).Infoln("set up chap session auth for initiator, initiator, in_user, out_user:", initiator, chapCredentials.InUser, chapCredentials.OutUser)
 		}
 	}
 	return vol, lun, pool, nil
@@ -297,13 +297,13 @@ func (p *iscsiProvisioner) getInitiators(options controller.VolumeOptions) []str
 // getFirstAvailableLun gets first available Lun.
 func getFirstAvailableLun(exportList exportList) (int32, error) {
 	sort.Sort(exportList)
-	glog.V(2).Infoln("sorted export List: ", exportList)
+	glog.V(2).Infoln("sorted export List:", exportList)
 	//this is sloppy way to remove duplicates
 	uniqueExport := make(map[int32]export)
 	for _, export := range exportList {
 		uniqueExport[export.Lun] = export
 	}
-	glog.V(2).Infoln("unique luns sorted export List: ", uniqueExport)
+	glog.V(2).Infoln("unique luns sorted export List:", uniqueExport)
 
 	//this is a sloppy way to get the list of luns
 	luns := make([]int, len(uniqueExport), len(uniqueExport))
@@ -312,7 +312,7 @@ func getFirstAvailableLun(exportList exportList) (int32, error) {
 		luns[i] = int(export.Lun)
 		i++
 	}
-	glog.V(2).Infoln("lun list: ", luns)
+	glog.V(2).Infoln("lun list:", luns)
 
 	if len(luns) >= 255 {
 		return -1, errors.New("255 luns allocated no more luns available")
@@ -321,7 +321,7 @@ func getFirstAvailableLun(exportList exportList) (int32, error) {
 	var sluns sort.IntSlice
 	sluns = luns[0:]
 	sort.Sort(sluns)
-	glog.V(2).Infoln("sorted lun list: ", sluns)
+	glog.V(2).Infoln("sorted lun list:", sluns)
 
 	lun := int32(len(sluns))
 	for i, clun := range sluns {
@@ -451,7 +451,7 @@ func (slice exportList) Swap(i, j int) {
 }
 
 func (p *iscsiProvisioner) getConnection() (*jsonrpc2.Client, error) {
-	glog.V(2).Infoln("opening connection to targetd: ", p.targetdURL)
+	glog.V(2).Infoln("opening connection to targetd:", p.targetdURL)
 
 	client := jsonrpc2.NewHTTPClient(p.targetdURL)
 	if client == nil {
