@@ -109,27 +109,53 @@ $ export KUBE_FEATURE_GATES="PersistentLocalVolumes=true,VolumeScheduling=true,M
 
 #### Option 1: GCE
 
+GCE clusters brought up with kube-up.sh will automatically format and mount the
+requested Local SSDs, so you can deploy the provisioner with the pre-generated
+deployment spec and skip to [step 4](#step-4-create-local-persistent-volume-claim),
+unless you want to customize the provisioner spec or storage classes.
+
 ##### Pre-1.9
 
 ``` console
 $ NODE_LOCAL_SSDS=<n> cluster/kube-up.sh
+$ kubectl create -f provisioner/deployment/kubernetes/admin_account.yaml
+$ kubectl create -f provisioner/deployment/kubernetes/gce/provisioner_generated_gce_ssd_count.yaml
 ```
 
 ##### 1.9+
 
 ``` console
 $ NODE_LOCAL_SSDS_EXT=<n>,<scsi|nvme>,fs cluster/kube-up.sh
-# This handles creating the StorageClasses
-$ kubectl create -f examples/deployment/kubernetes/gce/class-local-ssds.yaml
+$ kubectl create -f provisioner/deployment/kubernetes/admin_account.yaml
+$ kubectl create -f provisioner/deployment/kubernetes/gce/class-local-ssds.yaml
+$ kubectl create -f provisioner/deployment/kubernetes/gce/provisioner_generated_gce_ssd_volumes.yaml
 ```
 
 #### Option 2: GKE
 
+GKE clusters will automatically format and mount the
+requested Local SSDs, so you can deploy the provisioner with the pre-generated
+deployment spec and skip to [step 4](#step-4-create-local-persistent-volume-claim),
+unless you want to customize the provisioner spec or storage classes.
+
+##### Using local-ssd-count option
 ``` console
 $ gcloud container cluster create ... --local-ssd-count=<n> --enable-kubernetes-alpha
 $ gcloud container node-pools create ... --local-ssd-count=<n>
+$ kubectl create -f provisioner/deployment/kubernetes/admin_account.yaml
+
 # If running K8s 1.9+, also create the StorageClasses
-$ kubectl create -f examples/deployment/kubernetes/gce/class-local-ssds.yaml
+$ kubectl create -f provisioner/deployment/kubernetes/gce/class-local-ssds.yaml
+$ kubectl create -f provisioner/deployment/kubernetes/gce/provisioner_generated_gce_ssd_count.yaml
+```
+
+##### Using local-ssd-volumes option (available via whitelist only)
+``` console
+$ gcloud alpha container cluster create ... --local-ssd-volumes=<n>,<scsi|nvme>,fs --enable-kubernetes-alpha
+$ gcloud alpha container node-pools create ... --local-ssd-volumes=<n>,<scsi|nvme>,fs
+$ kubectl create -f provisioner/deployment/kubernetes/admin_account.yaml
+$ kubectl create -f provisioner/deployment/kubernetes/gce/class-local-ssds.yaml
+$ kubectl create -f provisioner/deployment/kubernetes/gce/provisioner_generated_gce_ssd_volumes.yaml
 ```
 
 #### Option 3: Baremetal environments
@@ -169,18 +195,19 @@ a single pod, a StorageClass must to be created with `volumeBindingMode` set to
 `WaitForFirstConsumer`.
 
 ```console
-$ kubectl create -f examples/deployment/kubernetes/example-storageclass.yaml
+$ kubectl create -f provisioner/deployment/kubernetes/example-storageclass.yaml
 ```
 
 ### Step 3: Creating local persistent volumes
 
 #### Option 1: Using the local volume static provisioner 
 
-	1. Create an admin account with cluster admin privilege:
+1. Create an admin account with cluster admin privilege:
 ``` console
 $ kubectl create -f ./provisioner/deployment/kubernetes/admin_account.yaml  
 ```
-	2. Generate Provisioner's DaemonSet and ConfigMap spec, and customize it.
+
+2. Generate Provisioner's DaemonSet and ConfigMap spec, and customize it.
 This step uses helm templates to generate the specs.  See the [helm README](helm) for setup instructions.
 To generate the provisioner's specs using the [default values](helm/provisioner/values.yaml), run:
 
@@ -202,14 +229,15 @@ helm template ./helm/provisioner --set engine=gke > ./provisioner/deployment/kub
 ```
 Parameter **--set engine=** canbe used in conjunction with custom vlues.yaml file in the same command line.
 
-	3. Deploy Provisioner 
+3. Deploy Provisioner 
 Once a user is satisfied with the content of Provisioner's yaml file, **kubectl** can be used
 to create Provisioner's DaemonSet and ConfigMap.
- 
+
 ``` console
 $ kubectl create -f ./provisioner/deployment/kubernetes/provisioner_generated.yaml 
 ```
-	4. Check discovered local volumes
+
+4. Check discovered local volumes
 Once launched, the external static provisioner will discover and create local-volume PVs.
 
 For example, if the directory `/mnt/disks/` contained one directory `/mnt/disks/vol1` then the following
@@ -283,7 +311,7 @@ Please replace the following elements to reflect your configuration:
      this local volume
   * "/mnt/disks/vol1" with the path to the mount point of local volumes
  
-### Step 3: Create local persistent volume claim
+### Step 4: Create local persistent volume claim
 
 ``` yaml
 kind: PersistentVolumeClaim
