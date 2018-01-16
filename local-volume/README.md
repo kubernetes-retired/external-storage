@@ -10,17 +10,24 @@ nodes.
 An external static provisioner is available to help simplify local storage
 management once the local volumes are configured.  Note that the local
 storage provisioner is different from most provisioners and does
-not support dynamic provisioning.  Instead, it requires that administrators
+not support dynamic provisioning yet.  Instead, it requires that administrators
 preconfigure the local volumes on each node and mount them under discovery
 directories.  The provisioner will manage the volumes under the discovery
 directories by creating and cleaning up PersistentVolumes for each volume.
+
+## Configuration Requirements
+
+* The local-volume plugin expects paths to be stable, including across
+  reboots and when disks are added or removed.
+* The static provisioner only discovers mount points.  For directory-based local
+  volumes, they must be bind-mounted into the discovery directories.
 
 ## Feature Status
 
 ### 1.9: Alpha
 
-**Important:** Both `PersistentLocalVolumes` and `VolumeScheduling` [feature gates
-must be enabled starting in 1.9](#enabling-the-alpha-feature-gates).
+**Important:** `PersistentLocalVolumes`, `VolumeScheduling`, and
+`MountPropagation` [feature gates must be enabled starting in 1.9](#enabling-the-alpha-feature-gates).
 
 What works:
 * Everything in 1.7.
@@ -78,6 +85,9 @@ What doesn't work and workarounds:
 
 ## User Guide
 
+These instructions reflect the latest version of the codebase.  For instructions
+on older versions, please see version links in the [CHANGELOG](provisioner/CHANGELOG.md).
+
 ### Step 1: Bringing up a cluster with local disks
 
 #### Enabling the alpha feature gates
@@ -127,8 +137,7 @@ $ kubectl create -f examples/deployment/kubernetes/gce/class-local-ssds.yaml
 1. Partition and format the disks on each node according to your application's
    requirements.
 2. Mount all the filesystems under one directory per StorageClass. The directories
-   are specified in a ConfigMap, see below. By default, the discovery directory is
-   `/mnt/disks` and storage class is `local-storage`.
+   are specified in a configmap, see below.
 3. Configure the Kubernetes API Server, controller-manager, scheduler, and all kubelets
    with `KUBE_FEATURE_GATES` as described [above](#enabling-the-alpha-feature-gates).
 4. If not using the default Kubernetes scheduler policy, the following
@@ -307,11 +316,6 @@ go run hack/e2e.go -- -v --test --test_args="--ginkgo.focus=\[Feature:LocalPersi
 
 [GKE Alpha](https://k8s-testgrid.appspot.com/sig-storage#gke-alpha)
 
-
-## Requirements
-
-* The local-volume plugin expects paths to be stable, including across 
-  reboots and when disks are added or removed.
 
 ## Best Practices
 
