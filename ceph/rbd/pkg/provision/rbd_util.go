@@ -76,6 +76,7 @@ func (u *RBDUtil) CreateImage(image string, pOpts *rbdProvisionOptions, options 
 		CephMonitors: pOpts.monitors,
 		RBDImage:     image,
 		RBDPool:      pOpts.pool,
+		FSType:       pOpts.fsType,
 	}, sz, nil
 }
 
