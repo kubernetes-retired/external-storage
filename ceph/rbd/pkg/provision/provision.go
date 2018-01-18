@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/api/v1/helper"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 const (
@@ -50,15 +51,31 @@ var (
 	supportedFeatures = sets.NewString("layering")
 )
 
+// rbdProvisionOptions is internal representation of rbd provision options,
+// parsed out from storage class parameters.
+// https://github.com/kubernetes/website/blob/master/docs/concepts/storage/storage-classes.md#ceph-rbd
 type rbdProvisionOptions struct {
-	monitors       []string
-	pool           string
-	adminSecret    string
-	adminID        string
-	userID         string
+	// Ceph monitors.
+	monitors []string
+	// Ceph RBD pool. Default is "rbd".
+	pool string
+	// Ceph client ID that is capable of creating images in the pool. Default is "admin".
+	adminID string
+	// Secret of admin client ID.
+	adminSecret string
+	// Ceph client ID that is used to map the RBD image. Default is the same as admin client ID.
+	userID string
+	// The name of Ceph Secret for userId to map RBD image. It must exist in
+	// the same namespace as PVCs. This parameter is required.
 	userSecretName string
-	imageFormat    string
-	imageFeatures  []string
+	// fsType that is supported by kubernetes. Default: "ext4".
+	fsType string
+	// Ceph RBD image format, "1" or "2". Default is "1".
+	imageFormat string
+	// This parameter is optional and should only be used if you set
+	// imageFormat to "2". Currently supported features are layering only.
+	// Default is "", and no features are turned on.
+	imageFeatures []string
 }
 
 type rbdProvisioner struct {
@@ -227,6 +244,8 @@ func (p *rbdProvisioner) parseParameters(parameters map[string]string) (*rbdProv
 				}
 				opts.imageFeatures = append(opts.imageFeatures, f)
 			}
+		case volume.VolumeParameterFSType:
+			opts.fsType = v
 		default:
 			return nil, fmt.Errorf("invalid option %q for %s provisioner", k, ProvisionerName)
 		}
