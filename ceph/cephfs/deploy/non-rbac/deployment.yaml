@@ -16,10 +16,7 @@ spec:
         image: "quay.io/external_storage/cephfs-provisioner:latest"
         env:
         - name: PROVISIONER_NAME
-          valueFrom:
-            configMapKeyRef:
-              key: provisioner.name
-              name: cephfs-provisioner
+          value: ceph.com/cephfs
         command:
           - "/usr/local/bin/cephfs-provisioner"
         args:
