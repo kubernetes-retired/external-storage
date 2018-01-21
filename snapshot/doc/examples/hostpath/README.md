@@ -114,14 +114,14 @@ metadata:
 
 * Create a storage class:
     ```bash
-    kubectl create -f examples/hostpath/provisioning-class.yaml
+    kubectl create -f examples/hostpath/class.yaml
     ```
 
 ### Restore a snapshot to a new PV
 
 * Create a PVC that claims a PV based on an existing snapshot
     ```bash
-    kubectl create -f examples/hostpath/provisioning-pvc.yaml
+    kubectl create -f examples/hostpath/claim.yaml
     ```
 * Check that a PV was created
 
