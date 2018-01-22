@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/golang/glog"
-	//"github.com/Sirupsen/logrus"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	"github.com/kubernetes-incubator/external-storage/lib/util"
 	"github.com/magiconair/properties"
