@@ -229,6 +229,8 @@ helm template ./helm/provisioner --set engine=gke > ./provisioner/deployment/kub
 ```
 Parameter **--set engine=** canbe used in conjunction with custom vlues.yaml file in the same command line.
 
+Note: By default, common.rbac is set to true which generates the necessary ServiceAccount, ClusterRole and ClusterRoleBinding.
+
 3. Deploy Provisioner 
 Once a user is satisfied with the content of Provisioner's yaml file, **kubectl** can be used
 to create Provisioner's DaemonSet and ConfigMap.
