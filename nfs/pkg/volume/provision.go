@@ -450,7 +450,11 @@ func (p *nfsProvisioner) createDirectory(directory, gid string) error {
 	}
 
 	if gid != "none" {
-		groupID, _ := strconv.ParseUint(gid, 10, 64)
+		groupID, err := strconv.ParseUint(gid, 10, 64)
+		if err != nil {
+			os.RemoveAll(path)
+			return fmt.Errorf("strconv.ParseUint failed with error: %v", err)
+		}
 		cmd := exec.Command("chgrp", strconv.FormatUint(groupID, 10), path)
 		out, err := cmd.CombinedOutput()
 		if err != nil {
