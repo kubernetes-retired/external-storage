@@ -2,6 +2,7 @@ language: go
 
 go:
   - 1.8
+  - 1.9
   - tip
 
 before_install:
@@ -13,4 +14,4 @@ script:
   - go test -v -race ./...
 
 after_success:
-  - test "$TRAVIS_GO_VERSION" = "1.8" && cd jsonrpc2 && goveralls -service=travis-ci
+  - test "$TRAVIS_GO_VERSION" = "1.9" && cd jsonrpc2 && goveralls -service=travis-ci
