@@ -19,11 +19,13 @@ package provision
 import (
 	"errors"
 	"fmt"
+	"net"
 	"strings"
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	"github.com/kubernetes-incubator/external-storage/lib/util"
+	"github.com/miekg/dns"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -85,6 +87,7 @@ type rbdProvisioner struct {
 	// provisioner's PVs.
 	identity string
 	rbdUtil  *RBDUtil
+	dnsip    string
 }
 
 // NewRBDProvisioner creates a Provisioner that provisions Ceph RBD PVs backed by Ceph RBD images.
@@ -182,6 +185,59 @@ func (p *rbdProvisioner) Delete(volume *v1.PersistentVolume) error {
 	return p.rbdUtil.DeleteImage(image, opts)
 }
 
+// Look up the cluster dns service by label "kube-dns"
+func findDNSIP(p *rbdProvisioner) (dnsip string) {
+	// find DNS server address through client API
+	// cache result in rbdProvisioner
+	if p.dnsip == "" {
+		dnssvc, err := p.client.CoreV1().Services(metav1.NamespaceSystem).Get("kube-dns", metav1.GetOptions{})
+		if err != nil {
+			glog.Errorf("error getting kube-dns service: %v\n", err)
+			return ""
+		}
+		if len(dnssvc.Spec.ClusterIP) == 0 {
+			glog.Errorf("kube-dns service ClusterIP bad\n")
+			return ""
+		}
+		p.dnsip = dnssvc.Spec.ClusterIP
+	}
+	return p.dnsip
+}
+
+// Look up hostname in dns server serverip.
+func lookuphost(hostname string, serverip string) (iplist []string, err error) {
+	glog.V(4).Infof("lookuphost %q on %q\n", hostname, serverip)
+	m := new(dns.Msg)
+	m.SetQuestion(dns.Fqdn(hostname), dns.TypeA)
+	in, err := dns.Exchange(m, joinHostPort(serverip, "53"))
+	if err != nil {
+		glog.Errorf("dns lookup of %q failed: err %v", hostname, err)
+		return nil, err
+	}
+	for _, a := range in.Answer {
+		glog.V(4).Infof("lookuphost answer: %v\n", a)
+		if t, ok := a.(*dns.A); ok {
+			iplist = append(iplist, t.A.String())
+		}
+	}
+
+	return iplist, nil
+}
+func splitHostPort(hostport string) (host, port string) {
+	host, port, err := net.SplitHostPort(hostport)
+	if err != nil {
+		host, port = hostport, ""
+	}
+	return host, port
+}
+
+func joinHostPort(host, port string) (hostport string) {
+	if port != "" {
+		return net.JoinHostPort(host, port)
+	}
+	return host
+}
+
 func (p *rbdProvisioner) parseParameters(parameters map[string]string) (*rbdProvisionOptions, error) {
 	// options with default values
 	opts := &rbdProvisionOptions{
@@ -199,10 +255,28 @@ func (p *rbdProvisioner) parseParameters(parameters map[string]string) (*rbdProv
 	for k, v := range parameters {
 		switch strings.ToLower(k) {
 		case "monitors":
+			// Try to find DNS info in local cluster DNS so that the kubernetes
+			// host DNS config doesn't have to know about cluster DNS
+			dnsip := findDNSIP(p)
+			glog.V(4).Infof("dnsip: %q\n", dnsip)
 			arr := strings.Split(v, ",")
 			for _, m := range arr {
-				opts.monitors = append(opts.monitors, m)
+				mhost, mport := splitHostPort(m)
+				if dnsip != "" {
+					var lookup []string
+					if lookup, err = lookuphost(mhost, dnsip); err == nil {
+						for _, a := range lookup {
+							glog.V(1).Infof("adding %+v from mon lookup\n", a)
+							opts.monitors = append(opts.monitors, joinHostPort(a, mport))
+						}
+					} else {
+						opts.monitors = append(opts.monitors, joinHostPort(mhost, mport))
+					}
+				} else {
+					opts.monitors = append(opts.monitors, joinHostPort(mhost, mport))
+				}
 			}
+			glog.V(4).Infof("final monitors list: %v\n", opts.monitors)
 			if len(opts.monitors) < 1 {
 				return nil, fmt.Errorf("missing Ceph monitors")
 			}

@@ -6,7 +6,7 @@ import (
 	"net/rpc"
 )
 
-var jErrRequest = json.RawMessage(`{"jsonrpc":"2.0","id":null,"error":{"code":-32600,"message":"Invalid request"}}`)
+var jErrRequest = json.RawMessage(`{"jsonrpc":"2.0","id":null,"error":{"code":-32600,"message":"invalid request"}}`)
 
 // JSONRPC2 is an internal RPC service used to process batch requests.
 type JSONRPC2 struct{}
