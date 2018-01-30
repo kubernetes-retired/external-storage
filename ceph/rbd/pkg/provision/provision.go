@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/api/v1/helper"
+	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -130,7 +130,7 @@ func (p *rbdProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 	}
 	glog.Infof("successfully created rbd image %q", image)
 
-	rbd.SecretRef = new(v1.LocalObjectReference)
+	rbd.SecretRef = new(v1.SecretReference)
 	rbd.SecretRef.Name = opts.userSecretName
 	rbd.RadosUser = opts.userID
 

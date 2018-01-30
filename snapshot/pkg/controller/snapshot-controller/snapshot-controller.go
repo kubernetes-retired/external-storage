@@ -30,8 +30,6 @@ import (
 	kcache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 
-	"k8s.io/kubernetes/pkg/api"
-
 	crdv1 "github.com/kubernetes-incubator/external-storage/snapshot/pkg/apis/crd/v1"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/controller/cache"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/controller/reconciler"
@@ -186,17 +184,13 @@ func (c *snapshotController) Run(ctx <-chan struct{}) {
 func (c *snapshotController) onSnapshotAdd(obj interface{}) {
 	// Add snapshot: Add snapshot to DesiredStateOfWorld, then ask snapshotter to create
 	// the actual snapshot
-	objCopy, err := api.Scheme.DeepCopy(obj)
-	if err != nil {
-		glog.Warning("failed to copy obj %#v: %v", obj, err)
-		return
-	}
-
-	snapshot, ok := objCopy.(*crdv1.VolumeSnapshot)
+	snapshotObj, ok := obj.(*crdv1.VolumeSnapshot)
 	if !ok {
-		glog.Warning("expecting type VolumeSnapshot but received type %T", objCopy)
+		glog.Warning("expecting type VolumeSnapshot but received type %T", obj)
 		return
 	}
+	snapshot := snapshotObj.DeepCopy()
+
 	glog.Infof("[CONTROLLER] OnAdd %s, Snapshot %#v", snapshot.Metadata.SelfLink, snapshot)
 	c.desiredStateOfWorld.AddSnapshot(snapshot)
 }
@@ -228,17 +222,7 @@ func (c *snapshotController) onSnapshotDelete(obj interface{}) {
 	}
 	// Delete snapshot: Remove the snapshot from DesiredStateOfWorld, then ask snapshotter to delete
 	// the snapshot itself
-	objCopy, err := api.Scheme.DeepCopy(deletedSnapshot)
-	if err != nil {
-		glog.Warning("failed to copy obj %#v: %v", obj, err)
-		return
-	}
-
-	snapshot, ok := objCopy.(*crdv1.VolumeSnapshot)
-	if !ok {
-		glog.Warning("expecting type VolumeSnapshot but received type %T", objCopy)
-		return
-	}
+	snapshot := deletedSnapshot.DeepCopy()
 	glog.Infof("[CONTROLLER] OnDelete %s, snapshot name: %s/%s\n", snapshot.Metadata.SelfLink, snapshot.Metadata.Namespace, snapshot.Metadata.Name)
 	c.desiredStateOfWorld.DeleteSnapshot(cache.MakeSnapshotName(snapshot.Metadata.Namespace, snapshot.Metadata.Name))
 

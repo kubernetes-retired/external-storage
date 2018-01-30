@@ -40,7 +40,7 @@ func (u *RBDUtil) kernelRBDMonitorsOpt(mons []string) string {
 }
 
 // CreateImage creates a new ceph image with provision and volume options.
-func (u *RBDUtil) CreateImage(image string, pOpts *rbdProvisionOptions, options controller.VolumeOptions) (*v1.RBDVolumeSource, int, error) {
+func (u *RBDUtil) CreateImage(image string, pOpts *rbdProvisionOptions, options controller.VolumeOptions) (*v1.RBDPersistentVolumeSource, int, error) {
 	var output []byte
 	var err error
 
@@ -72,7 +72,7 @@ func (u *RBDUtil) CreateImage(image string, pOpts *rbdProvisionOptions, options 
 		return nil, 0, fmt.Errorf("failed to create rbd image: %v, command output: %s", err, string(output))
 	}
 
-	return &v1.RBDVolumeSource{
+	return &v1.RBDPersistentVolumeSource{
 		CephMonitors: pOpts.monitors,
 		RBDImage:     image,
 		RBDPool:      pOpts.pool,
