@@ -1,7 +1,6 @@
 package logrus
 
 import (
-	"fmt"
 	"testing"
 	"time"
 )
@@ -46,15 +45,6 @@ var largeFields = Fields{
 	"entries":   "yeah",
 }
 
-var errorFields = Fields{
-	"foo": fmt.Errorf("bar"),
-	"baz": fmt.Errorf("qux"),
-}
-
-func BenchmarkErrorTextFormatter(b *testing.B) {
-	doBenchmark(b, &TextFormatter{DisableColors: true}, errorFields)
-}
-
 func BenchmarkSmallTextFormatter(b *testing.B) {
 	doBenchmark(b, &TextFormatter{DisableColors: true}, smallFields)
 }
@@ -80,14 +70,11 @@ func BenchmarkLargeJSONFormatter(b *testing.B) {
 }
 
 func doBenchmark(b *testing.B, formatter Formatter, fields Fields) {
-	logger := New()
-
 	entry := &Entry{
 		Time:    time.Time{},
 		Level:   InfoLevel,
 		Message: "message",
 		Data:    fields,
-		Logger:  logger,
 	}
 	var d []byte
 	var err error
