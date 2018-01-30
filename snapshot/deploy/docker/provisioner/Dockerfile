@@ -14,4 +14,6 @@
 
 FROM busybox:glibc
 COPY snapshot-provisioner /bin/snapshot-provisioner
+# Root CA certificates
+COPY etc usr /
 ENTRYPOINT ["/bin/snapshot-provisioner"]
