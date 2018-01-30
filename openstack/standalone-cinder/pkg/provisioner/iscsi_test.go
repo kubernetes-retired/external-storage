@@ -155,7 +155,7 @@ var _ = Describe("Iscsi Mapper", func() {
 
 		BeforeEach(func() {
 			pv = createPersistentVolume()
-			pv.Spec.PersistentVolumeSource.ISCSI = &v1.ISCSIVolumeSource{}
+			pv.Spec.PersistentVolumeSource.ISCSI = &v1.ISCSIPersistentVolumeSource{}
 		})
 
 		JustBeforeEach(func() {
@@ -166,7 +166,7 @@ var _ = Describe("Iscsi Mapper", func() {
 
 		Context("when the PV contains a secret reference", func() {
 			BeforeEach(func() {
-				pv.Spec.ISCSI.SecretRef = &v1.LocalObjectReference{
+				pv.Spec.ISCSI.SecretRef = &v1.SecretReference{
 					Name: "secretName",
 				}
 			})

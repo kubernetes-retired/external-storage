@@ -137,7 +137,7 @@ func (p *openEBSProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 				v1.ResourceName(v1.ResourceStorage): options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)],
 			},
 			PersistentVolumeSource: v1.PersistentVolumeSource{
-				ISCSI: &v1.ISCSIVolumeSource{
+				ISCSI: &v1.ISCSIPersistentVolumeSource{
 					TargetPortal: targetPortal,
 					IQN:          iqn,
 					Lun:          1,
