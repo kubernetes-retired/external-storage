@@ -1,3 +1,117 @@
+Release v1.12.70 (2018-01-26)
+===
+
+### Service Client Updates
+* `service/devicefarm`: Updates service API and documentation
+  * Add InteractionMode in CreateRemoteAccessSession for DirectDeviceAccess feature.
+* `service/medialive`: Updates service API and documentation
+  * Add InputSpecification to CreateChannel (specification of input attributes is used for channel sizing and affects pricing);  add NotFoundException to DeleteInputSecurityGroups.
+* `service/mturk-requester`: Updates service documentation
+
+Release v1.12.69 (2018-01-26)
+===
+
+### SDK Bugs
+* `models/api`: Fix colliding names [#1754](https://github.com/aws/aws-sdk-go/pull/1754) [#1756](https://github.com/aws/aws-sdk-go/pull/1756)
+    * SDK had duplicate folders that were causing errors in some builds.
+    * Fixes [#1753](https://github.com/aws/aws-sdk-go/issues/1753)
+Release v1.12.68 (2018-01-25)
+===
+
+### Service Client Updates
+* `service/alexaforbusiness`: Updates service API and documentation
+* `service/codebuild`: Updates service API and documentation
+  * Adding support for Shallow Clone and GitHub Enterprise in AWS CodeBuild.
+* `aws/endpoints`: Updated Regions and Endpoints metadata.
+* `service/guardduty`: Adds new service
+  * Added the missing AccessKeyDetails object to the resource shape.
+* `service/lambda`: Updates service API and documentation
+  * AWS Lambda now supports Revision ID on your function versions and aliases, to track and apply conditional updates when you are updating your function version or alias resources.
+
+### SDK Bugs
+* `service/s3/s3manager`: Fix check for nil OrigErr in Error() [#1749](https://github.com/aws/aws-sdk-go/issues/1749)
+    * S3 Manager's `Error` type did not check for nil of `OrigErr` when calling `Error()`
+    * Fixes [#1748](https://github.com/aws/aws-sdk-go/issues/1748)
+Release v1.12.67 (2018-01-22)
+===
+
+### Service Client Updates
+* `service/budgets`: Updates service API and documentation
+  * Add additional costTypes: IncludeDiscount, UseAmortized,  to support finer control for different charges included in a cost budget.
+
+Release v1.12.66 (2018-01-19)
+===
+
+### Service Client Updates
+* `aws/endpoints`: Updated Regions and Endpoints metadata.
+* `service/glue`: Updates service API and documentation
+  * New AWS Glue DataCatalog APIs to manage table versions and a new feature to skip archiving of the old table version when updating table.
+* `service/transcribe`: Adds new service
+
+Release v1.12.65 (2018-01-18)
+===
+
+### Service Client Updates
+* `service/sagemaker`: Updates service API and documentation
+  * CreateTrainingJob and CreateEndpointConfig now supports KMS Key for volume encryption.
+
+Release v1.12.64 (2018-01-17)
+===
+
+### Service Client Updates
+* `service/autoscaling-plans`: Updates service documentation
+* `service/ec2`: Updates service documentation
+  * Documentation updates for EC2
+
+Release v1.12.63 (2018-01-17)
+===
+
+### Service Client Updates
+* `service/application-autoscaling`: Updates service API and documentation
+* `service/autoscaling-plans`: Adds new service
+* `service/rds`: Updates service API and documentation
+  * With this release you can now integrate RDS DB instances with CloudWatch Logs. We have added parameters to the operations for creating and modifying DB instances (for example CreateDBInstance) to allow you to take advantage of this capability through the CLI and API. Once you enable this feature, a stream of log events will publish to CloudWatch Logs for each log type you enable.
+
+Release v1.12.62 (2018-01-15)
+===
+
+### Service Client Updates
+* `aws/endpoints`: Updated Regions and Endpoints metadata.
+* `service/lambda`: Updates service API and documentation
+  * Support for creating Lambda Functions using 'dotnetcore2.0' and 'go1.x'.
+
+Release v1.12.61 (2018-01-12)
+===
+
+### Service Client Updates
+* `service/glue`: Updates service API and documentation
+  * Support is added to generate ETL scripts in Scala which can now be run by  AWS Glue ETL jobs. In addition, the trigger API now supports firing when any conditions are met (in addition to all conditions). Also, jobs can be triggered based on a "failed" or "stopped" job run (in addition to a "succeeded" job run).
+
+Release v1.12.60 (2018-01-11)
+===
+
+### Service Client Updates
+* `service/elasticloadbalancing`: Updates service API and documentation
+* `service/elasticloadbalancingv2`: Updates service API and documentation
+* `service/rds`: Updates service API and documentation
+  * Read Replicas for Amazon RDS for MySQL, MariaDB, and PostgreSQL now support Multi-AZ deployments.Amazon RDS Read Replicas enable you to create one or more read-only copies of your database instance within the same AWS Region or in a different AWS Region. Updates made to the source database are asynchronously copied to the Read Replicas. In addition to providing scalability for read-heavy workloads, you can choose to promote a Read Replica to become standalone a DB instance when needed.Amazon RDS Multi-AZ Deployments provide enhanced availability for database instances within a single AWS Region. With Multi-AZ, your data is synchronously replicated to a standby in a different Availability Zone (AZ). In case of an infrastructure failure, Amazon RDS performs an automatic failover to the standby, minimizing disruption to your applications.You can now combine Read Replicas with Multi-AZ as part of a disaster recovery strategy for your production databases. A well-designed and tested plan is critical for maintaining business continuity after a disaster. Since Read Replicas can also be created in different regions than the source database, your Read Replica can be promoted to become the new production database in case of a regional disruption.You can also combine Read Replicas with Multi-AZ for your database engine upgrade process. You can create a Read Replica of your production database instance and upgrade it to a new database engine version. When the upgrade is complete, you can stop applications, promote the Read Replica to a standalone database instance and switch over your applications. Since the database instance is already a Multi-AZ deployment, no additional steps are needed.For more information, see the Amazon RDS User Guide.
+* `service/ssm`: Updates service documentation
+  * Updates documentation for the HierarchyLevelLimitExceededException error.
+
+Release v1.12.59 (2018-01-09)
+===
+
+### Service Client Updates
+* `service/kms`: Updates service documentation
+  * Documentation updates for AWS KMS
+
+Release v1.12.58 (2018-01-09)
+===
+
+### Service Client Updates
+* `service/ds`: Updates service API and documentation
+  * On October 24 we introduced AWS Directory Service for Microsoft Active Directory (Standard Edition), also known as AWS Microsoft AD (Standard Edition), which is a managed Microsoft Active Directory (AD) that is optimized for small and midsize businesses (SMBs). With this SDK release, you can now create an AWS Microsoft AD directory using API. This enables you to run typical SMB workloads using a cost-effective, highly available, and managed Microsoft AD in the AWS Cloud.
+
 Release v1.12.57 (2018-01-08)
 ===
 

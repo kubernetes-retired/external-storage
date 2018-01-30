@@ -34,8 +34,8 @@ type clientCodec struct {
 	pending map[uint64]string // map request id to method name
 }
 
-// NewClientCodec returns a new rpc.ClientCodec using JSON-RPC 2.0 on conn.
-func NewClientCodec(conn io.ReadWriteCloser) rpc.ClientCodec {
+// newClientCodec returns a new rpc.ClientCodec using JSON-RPC 2.0 on conn.
+func newClientCodec(conn io.ReadWriteCloser) rpc.ClientCodec {
 	return &clientCodec{
 		dec:     json.NewDecoder(conn),
 		enc:     json.NewEncoder(conn),
@@ -223,7 +223,7 @@ func (c *clientCodec) Close() error {
 // It also provides all methods of net/rpc Client.
 type Client struct {
 	*rpc.Client
-	codec rpc.ClientCodec
+	codec *clientCodec
 }
 
 // Notify try to invoke the named function. It return error only in case
@@ -239,13 +239,9 @@ func (c Client) Notify(serviceMethod string, args interface{}) error {
 // NewClient returns a new Client to handle requests to the
 // set of services at the other end of the connection.
 func NewClient(conn io.ReadWriteCloser) *Client {
-	return NewClientWithCodec(NewClientCodec(conn))
-}
-
-// NewClientWithCodec returns a new Client using the given rpc.ClientCodec.
-func NewClientWithCodec(codec rpc.ClientCodec) *Client {
+	codec := newClientCodec(conn)
 	client := rpc.NewClientWithCodec(codec)
-	return &Client{client, codec}
+	return &Client{client, codec.(*clientCodec)}
 }
 
 // Dial connects to a JSON-RPC 2.0 server at the specified network address.
