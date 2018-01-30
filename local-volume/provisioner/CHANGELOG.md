@@ -1,12 +1,12 @@
-# v2.0.0
+# [v2.0.0](https://github.com/kubernetes-incubator/external-storage/releases/tag/local-volume-provisioner-v2.0.0)
 This version is incompatible and has breaking changes with v1!
 * Remove default config, a configmap is now required.
 * Configmap data is changed from json to yaml syntax.
 * All local volumes must be mount points.  For directory-based volumes, a
-  bind-mount must be done in order for the provisioner to discover them.
+  bind-mount must be done in order for the provisioner to discover them. This
+  requires the K8s [mount propgataion feature](https://kubernetes.io/docs/concepts/storage/volumes/#mount-propagation)
+  to be enabled.
 * Detected capacity is rounded down to the nearest GB.
-* [Mount propagation](https://kubernetes.io/docs/concepts/storage/volumes/#mount-propagation)
-  is required to discover new mount points after the provisioner has started.
 * New option to specify which node labels to add to the PV.
 
 # [v1.0.1](https://github.com/kubernetes-incubator/external-storage/releases/tag/local-volume-provisioner-bootstrap-v1.0.1)
