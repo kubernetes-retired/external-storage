@@ -142,7 +142,7 @@ func (p *cinderProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 		goto ERROR_DELETE
 	}
 
-	connection, err = p.vsb.connectCinderVolume(p.VolumeService, volumeID)
+	connection, err = p.vsb.connectCinderVolume(p.VolumeService, initiatorName, volumeID)
 	if err != nil {
 		glog.Errorf("Failed to connect volume %s: %v", volumeID, err)
 		goto ERROR_UNRESERVE
@@ -179,7 +179,7 @@ ERROR_DETACH:
 		glog.Errorf("Failed to detach volume %s: %v", volumeID, cleanupErr)
 	}
 ERROR_DISCONNECT:
-	cleanupErr = p.vsb.disconnectCinderVolume(p.VolumeService, volumeID)
+	cleanupErr = p.vsb.disconnectCinderVolume(p.VolumeService, initiatorName, volumeID)
 	if cleanupErr != nil {
 		glog.Errorf("Failed to disconnect volume %s: %v", volumeID, cleanupErr)
 	}
@@ -234,7 +234,7 @@ func (p *cinderProvisioner) Delete(pv *v1.PersistentVolume) error {
 		return err
 	}
 
-	err = p.vsb.disconnectCinderVolume(p.VolumeService, volumeID)
+	err = p.vsb.disconnectCinderVolume(p.VolumeService, initiatorName, volumeID)
 	if err != nil {
 		glog.Errorf("Failed to disconnect volume %s: %v", volumeID, err)
 		return err

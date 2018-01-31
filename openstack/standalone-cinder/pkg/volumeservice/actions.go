@@ -29,7 +29,6 @@ import (
 const attachMountPoint = "/k8s.io/standalone-cinder"
 const attachHostName = "standalone-cinder.k8s.io"
 
-const initiatorName = "iqn.1994-05.com.redhat:a13fc3d1cc22"
 const pollInterval = 3 * time.Second
 const pollTimeout = 60 * time.Second
 
@@ -97,11 +96,11 @@ func ReserveCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
 // ConnectCinderVolume retrieves connection information for a cinder volume.
 // Depending on the type of volume, cinder may perform setup on a storage server
 // such as mapping a LUN to a particular ISCSI initiator.
-func ConnectCinderVolume(vs *gophercloud.ServiceClient, volumeID string) (VolumeConnection, error) {
+func ConnectCinderVolume(vs *gophercloud.ServiceClient, initiator string, volumeID string) (VolumeConnection, error) {
 	opt := volumeactions.InitializeConnectionOpts{
 		Host:      "localhost",
 		IP:        "127.0.0.1",
-		Initiator: initiatorName,
+		Initiator: initiator,
 	}
 	var rcv rcvVolumeConnection
 	err := volumeactions.InitializeConnection(vs, volumeID, &opt).ExtractInto(&rcv)
@@ -130,11 +129,11 @@ func DetachCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
 // DisconnectCinderVolume removes a connection to a cinder volume.  Depending on
 // the volume type, this may cause cinder to clean up the connection at a
 // storage server (i.e. remove a LUN mapping).
-func DisconnectCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
+func DisconnectCinderVolume(vs *gophercloud.ServiceClient, initiator string, volumeID string) error {
 	opt := volumeactions.TerminateConnectionOpts{
 		Host:      "localhost",
 		IP:        "127.0.0.1",
-		Initiator: initiatorName,
+		Initiator: initiator,
 	}
 
 	err := volumeactions.TerminateConnection(vs, volumeID, &opt).Result.Err

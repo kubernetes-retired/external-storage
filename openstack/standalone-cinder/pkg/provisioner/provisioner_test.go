@@ -344,7 +344,7 @@ func (vsb *fakeVolumeServiceBroker) reserveCinderVolume(vs *gophercloud.ServiceC
 	return vsb.mightFail.ret("reserveCinderVolume")
 }
 
-func (vsb *fakeVolumeServiceBroker) connectCinderVolume(vs *gophercloud.ServiceClient, volumeID string) (volumeservice.VolumeConnection, error) {
+func (vsb *fakeVolumeServiceBroker) connectCinderVolume(vs *gophercloud.ServiceClient, initiator string, volumeID string) (volumeservice.VolumeConnection, error) {
 	if vsb.mightFail.isSet("connectCinderVolume") {
 		return volumeservice.VolumeConnection{}, errors.New("injected error for testing")
 	}
@@ -359,7 +359,7 @@ func (vsb *fakeVolumeServiceBroker) detachCinderVolume(vs *gophercloud.ServiceCl
 	return vsb.mightFail.logRet("detachCinderVolume")
 }
 
-func (vsb *fakeVolumeServiceBroker) disconnectCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
+func (vsb *fakeVolumeServiceBroker) disconnectCinderVolume(vs *gophercloud.ServiceClient, initiator string, volumeID string) error {
 	return vsb.mightFail.logRet("disconnectCinderVolume")
 }
 

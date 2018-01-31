@@ -25,6 +25,7 @@ import (
 )
 
 const iscsiType = "iscsi"
+const initiatorName = "iqn.2018-01.io.k8s:a13fc3d1cc22"
 
 type iscsiMapper struct {
 	volumeMapper
@@ -39,9 +40,10 @@ func getChapSecretName(connection volumeservice.VolumeConnection, options contro
 }
 
 func (m *iscsiMapper) BuildPVSource(conn volumeservice.VolumeConnection, options controller.VolumeOptions) (*v1.PersistentVolumeSource, error) {
+	initiator := initiatorName[:]
 	ret := &v1.PersistentVolumeSource{
 		ISCSI: &v1.ISCSIVolumeSource{
-			// TODO: Need some way to specify the initiator name
+			InitiatorName:   &initiator,
 			TargetPortal:    conn.Data.TargetPortal,
 			IQN:             conn.Data.TargetIqn,
 			Lun:             conn.Data.TargetLun,
