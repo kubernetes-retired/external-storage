@@ -176,6 +176,18 @@ type nfsProvisioner struct {
 }
 
 var _ controller.Provisioner = &nfsProvisioner{}
+var _ controller.Qualifier = &nfsProvisioner{}
+
+// ShouldProvision returns whether provisioning should be attempted for the given
+// claim.
+func (p *nfsProvisioner) ShouldProvision(claim *v1.PersistentVolumeClaim) bool {
+	// As long as the export limit has not been reached we're ok to provision
+	ok := p.checkExportLimit()
+	if !ok {
+		glog.Infof("export limit reached. skipping claim %s/%s", claim.Namespace, claim.Name)
+	}
+	return ok
+}
 
 // Provision creates a volume i.e. the storage asset and returns a PV object for
 // the volume.
