@@ -195,22 +195,3 @@ func createIscsiConnectionInfo() volumeservice.VolumeConnection {
 		},
 	}
 }
-
-type fakeClusterBroker struct {
-	clusterBroker
-	CreatedSecret *v1.Secret
-	DeletedSecret string
-	Namespace     string
-}
-
-func (cb *fakeClusterBroker) createSecret(p *cinderProvisioner, ns string, secret *v1.Secret) error {
-	cb.CreatedSecret = secret
-	cb.Namespace = ns
-	return nil
-}
-
-func (cb *fakeClusterBroker) deleteSecret(p *cinderProvisioner, ns string, secretName string) error {
-	cb.DeletedSecret = secretName
-	cb.Namespace = ns
-	return nil
-}
