@@ -28,31 +28,37 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func createVolumeOptions() controller.VolumeOptions {
+func createPVC(name string, size string) *v1.PersistentVolumeClaim {
 	var storageClass = "storageclass"
 
 	capacity, err := resource.ParseQuantity("1Gi")
 	if err != nil {
 		glog.Error("Programmer error, cannot parse quantity string")
-		return controller.VolumeOptions{}
+		return &v1.PersistentVolumeClaim{}
 	}
-
-	return controller.VolumeOptions{
-		PVName: "testpv",
-		PVC: &v1.PersistentVolumeClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: "testns",
-			},
-			Spec: v1.PersistentVolumeClaimSpec{
-				StorageClassName: &storageClass,
-				AccessModes:      []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-				Resources: v1.ResourceRequirements{
-					Requests: v1.ResourceList{
-						v1.ResourceName(v1.ResourceStorage): capacity,
-					},
+	return &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        name,
+			Namespace:   "testns",
+			Annotations: make(map[string]string),
+		},
+		Spec: v1.PersistentVolumeClaimSpec{
+			StorageClassName: &storageClass,
+			AccessModes:      []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): capacity,
 				},
 			},
 		},
+	}
+}
+
+func createVolumeOptions() controller.VolumeOptions {
+	return controller.VolumeOptions{
+		PVName:                        "testpv",
+		PVC:                           createPVC("curPVC", "1G"),
+		Parameters:                    make(map[string]string),
 		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 	}
 }
