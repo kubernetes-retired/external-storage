@@ -151,8 +151,8 @@ $ kubectl create -f provisioner/deployment/kubernetes/gce/provisioner_generated_
 
 ##### Using local-ssd-volumes option (available via whitelist only)
 ``` console
-$ gcloud alpha container cluster create ... --local-ssd-volumes=<n>,<scsi|nvme>,fs --enable-kubernetes-alpha
-$ gcloud alpha container node-pools create ... --local-ssd-volumes=<n>,<scsi|nvme>,fs
+$ gcloud alpha container cluster create ... --local-ssd-volumes="count=<n>,type=<scsi|nvme>,format=fs" --enable-kubernetes-alpha
+$ gcloud alpha container node-pools create ... --local-ssd-volumes="count=<n>,type=<scsi|nvme>,format=fs"
 $ kubectl create -f provisioner/deployment/kubernetes/admin_account.yaml
 $ kubectl create -f provisioner/deployment/kubernetes/gce/class-local-ssds.yaml
 $ kubectl create -f provisioner/deployment/kubernetes/gce/provisioner_generated_gce_ssd_volumes.yaml
