@@ -73,8 +73,8 @@ func buildPV(m volumeMapper, p *cinderProvisioner, options controller.VolumeOpti
 			Name:      options.PVName,
 			Namespace: options.PVC.Namespace,
 			Annotations: map[string]string{
-				ProvisionerIDAnn: p.Identity,
-				CinderVolumeID:   volumeID,
+				ProvisionerIDAnn:  p.Identity,
+				CinderVolumeIDAnn: volumeID,
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{

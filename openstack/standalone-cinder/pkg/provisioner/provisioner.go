@@ -39,8 +39,8 @@ const (
 	// ProvisionerIDAnn is an annotation to identify a particular instance of this provisioner
 	ProvisionerIDAnn = "standaloneCinderProvisionerIdentity"
 
-	// CinderVolumeID is an annotation to store the ID of the associated cinder volume
-	CinderVolumeID = "cinderVolumeId"
+	// CinderVolumeIDAnn is an annotation to store the ID of the associated cinder volume
+	CinderVolumeIDAnn = "cinderVolumeId"
 )
 
 type cinderProvisioner struct {
@@ -215,9 +215,9 @@ func (p *cinderProvisioner) Delete(pv *v1.PersistentVolume) error {
 	// TODO when beta is removed, have to check kube version and pick v1/beta
 	// accordingly: maybe the controller lib should offer a function for that
 
-	volumeID, ok := pv.Annotations[CinderVolumeID]
+	volumeID, ok := pv.Annotations[CinderVolumeIDAnn]
 	if !ok {
-		return errors.New(CinderVolumeID + " annotation not found on PV")
+		return errors.New(CinderVolumeIDAnn + " annotation not found on PV")
 	}
 
 	mapper, err := p.mb.newVolumeMapperFromPV(pv)

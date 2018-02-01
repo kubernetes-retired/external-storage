@@ -61,8 +61,8 @@ func createPersistentVolume() *v1.PersistentVolume {
 	return &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
-				ProvisionerIDAnn: "identity",
-				CinderVolumeID:   "cinderVolumeID",
+				ProvisionerIDAnn:  "identity",
+				CinderVolumeIDAnn: "cinderVolumeID",
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{

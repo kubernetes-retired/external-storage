@@ -167,8 +167,8 @@ var _ = Describe("Mapper", func() {
 
 		It("should yield a valid PV associated with this provisioner", func() {
 			annotations := map[string]string{
-				ProvisionerIDAnn: "identity",
-				CinderVolumeID:   "volumeid",
+				ProvisionerIDAnn:  "identity",
+				CinderVolumeIDAnn: "volumeid",
 			}
 			accessModes := []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
 			quantity, parseErr := resource.ParseQuantity("1Gi")

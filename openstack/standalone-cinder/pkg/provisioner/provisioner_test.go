@@ -269,7 +269,7 @@ var _ = Describe("Provisioner", func() {
 
 		Context("when the cinder volume ID annotation is missing from the PV", func() {
 			BeforeEach(func() {
-				delete(pv.Annotations, CinderVolumeID)
+				delete(pv.Annotations, CinderVolumeIDAnn)
 			})
 
 			It("should fail", func() {
