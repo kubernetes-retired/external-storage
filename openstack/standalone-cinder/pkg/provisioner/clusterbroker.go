@@ -31,7 +31,7 @@ type k8sClusterBroker struct {
 	clusterBroker
 }
 
-func (k8sClusterBroker) createSecret(p *cinderProvisioner, ns string, secret *v1.Secret) error {
+func (*k8sClusterBroker) createSecret(p *cinderProvisioner, ns string, secret *v1.Secret) error {
 	_, err := p.Client.CoreV1().Secrets(ns).Create(secret)
 	if err != nil {
 		glog.Errorf("Failed to create chap secret in namespace %s: %v", ns, err)
