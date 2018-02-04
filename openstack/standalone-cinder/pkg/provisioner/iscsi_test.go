@@ -74,7 +74,7 @@ var _ = Describe("Iscsi Mapper", func() {
 
 		JustBeforeEach(func() {
 			secretName = getChapSecretName(conn, options)
-			source, err = mapper.BuildPVSource(conn, options)
+			source, err = mapper.BuildPVSource(conn, options, secretName)
 		})
 
 		It("should be populated with iscsi connection info", func() {
@@ -103,6 +103,7 @@ var _ = Describe("Iscsi Mapper", func() {
 			conn    volumeservice.VolumeConnection
 			options controller.VolumeOptions
 			err     error
+			secret  string
 		)
 
 		BeforeEach(func() {
@@ -113,7 +114,7 @@ var _ = Describe("Iscsi Mapper", func() {
 		})
 
 		JustBeforeEach(func() {
-			err = mapper.AuthSetup(&cinderProvisioner{}, options, conn)
+			secret, err = mapper.AuthSetup(&cinderProvisioner{}, options, conn)
 		})
 
 		Context("when the connection supplies CHAP credentials", func() {

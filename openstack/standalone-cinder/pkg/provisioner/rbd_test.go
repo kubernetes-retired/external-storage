@@ -71,11 +71,12 @@ var _ = Describe("Rbd Mapper", func() {
 
 	Describe("the persistent volume source", func() {
 		var (
-			mapper  rbdMapper
-			conn    volumeservice.VolumeConnection
-			options controller.VolumeOptions
-			source  *v1.PersistentVolumeSource
-			err     error
+			mapper     rbdMapper
+			conn       volumeservice.VolumeConnection
+			options    controller.VolumeOptions
+			source     *v1.PersistentVolumeSource
+			secretName string
+			err        error
 		)
 
 		BeforeEach(func() {
@@ -85,7 +86,8 @@ var _ = Describe("Rbd Mapper", func() {
 		})
 
 		JustBeforeEach(func() {
-			source, err = mapper.BuildPVSource(conn, options)
+			secretName = getRbdSecretName(options.PVC)
+			source, err = mapper.BuildPVSource(conn, options, secretName)
 		})
 
 		Context("when the connection information is valid", func() {
@@ -145,7 +147,7 @@ var _ = Describe("Rbd Mapper", func() {
 
 		Context("when called to setup", func() {
 			It("should do nothing and always succeed", func() {
-				err = mapper.AuthSetup(&cinderProvisioner{}, controller.VolumeOptions{},
+				_, err = mapper.AuthSetup(&cinderProvisioner{}, controller.VolumeOptions{},
 					volumeservice.VolumeConnection{})
 				Expect(err).To(BeNil())
 			})

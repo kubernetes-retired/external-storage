@@ -37,6 +37,9 @@ const (
 
 	// CinderVolumeID is an annotation to store the ID of the associated cinder volume
 	CinderVolumeID = "cinderVolumeId"
+
+	// SecretRefered is an annotation of pv to show whether the pv refer the secret
+	SecretRefered = "secretRefered"
 )
 
 type cinderProvisioner struct {
@@ -77,6 +80,7 @@ func (p *cinderProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 		connection volumeservice.VolumeConnection
 		mapper     volumeMapper
 		pv         *v1.PersistentVolume
+		secretName string
 		cleanupErr error
 	)
 
@@ -116,13 +120,13 @@ func (p *cinderProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 		goto ERROR_DISCONNECT
 	}
 
-	err = mapper.AuthSetup(p, options, connection)
+	secretName, err = mapper.AuthSetup(p, options, connection)
 	if err != nil {
 		glog.Errorf("Failed to prepare volume auth: %v", err)
 		goto ERROR_DISCONNECT
 	}
 
-	pv, err = p.mb.buildPV(mapper, p, options, connection, volumeID)
+	pv, err = p.mb.buildPV(mapper, p, options, connection, volumeID, secretName)
 	if err != nil {
 		glog.Errorf("Failed to build PV: %v", err)
 		goto ERROR_DISCONNECT
@@ -176,7 +180,6 @@ func (p *cinderProvisioner) Delete(pv *v1.PersistentVolume) error {
 		glog.Errorf("Failed to instantiate mapper: %s", err)
 		return err
 	}
-
 	mapper.AuthTeardown(p, pv)
 
 	err = p.vsb.disconnectCinderVolume(p.VolumeService, volumeID)
@@ -199,5 +202,6 @@ func (p *cinderProvisioner) Delete(pv *v1.PersistentVolume) error {
 	}
 
 	glog.V(2).Infof("Successfully deleted cinder volume %s", volumeID)
+
 	return nil
 }

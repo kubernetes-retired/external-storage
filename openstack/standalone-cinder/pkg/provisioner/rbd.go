@@ -49,7 +49,7 @@ func getRbdSecretName(pvc *v1.PersistentVolumeClaim) string {
 	return fmt.Sprintf("%s-cephx-secret", *pvc.Spec.StorageClassName)
 }
 
-func (m *rbdMapper) BuildPVSource(conn volumeservice.VolumeConnection, options controller.VolumeOptions) (*v1.PersistentVolumeSource, error) {
+func (m *rbdMapper) BuildPVSource(conn volumeservice.VolumeConnection, options controller.VolumeOptions, secretName string) (*v1.PersistentVolumeSource, error) {
 	mons := getMonitors(conn)
 	if mons == nil {
 		return nil, errors.New("No monitors could be parsed from connection info")
@@ -66,14 +66,14 @@ func (m *rbdMapper) BuildPVSource(conn volumeservice.VolumeConnection, options c
 			RBDImage:     splitName[1],
 			RadosUser:    conn.Data.AuthUsername,
 			SecretRef: &v1.LocalObjectReference{
-				Name: getRbdSecretName(options.PVC),
+				Name: secretName,
 			},
 		},
 	}, nil
 }
 
-func (m *rbdMapper) AuthSetup(p *cinderProvisioner, options controller.VolumeOptions, conn volumeservice.VolumeConnection) error {
-	return nil
+func (m *rbdMapper) AuthSetup(p *cinderProvisioner, options controller.VolumeOptions, conn volumeservice.VolumeConnection) (string, error) {
+	return getRbdSecretName(options.PVC), nil
 }
 
 func (m *rbdMapper) AuthTeardown(p *cinderProvisioner, pv *v1.PersistentVolume) error {
