@@ -32,3 +32,4 @@ spec:
           requests:
             cpu: 50m
             memory: 64Mi
+      serviceAccount: digitalocean-provisioner
