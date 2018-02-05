@@ -202,12 +202,7 @@ $ kubectl create -f provisioner/deployment/kubernetes/example-storageclass.yaml
 
 #### Option 1: Using the local volume static provisioner 
 
-1. Create an admin account with cluster admin privilege:
-``` console
-$ kubectl create -f ./provisioner/deployment/kubernetes/admin_account.yaml  
-```
-
-2. Generate Provisioner's DaemonSet and ConfigMap spec, and customize it.
+1. Generate Provisioner's ServiceAccount, DaemonSet and ConfigMap spec, and customize it.
 This step uses helm templates to generate the specs.  See the [helm README](helm) for setup instructions.
 To generate the provisioner's specs using the [default values](helm/provisioner/values.yaml), run:
 
@@ -231,7 +226,7 @@ Parameter **--set engine=** canbe used in conjunction with custom vlues.yaml fil
 
 Note: By default, common.rbac is set to true which generates the necessary ServiceAccount, ClusterRole and ClusterRoleBinding.
 
-3. Deploy Provisioner 
+2. Deploy Provisioner 
 Once a user is satisfied with the content of Provisioner's yaml file, **kubectl** can be used
 to create Provisioner's DaemonSet and ConfigMap.
 
@@ -239,7 +234,7 @@ to create Provisioner's DaemonSet and ConfigMap.
 $ kubectl create -f ./provisioner/deployment/kubernetes/provisioner_generated.yaml 
 ```
 
-4. Check discovered local volumes
+3. Check discovered local volumes
 Once launched, the external static provisioner will discover and create local-volume PVs.
 
 For example, if the directory `/mnt/disks/` contained one directory `/mnt/disks/vol1` then the following
