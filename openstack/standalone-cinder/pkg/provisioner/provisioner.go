@@ -19,13 +19,17 @@ package provisioner
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/golang/glog"
 	"github.com/gophercloud/gophercloud"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	"github.com/kubernetes-incubator/external-storage/openstack/standalone-cinder/pkg/volumeservice"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/kubernetes"
+
+	volumes_v2 "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
 )
 
 const (
@@ -71,9 +75,39 @@ func NewCinderProvisioner(client kubernetes.Interface, id, configFilePath string
 	}, nil
 }
 
+func getCreateOptions(options controller.VolumeOptions) (volumes_v2.CreateOpts, error) {
+	name := fmt.Sprintf("cinder-dynamic-pvc-%s", uuid.NewUUID())
+	capacity := options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
+	sizeBytes := capacity.Value()
+	// Cinder works with gigabytes, convert to GiB with rounding up
+	sizeGB := int((sizeBytes + 1024*1024*1024 - 1) / (1024 * 1024 * 1024))
+	volType := ""
+	availability := "nova"
+	// Apply ProvisionerParameters (case-insensitive). We leave validation of
+	// the values to the cloud provider.
+	for k, v := range options.Parameters {
+		switch strings.ToLower(k) {
+		case "type":
+			volType = v
+		case "availability":
+			availability = v
+		default:
+			return volumes_v2.CreateOpts{}, fmt.Errorf("invalid option %q", k)
+		}
+	}
+
+	return volumes_v2.CreateOpts{
+		Name:             name,
+		Size:             sizeGB,
+		VolumeType:       volType,
+		AvailabilityZone: availability,
+	}, nil
+}
+
 // Provision creates a storage asset and returns a PV object representing it.
 func (p *cinderProvisioner) Provision(options controller.VolumeOptions) (*v1.PersistentVolume, error) {
 	var (
+		volumeID   string
 		connection volumeservice.VolumeConnection
 		mapper     volumeMapper
 		pv         *v1.PersistentVolume
@@ -85,8 +119,12 @@ func (p *cinderProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 	}
 
 	// TODO: Check access mode
-
-	volumeID, err := p.vsb.createCinderVolume(p.VolumeService, options)
+	createOptions, err := getCreateOptions(options)
+	if err != nil {
+		glog.Error(err)
+		goto ERROR
+	}
+	volumeID, err = p.vsb.createCinderVolume(p.VolumeService, createOptions)
 	if err != nil {
 		glog.Errorf("Failed to create volume")
 		goto ERROR
