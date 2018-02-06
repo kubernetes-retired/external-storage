@@ -1,0 +1,29 @@
+{{- if .Values.common.rbac }}
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: local-storage-provisioner-pv-binding
+  namespace: {{ .Values.common.namespace }}
+subjects:
+- kind: ServiceAccount
+  name: {{ .Values.daemonset.serviceAccount }}
+  namespace: {{ .Values.common.namespace }}
+roleRef:
+  kind: ClusterRole
+  name: system:persistent-volume-provisioner
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: local-storage-provisioner-node-binding
+  namespace: {{ .Values.common.namespace }}
+subjects:
+- kind: ServiceAccount
+  name: {{ .Values.daemonset.serviceAccount }}
+  namespace: {{ .Values.common.namespace }}
+roleRef:
+  kind: ClusterRole
+  name: system:node
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}

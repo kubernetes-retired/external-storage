@@ -139,6 +139,7 @@ deployment spec and skip to [step 4](#step-4-create-local-persistent-volume-clai
 unless you want to customize the provisioner spec or storage classes.
 
 ##### Using local-ssd-count option
+
 ``` console
 $ gcloud container cluster create ... --local-ssd-count=<n> --enable-kubernetes-alpha
 $ gcloud container node-pools create ... --local-ssd-count=<n>
@@ -150,6 +151,7 @@ $ kubectl create -f provisioner/deployment/kubernetes/gce/provisioner_generated_
 ```
 
 ##### Using local-ssd-volumes option (available via whitelist only)
+
 ``` console
 $ gcloud alpha container cluster create ... --local-ssd-volumes="count=<n>,type=<scsi|nvme>,format=fs" --enable-kubernetes-alpha
 $ gcloud alpha container node-pools create ... --local-ssd-volumes="count=<n>,type=<scsi|nvme>,format=fs"
@@ -190,6 +192,7 @@ $ ALLOW_PRIVILEGED=true LOG_LEVEL=5 FEATURE_GATES=$KUBE_FEATURE_GATES hack/local
 ```
 
 ### Step 2: Creating a StorageClass (1.9+)
+
 To delay volume binding until pod scheduling and to handle multiple local PVs in
 a single pod, a StorageClass must to be created with `volumeBindingMode` set to
 `WaitForFirstConsumer`.
@@ -202,12 +205,7 @@ $ kubectl create -f provisioner/deployment/kubernetes/example-storageclass.yaml
 
 #### Option 1: Using the local volume static provisioner 
 
-1. Create an admin account with cluster admin privilege:
-``` console
-$ kubectl create -f ./provisioner/deployment/kubernetes/admin_account.yaml  
-```
-
-2. Generate Provisioner's DaemonSet and ConfigMap spec, and customize it.
+1. Generate Provisioner's ServiceAccount, Roles, DaemonSet and ConfigMap spec, and customize it.
 This step uses helm templates to generate the specs.  See the [helm README](helm) for setup instructions.
 To generate the provisioner's specs using the [default values](helm/provisioner/values.yaml), run:
 
@@ -229,7 +227,13 @@ helm template ./helm/provisioner --set engine=gke > ./provisioner/deployment/kub
 ```
 Parameter **--set engine=** canbe used in conjunction with custom vlues.yaml file in the same command line.
 
-3. Deploy Provisioner 
+Note: By default, common.rbac is set to "true" which generates the necessary ServiceAccount, ClusterRole and ClusterRoleBinding for an RBAC(Role Based Access Control) enabled kubernetes cluster. If your cluster does not use RBAC, you should add --set common.rbac=false when running your helm install command, such as:
+
+``` console
+helm template ./helm/provisioner --set common.rbac=false > ./provisioner/deployment/kubernetes/provisioner_generated.yaml
+```
+
+2. Deploy Provisioner 
 Once a user is satisfied with the content of Provisioner's yaml file, **kubectl** can be used
 to create Provisioner's DaemonSet and ConfigMap.
 
@@ -237,7 +241,7 @@ to create Provisioner's DaemonSet and ConfigMap.
 $ kubectl create -f ./provisioner/deployment/kubernetes/provisioner_generated.yaml 
 ```
 
-4. Check discovered local volumes
+3. Check discovered local volumes
 Once launched, the external static provisioner will discover and create local-volume PVs.
 
 For example, if the directory `/mnt/disks/` contained one directory `/mnt/disks/vol1` then the following
