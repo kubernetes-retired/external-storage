@@ -17,17 +17,12 @@ limitations under the License.
 package volumeservice
 
 import (
-	"fmt"
-	"strings"
 	"time"
 
 	"github.com/golang/glog"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions"
 	volumes_v2 "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
-	"github.com/kubernetes-incubator/external-storage/lib/controller"
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/uuid"
 )
 
 const initiatorName = "iqn.1994-05.com.redhat:a13fc3d1cc22"
@@ -65,38 +60,11 @@ type rcvVolumeConnection struct {
 }
 
 // CreateCinderVolume creates a new volume in cinder according to the PVC specifications
-func CreateCinderVolume(vs *gophercloud.ServiceClient, options controller.VolumeOptions) (string, error) {
-	name := fmt.Sprintf("cinder-dynamic-pvc-%s", uuid.NewUUID())
-	capacity := options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-	sizeBytes := capacity.Value()
-	// Cinder works with gigabytes, convert to GiB with rounding up
-	sizeGB := int((sizeBytes + 1024*1024*1024 - 1) / (1024 * 1024 * 1024))
-	volType := ""
-	availability := "nova"
-	// Apply ProvisionerParameters (case-insensitive). We leave validation of
-	// the values to the cloud provider.
-	for k, v := range options.Parameters {
-		switch strings.ToLower(k) {
-		case "type":
-			volType = v
-		case "availability":
-			availability = v
-		default:
-			return "", fmt.Errorf("invalid option %q", k)
-		}
-	}
-
-	opts := volumes_v2.CreateOpts{
-		Name:             name,
-		Size:             sizeGB,
-		VolumeType:       volType,
-		AvailabilityZone: availability,
-	}
-
-	vol, err := volumes_v2.Create(vs, &opts).Extract()
+func CreateCinderVolume(vs *gophercloud.ServiceClient, options volumes_v2.CreateOpts) (string, error) {
+	vol, err := volumes_v2.Create(vs, &options).Extract()
 
 	if err != nil {
-		glog.Errorf("Failed to create a %d GiB volume: %v", sizeGB, err)
+		glog.Errorf("Failed to create a %d GiB volume: %v", options.Size, err)
 		return "", err
 	}
 
