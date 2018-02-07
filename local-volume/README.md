@@ -22,66 +22,28 @@ directories by creating and cleaning up PersistentVolumes for each volume.
 * The static provisioner only discovers mount points.  For directory-based local
   volumes, they must be bind-mounted into the discovery directories.
 
-## Feature Status
+## K8s Feature Status
+
+Also see [known issues](KNOWN_ISSUES.md) and [provisioner CHANGELOG](provisioner/CHANGELOG.md).
 
 ### 1.9: Alpha
 
-**Important:** `PersistentLocalVolumes`, `VolumeScheduling`, and
-`MountPropagation` [feature gates must be enabled starting in 1.9](#enabling-the-alpha-feature-gates).
-
-What works:
-* Everything in 1.7.
-* New StorageClass `volumeBindingMode` parameter that fixes the previous
-  issues:
-    * Multiple local PVCs in a single pod.
-    * PVC binding is delayed until pod scheduling and takes into account all the
-      pod's scheduling requirements.
-
-What doesn't work:
-* If you prebind a PVC (by setting PVC.VolumeName) at the same time that another
-Pod is being scheduled, it's possible that the Pod's PVCs will encounter a partial
-binding failure.  Manual recovery is needed in this situation.
-    * Workarounds:
-         * Don't prebind PVCs and have Kubernetes bind volumes for the same
-           StorageClass.
-         * Prebind PV upon creation instead.
+* New StorageClass `volumeBindingMode` parameter that will delay PVC binding
+  until a pod is scheduled.
 
 ### 1.7: Alpha
 
-What works:
-* Create a PV specifying a directory with node affinity.
+* New `local` PersistentVolume source that allows specifying a directory or mount
+  point with node affinity.
 * Pod using the PVC that is bound to this PV will always get scheduled to that node.
-* External static provisioner DaemonSet that discovers local directories,
-  creates, cleans up and deletes PVs.
-
-What doesn't work and workarounds:
-* Multiple local PVCs in a single pod.
-    * Goal for 1.9.
-    * No known workarounds.
-* PVC binding does not consider pod scheduling requirements and may make
-  suboptimal or incorrect decisions.
-    * Goal for 1.9.
-    * Workarounds:
-        * Run your pods that require local storage first.
-        * Give your pods high priority.
-        * Run a workaround controller that unbinds PVCs for pods that are
-          stuck pending. TODO: add link
-* The provisioner will not correctly detect mounts added after it
-  has been started without mount propogation.
-  * This issue is resolved in provisioner 2.0 when the mount propagation
-  alpha feature gate is enabled, which is available in Kubernetes 1.8+.
-  * The provisioner 1.x will detect the existance of a new directory in the
-  discovery directory. Then, it will incorrectly create a local PV with
-  the root filesystem capacity. 
-  * Provisioner 1.x workaround: Before adding any new mount points, stop
-  the provisioner daemonset, add the new mount points, start the daemonset.
 
 ### Future features
-* Local block devices as a volume source, with partitioning and fs formatting
+
 * Pod accessing local raw block device
+* Local block devices as a volume source, with partitioning and fs formatting
+* Dynamic provisioning for shared local persistent storage
 * Local PV health monitoring, taints and tolerations
 * Inline PV (use dedicated local disk as ephemeral storage)
-* Dynamic provisioning for shared local persistent storage
 
 ## User Guide
 
