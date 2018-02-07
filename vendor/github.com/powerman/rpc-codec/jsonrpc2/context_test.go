@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/rpc"
 	"reflect"
-	"sort"
 	"testing"
 
 	"github.com/powerman/rpc-codec/jsonrpc2"
@@ -223,7 +222,6 @@ func TestContextBatch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sort.Slice(res, func(i, j int) bool { return res[i]["id"].(float64) < res[j]["id"].(float64) })
 	if !reflect.DeepEqual(want, res) {
 		t.Errorf("%s:\n\n\texp: %#v\n\n\tgot: %#v\n\n", req, want, res)
 	}

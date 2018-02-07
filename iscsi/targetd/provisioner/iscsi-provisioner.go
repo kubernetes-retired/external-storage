@@ -143,7 +143,7 @@ func (p *iscsiProvisioner) Provision(options controller.VolumeOptions) (*v1.Pers
 				v1.ResourceName(v1.ResourceStorage): options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)],
 			},
 			PersistentVolumeSource: v1.PersistentVolumeSource{
-				ISCSI: &v1.ISCSIVolumeSource{
+				ISCSI: &v1.ISCSIPersistentVolumeSource{
 					TargetPortal:      options.Parameters["targetPortal"],
 					Portals:           portals,
 					IQN:               options.Parameters["iqn"],
@@ -153,7 +153,7 @@ func (p *iscsiProvisioner) Provision(options controller.VolumeOptions) (*v1.Pers
 					FSType:            getFsType(options.Parameters["fsType"]),
 					DiscoveryCHAPAuth: getBool(options.Parameters["chapAuthDiscovery"]),
 					SessionCHAPAuth:   getBool(options.Parameters["chapAuthSession"]),
-					SecretRef:         getSecretRef(getBool(options.Parameters["chapAuthDiscovery"]), getBool(options.Parameters["chapAuthSession"]), &v1.LocalObjectReference{Name: viper.GetString("provisioner-name") + "-chap-secret"}),
+					SecretRef:         getSecretRef(getBool(options.Parameters["chapAuthDiscovery"]), getBool(options.Parameters["chapAuthSession"]), &v1.SecretReference{Name: viper.GetString("provisioner-name") + "-chap-secret"}),
 				},
 			},
 		},
@@ -176,7 +176,7 @@ func getFsType(fsType string) string {
 	return fsType
 }
 
-func getSecretRef(discovery bool, session bool, ref *v1.LocalObjectReference) *v1.LocalObjectReference {
+func getSecretRef(discovery bool, session bool, ref *v1.SecretReference) *v1.SecretReference {
 	if discovery || session {
 		return ref
 	}

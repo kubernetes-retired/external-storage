@@ -110,7 +110,8 @@ func BenchmarkGOBRPC_tcp(b *testing.B) {
 
 func BenchmarkJSONRPC2_http(b *testing.B) {
 	ts := httptest.NewServer(jsonrpc2.HTTPHandler(nil))
-	defer ts.Close()
+	// Don't close because of https://github.com/golang/go/issues/12262
+	// defer ts.Close()
 	client := jsonrpc2.NewHTTPClient(ts.URL)
 	defer client.Close()
 	benchmarkRPC(b, client)
@@ -118,7 +119,8 @@ func BenchmarkJSONRPC2_http(b *testing.B) {
 
 func BenchmarkGOBRPC_http(b *testing.B) {
 	ts := httptest.NewServer(rpc.DefaultServer)
-	defer ts.Close()
+	// Don't close because of https://github.com/golang/go/issues/12262
+	// defer ts.Close()
 	client, err := rpc.DialHTTP("tcp", ts.URL[7:])
 	if err != nil {
 		b.Errorf("rpc.DialHTTP(tcp, %q), err = %v", ts.URL, err)

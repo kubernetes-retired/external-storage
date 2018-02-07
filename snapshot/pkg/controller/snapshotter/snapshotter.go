@@ -700,14 +700,7 @@ func (vs *volumeSnapshotter) updateVolumeSnapshotMetadata(snapshot *crdv1.Volume
 	}
 
 	// Copy the snapshot object before updating it
-	objCopy, err := vs.scheme.DeepCopy(&snapshotObj)
-	if err != nil {
-		return nil, fmt.Errorf("Error copying snapshot object %s object: %v", snapshot.Metadata.Name, err)
-	}
-	snapshotCopy, ok := objCopy.(*crdv1.VolumeSnapshot)
-	if !ok {
-		return nil, fmt.Errorf("Error: expecting type VolumeSnapshot but received type %T", objCopy)
-	}
+	snapshotCopy := snapshotObj.DeepCopy()
 
 	tags := make(map[string]string)
 	tags[snapshotMetadataTimeStamp] = fmt.Sprintf("%d", time.Now().UnixNano())
@@ -750,8 +743,7 @@ func (vs *volumeSnapshotter) UpdateVolumeSnapshotStatus(snapshot *crdv1.VolumeSn
 	if err != nil {
 		return nil, err
 	}
-	objCopy, err := vs.scheme.DeepCopy(&snapshotObj.Status)
-	oldStatus := objCopy.(*crdv1.VolumeSnapshotStatus)
+	oldStatus := snapshotObj.Status.DeepCopy()
 
 	status := snapshotObj.Status
 	isEqual := false
@@ -807,14 +799,7 @@ func (vs *volumeSnapshotter) bindandUpdateVolumeSnapshot(uniqueSnapshotName stri
 		Do().Into(&snapshotObj)
 
 	// TODO: Is copy needed here?
-	objCopy, err := vs.scheme.DeepCopy(&snapshotObj)
-	if err != nil {
-		return nil, fmt.Errorf("Error copying snapshot object %s object from API server: %v", uniqueSnapshotName, err)
-	}
-	snapshotCopy, ok := objCopy.(*crdv1.VolumeSnapshot)
-	if !ok {
-		return nil, fmt.Errorf("Error: expecting type VolumeSnapshot but received type %T", objCopy)
-	}
+	snapshotCopy := snapshotObj.DeepCopy()
 
 	snapshotCopy.Spec.SnapshotDataName = snapshotDataName
 	if status != nil {
