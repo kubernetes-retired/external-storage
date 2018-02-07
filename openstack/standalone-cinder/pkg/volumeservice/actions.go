@@ -17,15 +17,19 @@ limitations under the License.
 package volumeservice
 
 import (
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions"
 	volumes_v2 "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 const initiatorName = "iqn.1994-05.com.redhat:a13fc3d1cc22"
+const interval = 3 * time.Second
+const timeout = 60 * time.Second
 
 // VolumeConnectionDetails represent the type-specific values for a given
 // DriverVolumeType.  Depending on the volume type, fields may be absent or
@@ -76,12 +80,10 @@ func CreateCinderVolume(vs *gophercloud.ServiceClient, options volumes_v2.Create
 // become available.  The connection information cannot be retrieved from cinder
 // until the volume is available.
 func WaitForAvailableCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
-	// TODO: Implement proper polling instead of brain-dead timers
-	c := make(chan error)
-	go time.AfterFunc(5*time.Second, func() {
-		c <- nil
+	return wait.Poll(interval, timeout, func() (bool, error) {
+		status, err := GetCinderVolumeStatus(vs, volumeID)
+		return strings.ToLower(status) == "available", err
 	})
-	return <-c
 }
 
 // ReserveCinderVolume marks the volume as 'Attaching' in cinder.  This prevents
@@ -143,4 +145,14 @@ func DeleteCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
 	}
 
 	return err
+}
+
+// GetCinderVolumeStatus get the given cinder volume status.
+func GetCinderVolumeStatus(vs *gophercloud.ServiceClient, volumeID string) (string, error) {
+	volume, err := volumes_v2.Get(vs, volumeID).Extract()
+	if err != nil {
+		glog.Errorf("Failed to get volume:%v ", volumeID)
+		return "", err
+	}
+	return volume.Status, nil
 }

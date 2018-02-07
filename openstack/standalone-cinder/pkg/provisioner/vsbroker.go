@@ -31,6 +31,7 @@ type volumeServiceBroker interface {
 	disconnectCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error
 	unreserveCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error
 	deleteCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error
+	getCinderVolumeStatus(vs *gophercloud.ServiceClient, volumeID string) (string, error)
 }
 
 type gophercloudBroker struct {
@@ -63,4 +64,8 @@ func (vsb *gophercloudBroker) unreserveCinderVolume(vs *gophercloud.ServiceClien
 
 func (vsb *gophercloudBroker) deleteCinderVolume(vs *gophercloud.ServiceClient, volumeID string) error {
 	return volumeservice.DeleteCinderVolume(vs, volumeID)
+}
+
+func (vsb *gophercloudBroker) getCinderVolumeStatus(vs *gophercloud.ServiceClient, volumeID string) (string, error) {
+	return volumeservice.GetCinderVolumeStatus(vs, volumeID)
 }
