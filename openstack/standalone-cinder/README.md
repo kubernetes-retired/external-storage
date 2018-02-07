@@ -29,9 +29,44 @@ cinder deployment with keystone managing authentication and
 providing the service catalog, and a standalone configuration where
 cinder is accessed directly.
 
-Conventional cinder deployments can be used by supplying a clound
+Cinder deployments can be used by supplying a clound
 config file identical to the one you would use to configure an
-openstack cloud provider.
+openstack cloud provider or by specifying authentication parameters
+in the environment.
+
+```ini
+# Example configuration: keystone auth via cloudconfig
+[Global]
+auth-url=http://keystone-host:5000/v2.0
+username=admin
+password=Passw0rd!
+region=RegionOne
+tenant-id=637b7373213d439d8119285244481456
+```
+
+```ini
+# Example configuration: noauth via cloudconfig
+[Global]
+cinder-endpoint=http://cinder-host:8776/v2
+username=admin
+tenant-name=admin
+```
+
+```sh
+# Example configuration: keystone auth via environment variables
+OS_AUTH_URL=http://keystone-host:5000/v2.0
+OS_USERNAME=admin
+OS_PASSWORD=Passw0rd!
+OS_TENANT_ID=637b7373213d439d8119285244481456
+OS_REGION_NAME=RegionOne
+```
+
+```sh
+# Example configuration: noauth via environment variables
+OS_CINDER_ENDPOINT=http://cinder-host:8776/v2
+OS_USERNAME=admin
+OS_TENANT_NAME=admin
+```
 
 ### Workflows
 | User       | Kubernetes   | Provisioner  | Cinder       |

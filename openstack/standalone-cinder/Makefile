@@ -35,8 +35,7 @@ container: build
 	docker tag $(MUTABLE_IMAGE) $(IMAGE)
 
 test:
-	go test ./pkg/provisioner
-
+	go test -cover ./pkg/provisioner ./pkg/volumeservice
 
 clean:
 	-rm cinder-provisioner
