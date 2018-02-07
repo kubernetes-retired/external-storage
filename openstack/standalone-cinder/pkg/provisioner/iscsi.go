@@ -40,7 +40,7 @@ func getChapSecretName(connection volumeservice.VolumeConnection, options contro
 
 func (m *iscsiMapper) BuildPVSource(conn volumeservice.VolumeConnection, options controller.VolumeOptions) (*v1.PersistentVolumeSource, error) {
 	ret := &v1.PersistentVolumeSource{
-		ISCSI: &v1.ISCSIVolumeSource{
+		ISCSI: &v1.ISCSIPersistentVolumeSource{
 			// TODO: Need some way to specify the initiator name
 			TargetPortal:    conn.Data.TargetPortal,
 			IQN:             conn.Data.TargetIqn,
@@ -51,7 +51,7 @@ func (m *iscsiMapper) BuildPVSource(conn volumeservice.VolumeConnection, options
 	secretName := getChapSecretName(conn, options)
 	if secretName != "" {
 		ret.ISCSI.SessionCHAPAuth = true
-		ret.ISCSI.SecretRef = &v1.LocalObjectReference{
+		ret.ISCSI.SecretRef = &v1.SecretReference{
 			Name: secretName,
 		}
 	}

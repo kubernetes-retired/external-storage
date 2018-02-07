@@ -226,7 +226,7 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 
 	glog.V(1).Infof(" Volume configuration : %+v", blockVol)
 
-	secretRef := &v1.LocalObjectReference{}
+	secretRef := &v1.SecretReference{}
 
 	if cfg.chapAuthEnabled && iscsiVol.User != "" && iscsiVol.AuthKey != "" {
 		nameSpace := options.PVC.Namespace
@@ -283,7 +283,7 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 				v1.ResourceName(v1.ResourceStorage): options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)],
 			},
 			PersistentVolumeSource: v1.PersistentVolumeSource{
-				ISCSI: &v1.ISCSIVolumeSource{
+				ISCSI: &v1.ISCSIPersistentVolumeSource{
 					TargetPortal:    iscsiVol.TargetPortal,
 					Portals:         iscsiVol.Portals,
 					IQN:             iscsiVol.Iqn,
@@ -301,7 +301,7 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 }
 
 //createSecretRef() creates a secret reference.
-func (p *glusterBlockProvisioner) createSecretRef(nameSpace string, secretName string, user string, password string) (*v1.LocalObjectReference, error) {
+func (p *glusterBlockProvisioner) createSecretRef(nameSpace string, secretName string, user string, password string) (*v1.SecretReference, error) {
 	var err error
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -315,7 +315,7 @@ func (p *glusterBlockProvisioner) createSecretRef(nameSpace string, secretName s
 		Type: chapType,
 	}
 
-	secretRef := &v1.LocalObjectReference{}
+	secretRef := &v1.SecretReference{}
 	if secret != nil {
 		_, err = p.client.CoreV1().Secrets(nameSpace).Create(secret)
 		if err != nil && errors.IsAlreadyExists(err) {

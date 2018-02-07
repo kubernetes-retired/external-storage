@@ -60,12 +60,12 @@ func (m *rbdMapper) BuildPVSource(conn volumeservice.VolumeConnection, options c
 	}
 
 	return &v1.PersistentVolumeSource{
-		RBD: &v1.RBDVolumeSource{
+		RBD: &v1.RBDPersistentVolumeSource{
 			CephMonitors: mons,
 			RBDPool:      splitName[0],
 			RBDImage:     splitName[1],
 			RadosUser:    conn.Data.AuthUsername,
-			SecretRef: &v1.LocalObjectReference{
+			SecretRef: &v1.SecretReference{
 				Name: getRbdSecretName(options.PVC),
 			},
 		},
