@@ -24,7 +24,9 @@ import (
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	"github.com/kubernetes-incubator/external-storage/openstack/standalone-cinder/pkg/volumeservice"
+
 	"k8s.io/api/core/v1"
+	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 )
 
 const rbdType = "rbd"
@@ -46,7 +48,7 @@ func getMonitors(conn volumeservice.VolumeConnection) []string {
 }
 
 func getRbdSecretName(pvc *v1.PersistentVolumeClaim) string {
-	return fmt.Sprintf("%s-cephx-secret", *pvc.Spec.StorageClassName)
+	return fmt.Sprintf("%s-cephx-secret", helper.GetPersistentVolumeClaimClass(pvc))
 }
 
 func (m *rbdMapper) BuildPVSource(conn volumeservice.VolumeConnection, options controller.VolumeOptions) (*v1.PersistentVolumeSource, error) {
