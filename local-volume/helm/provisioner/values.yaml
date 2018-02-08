@@ -1,5 +1,9 @@
 common:
   #
+  # Defines whether to generate service account and role bindings.
+  #
+  rbac: true
+  #
   # Defines the namespace where provisioner runs
   #
   namespace: default
