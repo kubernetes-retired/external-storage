@@ -10,6 +10,7 @@ parameters:
   adminSecretNamespace: kube-system
   adminSecretName: ceph-admin-secret
   userId: kube
+  userSecretNamespace: kube-system
   userSecretName: ceph-secret
   imageFormat: "2"
   imageFeatures: layering
