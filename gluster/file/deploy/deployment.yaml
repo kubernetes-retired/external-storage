@@ -1,0 +1,19 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: glusterfile-provisioner
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: glusterfile-provisioner
+    spec:
+      containers:
+          env:
+              name: PROVISIONER_NAME
+              value: gluster.org/glusterfile
+          image: "quay.io/external_storage/glusterfile-provisioner:latest"
+          name: glusterfile-provisioner
