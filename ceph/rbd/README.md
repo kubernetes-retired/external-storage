@@ -41,7 +41,7 @@ kubectl create secret generic ceph-admin-secret --from-file=/tmp/secret --namesp
 ceph osd pool create kube 8 8
 ceph auth add client.kube mon 'allow r' osd 'allow rwx pool=kube'
 ceph auth get client.kube 2>&1 |grep "key = " |awk '{print  $3'} |xargs echo -n > /tmp/secret
-kubectl create secret generic ceph-secret --from-file=/tmp/secret --namespace=default
+kubectl create secret generic ceph-secret --from-file=/tmp/secret --namespace=kube-system
 ```
 
 * Start RBD provisioner

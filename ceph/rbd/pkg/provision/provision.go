@@ -67,9 +67,10 @@ type rbdProvisionOptions struct {
 	adminSecret string
 	// Ceph client ID that is used to map the RBD image. Default is the same as admin client ID.
 	userID string
-	// The name of Ceph Secret for userId to map RBD image. It must exist in
-	// the same namespace as PVCs. This parameter is required.
+	// The name of Ceph Secret for userID to map RBD image. This parameter is required.
 	userSecretName string
+	// The namespace of Ceph Secret for userID to map RBD image. This parameter is optional.
+	userSecretNamespace string
 	// fsType that is supported by kubernetes. Default: "ext4".
 	fsType string
 	// Ceph RBD image format, "1" or "2". Default is "1".
@@ -132,6 +133,9 @@ func (p *rbdProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 
 	rbd.SecretRef = new(v1.SecretReference)
 	rbd.SecretRef.Name = opts.userSecretName
+	if len(opts.userSecretNamespace) > 0 {
+		rbd.SecretRef.Namespace = opts.userSecretNamespace
+	}
 	rbd.RadosUser = opts.userID
 
 	pv := &v1.PersistentVolume{
@@ -223,6 +227,7 @@ func lookuphost(hostname string, serverip string) (iplist []string, err error) {
 
 	return iplist, nil
 }
+
 func splitHostPort(hostport string) (host, port string) {
 	host, port, err := net.SplitHostPort(hostport)
 	if err != nil {
@@ -305,6 +310,8 @@ func (p *rbdProvisioner) parseParameters(parameters map[string]string) (*rbdProv
 				return nil, fmt.Errorf("missing user secret name")
 			}
 			opts.userSecretName = v
+		case "usersecretnamespace":
+			opts.userSecretNamespace = v
 		case "imageformat":
 			if v != rbdImageFormat1 && v != rbdImageFormat2 {
 				return nil, fmt.Errorf("invalid ceph imageformat %s, expecting %s or %s", v, rbdImageFormat1, rbdImageFormat2)
