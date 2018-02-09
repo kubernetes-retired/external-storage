@@ -19,6 +19,10 @@ package provisioner
 import (
 	"errors"
 	"fmt"
+	"sort"
+	"strconv"
+	"strings"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	"github.com/kubernetes-incubator/external-storage/lib/util"
@@ -27,9 +31,6 @@ import (
 	"github.com/spf13/viper"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sort"
-	"strconv"
-	"strings"
 )
 
 var log = logrus.New()
@@ -142,6 +143,8 @@ func (p *iscsiProvisioner) Provision(options controller.VolumeOptions) (*v1.Pers
 			Capacity: v1.ResourceList{
 				v1.ResourceName(v1.ResourceStorage): options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)],
 			},
+			// set volumeMode from PVC Spec
+			VolumeMode: options.PVC.Spec.VolumeMode,
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				ISCSI: &v1.ISCSIPersistentVolumeSource{
 					TargetPortal:      options.Parameters["targetPortal"],
