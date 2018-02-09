@@ -261,6 +261,7 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 		modeAnn = "url:" + cfg.url + "," + "user:" + cfg.user + "," + "secret:" + cfg.restSecretName + "," + "secretnamespace:" + cfg.restSecretNamespace
 	}
 
+	volMode := v1.PersistentVolumeBlock
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: options.PVName,
@@ -277,6 +278,7 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{
+			VolumeMode:                    &volMode,
 			PersistentVolumeReclaimPolicy: options.PersistentVolumeReclaimPolicy,
 			AccessModes:                   options.PVC.Spec.AccessModes,
 			Capacity: v1.ResourceList{
