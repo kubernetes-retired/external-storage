@@ -34,17 +34,21 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	fakev1core "k8s.io/client-go/kubernetes/typed/core/v1/fake"
 	testclient "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/cache"
 	fcache "k8s.io/client-go/tools/cache/testing"
 	ref "k8s.io/client-go/tools/reference"
+	utilversion "k8s.io/kubernetes/pkg/util/version"
 )
 
 const (
 	resyncPeriod         = 100 * time.Millisecond
+	sharedResyncPeriod   = 1 * time.Second
 	defaultServerVersion = "v1.5.0"
 )
 
@@ -510,6 +514,76 @@ func TestIsOnlyRecordUpdate(t *testing.T) {
 	}
 }
 
+func TestControllerSharedInformers(t *testing.T) {
+	tests := []struct {
+		name            string
+		objs            []runtime.Object
+		provisionerName string
+		expectedVolumes []v1.PersistentVolume
+		serverVersion   string
+	}{
+		{
+			name: "provision for claim-1 with v1beta1 storage class",
+			objs: []runtime.Object{
+				newStorageClass("class-1", "foo.bar/baz"),
+				newClaim("claim-1", "uid-1-1", "class-1", "foo.bar/baz", "", nil),
+			},
+			provisionerName: "foo.bar/baz",
+			serverVersion:   "v1.5.0",
+			expectedVolumes: []v1.PersistentVolume{
+				*newProvisionedVolume(newStorageClass("class-1", "foo.bar/baz"), newClaim("claim-1", "uid-1-1", "class-1", "foo.bar/baz", "", nil)),
+			},
+		},
+		{
+			name: "provision for claim-1 with v1 storage class",
+			objs: []runtime.Object{
+				newStorageClassWithSpecifiedReclaimPolicy("class-1", "foo.bar/baz", v1.PersistentVolumeReclaimDelete),
+				newClaim("claim-1", "uid-1-1", "class-1", "foo.bar/baz", "", nil),
+			},
+			provisionerName: "foo.bar/baz",
+			serverVersion:   "v1.8.0",
+			expectedVolumes: []v1.PersistentVolume{
+				*newProvisionedVolumeWithSpecifiedReclaimPolicy(newStorageClassWithSpecifiedReclaimPolicy("class-1", "foo.bar/baz", v1.PersistentVolumeReclaimDelete), newClaim("claim-1", "uid-1-1", "class-1", "foo.bar/baz", "", nil)),
+			},
+		},
+		{
+			name: "delete volume-1",
+			objs: []runtime.Object{
+				newVolume("volume-1", v1.VolumeReleased, v1.PersistentVolumeReclaimDelete, map[string]string{annDynamicallyProvisioned: "foo.bar/baz"}),
+			},
+			provisionerName: "foo.bar/baz",
+			expectedVolumes: []v1.PersistentVolume{},
+		},
+	}
+
+	for _, test := range tests {
+		client := fake.NewSimpleClientset(test.objs...)
+
+		serverVersion := defaultServerVersion
+		if test.serverVersion != "" {
+			serverVersion = test.serverVersion
+		}
+		ctrl, informersFactory := newTestProvisionControllerSharedInformers(client, test.provisionerName,
+			newTestProvisioner(), serverVersion, sharedResyncPeriod)
+		stopCh := make(chan struct{})
+
+		go ctrl.Run(stopCh)
+		go informersFactory.Start(stopCh)
+
+		informersFactory.WaitForCacheSync(stopCh)
+		time.Sleep(2 * sharedResyncPeriod)
+		ctrl.runningOperations.Wait()
+
+		pvList, _ := client.Core().PersistentVolumes().List(metav1.ListOptions{})
+		if (len(test.expectedVolumes) > 0 || len(pvList.Items) > 0) &&
+			!reflect.DeepEqual(test.expectedVolumes, pvList.Items) {
+			t.Logf("test case: %s", test.name)
+			t.Errorf("expected PVs:\n %v\n but got:\n %v\n", test.expectedVolumes, pvList.Items)
+		}
+		close(stopCh)
+	}
+}
+
 func newTestProvisionController(
 	client kubernetes.Interface,
 	provisionerName string,
@@ -529,6 +603,43 @@ func newTestProvisionController(
 		RetryPeriod(resyncPeriod/2),
 		TermLimit(2*resyncPeriod))
 	return ctrl
+}
+
+func newTestProvisionControllerSharedInformers(
+	client kubernetes.Interface,
+	provisionerName string,
+	provisioner Provisioner,
+	serverGitVersion string,
+	resyncPeriod time.Duration,
+) (*ProvisionController, informers.SharedInformerFactory) {
+
+	informerFactory := informers.NewSharedInformerFactory(client, resyncPeriod)
+	claimInformer := informerFactory.Core().V1().PersistentVolumeClaims().Informer()
+	volumeInformer := informerFactory.Core().V1().PersistentVolumes().Informer()
+	classInformer := func() cache.SharedIndexInformer {
+		if utilversion.MustParseSemantic(serverGitVersion).AtLeast(utilversion.MustParseSemantic("v1.6.0")) {
+			return informerFactory.Storage().V1().StorageClasses().Informer()
+		}
+		return informerFactory.Storage().V1beta1().StorageClasses().Informer()
+	}()
+
+	ctrl := NewProvisionController(
+		client,
+		provisionerName,
+		provisioner,
+		serverGitVersion,
+		ResyncPeriod(resyncPeriod),
+		ExponentialBackOffOnError(false),
+		CreateProvisionedPVInterval(10*time.Millisecond),
+		LeaseDuration(2*resyncPeriod),
+		RenewDeadline(resyncPeriod),
+		RetryPeriod(resyncPeriod/2),
+		TermLimit(2*resyncPeriod),
+		ClaimsInformer(claimInformer),
+		VolumesInformer(volumeInformer),
+		ClassesInformer(classInformer))
+
+	return ctrl, informerFactory
 }
 
 func newStorageClass(name, provisioner string) *storagebeta.StorageClass {
