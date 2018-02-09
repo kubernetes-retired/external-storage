@@ -181,13 +181,21 @@ func (d *Discoverer) getVolumeType(fullPath string) (string, error) {
 	if isdir {
 		return common.VolumeTypeFile, nil
 	}
+	// check for Block before returning errdir
 	isblk, errblk := d.VolUtil.IsBlock(fullPath)
 	if isblk {
 		return common.VolumeTypeBlock, nil
 	}
 
-	return "", fmt.Errorf("Block device check for %q failed: DirErr - %v BlkErr - %v", fullPath, errdir, errblk)
+	if errdir == nil && errblk == nil {
+		return "", fmt.Errorf("Skipping file %q: not a directory nor block device", fullPath)
+	}
 
+	// report the first error found
+	if errdir != nil {
+		return "", fmt.Errorf("Directory check for %q failed: %s", fullPath, errdir)
+	}
+	return "", fmt.Errorf("Block device check for %q failed: %s", fullPath, errblk)
 }
 
 func generatePVName(file, node, class string) string {
