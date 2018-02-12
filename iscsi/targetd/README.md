@@ -254,7 +254,7 @@ docker run -ti -v /root/.kube:/kube -v /var/run/kubernetes:/var/run/kubernetes -
 storage classes should look like the following
 ```
 kind: StorageClass
-apiVersion: storage.k8s.io/v1beta1
+apiVersion: storage.k8s.io/v1
 metadata:
   name: iscsi
 provisioner: iscsi
