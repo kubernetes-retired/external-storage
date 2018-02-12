@@ -354,7 +354,20 @@ func TestValidateOptions(t *testing.T) {
 	}
 }
 
+func TestShouldProvision(t *testing.T) {
+	claim := newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil)
+	evaluateExportTests(t, "ShouldProvision", func(p *nfsProvisioner) bool {
+		return p.ShouldProvision(claim)
+	})
+}
+
 func TestCheckExportLimit(t *testing.T) {
+	evaluateExportTests(t, "checkExportLimit", func(p *nfsProvisioner) bool {
+		return p.checkExportLimit()
+	})
+}
+
+func evaluateExportTests(t *testing.T, output string, checker func(*nfsProvisioner) bool) {
 	tmpDir := utiltesting.MkTmpdirOrDie("nfsProvisionTest")
 	defer os.RemoveAll(tmpDir)
 
@@ -391,8 +404,8 @@ func TestCheckExportLimit(t *testing.T) {
 	for _, test := range tests {
 		client := fake.NewSimpleClientset()
 		p := newNFSProvisionerInternal(tmpDir+"/", client, false, &testExporter{exportMap: &exportMap{exportIDs: test.exportIDs}}, newDummyQuotaer(), "", test.maxExports)
-		ok := p.checkExportLimit()
-		evaluate(t, test.name, test.expectError, nil, test.expectedResult, ok, "checkExportLimit")
+		ok := checker(p)
+		evaluate(t, test.name, test.expectError, nil, test.expectedResult, ok, output)
 	}
 }
 
