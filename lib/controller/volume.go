@@ -38,6 +38,15 @@ type Provisioner interface {
 	Delete(*v1.PersistentVolume) error
 }
 
+// Qualifier is an optional interface implemented by provisioners to determine
+// whether a claim should be provisioned as early as possible (e.g. prior to
+// leader election).
+type Qualifier interface {
+	// ShouldProvision returns whether provisioning for the claim should
+	// be attempted.
+	ShouldProvision(*v1.PersistentVolumeClaim) bool
+}
+
 // IgnoredError is the value for Delete to return to indicate that the call has
 // been ignored and no action taken. In case multiple provisioners are serving
 // the same storage class, provisioners may ignore PVs they are not responsible

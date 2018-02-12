@@ -646,6 +646,12 @@ func (ctrl *ProvisionController) shouldProvision(claim *v1.PersistentVolumeClaim
 		return false
 	}
 
+	if qualifier, ok := ctrl.provisioner.(Qualifier); ok {
+		if !qualifier.ShouldProvision(claim) {
+			return false
+		}
+	}
+
 	// Kubernetes 1.5 provisioning with annStorageProvisioner
 	if ctrl.kubeVersion.AtLeast(utilversion.MustParseSemantic("v1.5.0")) {
 		if provisioner, found := claim.Annotations[annStorageProvisioner]; found {
