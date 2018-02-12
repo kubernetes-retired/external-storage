@@ -311,6 +311,7 @@ func TestShouldProvision(t *testing.T) {
 	tests := []struct {
 		name             string
 		provisionerName  string
+		provisioner      Provisioner
 		class            *storagebeta.StorageClass
 		claim            *v1.PersistentVolumeClaim
 		serverGitVersion string
@@ -319,6 +320,7 @@ func TestShouldProvision(t *testing.T) {
 		{
 			name:            "should provision",
 			provisionerName: "foo.bar/baz",
+			provisioner:     newTestProvisioner(),
 			class:           newStorageClass("class-1", "foo.bar/baz"),
 			claim:           newClaim("claim-1", "1-1", "class-1", "foo.bar/baz", "", nil),
 			expectedShould:  true,
@@ -326,6 +328,7 @@ func TestShouldProvision(t *testing.T) {
 		{
 			name:            "claim already bound",
 			provisionerName: "foo.bar/baz",
+			provisioner:     newTestProvisioner(),
 			class:           newStorageClass("class-1", "foo.bar/baz"),
 			claim:           newClaim("claim-1", "1-1", "class-1", "foo.bar/baz", "foo", nil),
 			expectedShould:  false,
@@ -333,6 +336,7 @@ func TestShouldProvision(t *testing.T) {
 		{
 			name:            "no such class",
 			provisionerName: "foo.bar/baz",
+			provisioner:     newTestProvisioner(),
 			class:           newStorageClass("class-1", "foo.bar/baz"),
 			claim:           newClaim("claim-1", "1-1", "class-2", "", "", nil),
 			expectedShould:  false,
@@ -340,6 +344,7 @@ func TestShouldProvision(t *testing.T) {
 		{
 			name:            "not this provisioner's job",
 			provisionerName: "foo.bar/baz",
+			provisioner:     newTestProvisioner(),
 			class:           newStorageClass("class-1", "abc.def/ghi"),
 			claim:           newClaim("claim-1", "1-1", "class-1", "abc.def/ghi", "", nil),
 			expectedShould:  false,
@@ -349,6 +354,7 @@ func TestShouldProvision(t *testing.T) {
 		{
 			name:            "unknown provisioner annotation 1.5",
 			provisionerName: "foo.bar/baz",
+			provisioner:     newTestProvisioner(),
 			class:           newStorageClass("class-1", "foo.bar/baz"),
 			claim: newClaim("claim-1", "1-1", "class-1", "", "",
 				map[string]string{annStorageProvisioner: "abc.def/ghi"}),
@@ -358,6 +364,7 @@ func TestShouldProvision(t *testing.T) {
 		{
 			name:            "should provision, unknown provisioner annotation but 1.4",
 			provisionerName: "foo.bar/baz",
+			provisioner:     newTestProvisioner(),
 			class:           newStorageClass("class-1", "foo.bar/baz"),
 			claim: newClaim("claim-1", "1-1", "class-1", "", "",
 				map[string]string{annStorageProvisioner: "abc.def/ghi"}),
@@ -376,20 +383,36 @@ func TestShouldProvision(t *testing.T) {
 		{
 			name:             "should provision, no provisioner annotation needed",
 			provisionerName:  "foo.bar/baz",
+			provisioner:      newTestProvisioner(),
 			class:            newStorageClass("class-1", "foo.bar/baz"),
 			claim:            newClaim("claim-1", "1-1", "class-1", "", "", nil),
 			serverGitVersion: "v1.4.0",
 			expectedShould:   true,
 		},
+		{
+			name:            "qualifier says no",
+			provisionerName: "foo.bar/baz",
+			provisioner:     newTestQualifiedProvisioner(false),
+			class:           newStorageClass("class-1", "foo.bar/baz"),
+			claim:           newClaim("claim-1", "1-1", "class-1", "foo.bar/baz", "", nil),
+			expectedShould:  false,
+		},
+		{
+			name:            "qualifier says yes, should provision",
+			provisionerName: "foo.bar/baz",
+			provisioner:     newTestQualifiedProvisioner(true),
+			class:           newStorageClass("class-1", "foo.bar/baz"),
+			claim:           newClaim("claim-1", "1-1", "class-1", "foo.bar/baz", "", nil),
+			expectedShould:  true,
+		},
 	}
 	for _, test := range tests {
 		client := fake.NewSimpleClientset(test.claim)
-		provisioner := newTestProvisioner()
 		serverVersion := defaultServerVersion
 		if test.serverGitVersion != "" {
 			serverVersion = test.serverGitVersion
 		}
-		ctrl := newTestProvisionController(client, test.provisionerName, provisioner, serverVersion)
+		ctrl := newTestProvisionController(client, test.provisionerName, test.provisioner, serverVersion)
 
 		err := ctrl.classes.Add(test.class)
 		if err != nil {
@@ -787,6 +810,22 @@ type testProvisioner struct {
 }
 
 var _ Provisioner = &testProvisioner{}
+
+func newTestQualifiedProvisioner(answer bool) *testQualifiedProvisioner {
+	return &testQualifiedProvisioner{newTestProvisioner(), answer}
+}
+
+type testQualifiedProvisioner struct {
+	*testProvisioner
+	answer bool
+}
+
+var _ Provisioner = &testQualifiedProvisioner{}
+var _ Qualifier = &testQualifiedProvisioner{}
+
+func (p *testQualifiedProvisioner) ShouldProvision(claim *v1.PersistentVolumeClaim) bool {
+	return p.answer
+}
 
 func (p *testProvisioner) Provision(options VolumeOptions) (*v1.PersistentVolume, error) {
 	p.provisionCalls <- true
