@@ -19,10 +19,12 @@ package volume
 import (
 	"fmt"
 	"io/ioutil"
+	"math"
 	"os"
 	"os/exec"
 	"path"
 	"reflect"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -320,18 +322,44 @@ func (p *nfsProvisioner) validateOptions(options controller.VolumeOptions) (stri
 		return "", false, "", fmt.Errorf("claim.Spec.Selector is not supported")
 	}
 
-	var stat syscall.Statfs_t
-	if err := syscall.Statfs(p.exportDir, &stat); err != nil {
-		return "", false, "", fmt.Errorf("error calling statfs on %v: %v", p.exportDir, err)
-	}
 	capacity := options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	requestBytes := capacity.Value()
-	available := int64(stat.Bavail) * int64(stat.Bsize)
+	available, err := getAvailableDiskBytes(p.exportDir)
+	if err != nil {
+		return "", false, "", fmt.Errorf("error calling statfs on %v: %v", p.exportDir, err)
+	}
 	if requestBytes > available {
 		return "", false, "", fmt.Errorf("insufficient available space %v bytes to satisfy claim for %v bytes", available, requestBytes)
 	}
 
 	return gid, rootSquash, mountOptions, nil
+}
+
+func getAvailableDiskBytes(directory string) (int64, error) {
+	var stat syscall.Statfs_t
+	if err := syscall.Statfs(directory, &stat); err != nil {
+		return 0, err
+	}
+
+	zeroSizeMeansUnlimited := runtime.GOOS == "linux" && stat.Blocks == 0 && isStatsZeroIfUnlimited(stat)
+	if zeroSizeMeansUnlimited {
+		return math.MaxInt64, nil
+	}
+	return int64(stat.Bavail) * int64(stat.Bsize), nil
+}
+
+const tmpfsMagic = 0x01021994
+const hugetlbfsMagic = 0x958458f6
+const ramfsMagic = 0x858458f6
+
+func isStatsZeroIfUnlimited(stat syscall.Statfs_t) bool {
+	switch stat.Type {
+	case tmpfsMagic:
+	case hugetlbfsMagic:
+	case ramfsMagic:
+		return true
+	}
+	return false
 }
 
 // getServer gets the server IP to put in a provisioned PV's spec.
