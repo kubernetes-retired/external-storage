@@ -149,7 +149,7 @@ rules:
 ```
 Now the cluster role has to be bound to the user 'alice' by creating a ClusterRole binding object.
 ```yaml
-apiVersion: rbac.authorization.k8s.io/v1beta1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: volumesnapsot-admin
