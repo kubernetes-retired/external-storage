@@ -113,8 +113,6 @@ unmount() {
 # log CLI
 # debug $@
 
-log "hello"
-
 op=$1
 
 if [ "$op" = "init" ]; then
