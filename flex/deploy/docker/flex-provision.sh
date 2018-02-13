@@ -31,7 +31,7 @@ err() {
 
 log() {
     echo -n $* >&1
-    debug "log() called:"$*
+    debug "flex[$$]: log() called:"$*
 }
 
 # Saves debug output to a log file.
