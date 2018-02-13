@@ -14,98 +14,174 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Set this to true to log the call output to /tmp/flex-provisioner.log
-INTERNAL_DEBUG=true
+# ==============================================================================
+# Config
+# ==============================================================================
+# Uncomment to disable logging to /tmp/flex-provisioner.log
+#INTERNAL_DEBUG=false
 
-INTERNAL_DEBUG=${INTERNAL_DEBUG:-"false"}
+# Uncomment to disable attach/detach capability
+#CAPABILITY_ATTACH=false
 
-usage() {
-    echo "Invalid usage of flex provisioner CLI.. :"
-    debug "Invalid usage of flex provisioner CLI.. :"
-    exit 1
-}
+# ==============================================================================
+# Defaults and Helpers
+# ==============================================================================
 
-err() {
-    echo -ne $* 1>&2
-}
-
-log() {
-    echo -n $* >&1
-    debug "log() called:"$*
-}
+INTERNAL_DEBUG=${INTERNAL_DEBUG:-"true"}
+CAPABILITY_ATTACH=${CAPABILITY_ATTACH:-"true"}
 
 # Saves debug output to a log file.
 debug() {
-    if [ "${INTERNAL_DEBUG}" == "true" ]; then
-        echo $* >> /tmp/flex-provisioner.log
+    if [ "${INTERNAL_DEBUG}" = "true" ]; then
+        echo "$(date '+%Y-%m-%d %H:%M:%S') flex[$$]: $*" >> /tmp/flex-provisioner.log
     fi
 }
 
-# checks if the resource is mounted
-ismounted() {
-    debug "ismounted() called"
-    echo 0
+err() {
+    echo "$*" 1>&2
+    debug "err() called: "$*
 }
 
-# deletes a provisioned volume
-delete(){
-    debug "delete() called"
+log() {
+    echo "$*" >&1
+    debug "log() called: "$*
+}
+
+die_notsupported() {
+    log "{\"status\": \"Not supported\", \"message\": \"$*\"}"
+    exit 0
+}
+
+usage() {
+    err "Usage:"
+    err "  $0 <action> [<params>]"
+    err ""
+    die_notsupported "Invalid usage of flex provisioner CLI."
+}
+
+assert_jq() {
+    if ! command -v jq >/dev/null 2>&1; then
+      err "{ \"status\": \"Failure\", \"message\": \"'jq' binary not found. Please install jq package before using this driver\"}"
+      exit 1
+    fi
+}
+# ==============================================================================
+# Actions
+# ==============================================================================
+# provisions a volume
+doprovision(){
     log "{\"status\": \"Success\"}"
     exit 0
 }
 
-# provisions a volume
-provision(){
-    debug "provision() called"
+# deletes a provisioned volume
+dodelete(){
     log "{\"status\": \"Success\"}"
+    exit 0
+}
+
+# Initializes the driver
+doinit(){
+    log "{\"status\": \"Success\", \"capabilities\": {\"attach\": ${CAPABILITY_ATTACH}}}"
     exit 0
 }
 
 # get volume's name
-getvolumename() {
-    debug "getvolumename() called"
+dogetvolumename() {
+    local json_options=$1
+    local node_name=$2
+
     log "{\"status\": \"Success\"}"
     exit 0
 }
 
-# attaches a volume to host
-attach() {
-    debug "attach() called"
+# Attach the volume specified by the given spec on the given host
+doattach() {
+    local json_options=$1
+    local node_name=$2
+
+    local device=''
+
+    log "{\"status\": \"Success\", \"device\": \"$device\"}"
+    exit 0
+}
+
+# Detach the volume from the Kubelet node
+dodetach() {
+    local mount_device=$1
+    local node_name=$2
+
     log "{\"status\": \"Success\"}"
     exit 0
 }
 
-# detaches a volume from host
-detach() {
-    debug "detach() called"
+# Wait for the volume to be attached on the remote node
+dowaitforattach() {
+    local json_options=$1
+
+    local device=''
+
+    log "{\"status\": \"Success\", \"device\": \"$device\"}"
+    exit 0
+}
+
+# Check the volume is attached on the node
+doisattached() {
+    local json_options=$1
+    local node_name=$2
+
     log "{\"status\": \"Success\"}"
     exit 0
 }
 
-# mounts the volume to global path
+# Mount device mounts the device to a global path which individual pods can then bind mount.
 domountdevice() {
-    debug "domountdevice() called"
+    local mount_dir=$1
+    local mount_device=$2
+    local json_options=$3
+
+    die_notsupported # = using default
+
     log "{\"status\": \"Success\"}"
     exit 0
 }
 
-# mounts the volume
+# Mount device mounts the device to a global path which individual pods can then bind mount.
+dounmountdevice() {
+    local mount_device=$1
+
+    die_notsupported # = using default
+    log "{\"status\": \"Success\"}"
+    exit 0
+}
+
+# Mount the volume at the mount dir
 domount() {
-    debug "domount() called"
-    log "{\"status\": \"Success\"}"
-    exit 0
-}
+    local mount_dir=$1
+    local json_options=$2
 
-# unmounts the global path
-unmountdevice() {
-    debug "unmountdevice() called"
-    log "{\"status\": \"Success\"}"
+    die_notsupported # = using default
+
+    assert_jq
+    #local fs_type="$(echo "$json_options" | jq -r '.["kubernetes.io/fsType"]')"
+    local pod_name="$(echo "$json_options" | jq -r '.["kubernetes.io/pod.name"]')"
+    local pod_namespace="$(echo "$json_options" | jq -r '.["kubernetes.io/pod.namespace"]')"
+    #local pod_uid="$(echo "$json_options" | jq -r '.["kubernetes.io/pod.uid"]')"
+    local volume_name="$(echo "$json_options" | jq -r '.["kubernetes.io/pvOrVolumeName"]')"
+    local read_write="$(echo "$json_options" | jq -r '.["kubernetes.io/readwrite"]')"
+    #local service_account="$(echo "$json_options" | jq -r '.["kubernetes.io/serviceAccount.name"]')"
+
+    log "{\"status\": \"Success\"}: "$*
     exit 0
 }
 
 # unmounts the volume
-unmount() {
-    debug "unmount() called"
+dounmount() {
+    local mount_dir=$1
+
+    die_notsupported # = using default
+
+    umount "$mount_dir"
     log "{\"status\": \"Success\"}"
     exit 0
 }
@@ -113,46 +189,53 @@ unmount() {
 # log CLI
 # debug $@
 
-log "hello"
+op="$1"
 
-op=$1
-
-if [ "$op" = "init" ]; then
-	log "{\"status\": \"Success\"}"
-	exit 0
-fi
+[ -n "$op" ] || usage
 
 shift
-case "$op" in
-        getvolumename)
-		getvolumename $*
-		;;
-	attach)
-		attach $*
-		;;
-	detach)
-		detach $*
-		;;
-	provision)
-		provision $*
-		;;
-	delete)
-        delete $*
-        ;;
-        mountdevice)
-		domountdevice $*
-		;;
-	mount)
-		domount $*
-		;;
-	unmountdevice)
-		unmountdevice $*
-		;;
-	unmount)
-		unmount $*
-		;;
-	*)
-		usage
-esac
 
-exit 1
+debug "$op() called: "$*
+
+case "$op" in
+    # Called from flex-provisioner
+    provision)
+        doprovision $*
+        ;;
+    delete)
+        dodelete $*
+        ;;
+    # Called from kubelet/kube-controller-manager
+    init)
+        doinit $*
+        ;;
+    getvolumename)
+        dogetvolumename $*
+        ;;
+    attach)
+        doattach $*
+        ;;
+    detach)
+        dodetach $*
+        ;;
+    waitforattach)
+        dowaitforattach $*
+        ;;
+    isattached)
+        doisattached $*
+        ;;
+    mountdevice)
+        domountdevice $*
+        ;;
+    unmountdevice)
+        dounmountdevice $*
+        ;;
+    mount)
+        domount $*
+        ;;
+    unmount)
+        dounmount $*
+        ;;
+    *)
+        die_notsupported "Command $op not supported"
+esac
