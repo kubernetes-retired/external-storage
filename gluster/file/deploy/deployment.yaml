@@ -11,9 +11,10 @@ spec:
       labels:
         app: glusterfile-provisioner
     spec:
+      serviceAccountName: glusterfs-provisioner
       containers:
-          env:
-              name: PROVISIONER_NAME
-              value: gluster.org/glusterfile
+        - name: glusterfile-provisioner
           image: "quay.io/external_storage/glusterfile-provisioner:latest"
-          name: glusterfile-provisioner
+          env:
+            - name: PROVISIONER_NAME
+              value: gluster.org/glusterfile
