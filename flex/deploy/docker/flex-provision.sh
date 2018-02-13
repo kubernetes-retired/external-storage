@@ -46,6 +46,12 @@ ismounted() {
     debug "ismounted() called"
     echo 0
 }
+# init
+doinit(){
+    debug "init() called"
+    log "{\"status\": \"Success\"}"
+    exit 0
+}
 
 # deletes a provisioned volume
 delete(){
@@ -122,6 +128,9 @@ fi
 
 shift
 case "$op" in
+	init)
+		doinit $*
+		;;
         getvolumename)
 		getvolumename $*
 		;;
