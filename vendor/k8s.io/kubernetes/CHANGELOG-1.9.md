@@ -1201,7 +1201,7 @@ filename | sha256 hash
 
 ### Action Required
 
-* action required: The `storage.k8s.io/v1` API  and `volume.beta.kubernetes.io/storage-class` annotation are deprecated. They will be removed in a future release. Please use v1 API and field `v1.PersistentVolumeClaim.Spec.StorageClassName`/`v1.PersistentVolume.Spec.StorageClassName` instead. ([#53580](https://github.com/kubernetes/kubernetes/pull/53580), [@xiangpengzhao](https://github.com/xiangpengzhao))
+* action required: The `storage.k8s.io/v1beta1` API  and `volume.beta.kubernetes.io/storage-class` annotation are deprecated. They will be removed in a future release. Please use v1 API and field `v1.PersistentVolumeClaim.Spec.StorageClassName`/`v1.PersistentVolume.Spec.StorageClassName` instead. ([#53580](https://github.com/kubernetes/kubernetes/pull/53580), [@xiangpengzhao](https://github.com/xiangpengzhao))
 * action required: Deprecated flags `--portal-net` and `service-node-ports` of kube-apiserver are removed. ([#52547](https://github.com/kubernetes/kubernetes/pull/52547), [@xiangpengzhao](https://github.com/xiangpengzhao))
 * The `node.kubernetes.io/memory-pressure` taint now respects the configured whitelist.  If you need to use it, you'll have to add it to the whitelist. ([#55251](https://github.com/kubernetes/kubernetes/pull/55251), [@deads2k](https://github.com/deads2k))
 
