@@ -35,12 +35,18 @@ import (
 
 const (
 	provisionerNameKey = "PROVISIONER_NAME"
+
+	annCreatedBy           = "kubernetes.io/createdby"
+	createdBy              = "nfs-client-dynamic-provisioner"
+	mountOptionAnnotation  = "volume.beta.kubernetes.io/mount-options"
+	storageClassAnnotation = "volume.beta.kubernetes.io/storage-class"
 )
 
 type nfsProvisioner struct {
-	client kubernetes.Interface
-	server string
-	path   string
+	client   kubernetes.Interface
+	server   string
+	path     string
+	pvcAnnot bool
 }
 
 const (
@@ -48,6 +54,54 @@ const (
 )
 
 var _ controller.Provisioner = &nfsProvisioner{}
+
+// This function will gather the annotations we want from the PVC
+// only volume.beta.kubernetes.io/mount-options is supported at the moment
+func (p *nfsProvisioner) getAnnotationsFromVolumClaim(options controller.VolumeOptions) map[string]string {
+	annotations := make(map[string]string)
+	if p.pvcAnnot {
+		if val, ok := options.PVC.Annotations[mountOptionAnnotation]; ok {
+			annotations[mountOptionAnnotation] = val
+		}
+	}
+	return annotations
+}
+
+// This function will gather the annotations we want from the storage class
+// only volume.beta.kubernetes.io/mount-options is supported at the moment
+// It will only gathers them if pvcAnnot is set to 1
+func (p *nfsProvisioner) getAnnotationsFromStorageClass(options controller.VolumeOptions) map[string]string {
+	annotations := make(map[string]string)
+	if val, ok := options.PVC.Annotations[storageClassAnnotation]; ok {
+		glog.Infof("Handling storage class annotations")
+		var soptions metav1.GetOptions
+		result, err := p.client.StorageV1().StorageClasses().Get(val, soptions)
+		if err != nil {
+			panic(err.Error())
+		}
+		if val, ok := result.Annotations[mountOptionAnnotation]; ok {
+			annotations[mountOptionAnnotation] = val
+		}
+	}
+	return annotations
+}
+
+// This function will gather the annotations we want from the PVC and the storage class to merge it
+// In the merge operation if an annotations is present in both of them the storage class one will prevail
+func (p *nfsProvisioner) getAnnotations(options controller.VolumeOptions) map[string]string {
+	glog.Infof("Handling annotations")
+	annotations := make(map[string]string)
+	annotations[annCreatedBy] = createdBy
+	pvcAnnotations := p.getAnnotationsFromVolumClaim(options)
+	scAnnotations := p.getAnnotationsFromStorageClass(options)
+	for k, v := range pvcAnnotations {
+		annotations[k] = v
+	}
+	for k, v := range scAnnotations {
+		annotations[k] = v
+	}
+	return annotations
+}
 
 func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.PersistentVolume, error) {
 	if options.PVC.Spec.Selector != nil {
@@ -71,7 +125,8 @@ func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: options.PVName,
+			Name:        options.PVName,
+			Annotations: p.getAnnotations(options),
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: options.PersistentVolumeReclaimPolicy,
@@ -112,6 +167,13 @@ func main() {
 	if path == "" {
 		glog.Fatal("NFS_PATH not set")
 	}
+
+	// By default gathering annotations from the PVC is disabled
+	usePvcAnnot := false
+	pvcAnnotEnv := os.Getenv("pvcAnnot")
+	if pvcAnnotEnv == "1" {
+		usePvcAnnot = true
+	}
 	provisionerName := os.Getenv(provisionerNameKey)
 	if provisionerName == "" {
 		glog.Fatalf("environment variable %s is not set! Please set it.", provisionerNameKey)
@@ -136,8 +198,10 @@ func main() {
 	}
 
 	clientNFSProvisioner := &nfsProvisioner{
-		server: server,
-		path:   path,
+		server:   server,
+		path:     path,
+		client:   clientset,
+		pvcAnnot: usePvcAnnot,
 	}
 	// Start the provision controller which will dynamically provision efs NFS
 	// PVs
