@@ -26,7 +26,7 @@ usage() {
 }
 
 err() {
-    echo -ne $* 1>&2
+    echo -n $* 1>&2
 }
 
 log() {
@@ -36,7 +36,7 @@ log() {
 
 # Saves debug output to a log file.
 debug() {
-    if [ "${INTERNAL_DEBUG}" == "true" ]; then
+    if [ "${INTERNAL_DEBUG}" = "true" ]; then
         echo $* >> /tmp/flex-provisioner.log
     fi
 }
