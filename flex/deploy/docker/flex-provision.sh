@@ -20,8 +20,8 @@ INTERNAL_DEBUG=true
 INTERNAL_DEBUG=${INTERNAL_DEBUG:-"false"}
 
 usage() {
-    echo "Invalid usage of flex provisioner CLI.. :"
-    debug "Invalid usage of flex provisioner CLI.. :"
+    echo "Invalid usage of flex provisioner CLI.. :"$*
+    debug "Invalid usage of flex provisioner CLI.. :"$*
     exit 1
 }
 
@@ -159,7 +159,7 @@ case "$op" in
 		unmount $*
 		;;
 	*)
-		usage
+		usage $op $*
 esac
 
 exit 1
