@@ -48,7 +48,7 @@ Bug fix: picked up a security fix [kubernetes/kubernetes#53443](https://github.c
 
    * [https://github.com/kubernetes/kubernetes/pull/41901](https://github.com/kubernetes/kubernetes/pull/41901)
 
-* Promoted rbac.authorization.k8s.io/v1 to rbac.authorization.k8s.io/v1
+* Promoted rbac.authorization.k8s.io/v1beta1 to rbac.authorization.k8s.io/v1
 
    * [https://github.com/kubernetes/kubernetes/pull/49642](https://github.com/kubernetes/kubernetes/pull/49642)
 
