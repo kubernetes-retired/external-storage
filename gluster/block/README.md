@@ -9,21 +9,22 @@ quay.io/external_storage/glusterblock-provisioner:latest
 
 ## What is Gluster Block Provisioner ?
 
-Gluster Block Provisioner is an external provisioner which dynamically provision gluster block volumes ( ISCSI volumes ) on demand. The persistent Volume Claim which has been requested with this external provisioner's identity ( for eg# `gluster.org/glusterblock`)  will be served by this provisioner. This provisioner is capable of operating on couple of modes ( `gluster-block` and `heketi`).
+Gluster Block Provisioner is an external provisioner which dynamically provision gluster block volumes ( ISCSI volumes ) on demand. The persistentVolumeClaim which has been requested with this external provisioner's identity ( for eg# `gluster.org/glusterblock`)  will be served by this provisioner. This provisioner is capable of operating on couple of modes ( `gluster-block` and `heketi`).
 
 `gluster-block` mode :  This is an experimental or test mode on which the provisioner will directly talk to `gluster-block` utility or command line interface of gluster-block. 
 
 `heketi` mode : This is the recommended/supported mode on which the provisioner will talk to `heketi's` Block API to provision gluster block volumes.  
 
-Additional Reference:
-[gluster-block](https://github.com/gluster/gluster-block)
-[heketi](https://github.com/heketi/heketi)
-[gluster-kubernetes](https://github.com/gluster/gluster-kubernetes)
+This project is related to and relies on the following projects:
+
+* [gluster-block](https://github.com/gluster/gluster-block)
+* [heketi](https://github.com/heketi/heketi) - GlusterFS volume management REST API
+* [gluster-kubernetes](https://github.com/gluster/gluster-kubernetes)- Kubernetes integrations for GlusterFS
 
 
 ## Build Gluster Block Provisioner and container image
 
-If you want to build the container from source instead of pulling the docker image, please follow below steps:
+If you want to build the container from source instead of pulling the docker image, simply run the following from the `glusterfs/block/` directory:
 
  Step 1: Build the provisioner binary
 ```
@@ -36,6 +37,8 @@ Step 2:  Get Gluster Block Provisioner Container image
 ```
 
 ## Start Kubernetes Cluster
+
+The following steps assume you have a Kubernetes cluster up and running
 
 ## Start glusterblock provisioner
 
@@ -87,7 +90,7 @@ If provisioner want to operate on `heketi` mode, below args can be  filled in st
 
 * `restuser` : Gluster REST service/Heketi user who has access to create volumes in the Gluster Trusted Pool.
 
-* `restsecretnamespace` + `restsecretname` : Identification of Secret instance that contains user password to use when talking to Gluster REST service. These parameters are optional, empty password will be used when both `restsecretnamespace` and `restsecretname` are omitted. The provided secret must have type "gluster.org/glusterblock".
+* `restsecretnamespace` + `restsecretname` : Namespace and Name of the Secret instance that contains user password to use when talking to heketi. These parameters are optional, An empty password will be used when both `restsecretnamespace` and `restsecretname` are omitted. The provided secret must have type matching your provisioner ID (e.g. `gluster.org/glusterfs`).
 
 
 ### Gluster-Block Mode parameters:
@@ -103,9 +106,7 @@ in storage class parameter.
 "glustervol=blockmaster1,hosts=10.67.116.108"
 ```
 
-## How to test:
-
-### Create a claim
+##  Testing: Create a PersistentVolumeClaim
 
 ```
 [root@localhost]# kubectl create -f glusterblock-claim1.yaml
