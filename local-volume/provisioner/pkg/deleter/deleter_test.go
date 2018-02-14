@@ -24,9 +24,10 @@ import (
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/util"
 
+	"time"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
-	"time"
 )
 
 const (
@@ -57,7 +58,7 @@ type testConfig struct {
 
 type testVol struct {
 	pvPhase    v1.PersistentVolumePhase
-	VolumeType string
+	VolumeMode string
 }
 
 func TestDeleteVolumes_Basic(t *testing.T) {
@@ -201,7 +202,7 @@ func TestDeleteBlock_BasicProcessExec(t *testing.T) {
 	vols := map[string]*testVol{
 		"pv4": {
 			pvPhase:    v1.VolumeReleased,
-			VolumeType: util.FakeEntryBlock,
+			VolumeMode: util.FakeEntryBlock,
 		},
 	}
 	// The volume should be deleted after a successful cleanup
@@ -236,7 +237,7 @@ func TestDeleteBlock_FailedProcess(t *testing.T) {
 	vols := map[string]*testVol{
 		"pv4": {
 			pvPhase:    v1.VolumeReleased,
-			VolumeType: util.FakeEntryBlock,
+			VolumeMode: util.FakeEntryBlock,
 		},
 	}
 	// Nothing should be deleted as it was a failed cleanup process
@@ -272,7 +273,7 @@ func TestDeleteBlock_DuplicateAttempts(t *testing.T) {
 	vols := map[string]*testVol{
 		"pv4": {
 			pvPhase:    v1.VolumeReleased,
-			VolumeType: util.FakeEntryBlock,
+			VolumeMode: util.FakeEntryBlock,
 		},
 	}
 	expectedDeletedPVs := map[string]string{"pv4": ""}
@@ -316,11 +317,19 @@ func testSetup(t *testing.T, config *testConfig, cleanupCmd []string) *Deleter {
 	newVols["test1"] = []*util.FakeDirEntry{}
 	for pvName, vol := range config.vols {
 		fakePath := filepath.Join(testHostDir, "test1", "entry-"+pvName)
-		pv := common.CreateLocalPVSpec(&common.LocalPVConfig{
+		lpvConfig := common.LocalPVConfig{
 			Name:         pvName,
 			HostPath:     fakePath,
 			StorageClass: testStorageClass,
-		})
+		}
+		// If volume mode has been explicitly specified in the volume config, then explicitly set it in the PV.
+		switch vol.VolumeMode {
+		case util.FakeEntryBlock:
+			lpvConfig.VolumeMode = v1.PersistentVolumeBlock
+		case util.FakeEntryFile:
+			lpvConfig.VolumeMode = v1.PersistentVolumeFilesystem
+		}
+		pv := common.CreateLocalPVSpec(&lpvConfig)
 		pv.Status.Phase = vol.pvPhase
 
 		_, err := config.apiUtil.CreatePV(pv)
@@ -333,7 +342,7 @@ func testSetup(t *testing.T, config *testConfig, cleanupCmd []string) *Deleter {
 		config.generatedPVs[pvName] = pv
 		// Make sure the fake Volumeutil knows about it
 		newVols["test1"] = append(newVols["test1"], &util.FakeDirEntry{Name: "entry-" + pvName, Hash: 0xf34b8003,
-			VolumeType: vol.VolumeType})
+			VolumeType: vol.VolumeMode})
 	}
 	// Update volume util
 	config.volUtil.AddNewDirEntries(testMountDir, newVols)
