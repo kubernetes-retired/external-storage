@@ -26,26 +26,46 @@ configmap:
     storageClass:
     - fast-disks:
         hostDir: /mnt/fast-disks
+        blockCleanerCommand:
+        #  Do a quick reset of the block device during its cleanup.
+        #  - "/scripts/quick_reset.sh"
+        #  or use dd to zero out block dev in two iterations by uncommenting these lines
+        #  - "/scripts/dd_zero.sh"
+        #  - "2"
+        # or run shred utility for 2 iteration.s
+           - "/scripts/shred.sh"
+           - "2"
+        # or blkdiscard utility by uncommenting the line below.
+        #  - "/scripts/blkdiscard.sh"
+ 
   #
   # Storage classes for GCE Pre-1.9
   gcePre19:
     storageClass:
       - local-scsi:
           hostDir: "/mnt/disks"
+          blockCleanerCommand:
+            - "/scripts/quick_reset.sh"
   #
   # Storage classes for GCE 1.9+
   gcePost19:
     storageClass:
       - local-scsi:
           hostDir: "/mnt/disks/by-uuid/google-local-ssds-scsi-fs"
+          blockCleanerCommand:
+            - "/scripts/quick_reset.sh"
       - local-nvme:
           hostDir: "/mnt/disks/by-uuid/google-local-ssds-nvme-fs" 
+          blockCleanerCommand:
+            - "/scripts/quick_reset.sh"
   #
   # Storage classes for GKE
   gke:
     storageClass:
       - local-scsi:
           hostDir: "/mnt/disks"
+          blockCleanerCommand:
+            - "/scripts/quick_reset.sh"
   #
 daemonset:
   #

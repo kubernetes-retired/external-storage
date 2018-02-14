@@ -48,15 +48,14 @@ func StartLocalController(client *kubernetes.Clientset, config *common.UserConfi
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: provisionerName})
 
 	runtimeConfig := &common.RuntimeConfig{
-		UserConfig:    config,
-		Cache:         cache.NewVolumeCache(),
-		VolUtil:       util.NewVolumeUtil(),
-		APIUtil:       util.NewAPIUtil(client),
-		Client:        client,
-		Name:          provisionerName,
-		Recorder:      recorder,
-		BlockDisabled: true, // TODO: Block discovery currently disabled.
-		Mounter:       mount.New("" /* default mount path */),
+		UserConfig: config,
+		Cache:      cache.NewVolumeCache(),
+		VolUtil:    util.NewVolumeUtil(),
+		APIUtil:    util.NewAPIUtil(client),
+		Client:     client,
+		Name:       provisionerName,
+		Recorder:   recorder,
+		Mounter:    mount.New("" /* default mount path */),
 	}
 
 	populator := populator.NewPopulator(runtimeConfig)

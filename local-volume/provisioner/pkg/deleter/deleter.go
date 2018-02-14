@@ -17,18 +17,18 @@ limitations under the License.
 package deleter
 
 import (
-	"fmt"
-
-	"github.com/golang/glog"
-	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
-
 	"bufio"
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
 	"sync"
+
+	"github.com/golang/glog"
+	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
+
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 )
 
 // Deleter handles PV cleanup and object deletion
@@ -80,11 +80,10 @@ func (d *Deleter) deletePV(pv *v1.PersistentVolume) error {
 		return err
 	}
 
-	// TODO: Get volType from PV.
-	volType := common.VolumeTypeFile
-	isblk, _ := d.VolUtil.IsBlock(mountPath)
-	if isblk {
-		volType = common.VolumeTypeBlock
+	// Default is filesystem mode, so even if volume mode is not specified, mode should be filesystem.
+	volMode := v1.PersistentVolumeFilesystem
+	if pv.Spec.VolumeMode != nil && *pv.Spec.VolumeMode == v1.PersistentVolumeBlock {
+		volMode = v1.PersistentVolumeBlock
 	}
 
 	if d.ProcTable.IsRunning(pv.Name) {
@@ -97,12 +96,12 @@ func (d *Deleter) deletePV(pv *v1.PersistentVolume) error {
 		return err
 	}
 
-	go d.asyncDeletePV(pv, volType, mountPath, config)
+	go d.asyncDeletePV(pv, volMode, mountPath, config)
 
 	return nil
 }
 
-func (d *Deleter) asyncDeletePV(pv *v1.PersistentVolume, volType string, mountPath string, config common.MountConfig) {
+func (d *Deleter) asyncDeletePV(pv *v1.PersistentVolume, volMode v1.PersistentVolumeMode, mountPath string, config common.MountConfig) {
 	defer d.ProcTable.MarkDone(pv.Name)
 
 	// Make absolutely sure here that we are not deleting anything outside of mounted dir
@@ -114,13 +113,13 @@ func (d *Deleter) asyncDeletePV(pv *v1.PersistentVolume, volType string, mountPa
 	}
 
 	var err error
-	switch volType {
-	case common.VolumeTypeFile:
+	switch volMode {
+	case v1.PersistentVolumeFilesystem:
 		err = d.deleteFilePV(pv, mountPath, config)
-	case common.VolumeTypeBlock:
+	case v1.PersistentVolumeBlock:
 		err = d.cleanupBlockPV(pv, mountPath, config)
 	default:
-		err = fmt.Errorf("Unexpected volume type %q for deleting path %q", volType, pv.Spec.Local.Path)
+		err = fmt.Errorf("Unexpected volume mode %q for deleting path %q", volMode, pv.Spec.Local.Path)
 	}
 
 	if err != nil {
