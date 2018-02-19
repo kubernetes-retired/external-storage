@@ -8,6 +8,8 @@ quay.io/external_storage/glusterfile-provisioner:latest
 
 Gluster File Provisioner is an external provisioner which dynamically provisions gluster file volumes  on demand. The persistentVolumeClaim which has been requested with this external provisioner's identity (for e.g.# `gluster.org/glusterfile`)  will be served by this provisioner.
 
+This project is related to and relies on the following projects:
+
 * [glusterfs](https://github.com/gluster/glusterfs)
 * [heketi](https://github.com/heketi/heketi)
 * [gluster-kubernetes](https://github.com/gluster/gluster-kubernetes)
@@ -51,7 +53,7 @@ parameters:
     restuser: "admin"
     restsecretnamespace: "default"
     restsecretname: "heketi-secret"
-    clusterids: "454811fcedbec6316bc10e591a57b472"
+    clusterid: "454811fcedbec6316bc10e591a57b472"
     volumetype: "replicate:3"
     volumeoptions: "features.shard enable"
     volumenameprefix: "dept-dev"
@@ -66,6 +68,13 @@ parameters:
 
 * `gidMin` + `gidMax` : The minimum and maximum value of GID range for the storage class. A unique value (GID) in this range ( gidMin-gidMax ) will be used for dynamically provisioned volumes. These are optional values. If not specified, the volume will be provisioned with a value between 2000-2147483647 which are defaults for gidMin and gidMax respectively.
 
+* `clusterid`: It is the ID of the cluster which will be used by Heketi when provisioning the volume. It can also be a list of comma separated cluster IDs. This is an optional parameter.
+
+Note
+To get the cluster ID, execute the following command:
+~~~
+# heketi-cli cluster list
+~~~
 * `volumetype` : The volume type and its parameters can be configured with this optional value. If the volume type is not mentioned, it's up to the provisioner to decide the volume type.
 For example:
 
@@ -88,9 +97,11 @@ For available volume options and its administration refer: ([Administration Guid
 
 Please note that, the value for this parameter cannot contain `_` in storageclass. This is an optional parameter.
 
-Reference : ([How to configure Gluster on Kubernetes](https://github.com/gluster/gluster-kubernetes/blob/master/docs/setup-guide.md))
+Additional Reference:
 
-Reference : ([How to configure Heketi](https://github.com/heketi/heketi/wiki/Setting-up-the-topology))
+([How to configure Gluster on Kubernetes](https://github.com/gluster/gluster-kubernetes/blob/master/docs/setup-guide.md))
+
+([How to configure Heketi](https://github.com/heketi/heketi/wiki/Setting-up-the-topology))
 
 When the persistent volumes are dynamically provisioned, the Gluster plugin automatically create an endpoint and a headless service in the name `glusterfile-dynamic-<claimname>`. This dynamic endpoint and service will be deleted automatically when the persistent volume claim is deleted.
 

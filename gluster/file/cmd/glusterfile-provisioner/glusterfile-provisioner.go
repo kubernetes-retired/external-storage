@@ -188,7 +188,7 @@ func (p *glusterfileProvisioner) CreateVolume(gid *int, config *provisionerConfi
 	var clusterIDs []string
 	customVolumeName := ""
 
-	glog.V(2).Infof("create volume of size %d GiB and configuration %+v", sz, config)
+	glog.V(2).Infof("create volume of size %dGiB and configuration %+v", sz, config)
 
 	if config.url == "" {
 		glog.Errorf("REST server endpoint is empty")
@@ -214,11 +214,11 @@ func (p *glusterfileProvisioner) CreateVolume(gid *int, config *provisionerConfi
 	volumeReq := &gapi.VolumeCreateRequest{Size: sz, Name: customVolumeName, Clusters: clusterIDs, Gid: gid64, Durability: config.volumeType, GlusterVolumeOptions: p.volumeOptions}
 	volume, err := cli.VolumeCreate(volumeReq)
 	if err != nil {
-		glog.Errorf("error creating volume: %v ", err)
-		return nil, 0, "", fmt.Errorf("error creating volume: %v", err)
+		glog.Errorf("failed to create gluster volume: %v", err)
+		return nil, 0, "", fmt.Errorf("failed to create gluster volume: %v", err)
 	}
 
-	glog.V(1).Infof("volume with size %d and name: %s created", volume.Size, volume.Name)
+	glog.V(1).Infof("volume with size %d and name %s created", volume.Size, volume.Name)
 
 	volID = volume.Id
 	dynamicHostIps, err := getClusterNodes(cli, volume.Cluster)
@@ -234,11 +234,11 @@ func (p *glusterfileProvisioner) CreateVolume(gid *int, config *provisionerConfi
 		glog.Errorf("failed to create endpoint/service %v/%v: %v", epNamespace, epServiceName, err)
 		deleteErr := cli.VolumeDelete(volume.Id)
 		if deleteErr != nil {
-			glog.Errorf("error when deleting the volume: %v , manual deletion required", deleteErr)
+			glog.Errorf("error when deleting the volume: %v, manual deletion required", deleteErr)
 		}
 		return nil, 0, "", fmt.Errorf("failed to create endpoint/service %v/%v: %v", epNamespace, epServiceName, err)
 	}
-	glog.V(3).Infof("dynamic endpoint %v and service : %v ", endpoint, service)
+	glog.V(3).Infof("dynamic endpoint %v and service %v", endpoint, service)
 
 	return &v1.GlusterfsVolumeSource{
 		EndpointsName: endpoint.Name,
@@ -350,32 +350,16 @@ func getVolumeID(pv *v1.PersistentVolume, volumeName string) (string, error) {
 	return volumeID, nil
 }
 
-func (p *glusterfileProvisioner) Delete(volume *v1.PersistentVolume) error {
-
-	glog.V(1).Infof("deleting volume")
-
-	err := p.allocator.Release(volume)
-	if err != nil {
-		return err
-	}
-
-	glog.V(2).Infof("delete volume: %s", volume.Spec.Glusterfs.Path)
-
-	volumeName := volume.Spec.Glusterfs.Path
-	volumeID, err := getVolumeID(volume, volumeName)
-	if err != nil {
-		return fmt.Errorf("failed to get volumeID: %v", err)
-	}
-
-	delRestString, ok := volume.Annotations[restStr]
+func (p *glusterfileProvisioner) getRESTCredentials(pv *v1.PersistentVolume) (map[string]string, error) {
+	restString, ok := pv.Annotations[restStr]
 	if !ok {
-		return fmt.Errorf("volume annotation for server details not found on PV")
+		return nil, fmt.Errorf("volume annotation for server details not found on PV")
 	}
 
-	delRestStrSlice := dstrings.Split(delRestString, ",")
+	restStrSlice := dstrings.Split(restString, ",")
 	heketiModeArgs := make(map[string]string)
 
-	for _, v := range delRestStrSlice {
+	for _, v := range restStrSlice {
 		if v != "" {
 			s := dstrings.Split(v, ":")
 
@@ -393,9 +377,34 @@ func (p *glusterfileProvisioner) Delete(volume *v1.PersistentVolume) error {
 		heketiModeArgs["restsecretvalue"], err = parseSecret(heketiModeArgs["secretnamespace"], heketiModeArgs["secret"], p.client)
 		if err != nil {
 			glog.Errorf("failed to parse secret %s: %v", heketiModeArgs["secret"], err)
-			return err
+			return nil, err
 		}
 	}
+
+	return heketiModeArgs, nil
+}
+
+func (p *glusterfileProvisioner) Delete(volume *v1.PersistentVolume) error {
+
+	glog.V(1).Infof("deleting volume, path %s", volume.Spec.Glusterfs.Path)
+
+	err := p.allocator.Release(volume)
+	if err != nil {
+		return err
+	}
+
+	volumeName := volume.Spec.Glusterfs.Path
+	volumeID, err := getVolumeID(volume, volumeName)
+	if err != nil {
+		return fmt.Errorf("failed to get volumeID: %v", err)
+	}
+
+	heketiModeArgs, credErr := p.getRESTCredentials(volume)
+	if credErr != nil {
+		glog.Errorf("failed to retrieve REST credentials from pv: %v", credErr)
+		return fmt.Errorf("failed to retrieve REST credentials from pv: %v", credErr)
+	}
+
 	cli := gcli.NewClient(heketiModeArgs["url"], heketiModeArgs["user"], heketiModeArgs["restsecretvalue"])
 	if cli == nil {
 		glog.Errorf("failed to create REST client")
