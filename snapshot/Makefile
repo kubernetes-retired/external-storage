@@ -34,8 +34,12 @@ provisioner:
 	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o _output/bin/snapshot-provisioner cmd/snapshot-pv-provisioner/snapshot-pv-provisioner.go
 
 clean:
-	-rm -f deploy/controller/snapshot-controller
-	-rm -f deploy/provisioner/snapshot-provisioner
+	-rm -f deploy/docker/controller/snapshot-controller
+	-rm -f deploy/docker/provisioner/snapshot-provisioner
+	-rm -rf deploy/docker/controller/etc
+	-rm -rf deploy/docker/controller/usr
+	-rm -rf deploy/docker/provisioner/etc
+	-rm -rf deploy/docker/provisioner/usr
 	-rm -rf _output
 
 test:
@@ -46,6 +50,9 @@ container: controller provisioner container-quick
 container-quick:
 	cp _output/bin/snapshot-controller deploy/docker/controller
 	cp _output/bin/snapshot-provisioner deploy/docker/provisioner
+	# Copy the root CA certificates -- cloudproviders need them
+	cp -r --remove-destination deploy/ca-certificates/* deploy/docker/controller/
+	cp -r --remove-destination deploy/ca-certificates/* deploy/docker/provisioner/
 	docker build -t $(MUTABLE_IMAGE_CONTROLLER) deploy/docker/controller
 	docker tag $(MUTABLE_IMAGE_CONTROLLER) $(IMAGE_CONTROLLER)
 	docker build -t $(MUTABLE_IMAGE_PROVISIONER) deploy/docker/provisioner
