@@ -1,0 +1,45 @@
+---
+kind: Template
+apiVersion: v1
+metadata:
+  name: glusterfile-provisioner
+  labels:
+    glusterfile: glusterfile-template
+  annotations:
+    description: Gluster File Provisioner Deployment Template
+    tags: glusterfile
+labels:
+  template: glusterfile-provisioner
+objects:
+- kind: DeploymentConfig
+  apiVersion: v1
+  metadata:
+    name: glusterfile-provisioner
+    labels:
+      glusterfile: glusterfile-provisioner-dc
+    annotations:
+      description: Defines how to deploy Gluster File Provisioner Pod.
+  spec:
+    replicas: 1
+    selector:
+      glusterfile: glusterfile-provisioner-pod
+    triggers:
+    - type: ConfigChange
+    strategy:
+      type: Recreate
+    template:
+      metadata:
+        name: glusterfile-provisioner
+        labels:
+          glusterfile: glusterfile-provisioner-pod
+      spec:
+        serviceAccountName: glusterfile-provisioner
+        hostNetwork: true
+        containers:
+        - name: glusterfile-provisioner
+          image: quay.io/external_storage/glusterfile-provisioner:latest
+          imagePullPolicy: IfNotPresent
+          env:
+          - name: PROVISIONER_NAME
+            value: gluster.org/glusterfile
+
