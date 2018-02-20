@@ -54,6 +54,7 @@ const (
 	blockVolPrefix     = "blockvol_"
 	heketiOpmode       = "heketi"
 	glusterBlockOpmode = "gluster-block"
+	volIDAnn           = "gluster.org/volume-id"
 )
 
 type glusterBlockProvisioner struct {
@@ -96,6 +97,9 @@ type provisionerConfig struct {
 
 	// Optional: Chap Auth Enable
 	chapAuthEnabled bool
+
+	// Optional: Custom Volume name prefix string.
+	volumeNamePrefix string
 }
 
 type glusterBlockVolume struct {
@@ -138,6 +142,7 @@ type iscsiSpec struct {
 	BlockSecret       string
 	BlockSecretNs     string
 	BlockVolName      string
+	VolumeID          string
 }
 
 //NewGlusterBlockProvisioner create a new provisioner.
@@ -188,6 +193,11 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 	if cfg.opMode == glusterBlockOpmode {
 		blockVolName = blockVolPrefix + string(uuid.NewUUID())
 	}
+
+	if cfg.volumeNamePrefix != "" {
+		blockVolName = fmt.Sprintf("%s_%s_%s_%s", cfg.volumeNamePrefix, p.options.PVC.Namespace, p.options.PVC.Name, uuid.NewUUID())
+	}
+
 	blockVol, createErr := p.createVolume(volszInt, blockVolName, cfg)
 	if createErr != nil {
 		return nil, fmt.Errorf("failed to create volume: %v", createErr)
@@ -204,13 +214,19 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 		iscsiVol.Iqn = blockVol.heketiBlockVolRes.Iqn
 		iscsiVol.User = blockVol.heketiBlockVolRes.User
 		iscsiVol.AuthKey = blockVol.heketiBlockVolRes.AuthKey
-		iscsiVol.BlockVolName = blockVolPrefix + blockVol.heketiBlockVolRes.ID
+		if cfg.volumeNamePrefix != "" {
+			iscsiVol.BlockVolName = blockVolName
+		} else {
+			iscsiVol.BlockVolName = blockVolPrefix + blockVol.heketiBlockVolRes.ID
+		}
+		iscsiVol.VolumeID = blockVol.heketiBlockVolRes.ID
 	} else if cfg.opMode == glusterBlockOpmode && blockVol.glusterBlockExecVolRes != nil {
 		iscsiVol.Portals = blockVol.glusterBlockExecVolRes.Portals
 		iscsiVol.Iqn = blockVol.glusterBlockExecVolRes.Iqn
 		iscsiVol.User = blockVol.glusterBlockExecVolRes.User
 		iscsiVol.AuthKey = blockVol.glusterBlockExecVolRes.AuthKey
 		iscsiVol.BlockVolName = blockVolName
+		iscsiVol.VolumeID = ""
 	} else {
 		return nil, fmt.Errorf("failed to parse blockvol %v for opmode %v response", *blockVol, cfg.opMode)
 	}
@@ -275,6 +291,7 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 				"Blockstring":      modeAnn,
 				"AccessKey":        iscsiVol.BlockSecret,
 				"AccessKeyNs":      iscsiVol.BlockSecretNs,
+				volIDAnn:           iscsiVol.VolumeID,
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{
@@ -537,7 +554,10 @@ func (p *glusterBlockProvisioner) Delete(volume *v1.PersistentVolume) error {
 			return fmt.Errorf("[heketi]: failed to create REST client, REST server authentication failed")
 		}
 
-		volumeID := dstrings.TrimPrefix(delBlockVolName, blockVolPrefix)
+		volumeID, err := getVolumeID(volume, delBlockVolName)
+		if err != nil {
+			return fmt.Errorf("failed to get volumeID, err: %v", err)
+		}
 
 		deleteErr := cli.BlockVolumeDelete(volumeID)
 		if deleteErr != nil {
@@ -564,6 +584,26 @@ func (p *glusterBlockProvisioner) Delete(volume *v1.PersistentVolume) error {
 		}
 	}
 	return nil
+}
+
+// getVolumeID returns volumeID from the PV or volumename.
+func getVolumeID(pv *v1.PersistentVolume, volumeName string) (string, error) {
+	volumeID := ""
+
+	// Get volID from pvspec if available, else fill it from volumename.
+	if pv != nil {
+		if pv.Annotations[volIDAnn] != "" {
+			volumeID = pv.Annotations[volIDAnn]
+		} else {
+			volumeID = dstrings.TrimPrefix(volumeName, blockVolPrefix)
+		}
+	} else {
+		return volumeID, fmt.Errorf("provided PV spec is nil")
+	}
+	if volumeID == "" {
+		return volumeID, fmt.Errorf("volume ID is empty")
+	}
+	return volumeID, nil
 }
 
 //sortTargetPortal extract TP
@@ -600,6 +640,7 @@ func parseClassParameters(params map[string]string, kubeclient kubernetes.Interf
 	parseOpmode := ""
 	blkmodeArgs := ""
 	haCount := 3
+	parseVolumeNamePrefix := ""
 
 	for k, v := range params {
 		switch dstrings.ToLower(k) {
@@ -629,7 +670,10 @@ func parseClassParameters(params map[string]string, kubeclient kubernetes.Interf
 			blkmodeArgs = v
 		case "chapauthenabled":
 			chapAuthEnabled = dstrings.ToLower(v) == "true"
-
+		case "volumenameprefix":
+			if len(v) != 0 {
+				parseVolumeNamePrefix = v
+			}
 		default:
 			return nil, fmt.Errorf("invalid option %q for volume plugin %s", k, "glusterblock")
 		}
@@ -676,6 +720,13 @@ func parseClassParameters(params map[string]string, kubeclient kubernetes.Interf
 
 	cfg.restAuthEnabled = authEnabled
 	cfg.chapAuthEnabled = chapAuthEnabled
+
+	if len(parseVolumeNamePrefix) != 0 {
+		if dstrings.Contains(parseVolumeNamePrefix, "_") {
+			return nil, fmt.Errorf("Storageclass parameter 'volumenameprefix' should not contain '_' in its value")
+		}
+		cfg.volumeNamePrefix = parseVolumeNamePrefix
+	}
 	return &cfg, nil
 }
 
