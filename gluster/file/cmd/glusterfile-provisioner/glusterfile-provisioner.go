@@ -32,11 +32,13 @@ import (
 	"github.com/pborman/uuid"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 const (
@@ -245,6 +247,70 @@ func (p *glusterfileProvisioner) CreateVolume(gid *int, config *provisionerConfi
 		Path:          volume.Name,
 		ReadOnly:      false,
 	}, sz, volID, nil
+}
+
+func (p *glusterfileProvisioner) RequiresFSResize() bool {
+	return false
+}
+
+func (p *glusterfileProvisioner) ExpandVolumeDevice(spec *volume.Spec, newSize resource.Quantity, oldSize resource.Quantity) (resource.Quantity, error) {
+	pvSpec := spec.PersistentVolume.Spec
+	volumeName := pvSpec.Glusterfs.Path
+	glog.V(2).Infof("Request to expand volume: [%s]", volumeName)
+	volumeID, err := getVolumeID(spec.PersistentVolume, volumeName)
+
+	if err != nil {
+		return oldSize, fmt.Errorf("failed to get volumeID for volume [%s], err: %v", volumeName, err)
+	}
+
+	heketiModeArgs, credErr := p.getRESTCredentials(spec.PersistentVolume)
+	if credErr != nil {
+		glog.Errorf("failed to retrieve REST credentials from pv: %v", credErr)
+		return oldSize, fmt.Errorf("failed to retrieve REST credentials from pv: %v", credErr)
+	}
+
+	glog.V(4).Infof("Expanding volume %q with configuration %+v", volumeID)
+
+	//Create REST server connection
+	cli := gcli.NewClient(heketiModeArgs["url"], heketiModeArgs["user"], heketiModeArgs["restsecretvalue"])
+	if cli == nil {
+		glog.Errorf("failed to create glusterfs REST client")
+		return oldSize, fmt.Errorf("failed to create glusterfs REST client, REST server authentication failed")
+	}
+
+	// Find out delta size
+	expansionSize := (newSize.Value() - oldSize.Value())
+
+	expansionSizeGiB := int(util.RoundUpToGiB(expansionSize))
+
+	// Find out requested Size
+	//requestGiB := util.RoundUpToGiB(newSize)
+	requestGiB := int(util.RoundUpToGiB(newSize.Value()))
+
+	//Check the existing volume size
+	currentVolumeInfo, err := cli.VolumeInfo(volumeID)
+	if err != nil {
+		glog.Errorf("error when fetching details of volume[%s]: %v", volumeName, err)
+		return oldSize, err
+	}
+
+	if (currentVolumeInfo.Size) >= requestGiB {
+		return newSize, nil
+	}
+
+	// Make volume expansion request
+	volumeExpandReq := &gapi.VolumeExpandRequest{Size: expansionSizeGiB}
+
+	// Expand the volume
+	volumeInfoRes, err := cli.VolumeExpand(volumeID, volumeExpandReq)
+	if err != nil {
+		glog.Errorf("error when expanding the volume[%s]: %v", volumeName, err)
+		return oldSize, err
+	}
+
+	glog.V(2).Infof("volume %s expanded to new size %d successfully", volumeName, volumeInfoRes.Size)
+	newVolumeSize := resource.MustParse(fmt.Sprintf("%dGi", volumeInfoRes.Size))
+	return newVolumeSize, nil
 }
 
 func (p *glusterfileProvisioner) createEndpointService(namespace string, epServiceName string, hostips []string, pvcname string) (endpoint *v1.Endpoints, service *v1.Service, err error) {
