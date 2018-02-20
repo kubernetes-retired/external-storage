@@ -96,6 +96,9 @@ type provisionerConfig struct {
 
 	// Optional: Chap Auth Enable
 	chapAuthEnabled bool
+
+	//Optional: Chap Auth Secret Namespace.
+	chapSecretNamespace string
 }
 
 type glusterBlockVolume struct {
@@ -230,6 +233,11 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 
 	if cfg.chapAuthEnabled && iscsiVol.User != "" && iscsiVol.AuthKey != "" {
 		nameSpace := options.PVC.Namespace
+
+		if len(cfg.chapSecretNamespace) != 0 {
+			nameSpace = cfg.chapSecretNamespace
+		}
+
 		secretName := "glusterblk-" + iscsiVol.User + "-secret"
 		secretRef, err = p.createSecretRef(nameSpace, secretName, iscsiVol.User, iscsiVol.AuthKey)
 		if err != nil {
@@ -629,6 +637,8 @@ func parseClassParameters(params map[string]string, kubeclient kubernetes.Interf
 			blkmodeArgs = v
 		case "chapauthenabled":
 			chapAuthEnabled = dstrings.ToLower(v) == "true"
+		case "chapsecretnamespace":
+			cfg.chapSecretNamespace = v
 
 		default:
 			return nil, fmt.Errorf("invalid option %q for volume plugin %s", k, "glusterblock")

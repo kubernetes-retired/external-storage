@@ -11,5 +11,6 @@ parameters:
     opmode: "heketi"
     hacount: "1"
     chapauthenabled: "true"
-    #clusterids: "454811fcedbec6316bc10e591a57b472"
+    clusterids: "454811fcedbec6316bc10e591a57b472"
+    chapsecretnamespace: "default"
 

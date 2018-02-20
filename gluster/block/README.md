@@ -80,6 +80,8 @@ parameters:
 
 * `hacount`: This is the count of number of paths to the block target server. This provide high availability via multipathing capability of iscsi. If there is a path failure, the I/Os will not be disturbed and will be served via another available paths.
 
+* `chapsecretnamespace`: The value of this parameter decide in which namespace the CHAP secrets are kept. This is an optional parameter, if not specified secrets are kept under PVC namespace.
+
 
 ### Heketi Mode Parameters:
 
