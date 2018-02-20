@@ -91,6 +91,7 @@ func main() {
 		prName,
 		rbdProvisioner,
 		serverVersion.GitVersion,
+		controller.NewDefaultNamer(),
 	)
 
 	pc.Run(wait.NeverStop)

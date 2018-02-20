@@ -78,6 +78,7 @@ func main() {
 		*provisioner,
 		glusterfsProvisioner,
 		serverVersion.GitVersion,
+		controller.NewDefaultNamer(),
 	)
 
 	pc.Run(wait.NeverStop)

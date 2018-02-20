@@ -86,6 +86,7 @@ func main() {
 		*provisioner,
 		flexProvisioner,
 		serverVersion.GitVersion,
+		controller.NewDefaultNamer(),
 	)
 
 	pc.Run(wait.NeverStop)

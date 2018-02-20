@@ -95,6 +95,7 @@ func main() {
 		*provisioner,
 		digitaloceanProvisioner,
 		serverVersion.GitVersion,
+		controller.NewDefaultNamer(),
 	)
 
 	pc.Run(wait.NeverStop)

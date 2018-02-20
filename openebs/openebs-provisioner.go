@@ -215,7 +215,8 @@ func main() {
 			clientset,
 			provisionerName,
 			openEBSProvisioner,
-			serverVersion.GitVersion)
+			serverVersion.GitVersion,
+			controller.NewDefaultNamer())
 
 		pc.Run(wait.NeverStop)
 	} else {

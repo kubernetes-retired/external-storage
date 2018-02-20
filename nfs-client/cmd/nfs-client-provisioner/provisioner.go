@@ -141,6 +141,6 @@ func main() {
 	}
 	// Start the provision controller which will dynamically provision efs NFS
 	// PVs
-	pc := controller.NewProvisionController(clientset, provisionerName, clientNFSProvisioner, serverVersion.GitVersion)
+	pc := controller.NewProvisionController(clientset, provisionerName, clientNFSProvisioner, serverVersion.GitVersion, controller.NewDefaultNamer())
 	pc.Run(wait.NeverStop)
 }

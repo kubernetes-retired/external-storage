@@ -132,6 +132,7 @@ func main() {
 		*provisioner,
 		nfsProvisioner,
 		serverVersion.GitVersion,
+		controller.NewDefaultNamer(),
 	)
 
 	pc.Run(wait.NeverStop)

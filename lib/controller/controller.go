@@ -133,6 +133,7 @@ type ProvisionController struct {
 
 	hasRun     bool
 	hasRunLock *sync.Mutex
+	namer      Namer
 }
 
 const (
@@ -323,6 +324,7 @@ func NewProvisionController(
 	provisionerName string,
 	provisioner Provisioner,
 	kubeVersion string,
+	namer Namer,
 	options ...func(*ProvisionController) error,
 ) *ProvisionController {
 	identity := uuid.NewUUID()
@@ -364,6 +366,7 @@ func NewProvisionController(
 		leaderElectorsMutex:           &sync.Mutex{},
 		hasRun:                        false,
 		hasRunLock:                    &sync.Mutex{},
+		namer:                         namer,
 	}
 
 	for _, option := range options {
@@ -838,7 +841,7 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 	//  A previous doProvisionClaim may just have finished while we were waiting for
 	//  the locks. Check that PV (with deterministic name) hasn't been provisioned
 	//  yet.
-	pvName := ctrl.getProvisionedVolumeNameForClaim(claim)
+	pvName := ctrl.namer.GetProvisionedVolumeNameForClaim(claim)
 	volume, err := ctrl.client.CoreV1().PersistentVolumes().Get(pvName, metav1.GetOptions{})
 	if err == nil && volume != nil {
 		// Volume has been already provisioned, nothing to do.
@@ -1153,12 +1156,6 @@ func (ctrl *ProvisionController) deleteVolumeOperation(volume *v1.PersistentVolu
 
 	glog.Infof("volume %q deleted from database", volume.Name)
 	return nil
-}
-
-// getProvisionedVolumeNameForClaim returns PV.Name for the provisioned volume.
-// The name must be unique.
-func (ctrl *ProvisionController) getProvisionedVolumeNameForClaim(claim *v1.PersistentVolumeClaim) string {
-	return "pvc-" + string(claim.UID)
 }
 
 // scheduleOperation starts given asynchronous operation on given volume. It

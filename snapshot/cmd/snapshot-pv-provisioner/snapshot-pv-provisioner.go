@@ -264,6 +264,7 @@ func main() {
 		provisionerName,
 		snapshotProvisioner,
 		serverVersion.GitVersion,
+		controller.NewDefaultNamer(),
 	)
 	glog.Infof("starting PV provisioner %s", provisionerName)
 	pc.Run(wait.NeverStop)

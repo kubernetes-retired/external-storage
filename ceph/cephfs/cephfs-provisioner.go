@@ -377,6 +377,7 @@ func main() {
 		prName,
 		cephFSProvisioner,
 		serverVersion.GitVersion,
+		controller.NewDefaultNamer(),
 	)
 
 	pc.Run(wait.NeverStop)

@@ -80,6 +80,7 @@ func main() {
 		provisioner.ProvisionerName,
 		cinderProvisioner,
 		serverVersion.GitVersion,
+		controller.NewDefaultNamer(),
 	)
 
 	pc.Run(wait.NeverStop)

@@ -141,6 +141,6 @@ func main() {
 
 	// Start the provision controller which will dynamically provision hostPath
 	// PVs
-	pc := controller.NewProvisionController(clientset, provisionerName, hostPathProvisioner, serverVersion.GitVersion)
+	pc := controller.NewProvisionController(clientset, provisionerName, hostPathProvisioner, serverVersion.GitVersion, controller.NewDefaultNamer())
 	pc.Run(wait.NeverStop)
 }
