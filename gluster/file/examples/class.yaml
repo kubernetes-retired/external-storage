@@ -8,7 +8,7 @@ parameters:
     restuser: "admin"
     restsecretnamespace: "default"
     restsecretname: "heketi-secret"
-    #clusterids: "454811fcedbec6316bc10e591a57b472"
+    #clusterid: "454811fcedbec6316bc10e591a57b472"
     volumetype: "replicate:3"
     volumeoptions: "features.shard enable"
     volumenameprefix: "dept-dev"
