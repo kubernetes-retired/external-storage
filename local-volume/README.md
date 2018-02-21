@@ -26,6 +26,13 @@ directories by creating and cleaning up PersistentVolumes for each volume.
 
 Also see [known issues](KNOWN_ISSUES.md) and [provisioner CHANGELOG](provisioner/CHANGELOG.md).
 
+### 1.10: Beta
+
+* New PV.NodeAffinity field added.
+* **Important:** Alpha PV NodeAffinity annotation is deprecated. Users must manually update
+  their PVs to use the new NodeAffinity field or run a one-time update job (TBD).
+* Alpha: Raw block support added.
+
 ### 1.9: Alpha
 
 * New StorageClass `volumeBindingMode` parameter that will delay PVC binding
@@ -39,7 +46,6 @@ Also see [known issues](KNOWN_ISSUES.md) and [provisioner CHANGELOG](provisioner
 
 ### Future features
 
-* Pod accessing local raw block device
 * Local block devices as a volume source, with partitioning and fs formatting
 * Dynamic provisioning for shared local persistent storage
 * Local PV health monitoring, taints and tolerations
@@ -64,10 +70,15 @@ $ export KUBE_FEATURE_GATES="PersistentLocalVolumes=true"
 $ export KUBE_FEATURE_GATES="PersistentLocalVolumes=true,MountPropagation=true"
 ```
 
-##### 1.9+
+##### 1.9
 ```
 $ export KUBE_FEATURE_GATES="PersistentLocalVolumes=true,VolumeScheduling=true,MountPropagation=true"
 ```
+
+##### 1.10+
+
+$ export KUBE_FEATURE_GATES="BlockVolume=true"
+
 
 #### Option 1: GCE
 
@@ -165,14 +176,17 @@ $ kubectl create -f provisioner/deployment/kubernetes/example-storageclass.yaml
 
 ### Step 3: Creating local persistent volumes
 
-#### Option 1: Using the local volume static provisioner 
+#### Option 1: Using the local volume static provisioner
+
+**Important:** Running provisioner v2.1.0 or later against a Kubernetes cluster prior
+to v1.10 requires setting the `useAlphaAPI` configMap parameter to use the alpha API.
 
 1. Generate Provisioner's ServiceAccount, Roles, DaemonSet and ConfigMap spec, and customize it.
 This step uses helm templates to generate the specs.  See the [helm README](helm) for setup instructions.
 To generate the provisioner's specs using the [default values](helm/provisioner/values.yaml), run:
 
 ``` console
-helm template ./helm/provisioner > ./provisioner/deployment/kubernetes/provisioner_generated.yaml 
+helm template ./helm/provisioner > ./provisioner/deployment/kubernetes/provisioner_generated.yaml
 ```
 
 You can also provide a custom values file instead:
@@ -218,19 +232,20 @@ $ kubectl describe pv local-pv-ce05be60
 Name:		local-pv-ce05be60
 Labels:		<none>
 Annotations:	pv.kubernetes.io/provisioned-by=local-volume-provisioner-minikube-18f57fb2-a186-11e7-b543-080027d51893
-		volume.alpha.kubernetes.io/node-affinity={"requiredDuringSchedulingIgnoredDuringExecution":{"nodeSelectorTerms":[{"matchExpressions":[{"key":"kubernetes.io/hostname","operator":"In","values":["minikub...
 StorageClass:	local-fast
 Status:		Available
 Claim:		
 Reclaim Policy:	Delete
 Access Modes:	RWO
 Capacity:	1024220Ki
+NodeAffinity:
+  Required Terms:
+      Term 0:  kubernetes.io/hostname in [my-node]
 Message:	
 Source:
     Type:	LocalVolume (a persistent volume backed by local storage on a node)
     Path:	/mnt/disks/vol1
 Events:		<none>
-
 ```
 
 The PV described above can be claimed and bound to a PVC by referencing the `local-fast` storageClassName.
@@ -246,18 +261,6 @@ apiVersion: v1
 kind: PersistentVolume
 metadata:
   name: example-local-pv
-  annotations:
-    "volume.alpha.kubernetes.io/node-affinity": '{
-      "requiredDuringSchedulingIgnoredDuringExecution": {
-        "nodeSelectorTerms": [
-          { "matchExpressions": [
-            { "key": "kubernetes.io/hostname",
-              "operator": "In",
-              "values": ["my-node"]
-            }
-          ]}
-         ]}
-        }'
 spec:
   capacity:
     storage: 5Gi
@@ -267,6 +270,13 @@ spec:
   storageClassName: local-storage
   local:
     path: /mnt/disks/vol1
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values: my-node
 ```
 Please replace the following elements to reflect your configuration:
 
