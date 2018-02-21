@@ -90,7 +90,7 @@ If provisioner want to operate on `heketi` mode, below args can be  filled in st
 
 * `restuser` : Gluster REST service/Heketi user who has access to create volumes in the Gluster Trusted Pool.
 
-* `restsecretnamespace` + `restsecretname` : Namespace and Name of the Secret instance that contains user password to use when talking to heketi. These parameters are optional, An empty password will be used when both `restsecretnamespace` and `restsecretname` are omitted. The provided secret must have type matching your provisioner ID (e.g. `gluster.org/glusterfs`).
+* `restsecretnamespace` + `restsecretname` : Namespace and Name of the Secret instance that contains user password to use when talking to heketi. These parameters are optional, An empty password will be used when both `restsecretnamespace` and `restsecretname` are omitted. The provided secret must have type matching your provisioner ID (e.g. `gluster.org/glusterblock`).
 
 
 ### Gluster-Block Mode parameters:
