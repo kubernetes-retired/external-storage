@@ -2,18 +2,6 @@ apiVersion: v1
 kind: PersistentVolume
 metadata:
   name: example-local-pv
-  annotations:
-    "volume.alpha.kubernetes.io/node-affinity": '{
-        "requiredDuringSchedulingIgnoredDuringExecution": {
-            "nodeSelectorTerms": [
-                { "matchExpressions": [
-                    { "key": "kubernetes.io/hostname",
-                      "operator": "In",
-                      "values": ["my-node"]
-                    }   
-                ]}  
-             ]}  
-          }'
 spec:
   capacity:
     storage: 5Gi 
@@ -23,3 +11,11 @@ spec:
   storageClassName: local-storage
   local:
     path: /mnt/disks/ssd1
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - my-node
