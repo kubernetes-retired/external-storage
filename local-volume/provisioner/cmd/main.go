@@ -58,6 +58,7 @@ func main() {
 		Node:            node,
 		DiscoveryMap:    provisionerConfig.StorageClassConfig,
 		NodeLabelsForPV: provisionerConfig.NodeLabelsForPV,
+		UseAlphaAPI:     provisionerConfig.UseAlphaAPI,
 	})
 }
 

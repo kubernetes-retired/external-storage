@@ -331,17 +331,26 @@ func findSCName(t *testing.T, targetDir string, test *testConfig) string {
 }
 
 func verifyNodeAffinity(t *testing.T, pv *v1.PersistentVolume) {
-	affinity, err := helper.GetStorageNodeAffinityFromAnnotation(pv.Annotations)
-	if err != nil {
-		t.Errorf("Could not get node affinity from annotation: %v", err)
-		return
-	}
-	if affinity == nil {
-		t.Errorf("No node affinity found")
-		return
-	}
+	var err error
+	var volumeNodeAffinity *v1.VolumeNodeAffinity
+	var nodeAffinity *v1.NodeAffinity
+	var selector *v1.NodeSelector
 
-	selector := affinity.RequiredDuringSchedulingIgnoredDuringExecution
+	volumeNodeAffinity = pv.Spec.NodeAffinity
+	if volumeNodeAffinity == nil {
+		nodeAffinity, err = helper.GetStorageNodeAffinityFromAnnotation(pv.Annotations)
+		if err != nil {
+			t.Errorf("Could not get node affinity from annotation: %v", err)
+			return
+		}
+		if nodeAffinity == nil {
+			t.Errorf("No node affinity found")
+			return
+		}
+		selector = nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+	} else {
+		selector = volumeNodeAffinity.Required
+	}
 	if selector == nil {
 		t.Errorf("NodeAffinity node selector is nil")
 		return

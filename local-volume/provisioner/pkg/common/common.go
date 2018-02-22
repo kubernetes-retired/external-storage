@@ -59,6 +59,8 @@ const (
 	ProvisonerStorageClassConfig = "storageClassMap"
 	// ProvisionerNodeLabelsForPV contains a list of node labels to be copied to the PVs created by the provisioner
 	ProvisionerNodeLabelsForPV = "nodeLabelsForPV"
+	// ProvisionerUseAlphaAPI shows if we need to use alpha API, default to false
+	ProvisionerUseAlphaAPI = "useAlphaAPI"
 	// VolumeDelete copied from k8s.io/kubernetes/pkg/controller/volume/events
 	VolumeDelete = "VolumeDelete"
 
@@ -76,6 +78,8 @@ type UserConfig struct {
 	DiscoveryMap map[string]MountConfig
 	// Labels and their values that are added to PVs created by the provisioner
 	NodeLabelsForPV []string
+	// UseAlphaAPI shows if we need to use alpha API
+	UseAlphaAPI bool
 }
 
 // MountConfig stores a configuration for discoverying a specific storageclass
@@ -116,7 +120,9 @@ type LocalPVConfig struct {
 	Capacity        int64
 	StorageClass    string
 	ProvisionerName string
+	UseAlphaAPI     bool
 	AffinityAnn     string
+	NodeAffinity    *v1.VolumeNodeAffinity
 	VolumeMode      v1.PersistentVolumeMode
 	Labels          map[string]string
 }
@@ -137,18 +143,18 @@ type ProvisionerConfiguration struct {
 	// NodeLabelsForPV contains a list of node labels to be copied to the PVs created by the provisioner
 	// +optional
 	NodeLabelsForPV []string `json:"nodeLabelsForPV" yaml:"nodeLabelsForPV"`
+	// UseAlphaAPI shows if we need to use alpha API, default to false
+	UseAlphaAPI bool `json:"useAlphaAPI" yaml:"useAlphaAPI"`
 }
 
 // CreateLocalPVSpec returns a PV spec that can be used for PV creation
 func CreateLocalPVSpec(config *LocalPVConfig) *v1.PersistentVolume {
-
-	return &v1.PersistentVolume{
+	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   config.Name,
 			Labels: config.Labels,
 			Annotations: map[string]string{
-				AnnProvisionedBy:                      config.ProvisionerName,
-				v1.AlphaStorageNodeAffinityAnnotation: config.AffinityAnn,
+				AnnProvisionedBy: config.ProvisionerName,
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{
@@ -168,6 +174,12 @@ func CreateLocalPVSpec(config *LocalPVConfig) *v1.PersistentVolume {
 			VolumeMode:       &config.VolumeMode,
 		},
 	}
+	if config.UseAlphaAPI {
+		pv.ObjectMeta.Annotations[v1.AlphaStorageNodeAffinityAnnotation] = config.AffinityAnn
+	} else {
+		pv.Spec.NodeAffinity = config.NodeAffinity
+	}
+	return pv
 }
 
 // GetContainerPath gets the local path (within provisioner container) of the PV
@@ -199,12 +211,17 @@ func VolumeConfigToConfigMapData(config *ProvisionerConfiguration) (map[string]s
 	}
 	configMapData[ProvisonerStorageClassConfig] = string(val)
 	if len(config.NodeLabelsForPV) > 0 {
-		nodeLabels, err := yaml.Marshal(config.NodeLabelsForPV)
-		if err != nil {
-			return nil, fmt.Errorf("unable to Marshal node label: %v", err)
+		nodeLabels, nlErr := yaml.Marshal(config.NodeLabelsForPV)
+		if nlErr != nil {
+			return nil, fmt.Errorf("unable to Marshal node label: %v", nlErr)
 		}
 		configMapData[ProvisionerNodeLabelsForPV] = string(nodeLabels)
 	}
+	ver, err := yaml.Marshal(config.UseAlphaAPI)
+	if err != nil {
+		return nil, fmt.Errorf("unable to Marshal API version config: %v", err)
+	}
+	configMapData[ProvisionerUseAlphaAPI] = string(ver)
 
 	return configMapData, nil
 }

@@ -39,21 +39,12 @@ type Discoverer struct {
 	// it is being cleaned
 	ProcTable       deleter.ProcTable
 	nodeAffinityAnn string
+	nodeAffinity    *v1.VolumeNodeAffinity
 }
 
 // NewDiscoverer creates a Discoverer object that will scan through
 // the configured directories and create local PVs for any new directories found
 func NewDiscoverer(config *common.RuntimeConfig, procTable deleter.ProcTable) (*Discoverer, error) {
-	affinity, err := generateNodeAffinity(config.Node)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to generate node affinity: %v", err)
-	}
-	tmpAnnotations := map[string]string{}
-	err = helper.StorageNodeAffinityToAlphaAnnotation(tmpAnnotations, affinity)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to convert node affinity to alpha annotation: %v", err)
-	}
-
 	labelMap := make(map[string]string)
 	for _, labelName := range config.NodeLabelsForPV {
 		labelVal, ok := config.Node.Labels[labelName]
@@ -62,11 +53,33 @@ func NewDiscoverer(config *common.RuntimeConfig, procTable deleter.ProcTable) (*
 		}
 	}
 
+	if config.UseAlphaAPI {
+		nodeAffinity, err := generateNodeAffinity(config.Node)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to generate node affinity: %v", err)
+		}
+		tmpAnnotations := map[string]string{}
+		err = helper.StorageNodeAffinityToAlphaAnnotation(tmpAnnotations, nodeAffinity)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to convert node affinity to alpha annotation: %v", err)
+		}
+		return &Discoverer{
+			RuntimeConfig:   config,
+			Labels:          labelMap,
+			ProcTable:       procTable,
+			nodeAffinityAnn: tmpAnnotations[v1.AlphaStorageNodeAffinityAnnotation]}, nil
+	}
+
+	volumeNodeAffinity, err := generateVolumeNodeAffinity(config.Node)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to generate volume node affinity: %v", err)
+	}
+
 	return &Discoverer{
-		RuntimeConfig:   config,
-		Labels:          labelMap,
-		ProcTable:       procTable,
-		nodeAffinityAnn: tmpAnnotations[v1.AlphaStorageNodeAffinityAnnotation]}, nil
+		RuntimeConfig: config,
+		Labels:        labelMap,
+		ProcTable:     procTable,
+		nodeAffinity:  volumeNodeAffinity}, nil
 }
 
 func generateNodeAffinity(node *v1.Node) (*v1.NodeAffinity, error) {
@@ -80,6 +93,32 @@ func generateNodeAffinity(node *v1.Node) (*v1.NodeAffinity, error) {
 
 	return &v1.NodeAffinity{
 		RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+			NodeSelectorTerms: []v1.NodeSelectorTerm{
+				{
+					MatchExpressions: []v1.NodeSelectorRequirement{
+						{
+							Key:      common.NodeLabelKey,
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{nodeValue},
+						},
+					},
+				},
+			},
+		},
+	}, nil
+}
+
+func generateVolumeNodeAffinity(node *v1.Node) (*v1.VolumeNodeAffinity, error) {
+	if node.Labels == nil {
+		return nil, fmt.Errorf("Node does not have labels")
+	}
+	nodeValue, found := node.Labels[common.NodeLabelKey]
+	if !found {
+		return nil, fmt.Errorf("Node does not have expected label %s", common.NodeLabelKey)
+	}
+
+	return &v1.VolumeNodeAffinity{
+		Required: &v1.NodeSelector{
 			NodeSelectorTerms: []v1.NodeSelectorTerm{
 				{
 					MatchExpressions: []v1.NodeSelectorRequirement{
@@ -214,16 +253,24 @@ func (d *Discoverer) createPV(file, class string, config common.MountConfig, cap
 	glog.Infof("Found new volume of volumeMode %q at host path %q with capacity %d, creating Local PV %q",
 		volMode, outsidePath, capacityByte, pvName)
 
-	pvSpec := common.CreateLocalPVSpec(&common.LocalPVConfig{
+	localPVConfig := &common.LocalPVConfig{
 		Name:            pvName,
 		HostPath:        outsidePath,
 		Capacity:        roundDownCapacityPretty(capacityByte),
 		StorageClass:    class,
 		ProvisionerName: d.Name,
-		AffinityAnn:     d.nodeAffinityAnn,
 		VolumeMode:      volMode,
 		Labels:          d.Labels,
-	})
+	}
+
+	if d.UseAlphaAPI {
+		localPVConfig.UseAlphaAPI = true
+		localPVConfig.AffinityAnn = d.nodeAffinityAnn
+	} else {
+		localPVConfig.NodeAffinity = d.nodeAffinity
+	}
+
+	pvSpec := common.CreateLocalPVSpec(localPVConfig)
 
 	_, err := d.APIUtil.CreatePV(pvSpec)
 	if err != nil {
