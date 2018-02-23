@@ -29,6 +29,7 @@ import (
 	"k8s.io/client-go/rest"
 	kcache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	kcontroller "k8s.io/kubernetes/pkg/controller"
 
 	crdv1 "github.com/kubernetes-incubator/external-storage/snapshot/pkg/apis/crd/v1"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/controller/cache"
@@ -166,16 +167,11 @@ func (c *snapshotController) Run(ctx <-chan struct{}) {
 	glog.Infof("Starting snapshot controller")
 
 	go c.snapshotController.Run(ctx)
-	for n := 0; n < 10; n++ {
-		if c.snapshotController.HasSynced() {
-			break
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
-	if !c.snapshotController.HasSynced() {
-		glog.Errorf("Error syncing the controller")
+
+	if !kcontroller.WaitForCacheSync("snapshot-controller", ctx, c.snapshotController.HasSynced) {
 		return
 	}
+
 	go c.reconciler.Run(ctx)
 	go c.desiredStateOfWorldPopulator.Run(ctx)
 
