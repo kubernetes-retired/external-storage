@@ -290,7 +290,7 @@ Now we create a `StorageClass` & `PersistentVolumeClaim` and see that a `Persist
 
 ```yaml
 kind: StorageClass
-apiVersion: storage.k8s.io/v1beta1
+apiVersion: storage.k8s.io/v1
 metadata:
   name: example-hostpath
 provisioner: example.com/hostpath
