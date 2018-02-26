@@ -26,6 +26,7 @@ provisioners=(
 efs-provisioner
 cephfs-provisioner
 glusterblock-provisioner
+glusterfile-provisioner
 glusterfs-simple-provisioner
 iscsi-controller
 local-volume-provisioner-bootstrap
