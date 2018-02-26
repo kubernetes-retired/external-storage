@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/ghodss/yaml"
@@ -37,7 +38,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"path/filepath"
 )
 
 const (
@@ -46,10 +46,6 @@ const (
 	// NodeLabelKey is the label key that this provisioner uses for PV node affinity
 	// hostname is not the best choice, but it's what pod and node affinity also use
 	NodeLabelKey = apis.LabelHostname
-	// VolumeTypeFile represents file type volumes
-	VolumeTypeFile = "file"
-	// VolumeTypeBlock represents block type volumes
-	VolumeTypeBlock = "block"
 
 	// DefaultBlockCleanerCommand is the default block device cleaning command
 	DefaultBlockCleanerCommand = "/scripts/quick_reset.sh"
@@ -121,6 +117,7 @@ type LocalPVConfig struct {
 	StorageClass    string
 	ProvisionerName string
 	AffinityAnn     string
+	VolumeMode      v1.PersistentVolumeMode
 	Labels          map[string]string
 }
 
@@ -144,6 +141,7 @@ type ProvisionerConfiguration struct {
 
 // CreateLocalPVSpec returns a PV spec that can be used for PV creation
 func CreateLocalPVSpec(config *LocalPVConfig) *v1.PersistentVolume {
+
 	return &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   config.Name,
@@ -167,6 +165,7 @@ func CreateLocalPVSpec(config *LocalPVConfig) *v1.PersistentVolume {
 				v1.ReadWriteOnce,
 			},
 			StorageClassName: config.StorageClass,
+			VolumeMode:       &config.VolumeMode,
 		},
 	}
 }

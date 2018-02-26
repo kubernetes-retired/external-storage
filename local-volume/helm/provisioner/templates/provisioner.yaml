@@ -5,7 +5,12 @@
 {{ $storageClass }}:
    hostDir: {{ $classConfig.hostDir }}
    mountDir: {{ if $classConfig.mountDir }} {{$classConfig.mountDir }} {{ else }} {{ $classConfig.hostDir }} {{ end }}
-   {{- end}}
+   {{- if $classConfig.blockCleanerCommand }}
+   blockCleanerCommand:
+   {{- range $tmp, $val := $classConfig.blockCleanerCommand }}
+     - "{{ $val -}}"{{- end}}
+   {{- end }}
+{{- end}}
 {{- end}}
 {{- end }}
 {{- define "configVolumes" }}

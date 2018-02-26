@@ -125,10 +125,21 @@ func (d *Discoverer) discoverVolumesAtPath(class string, config common.MountConf
 	}
 
 	for _, file := range files {
+		filePath := filepath.Join(config.MountDir, file)
+		volMode, err := d.getVolumeMode(filePath)
+		if err != nil {
+			glog.Error(err)
+			continue
+		}
 		// Check if PV already exists for it
 		pvName := generatePVName(file, d.Node.Name, class)
-		_, exists := d.Cache.GetPV(pvName)
+		pv, exists := d.Cache.GetPV(pvName)
 		if exists {
+			if volMode == v1.PersistentVolumeBlock && (pv.Spec.VolumeMode == nil ||
+				*pv.Spec.VolumeMode != v1.PersistentVolumeBlock) {
+				glog.Errorf("Incorrect Volume Mode: PV %q (path %q) was not created in block mode. "+
+					"Please check if BlockVolume features gate has been enabled for the cluster.", pvName, filePath)
+			}
 			continue
 		}
 
@@ -137,54 +148,43 @@ func (d *Discoverer) discoverVolumesAtPath(class string, config common.MountConf
 			continue
 		}
 
-		filePath := filepath.Join(config.MountDir, file)
-		volType, err := d.getVolumeType(filePath)
-		if err != nil {
-			glog.Error(err)
-			continue
-		}
-
 		var capacityByte int64
-		switch volType {
-		case common.VolumeTypeBlock:
-			if d.RuntimeConfig.BlockDisabled {
-				glog.Warningf("Block device (%q) PVs are currently disabled", filePath)
-				continue
-			}
+		switch volMode {
+		case v1.PersistentVolumeBlock:
 			capacityByte, err = d.VolUtil.GetBlockCapacityByte(filePath)
 			if err != nil {
 				glog.Errorf("Path %q block stats error: %v", filePath, err)
 				continue
 			}
-		case common.VolumeTypeFile:
+		case v1.PersistentVolumeFilesystem:
+			// Validate that this path is an actual mountpoint
+			if _, isMntPnt := mountPointMap[filePath]; isMntPnt == false {
+				glog.Errorf("Path %q is not an actual mountpoint", filePath)
+				continue
+			}
 			capacityByte, err = d.VolUtil.GetFsCapacityByte(filePath)
 			if err != nil {
 				glog.Errorf("Path %q fs stats error: %v", filePath, err)
 				continue
 			}
 		default:
-			glog.Errorf("Path %q has unexpected volume type %q", filePath, volType)
+			glog.Errorf("Path %q has unexpected volume type %q", filePath, volMode)
 			continue
 		}
 
-		// Validate that this path is an actual mountpoint
-		if _, isMntPnt := mountPointMap[filePath]; isMntPnt == false {
-			glog.Errorf("Path %q is not an actual mountpoint", filePath)
-			continue
-		}
-		d.createPV(file, class, config, capacityByte, volType)
+		d.createPV(file, class, config, capacityByte, volMode)
 	}
 }
 
-func (d *Discoverer) getVolumeType(fullPath string) (string, error) {
+func (d *Discoverer) getVolumeMode(fullPath string) (v1.PersistentVolumeMode, error) {
 	isdir, errdir := d.VolUtil.IsDir(fullPath)
 	if isdir {
-		return common.VolumeTypeFile, nil
+		return v1.PersistentVolumeFilesystem, nil
 	}
 	// check for Block before returning errdir
 	isblk, errblk := d.VolUtil.IsBlock(fullPath)
 	if isblk {
-		return common.VolumeTypeBlock, nil
+		return v1.PersistentVolumeBlock, nil
 	}
 
 	if errdir == nil && errblk == nil {
@@ -207,14 +207,13 @@ func generatePVName(file, node, class string) string {
 	return fmt.Sprintf("local-pv-%x", h.Sum32())
 }
 
-func (d *Discoverer) createPV(file, class string, config common.MountConfig, capacityByte int64, volType string) {
+func (d *Discoverer) createPV(file, class string, config common.MountConfig, capacityByte int64, volMode v1.PersistentVolumeMode) {
 	pvName := generatePVName(file, d.Node.Name, class)
 	outsidePath := filepath.Join(config.HostDir, file)
 
-	glog.Infof("Found new volume of volumeType %q at host path %q with capacity %d, creating Local PV %q",
-		volType, outsidePath, capacityByte, pvName)
+	glog.Infof("Found new volume of volumeMode %q at host path %q with capacity %d, creating Local PV %q",
+		volMode, outsidePath, capacityByte, pvName)
 
-	// TODO: Set block volumeType when the API is ready.
 	pvSpec := common.CreateLocalPVSpec(&common.LocalPVConfig{
 		Name:            pvName,
 		HostPath:        outsidePath,
@@ -222,6 +221,7 @@ func (d *Discoverer) createPV(file, class string, config common.MountConfig, cap
 		StorageClass:    class,
 		ProvisionerName: d.Name,
 		AffinityAnn:     d.nodeAffinityAnn,
+		VolumeMode:      volMode,
 		Labels:          d.Labels,
 	})
 
