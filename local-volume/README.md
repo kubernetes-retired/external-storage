@@ -11,16 +11,22 @@ An external static provisioner is available to help simplify local storage
 management once the local volumes are configured.  Note that the local
 storage provisioner is different from most provisioners and does
 not support dynamic provisioning yet.  Instead, it requires that administrators
-preconfigure the local volumes on each node and mount them under discovery
-directories.  The provisioner will manage the volumes under the discovery
-directories by creating and cleaning up PersistentVolumes for each volume.
+preconfigure the local volumes on each node and if volumes are supposed to be
+
+ 1. Filesystem volumeMode (default) PVs - mount them under discovery directories.
+ 2. Block volumeMode PVs - create a symbolic link under discovery directory to
+    the block device on the node.
+
+The provisioner will manage the volumes under the discovery directories by creating
+and cleaning up PersistentVolumes for each volume.
 
 ## Configuration Requirements
 
 * The local-volume plugin expects paths to be stable, including across
   reboots and when disks are added or removed.
-* The static provisioner only discovers mount points.  For directory-based local
-  volumes, they must be bind-mounted into the discovery directories.
+* The static provisioner only discovers either mount points (for Filesystem mode volumes)
+  or symbolic links (for Block mode volumes). For directory-based local volumes, they
+  must be bind-mounted into the discovery directories.
 
 ## Version Compatibility
 
@@ -234,6 +240,26 @@ Please replace the following elements to reflect your configuration:
   * "5Gi" with required size of storage volume
   * "local-storage" with the name of storage class associated with the
   local PVs that should be used for satisfying this PVC
+
+For "Block" volumeMode PVC, which tries to claim a "Block" PV, the following
+example can be used:
+
+``` yaml
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: example-local-claim
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  volumeMode: Block
+  storageClassName: local-storage
+```
+Note that the only additional field of interest here is volumeMode, which has been set
+to "Block".
 
 ## E2E Tests
 
