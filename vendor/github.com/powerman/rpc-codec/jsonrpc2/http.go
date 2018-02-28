@@ -102,11 +102,16 @@ type httpClientConn struct {
 	doer  Doer
 	ready chan io.ReadCloser
 	body  io.ReadCloser
+	close chan struct{}
 }
 
 func (conn *httpClientConn) Read(buf []byte) (int, error) {
 	if conn.body == nil {
-		conn.body = <-conn.ready
+		select {
+		case <-conn.close:
+			return 0, io.EOF
+		case conn.body = <-conn.ready:
+		}
 	}
 	n, err := conn.body.Read(buf)
 	if err == io.EOF {
@@ -131,22 +136,25 @@ func (conn *httpClientConn) Write(buf []byte) (int, error) {
 			var resp *http.Response
 			resp, err = conn.doer.Do(req)
 			const maxBodySlurpSize = 32 * 1024
-			if err != nil {
-			} else if resp.Header.Get("Content-Type") != contentType {
-				err = fmt.Errorf("bad HTTP Content-Type: %s", resp.Header.Get("Content-Type"))
-			} else if resp.StatusCode == http.StatusOK {
-				conn.ready <- resp.Body
-				return
-			} else if resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusAccepted {
-				// Read the body if small so underlying TCP connection will be re-used.
-				// No need to check for errors: if it fails, Transport won't reuse it anyway.
-				if resp.ContentLength == -1 || resp.ContentLength <= maxBodySlurpSize {
-					io.CopyN(ioutil.Discard, resp.Body, maxBodySlurpSize)
+
+			if err == nil {
+				mediaType, _, err2 := mime.ParseMediaType(resp.Header.Get("Content-Type"))
+				if mediaType != contentType || err2 != nil {
+					err = fmt.Errorf("bad HTTP Content-Type: %s", resp.Header.Get("Content-Type"))
+				} else if resp.StatusCode == http.StatusOK {
+					conn.ready <- resp.Body
+					return
+				} else if resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusAccepted {
+					// Read the body if small so underlying TCP connection will be re-used.
+					// No need to check for errors: if it fails, Transport won't reuse it anyway.
+					if resp.ContentLength == -1 || resp.ContentLength <= maxBodySlurpSize {
+						io.CopyN(ioutil.Discard, resp.Body, maxBodySlurpSize)
+					}
+					resp.Body.Close()
+					return
+				} else {
+					err = fmt.Errorf("bad HTTP Status: %s", resp.Status)
 				}
-				resp.Body.Close()
-				return
-			} else {
-				err = fmt.Errorf("bad HTTP Status: %s", resp.Status)
 			}
 			if resp != nil {
 				// Read the body if small so underlying TCP connection will be re-used.
@@ -170,6 +178,7 @@ func (conn *httpClientConn) Write(buf []byte) (int, error) {
 }
 
 func (conn *httpClientConn) Close() error {
+	close(conn.close)
 	return nil
 }
 
@@ -194,5 +203,6 @@ func NewCustomHTTPClient(url string, doer Doer) *Client {
 		url:   url,
 		doer:  doer,
 		ready: make(chan io.ReadCloser, 16),
+		close: make(chan struct{}),
 	})
 }
