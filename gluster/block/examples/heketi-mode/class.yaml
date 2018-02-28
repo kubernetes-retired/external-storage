@@ -12,4 +12,5 @@ parameters:
     hacount: "1"
     chapauthenabled: "true"
     #clusterids: "454811fcedbec6316bc10e591a57b472"
+     volumenameprefix: "dept-dev"
 
