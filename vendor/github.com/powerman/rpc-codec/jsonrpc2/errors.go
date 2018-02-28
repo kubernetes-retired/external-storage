@@ -8,12 +8,12 @@ import (
 
 var (
 	// Actual returned error may have different message.
-	errParse       = NewError(-32700, "Parse error")
-	errRequest     = NewError(-32600, "Invalid request")
-	errMethod      = NewError(-32601, "Method not found")
-	errParams      = NewError(-32602, "Invalid params")
-	errInternal    = NewError(-32603, "Internal error")
-	errServer      = NewError(-32000, "Server error")
+	errParse       = NewError(-32700, "parse error")
+	errRequest     = NewError(-32600, "invalid request")
+	errMethod      = NewError(-32601, "method not found")
+	errParams      = NewError(-32602, "invalid params")
+	errInternal    = NewError(-32603, "internal error")
+	errServer      = NewError(-32000, "server error")
 	errServerError = NewError(-32001, "jsonrpc2.Error: json.Marshal failed")
 )
 
