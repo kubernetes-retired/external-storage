@@ -80,6 +80,11 @@ parameters:
 
 * `hacount`: This is the count of number of paths to the block target server. This provide high availability via multipathing capability of iscsi. If there is a path failure, the I/Os will not be disturbed and will be served via another available paths.
 
+* `volumenameprefix` : By default dynamically provisioned volumes has the naming schema of vol_UUID format. With this option present in storageclass, an admin can now prefix the desired volume name from storageclass. If volumenameprefix storageclass parameter is set, the dynamically provisioned volumes are created in below format where _ is the field separator/delimiter:
+
+`volumenameprefix_Namespace_PVCname_randomUUID`
+
+Please note that, the value for this parameter cannot contain _ in storageclass. This is an optional parameter.
 
 ### Heketi Mode Parameters:
 
