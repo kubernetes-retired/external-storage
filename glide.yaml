@@ -17,17 +17,17 @@ import:
 - package: gopkg.in/gcfg.v1
   version: v1.2.1
 - package: k8s.io/apiserver
-  version: kubernetes-1.9.2
+  version: kubernetes-1.10.0-beta.1
 - package: k8s.io/apiextensions-apiserver
-  version: kubernetes-1.9.2
+  version: kubernetes-1.10.0-beta.1
 - package: k8s.io/apimachinery
-  version: kubernetes-1.9.2
+  version: kubernetes-1.10.0-beta.1
 - package: k8s.io/client-go
-  version: kubernetes-1.9.2
+  version: kubernetes-1.10.0-beta.1
 - package: k8s.io/api
-  version: kubernetes-1.9.2
+  version: kubernetes-1.10.0-beta.1
 - package: k8s.io/kubernetes
-  version: v1.9.2
+  version: v1.10.0-beta.0
 - package: github.com/heketi/heketi
   version: 300752517908f3456e90d1ee2a773e7dd8ce1afe
   subpackages:
