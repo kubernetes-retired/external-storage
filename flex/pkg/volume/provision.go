@@ -91,7 +91,7 @@ func (p *flexProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 				v1.ResourceName(v1.ResourceStorage): options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)],
 			},
 			PersistentVolumeSource: v1.PersistentVolumeSource{
-				FlexVolume: &v1.FlexVolumeSource{
+				FlexVolume: &v1.FlexPersistentVolumeSource{
 					Driver:   "flex",
 					Options:  map[string]string{},
 					ReadOnly: false,
