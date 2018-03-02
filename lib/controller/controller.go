@@ -950,9 +950,27 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 			ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, "ProvisioningCleanupFailed", strerr)
 		}
 	} else {
-		glog.Infof("volume %q provisioned for claim %q", volume.Name, claimToClaimKey(claim))
-		msg := fmt.Sprintf("Successfully provisioned volume %s", volume.Name)
-		ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, "ProvisioningSucceeded", msg)
+		expectedVolumeMode := claim.Spec.VolumeMode
+		provisionedVolumeMode := volume.Spec.VolumeMode
+		// Report error if volumeMode for claim is different from volumeMode for provisioned volume,
+		// except if default volumeMode(Filesystem) is expected for claim and volumeMode is not set for provisioned volume.
+		if expectedVolumeMode != provisionedVolumeMode &&
+			!(expectedVolumeMode != nil && *expectedVolumeMode == v1.PersistentVolumeFilesystem && provisionedVolumeMode == nil) {
+			var expected, provisioned v1.PersistentVolumeMode
+			if expectedVolumeMode != nil {
+				expected = *expectedVolumeMode
+			}
+			if provisionedVolumeMode != nil {
+				provisioned = *provisionedVolumeMode
+			}
+			glog.Infof("volume %q is provisioned, but not bound to claim %q", volume.Name, claimToClaimKey(claim))
+			strerr := fmt.Sprintf("Volume %q is provisioned, but won't be bound to claim %q due to volumeMode mismatch(expected: %v, provisioned: %v)", volume.Name, claimToClaimKey(claim), expected, provisioned)
+			ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, "ProvisioningFailed", strerr)
+		} else {
+			glog.Infof("volume %q provisioned for claim %q", volume.Name, claimToClaimKey(claim))
+			msg := fmt.Sprintf("Successfully provisioned volume %s", volume.Name)
+			ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, "ProvisioningSucceeded", msg)
+		}
 	}
 
 	return nil
