@@ -195,7 +195,7 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 	}
 
 	if cfg.volumeNamePrefix != "" {
-		blockVolName = fmt.Sprintf("%s_%s_%s_%s", cfg.volumeNamePrefix, p.options.PVC.Namespace, p.options.PVC.Name, uuid.NewUUID())
+		blockVolName = fmt.Sprintf("%s_%s_%s_%s", cfg.volumeNamePrefix, options.PVC.Namespace, options.PVC.Name, uuid.NewUUID())
 	}
 
 	blockVol, createErr := p.createVolume(volszInt, blockVolName, cfg)
@@ -438,6 +438,7 @@ func (p *glusterBlockProvisioner) createVolume(volSizeInt int, blockVol string, 
 			Clusters: clusterIDs,
 			Hacount:  config.haCount,
 			Auth:     config.chapAuthEnabled,
+			Name:     blockVol,
 		}
 
 		blockVolumeInfoRes, err := cli.BlockVolumeCreate(blockVolumeReq)
