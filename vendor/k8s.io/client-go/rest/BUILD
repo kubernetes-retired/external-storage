@@ -16,8 +16,7 @@ go_test(
         "url_utils_test.go",
         "urlbackoff_test.go",
     ],
-    importpath = "k8s.io/client-go/rest",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/google/gofuzz:go_default_library",
@@ -55,7 +54,6 @@ go_library(
         "transport.go",
         "url_utils.go",
         "urlbackoff.go",
-        "versions.go",
         "zz_generated.deepcopy.go",
     ],
     importpath = "k8s.io/client-go/rest",
