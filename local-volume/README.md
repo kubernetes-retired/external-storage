@@ -80,7 +80,6 @@ unless you want to customize the provisioner spec or storage classes.
 
 ``` console
 $ NODE_LOCAL_SSDS=<n> cluster/kube-up.sh
-$ kubectl create -f provisioner/deployment/kubernetes/admin_account.yaml
 $ kubectl create -f provisioner/deployment/kubernetes/gce/provisioner_generated_gce_ssd_count.yaml
 ```
 
@@ -88,7 +87,6 @@ $ kubectl create -f provisioner/deployment/kubernetes/gce/provisioner_generated_
 
 ``` console
 $ NODE_LOCAL_SSDS_EXT=<n>,<scsi|nvme>,fs cluster/kube-up.sh
-$ kubectl create -f provisioner/deployment/kubernetes/admin_account.yaml
 $ kubectl create -f provisioner/deployment/kubernetes/gce/class-local-ssds.yaml
 $ kubectl create -f provisioner/deployment/kubernetes/gce/provisioner_generated_gce_ssd_volumes.yaml
 ```
@@ -103,9 +101,9 @@ unless you want to customize the provisioner spec or storage classes.
 ##### Using local-ssd-count option
 
 ``` console
+# --enable-kubernetes-alpha flag is not needed from K8s 1.10+
 $ gcloud container cluster create ... --local-ssd-count=<n> --enable-kubernetes-alpha
 $ gcloud container node-pools create ... --local-ssd-count=<n>
-$ kubectl create -f provisioner/deployment/kubernetes/admin_account.yaml
 
 # If running K8s 1.9+, also create the StorageClasses
 $ kubectl create -f provisioner/deployment/kubernetes/gce/class-local-ssds.yaml
@@ -115,9 +113,9 @@ $ kubectl create -f provisioner/deployment/kubernetes/gce/provisioner_generated_
 ##### Using local-ssd-volumes option (available via whitelist only)
 
 ``` console
+# --enable-kubernetes-alpha flag is not needed from K8s 1.10+
 $ gcloud alpha container cluster create ... --local-ssd-volumes="count=<n>,type=<scsi|nvme>,format=fs" --enable-kubernetes-alpha
 $ gcloud alpha container node-pools create ... --local-ssd-volumes="count=<n>,type=<scsi|nvme>,format=fs"
-$ kubectl create -f provisioner/deployment/kubernetes/admin_account.yaml
 $ kubectl create -f provisioner/deployment/kubernetes/gce/class-local-ssds.yaml
 $ kubectl create -f provisioner/deployment/kubernetes/gce/provisioner_generated_gce_ssd_volumes.yaml
 ```
