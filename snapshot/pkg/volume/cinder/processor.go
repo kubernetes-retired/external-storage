@@ -30,7 +30,7 @@ import (
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/cloudprovider"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/cloudprovider/providers/openstack"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume"
-	k8sVol "k8s.io/kubernetes/pkg/volume"
+	k8sVol "k8s.io/kubernetes/pkg/volume/util"
 )
 
 type cinderPlugin struct {
