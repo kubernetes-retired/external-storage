@@ -17,17 +17,17 @@ import:
 - package: gopkg.in/gcfg.v1
   version: v1.2.1
 - package: k8s.io/apiserver
-  version: kubernetes-1.9.2
+  version: kubernetes-1.10.0-beta.1
 - package: k8s.io/apiextensions-apiserver
-  version: kubernetes-1.9.2
+  version: kubernetes-1.10.0-beta.1
 - package: k8s.io/apimachinery
-  version: kubernetes-1.9.2
+  version: kubernetes-1.10.0-beta.1
 - package: k8s.io/client-go
-  version: kubernetes-1.9.2
+  version: kubernetes-1.10.0-beta.1
 - package: k8s.io/api
-  version: kubernetes-1.9.2
+  version: kubernetes-1.10.0-beta.1
 - package: k8s.io/kubernetes
-  version: v1.9.2
+  version: v1.10.0-beta.1
 - package: github.com/heketi/heketi
   version: 300752517908f3456e90d1ee2a773e7dd8ce1afe
   subpackages:
@@ -48,6 +48,8 @@ import:
   version: 6e5b7d64ea59ae3b8fdf0456e73e6c7638200e31
 - package: github.com/davecgh/go-spew
   version: 04cdfd42973bb9c8589fd6a731800cf222fde1a9
+- package: golang.org/x/time/rate
+  version: f51c12702a4d776e4c1fa9b0fabab841babae631
 - package: golang.org/x/sys
   version: a2e06a18
   subpackages:
