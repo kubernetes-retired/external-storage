@@ -158,7 +158,7 @@ a single pod, a StorageClass must to be created with `volumeBindingMode` set to
 `WaitForFirstConsumer`.
 
 ```console
-$ kubectl create -f provisioner/deployment/kubernetes/example-storageclass.yaml
+$ kubectl create -f provisioner/deployment/kubernetes/example/default_example_storageclass.yaml
 ```
 
 ### Step 3: Creating local persistent volumes
