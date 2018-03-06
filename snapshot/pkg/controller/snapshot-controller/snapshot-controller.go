@@ -220,6 +220,6 @@ func (c *snapshotController) onSnapshotDelete(obj interface{}) {
 	// the snapshot itself
 	snapshot := deletedSnapshot.DeepCopy()
 	glog.Infof("[CONTROLLER] OnDelete %s, snapshot name: %s/%s\n", snapshot.Metadata.SelfLink, snapshot.Metadata.Namespace, snapshot.Metadata.Name)
-	c.desiredStateOfWorld.DeleteSnapshot(cache.MakeSnapshotName(snapshot.Metadata.Namespace, snapshot.Metadata.Name))
+	c.desiredStateOfWorld.DeleteSnapshot(cache.MakeSnapshotName(snapshot))
 
 }
