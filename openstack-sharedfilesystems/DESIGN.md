@@ -76,7 +76,7 @@ The necessary API calls are already implemented in the gophercloud library.
 [Testing pyramid](https://testing.googleblog.com/2015/04/just-say-no-to-more-end-to-end-tests.html) will be followed, however, end-to-end tests will be skipped because of lack of OpenStack Manila test environment that will be capable of running OpenShift and provisioning NFS shares.
 
 ### Unit tests
-Extensive unit tests that will be result of test driven development.
+Unit tests that will be result of test driven development.
 
 ### Integration tests
 No integration tests are planned.
