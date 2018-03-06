@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -46,11 +45,6 @@ const (
 	fakeShareTypeName = "default"
 )
 
-func mockGetAllZones() (sets.String, error) {
-	ret := sets.String{"nova1": sets.Empty{}, "nova2": sets.Empty{}, "nova3": sets.Empty{}}
-	return ret, nil
-}
-
 func TestPrepareCreateRequest(t *testing.T) {
 	functionUnderTest := "PrepareCreateRequest"
 
@@ -59,8 +53,7 @@ func TestPrepareCreateRequest(t *testing.T) {
 	pvcNameForSCMultiZoneTestCase := "pvc"
 	expectedResultForSCMultiZoneTestCase := volume.ChooseZoneForVolume(setOfZonesForSCMultiZoneTestCase, pvcNameForSCMultiZoneTestCase)
 	pvcNameForSCNoZonesSpecifiedTestCase := "pvc"
-	allClusterZonesForSCNoZonesSpecifiedTestCase, _ := mockGetAllZones()
-	expectedResultForSCNoZonesSpecifiedTestCase := volume.ChooseZoneForVolume(allClusterZonesForSCNoZonesSpecifiedTestCase, pvcNameForSCNoZonesSpecifiedTestCase)
+	expectedResultForSCNoZonesSpecifiedTestCase := "nova"
 	succCaseStorageSize, _ := resource.ParseQuantity("2G")
 	// First part: want no error
 	succCases := []struct {
@@ -290,7 +283,7 @@ func TestPrepareCreateRequest(t *testing.T) {
 		tags[persistentvolume.CloudVolumeCreatedForClaimNameTag] = succCase.volumeOptions.PVC.Name
 		tags[persistentvolume.CloudVolumeCreatedForVolumeNameTag] = succCase.want.Name
 		succCase.want.Metadata = tags
-		if request, err := PrepareCreateRequest(succCase.volumeOptions, mockGetAllZones); err != nil {
+		if request, err := PrepareCreateRequest(succCase.volumeOptions); err != nil {
 			t.Errorf("Test case %v: %v(%v) RETURNED (%v, %v), WANT (%v, %v)", i, functionUnderTest, succCase.volumeOptions, request, err, succCase.want, nil)
 		} else if !reflect.DeepEqual(request, succCase.want) {
 			t.Errorf("Test case %v: %v(%v) RETURNED (%v, %v), WANT (%v, %v)", i, functionUnderTest, succCase.volumeOptions, request, err, succCase.want, nil)
@@ -356,43 +349,40 @@ func TestPrepareCreateRequest(t *testing.T) {
 				Parameters: map[string]string{},
 			},
 		},
-	}
-	for _, errCase := range errCases {
-		if request, err := PrepareCreateRequest(errCase.volumeOptions, mockGetAllZones); err == nil {
-			t.Errorf("Test case %q: %v(%v) RETURNED (%v, %v), WANT (%v, %v)", errCase.testCaseName, functionUnderTest, errCase.volumeOptions, request, err, "N/A", "an error")
-		}
-	}
-
-	// Third part: want an error
-	errCasesStorageSizeNotConfigured := []controller.VolumeOptions{
 		{
-			PersistentVolumeReclaimPolicy: fakeReclaimPolicy,
-			PVName: fakePVName,
-			PVC: &v1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{Name: "pvc", Namespace: "foo"},
-				Spec:       v1.PersistentVolumeClaimSpec{},
+			testCaseName: "storage size not configured 1",
+			volumeOptions: controller.VolumeOptions{
+				PersistentVolumeReclaimPolicy: fakeReclaimPolicy,
+				PVName: fakePVName,
+				PVC: &v1.PersistentVolumeClaim{
+					ObjectMeta: metav1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+					Spec:       v1.PersistentVolumeClaimSpec{},
+				},
+				Parameters: map[string]string{},
 			},
-			Parameters: map[string]string{},
 		},
 		{
-			PersistentVolumeReclaimPolicy: fakeReclaimPolicy,
-			PVName: fakePVName,
-			PVC: &v1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{Name: "pvc", Namespace: "foo"},
-				Spec: v1.PersistentVolumeClaimSpec{
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{
-							v1.ResourceCPU: resource.Quantity{},
+			testCaseName: "storage size not configured 2",
+			volumeOptions: controller.VolumeOptions{
+				PersistentVolumeReclaimPolicy: fakeReclaimPolicy,
+				PVName: fakePVName,
+				PVC: &v1.PersistentVolumeClaim{
+					ObjectMeta: metav1.ObjectMeta{Name: "pvc", Namespace: "foo"},
+					Spec: v1.PersistentVolumeClaimSpec{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU: resource.Quantity{},
+							},
 						},
 					},
 				},
+				Parameters: map[string]string{},
 			},
-			Parameters: map[string]string{},
 		},
 	}
-	for _, errCase := range errCasesStorageSizeNotConfigured {
-		if request, err := PrepareCreateRequest(errCase, mockGetAllZones); err == nil {
-			t.Errorf("%v(%v) RETURNED (%v, %v), WANT (%v, %v)", functionUnderTest, errCase, request, err, "N/A", "an error")
+	for _, errCase := range errCases {
+		if request, err := PrepareCreateRequest(errCase.volumeOptions); err == nil {
+			t.Errorf("Test case %q: %v(%v) RETURNED (%v, %v), WANT (%v, %v)", errCase.testCaseName, functionUnderTest, errCase.volumeOptions, request, err, "N/A", "an error")
 		}
 	}
 }

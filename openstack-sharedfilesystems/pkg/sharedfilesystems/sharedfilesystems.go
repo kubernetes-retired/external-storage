@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,7 +27,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -41,11 +40,10 @@ const (
 	TypeSCParamName = "type"
 	// ProtocolNFS is the NFS shared filesystems protocol
 	ProtocolNFS = "NFS"
-	// ManilaAnnotationName is a string that identifies Manila external provisioner custom data
-	// stored in Persistent Volume annotations
-	ManilaAnnotationName = "manila.external-storage.incubator.kubernetes.io/"
 	// ManilaAnnotationShareIDName identifies provisioned Share ID
-	ManilaAnnotationShareIDName = ManilaAnnotationName + "ID"
+	ManilaAnnotationShareIDName = "manila.external-storage.incubator.kubernetes.io/" + "ID"
+	// shareAvailabilityTimeout is a timeout in secs for waiting until a newly created share becomes available.
+	shareAvailabilityTimeout = 120 /* secs */
 )
 
 func getPVCStorageSize(pvc *v1.PersistentVolumeClaim) (int, error) {
@@ -78,50 +76,45 @@ func getPVCStorageSize(pvc *v1.PersistentVolumeClaim) (int, error) {
 // PrepareCreateRequest return:
 // - success: ready to send shared filesystem create request data structure constructed from Persistent Volume Claim and corresponding Storage Class
 // - failure: an error
-func PrepareCreateRequest(options controller.VolumeOptions, getAllZones func() (sets.String, error)) (shares.CreateOpts, error) {
-	var request shares.CreateOpts
+func PrepareCreateRequest(options controller.VolumeOptions) (shares.CreateOpts, error) {
 	var storageSize int
 	var err error
-	// Currently only the NFS shares are supported, that's why the NFS is hardcoded.
-	request.ShareProto = ProtocolNFS
-	// mandatory parameters
+	// mandatory parameter
 	if storageSize, err = getPVCStorageSize(options.PVC); err != nil {
-		return request, err
+		return shares.CreateOpts{}, err
 	}
-	request.Size = storageSize
 
-	// optional parameters
-	request.Name = "pvc-" + string(options.PVC.UID)
-	tags := make(map[string]string)
-	tags[persistentvolume.CloudVolumeCreatedForClaimNamespaceTag] = options.PVC.Namespace
-	tags[persistentvolume.CloudVolumeCreatedForClaimNameTag] = options.PVC.Name
-	tags[persistentvolume.CloudVolumeCreatedForVolumeNameTag] = request.Name
-	request.Metadata = tags
-	isZonesParam := false
+	shareType := ""
+	zone := "nova"
 	for index, value := range options.Parameters {
 		switch strings.ToLower(index) {
 		case ZonesSCParamName:
 			setOfZones, err := util.ZonesToSet(value)
 			if err != nil {
-				return request, err
+				return shares.CreateOpts{}, err
 			}
-			request.AvailabilityZone = volume.ChooseZoneForVolume(setOfZones, options.PVC.Name)
-			isZonesParam = true
+			zone = volume.ChooseZoneForVolume(setOfZones, options.PVC.Name)
 		case TypeSCParamName:
-			request.ShareType = value
+			shareType = value
 		default:
-			return request, fmt.Errorf("invalid parameter %q", index)
+			return shares.CreateOpts{}, fmt.Errorf("invalid parameter %q", index)
 		}
 	}
-	if !isZonesParam {
-		var allAvailableZones sets.String
-		var err error
-		if allAvailableZones, err = getAllZones(); err != nil {
-			return request, err
-		}
-		request.AvailabilityZone = volume.ChooseZoneForVolume(allAvailableZones, options.PVC.Name)
-	}
-	return request, nil
+
+	shareName := "pvc-" + string(options.PVC.UID)
+	// Currently only the NFS shares are supported, that's why the NFS is hardcoded.
+	return shares.CreateOpts{
+		ShareProto: ProtocolNFS,
+		Size:       storageSize,
+		Name:       shareName,
+		ShareType:  shareType,
+		Metadata: map[string]string{
+			persistentvolume.CloudVolumeCreatedForClaimNamespaceTag: options.PVC.Namespace,
+			persistentvolume.CloudVolumeCreatedForClaimNameTag:      options.PVC.Name,
+			persistentvolume.CloudVolumeCreatedForVolumeNameTag:     shareName,
+		},
+		AvailabilityZone: zone,
+	}, nil
 }
 
 // WaitTillAvailable keeps querying Manila API for a share status until it is available. The waiting can:
@@ -130,8 +123,7 @@ func PrepareCreateRequest(options controller.VolumeOptions, getAllZones func() (
 // - another error occurs: error is returned.
 func WaitTillAvailable(client *gophercloud.ServiceClient, shareID string) error {
 	desiredStatus := "available"
-	timeout := 120 /* secs */
-	return gophercloud.WaitFor(timeout, func() (bool, error) {
+	return gophercloud.WaitFor(shareAvailabilityTimeout, func() (bool, error) {
 		current, err := shares.Get(client, shareID).Extract()
 		if err != nil {
 			return false, err
