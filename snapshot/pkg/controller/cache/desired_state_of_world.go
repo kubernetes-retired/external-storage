@@ -72,7 +72,7 @@ func (dsw *desiredStateOfWorld) AddSnapshot(snapshot *crdv1.VolumeSnapshot) erro
 	dsw.Lock()
 	defer dsw.Unlock()
 
-	snapshotName := MakeSnapshotName(snapshot.Metadata.Namespace, snapshot.Metadata.Name)
+	snapshotName := MakeSnapshotName(snapshot)
 	glog.Infof("Adding new snapshot to desired state of world: %s", snapshotName)
 	dsw.snapshots[snapshotName] = snapshot
 	return nil
