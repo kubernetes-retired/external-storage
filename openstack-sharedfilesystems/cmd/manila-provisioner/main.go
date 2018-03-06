@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,16 +27,16 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/sharedfilesystems/apiversions"
 	"github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/shares"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
-	sharedfilesystems "github.com/kubernetes-incubator/external-storage/openstack-sharedfilesystems/pkg"
+	sharedfilesystems "github.com/kubernetes-incubator/external-storage/openstack-sharedfilesystems/pkg/sharedfilesystems"
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
 
 const (
-	provisionerName = "kubernetes.io/manila"
+	provisionerName                    = "kubernetes.io/manila"
+	minimumSupportedManilaMicroversion = "2.21"
 )
 
 type manilaProvisioner struct {
@@ -88,18 +88,18 @@ func (p *manilaProvisioner) Provision(pvc controller.VolumeOptions) (*v1.Persist
 	var err error
 	var createdShare shares.Share
 	var createReq shares.CreateOpts
-	if createReq, err = sharedfilesystems.PrepareCreateRequest(pvc, devMockGetAllZones); err != nil {
-		return nil, fmt.Errorf("failed to create Create Request: (%v)", err)
+	if createReq, err = sharedfilesystems.PrepareCreateRequest(pvc); err != nil {
+		return nil, fmt.Errorf("failed to create Create Request: %v", err)
 	}
 	glog.V(4).Infof("successfully created a share Create Request: %v", createReq)
 	var createReqResponse *shares.Share
 	if createReqResponse, err = shares.Create(client, createReq).Extract(); err != nil {
-		return nil, fmt.Errorf("failed to create a share: (%v)", err)
+		return nil, fmt.Errorf("failed to create a share: %v", err)
 	}
 	glog.V(3).Infof("successfully created a share: (%v)", createReqResponse)
 	createdShare = *createReqResponse
 	if err = sharedfilesystems.WaitTillAvailable(client, createdShare.ID); err != nil {
-		errMsg := fmt.Errorf("waiting for the share %q to become created failed: (%v)", createdShare.ID, err)
+		errMsg := fmt.Errorf("waiting for the share %q to become created failed: %v", createdShare.ID, err)
 		glog.Errorf("%v", errMsg)
 		if resultingErr := deleteShare(client, createdShare.ID); resultingErr != nil {
 			return nil, resultingErr
@@ -108,13 +108,14 @@ func (p *manilaProvisioner) Provision(pvc controller.VolumeOptions) (*v1.Persist
 	}
 	glog.V(4).Infof("the share %q is now in state created", createdShare.ID)
 
-	var grantAccessReq shares.GrantAccessOpts
-	grantAccessReq.AccessType = "ip"
-	grantAccessReq.AccessTo = "0.0.0.0/0"
-	grantAccessReq.AccessLevel = "rw"
+	grantAccessReq := shares.GrantAccessOpts{
+		AccessType:  "ip",
+		AccessTo:    "0.0.0.0/0",
+		AccessLevel: "rw",
+	}
 	var grantAccessReqResponse *shares.AccessRight
 	if grantAccessReqResponse, err = shares.GrantAccess(client, createdShare.ID, grantAccessReq).Extract(); err != nil {
-		errMsg := fmt.Errorf("failed to grant access to the share %q: (%v)", createdShare.ID, err)
+		errMsg := fmt.Errorf("failed to grant access to the share %q: %v", createdShare.ID, err)
 		glog.Errorf("%v", errMsg)
 		if resultingErr := deleteShare(client, createdShare.ID); resultingErr != nil {
 			return nil, resultingErr
@@ -123,11 +124,10 @@ func (p *manilaProvisioner) Provision(pvc controller.VolumeOptions) (*v1.Persist
 	}
 	glog.V(4).Infof("granted access to the share %q: (%v)", createdShare.ID, grantAccessReqResponse)
 
-	var exportLocations []shares.ExportLocation
 	var chosenLocation shares.ExportLocation
 	var getExportLocationsReqResponse []shares.ExportLocation
 	if getExportLocationsReqResponse, err = shares.GetExportLocations(client, createdShare.ID).Extract(); err != nil {
-		errMsg := fmt.Errorf("failed to get export locations for the share %q: (%v)", createdShare.ID, err)
+		errMsg := fmt.Errorf("failed to get export locations for the share %q: %v", createdShare.ID, err)
 		glog.Errorf("%v", errMsg)
 		if resultingErr := deleteShare(client, createdShare.ID); resultingErr != nil {
 			return nil, resultingErr
@@ -135,8 +135,7 @@ func (p *manilaProvisioner) Provision(pvc controller.VolumeOptions) (*v1.Persist
 		return nil, errMsg
 	}
 	glog.V(4).Infof("got export locations for the share %q: (%v)", createdShare.ID, getExportLocationsReqResponse)
-	exportLocations = getExportLocationsReqResponse
-	if chosenLocation, err = sharedfilesystems.ChooseExportLocation(exportLocations); err != nil {
+	if chosenLocation, err = sharedfilesystems.ChooseExportLocation(getExportLocationsReqResponse); err != nil {
 		errMsg := fmt.Errorf("failed to choose an export location for the share %q: %q", createdShare.ID, err.Error())
 		fmt.Printf("%v", errMsg)
 		if resultingErr := deleteShare(client, createdShare.ID); resultingErr != nil {
@@ -187,20 +186,20 @@ func createManilaV2Client() *gophercloud.ServiceClient {
 	if err != nil {
 		glog.Fatalf("%v", err)
 	}
-	glog.V(1).Infof("successfully read options from environment variables: (%v)", authOpts)
+	glog.V(1).Infof("successfully read options from environment variables: OS_AUTH_URL(%q), OS_USERNAME/OS_USERID(%q/%q), OS_TENANT_NAME/OS_TENANT_ID(%q,%q), OS_DOMAIN_NAME/OS_DOMAIN_ID(%q,%q)", authOpts.IdentityEndpoint, authOpts.Username, authOpts.UserID)
 	provider, err := openstack.AuthenticatedClient(authOpts)
 	if err != nil {
-		glog.Fatalf("authentication failed: (%v)", err)
+		glog.Fatalf("authentication failed: %v", err)
 	}
 	glog.V(4).Infof("successfully created provider client: (%v)", provider)
 	client, err := openstack.NewSharedFileSystemV2(provider, gophercloud.EndpointOpts{Region: regionName})
 	if err != nil {
-		glog.Fatalf("failed to create Manila v2 client: (%v)", err)
+		glog.Fatalf("failed to create Manila v2 client: %v", err)
 	}
-	client.Microversion = "2.21"
+	client.Microversion = minimumSupportedManilaMicroversion
 	serverVer, err := apiversions.Get(client, "v2").Extract()
 	if err != nil {
-		glog.Fatalf("failed to get Manila v2 API min/max microversions: (%v)", err)
+		glog.Fatalf("failed to get Manila v2 API min/max microversions: %v", err)
 	}
 	glog.V(4).Infof("received server's microvesion data structure: (%v)", serverVer)
 	glog.V(3).Infof("server's min microversion is: %q, max microversion is: %q", serverVer.MinVersion, serverVer.Version)
@@ -221,9 +220,4 @@ func createManilaV2Client() *gophercloud.ServiceClient {
 	}
 	glog.V(4).Infof("successfully created Manila v2 client: (%v)", client)
 	return client
-}
-
-func devMockGetAllZones() (sets.String, error) {
-	ret := sets.String{"nova": sets.Empty{}}
-	return ret, nil
 }
