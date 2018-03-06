@@ -3,6 +3,8 @@ package jsonrpc2_test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -31,8 +33,8 @@ func TestHTTPServer(t *testing.T) {
 	const jSum = `{"jsonrpc":"2.0","id":0,"method":"Svc.Sum","params":[3,5]}`
 	const jNotify = `{"jsonrpc":"2.0","method":"Svc.Sum","params":[3,5]}`
 	const jRes = `{"jsonrpc":"2.0","id":0,"result":8}`
-	const jErr = `{"jsonrpc":"2.0","id":null,"error":{"code":-32600,"message":"Invalid request"}}`
-	const jParse = `{"jsonrpc":"2.0","id":null,"error":{"code":-32700,"message":"Parse error"}}`
+	const jErr = `{"jsonrpc":"2.0","id":null,"error":{"code":-32600,"message":"invalid request"}}`
+	const jParse = `{"jsonrpc":"2.0","id":null,"error":{"code":-32700,"message":"parse error"}}`
 	const contentType = "application/json"
 
 	cases := []struct {
@@ -58,8 +60,7 @@ func TestHTTPServer(t *testing.T) {
 	}
 
 	ts := httptest.NewServer(jsonrpc2.HTTPHandler(nil))
-	// Don't close because of https://github.com/golang/go/issues/12262
-	// defer ts.Close()
+	defer ts.Close()
 
 	for _, c := range cases {
 		req, err := http.NewRequest(c.method, ts.URL, strings.NewReader(c.body))
@@ -107,8 +108,7 @@ func TestHTTPServer(t *testing.T) {
 
 func TestHTTPClient(t *testing.T) {
 	ts := httptest.NewServer(jsonrpc2.HTTPHandler(nil))
-	// Don't close because of https://github.com/golang/go/issues/12262
-	// defer ts.Close()
+	defer ts.Close()
 	client := jsonrpc2.NewHTTPClient(ts.URL)
 	defer client.Close()
 
@@ -137,5 +137,38 @@ func TestHTTPClient(t *testing.T) {
 	}
 	if got != want {
 		t.Errorf("Call(%v) = %v, want = %v", in, got, want)
+	}
+}
+
+type ContentTypeHandler string
+
+func (h ContentTypeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", string(h))
+	io.WriteString(w, `{"jsonrpc":"2.0","id":0,"result":8}`)
+}
+
+func TestHTTPClientContentType(t *testing.T) {
+	const contentType = "application/json"
+	cases := []struct {
+		contentType string
+		wanterr     *jsonrpc2.Error
+	}{
+		{contentType, nil},
+		{contentType + "; charset=utf-8", nil},
+		{contentType + "; bad", jsonrpc2.NewError(-32603, "bad HTTP Content-Type: "+contentType+"; bad")},
+		{contentType + "rpc", jsonrpc2.NewError(-32603, "bad HTTP Content-Type: "+contentType+"rpc")},
+	}
+
+	for _, v := range cases {
+		ts := httptest.NewServer(ContentTypeHandler(v.contentType))
+		client := jsonrpc2.NewHTTPClient(ts.URL)
+
+		err := jsonrpc2.ServerError(client.Call("Svc.Sum", [2]int{3, 4}, nil))
+		if fmt.Sprintf("%#v", err) != fmt.Sprintf("%#v", v.wanterr) {
+			t.Errorf("%q, err = %#v, want %#v", v.contentType, err, v.wanterr)
+		}
+
+		client.Close()
+		ts.Close()
 	}
 }

@@ -220,8 +220,8 @@ func sortBatch(x interface{}) {
 // Tests
 
 const (
-	jerrParse     = `{"jsonrpc":"2.0","id":null,"error":{"code":-32700,"message":"Parse error"}}`
-	jerrRequest   = `{"jsonrpc":"2.0","id":null,"error":{"code":-32600,"message":"Invalid request"}}`
+	jerrParse     = `{"jsonrpc":"2.0","id":null,"error":{"code":-32700,"message":"parse error"}}`
+	jerrRequest   = `{"jsonrpc":"2.0","id":null,"error":{"code":-32600,"message":"invalid request"}}`
 	jerrMethodFmt = `{"jsonrpc":"2.0","id":0,"error":{"code":-32601,"message":"%s"}}`
 	jerrParamsFmt = `{"jsonrpc":"2.0","id":0,"error":{"code":-32602,"message":"%s"}}`
 	jres0         = `{"jsonrpc":"2.0","id":0,"result":0}`
