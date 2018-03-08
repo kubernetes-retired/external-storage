@@ -252,7 +252,11 @@ func (vs *volumeSnapshotter) waitForSnapshot(uniqueSnapshotName string, snapshot
 
 // This is the function responsible for determining the correct volume plugin to use,
 // asking it to make a snapshot and assigning it some name that it returns to the caller.
-func (vs *volumeSnapshotter) takeSnapshot(pv *v1.PersistentVolume, tags *map[string]string) (*crdv1.VolumeSnapshotDataSource, *[]crdv1.VolumeSnapshotCondition, error) {
+func (vs *volumeSnapshotter) takeSnapshot(
+	snapshot *crdv1.VolumeSnapshot,
+	pv *v1.PersistentVolume,
+	tags *map[string]string,
+) (*crdv1.VolumeSnapshotDataSource, *[]crdv1.VolumeSnapshotCondition, error) {
 	spec := &pv.Spec
 	volumeType := crdv1.GetSupportedVolumeFromPVSpec(spec)
 	if len(volumeType) == 0 {
@@ -263,7 +267,7 @@ func (vs *volumeSnapshotter) takeSnapshot(pv *v1.PersistentVolume, tags *map[str
 		return nil, nil, fmt.Errorf("%s is not supported volume for %#v", volumeType, spec)
 	}
 
-	snapDataSource, snapConditions, err := plugin.SnapshotCreate(pv, tags)
+	snapDataSource, snapConditions, err := plugin.SnapshotCreate(snapshot, pv, tags)
 	if err != nil {
 		glog.Warningf("failed to snapshot %#v, err: %v", spec, err)
 	} else {
@@ -490,7 +494,7 @@ func (vs *volumeSnapshotter) createSnapshot(uniqueSnapshotName string, snapshot 
 		return fmt.Errorf("Failed to update metadata for volume snapshot %s: %q", uniqueSnapshotName, err)
 	}
 
-	snapshotDataSource, snapStatus, err = vs.takeSnapshot(pv, tags)
+	snapshotDataSource, snapStatus, err = vs.takeSnapshot(snapshot, pv, tags)
 	if err != nil || snapshotDataSource == nil {
 		return fmt.Errorf("Failed to take snapshot of the volume %s: %q", pv.Name, err)
 	}
