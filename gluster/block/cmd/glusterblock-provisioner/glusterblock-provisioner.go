@@ -55,6 +55,7 @@ const (
 	heketiOpmode       = "heketi"
 	glusterBlockOpmode = "gluster-block"
 	volIDAnn           = "gluster.org/volume-id"
+	errIDNotFound      = "Id not found"
 )
 
 type glusterBlockProvisioner struct {
@@ -562,6 +563,11 @@ func (p *glusterBlockProvisioner) Delete(volume *v1.PersistentVolume) error {
 
 		deleteErr := cli.BlockVolumeDelete(volumeID)
 		if deleteErr != nil {
+			if dstrings.Contains(deleteErr.Error(), errIDNotFound) {
+				glog.Errorf("[heketi]: failed to find volume ID %v in database, manual intervention required", volumeID)
+				return fmt.Errorf("[heketi]: failed to find volume ID %v in database : %v", volumeID, deleteErr)
+			}
+
 			glog.Errorf("[heketi]: failed to delete gluster block volume %v: %v", delBlockVolName, deleteErr)
 			return fmt.Errorf("[heketi]: failed to delete glusterblock volume %v: %v", delBlockVolName, deleteErr)
 		}
