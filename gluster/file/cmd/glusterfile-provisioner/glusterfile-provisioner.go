@@ -284,7 +284,6 @@ func (p *glusterfileProvisioner) ExpandVolumeDevice(spec *volume.Spec, newSize r
 	expansionSizeGiB := int(util.RoundUpToGiB(expansionSize))
 
 	// Find out requested Size
-	//requestGiB := util.RoundUpToGiB(newSize)
 	requestGiB := int(util.RoundUpToGiB(newSize.Value()))
 
 	//Check the existing volume size
@@ -509,6 +508,7 @@ func (p *glusterfileProvisioner) Delete(volume *v1.PersistentVolume) error {
 	return nil
 
 }
+
 func (p *glusterfileProvisioner) deleteEndpointService(namespace string, epServiceName string) (err error) {
 	kubeClient := p.client
 	if kubeClient == nil {
@@ -730,16 +730,16 @@ func main() {
 		glog.Fatalf("Failed to create config: %v", err)
 	}
 
-	prName := provisionerName
-	provName := os.Getenv(provisionerNameKey)
+	provName := provisionerName
+	provEnvName := os.Getenv(provisionerNameKey)
 
 	// Precedence is given for ProvisionerNameKey
-	if provName != "" && *id != "" {
-		prName = provName
+	if provEnvName != "" && *id != "" {
+		provName = provEnvName
 	}
 
-	if provName == "" && *id != "" {
-		prName = *id
+	if provEnvName == "" && *id != "" {
+		provName = *id
 	}
 
 	clientset, err := kubernetes.NewForConfig(config)
@@ -756,14 +756,14 @@ func main() {
 
 	// Create the provisioner: it implements the Provisioner interface expected by
 	// the controller
-	glusterfileProvisioner := NewglusterfileProvisioner(clientset, prName)
+	glusterfileProvisioner := NewglusterfileProvisioner(clientset, provName)
 
 	// Start the provision controller which will dynamically provision glusterfs
 	// PVs
 
 	pc := controller.NewProvisionController(
 		clientset,
-		prName,
+		provName,
 		glusterfileProvisioner,
 		serverVersion.GitVersion,
 	)
