@@ -21,6 +21,8 @@ import (
 	"os/exec"
 
 	"github.com/golang/glog"
+	gcli "github.com/heketi/heketi/client/api/go-client"
+	gapi "github.com/heketi/heketi/pkg/glusterfs/api"
 	crdv1 "github.com/kubernetes-incubator/external-storage/snapshot/pkg/apis/crd/v1"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/cloudprovider"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume"
@@ -53,13 +55,31 @@ func (h *glusterfsPlugin) Init(_ cloudprovider.Interface) {
 }
 
 func (h *glusterfsPlugin) SnapshotCreate(pv *v1.PersistentVolume, tags *map[string]string) (*crdv1.VolumeSnapshotDataSource, *[]crdv1.VolumeSnapshotCondition, error) {
+	var err error
+	snapshotName := ""
 	spec := &pv.Spec
 	if spec == nil || spec.Glusterfs == nil {
 		return nil, nil, fmt.Errorf("invalid PV spec %v", spec)
 	}
 
 	volumePath := spec.Glusterfs.Path
-	snapshotName := volumePath + "_" + uuid.New()
+	//todo
+	volID := ""
+	if (*tags)["mode"] == "heketi" {
+		heketiArgs := tags
+		snapshotName, err := h.heketiSnapshotCreate(volID, (*tags)["resturl"], (*tags)["restuser"], (*tags)["restsecret"])
+		if err != nil {
+			glog.Errorf("[heketi] failed to create snapshot for volume %v: %v", volumePath, err)
+		}
+	} else {
+		snapshotName, err := h.glusterSnapshotCreate(volumePath)
+		if err != nil {
+			glog.Errorf("failed to create snapshot for volume %v: %v", volumePath, err)
+		}
+	}
+	//	heketiArgs := tags
+
+	/*snapshotName := volumePath + "_" + uuid.New()
 
 	cmd := exec.Command(glusterfsBinary, "snapshot", "create", snapshotName, volumePath, "no-timestamp")
 	out, err := cmd.CombinedOutput()
@@ -74,6 +94,7 @@ func (h *glusterfsPlugin) SnapshotCreate(pv *v1.PersistentVolume, tags *map[stri
 	if err != nil {
 		glog.Errorf("failed to activate snapshot:%v , err: %v", snapshotName, err)
 	}
+	*/
 
 	cond := []crdv1.VolumeSnapshotCondition{}
 	if err == nil {
@@ -103,6 +124,55 @@ func (h *glusterfsPlugin) SnapshotCreate(pv *v1.PersistentVolume, tags *map[stri
 		},
 	}
 	return res, &cond, err
+}
+
+func (h *glusterfsPlugin) glusterSnapshotCreate(volumePath string) (string, error) {
+	snapshotName := volumePath + "_" + uuid.New()
+
+	cmd := exec.Command(glusterfsBinary, "snapshot", "create", snapshotName, volumePath, "no-timestamp")
+	out, err := cmd.CombinedOutput()
+
+	if err != nil {
+		glog.Errorf("failed to create snapshot for volume :%v, out:%v, err: %v", volumePath, out, err)
+		return "", fmt.Errorf("failed to create snapshot for volume :%v, out:%v, err: %v", volumePath, out, err)
+	}
+	glog.V(1).Info("snapshot %v created successfully", snapshotName)
+	cmd = exec.Command(glusterfsBinary, "snapshot", "activate", snapshotName)
+	_, err = cmd.CombinedOutput()
+
+	if err != nil {
+		glog.Errorf("failed to activate snapshot:%v , err: %v", snapshotName, err)
+		return "", fmt.Errorf("failed to activate snapshot:%v , err: %v", snapshotName, err)
+	}
+
+	return snapshotName, nil
+}
+
+func (h *glusterfsPlugin) heketiSnapshotCreate(volID string, configUrl string, configUser string, configSecretValue string) (string, error) {
+	snapName := ""
+	snapID := ""
+	if configUrl == "" {
+		glog.Errorf("REST server endpoint is empty")
+		return "", fmt.Errorf("failed to create glusterfs REST client, REST URL is empty")
+	}
+
+	cli := gcli.NewClient(configUrl, configUser, configSecretValue)
+	if cli == nil {
+		glog.Errorf("failed to create glusterfs REST client")
+		return "", fmt.Errorf("failed to create glusterfs REST client, REST server authentication failed")
+	}
+
+	snapCreateReq := &gapi.VolumeSnapshotCreateRequest{Name: snapName}
+	snapInfoRes, snapErr := cli.VolumeSnapshotCreate(snapCreateReq)
+	if snapErr != nil {
+		glog.Errorf("failed to create snapshot of volume %v: %v", volID, snapErr)
+		return "", fmt.Errorf("failed to create snapshot of volume %v: %v", volID, snapErr)
+	}
+	if snapInfoRes != nil {
+		snapID := snapInfoRes.ID
+	}
+	return snapID, nil
+
 }
 
 func (h *glusterfsPlugin) SnapshotDelete(src *crdv1.VolumeSnapshotDataSource, _ *v1.PersistentVolume) error {
@@ -186,6 +256,12 @@ func (h *glusterfsPlugin) SnapshotRestore(snapshotData *crdv1.VolumeSnapshotData
 	// restore snapshot to a PV
 	snapID := snapshotData.Spec.GlusterSnapshotVolume.SnapshotID
 	newSnapPV := snapID
+	//TODO: if else
+	newSnapPV, restoreErr := h.heketiSnapshotRestore(snapID)
+	if restoreErr != nil {
+		glog.Errorf("heketi snapshot restore failed for %v: %v", snapID, restoreErr)
+		return nil, nil, fmt.Errorf("heketi snapshot restore failed for %v: %v", snapID, restoreErr)
+	}
 	cmd := exec.Command(glusterfsBinary, "snapshot", "clone", newSnapPV, snapID)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -202,6 +278,21 @@ func (h *glusterfsPlugin) SnapshotRestore(snapshotData *crdv1.VolumeSnapshotData
 		},
 	}
 	return pv, nil, nil
+}
+
+func (h *glusterfsPlugin) heketiSnapshotRestore(snapID string) (string, error) {
+
+	if snapID != "" {
+
+		cloneReq := &gapi.VolumeSnapshotCloneRequest{Name: snapID}
+		cloneInfoRes, cloneErr := gcli.VolumeSnapshotClone(cloneReq)
+		if cloneErr != nil {
+			glog.Errorf("failed to create clone of snapshot %v: %v", snapID, cloneErr)
+			return "", fmt.Errorf("failed to create clone of snapshot %v: %v", snapID, cloneErr)
+		}
+		return cloneInfoRes.ID, nil
+	}
+	return "", nil
 }
 
 func (h *glusterfsPlugin) VolumeDelete(pv *v1.PersistentVolume) error {
