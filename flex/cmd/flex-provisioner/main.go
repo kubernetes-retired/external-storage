@@ -36,6 +36,7 @@ var (
 	master      = flag.String("master", "", "Master URL to build a client config from. Either this or kubeconfig needs to be set if the provisioner is being run out of cluster.")
 	kubeconfig  = flag.String("kubeconfig", "", "Absolute path to the kubeconfig file. Either this or master needs to be set if the provisioner is being run out of cluster.")
 	execCommand = flag.String("execCommand", "/opt/storage/flex-provision.sh", "The provisioner executable.")
+	flexDriver  = flag.String("flexDriver", "flex", "The FlexVolume driver.")
 )
 
 func main() {
@@ -49,6 +50,10 @@ func main() {
 
 	if execCommand == nil {
 		glog.Fatalf("Invalid flags specified: must provide provisioner exec command")
+	}
+
+	if flexDriver == nil || *flexDriver == "" {
+		glog.Fatalf("Invalid flags specified: must provide FlexVolume driver")
 	}
 
 	// Create the client according to whether we are running in or out-of-cluster
@@ -78,7 +83,7 @@ func main() {
 
 	// Create the provisioner: it implements the Provisioner interface expected by
 	// the controller
-	flexProvisioner := vol.NewFlexProvisioner(clientset, *execCommand)
+	flexProvisioner := vol.NewFlexProvisioner(clientset, *execCommand, *flexDriver)
 
 	// Start the provision controller which will dynamically provision NFS PVs
 	pc := controller.NewProvisionController(
