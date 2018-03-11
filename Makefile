@@ -142,6 +142,11 @@ test-nfs:
 	make test
 .PHONY: test-nfs
 
+test-nfs-all:
+	cd nfs; \
+	make test-all
+.PHONY: test-nfs-all
+
 clean-nfs:
 	cd nfs; \
 	make clean
