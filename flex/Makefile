@@ -12,25 +12,33 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-IMAGE = quay.io/kubernetes_incubator/flex-provisioner
+ifeq ($(REGISTRY),)
+	REGISTRY = quay.io/external_storage/
+endif
 
-VERSION := latest
+ifeq ($(VERSION),)
+	VERSION = latest
+endif
+
+IMAGE = $(REGISTRY)flex-provisioner:$(VERSION)
+MUTABLE_IMAGE = $(REGISTRY)deploy/docker/flex-provisioner:latest
 
 all build:
-	GOOS=linux go install -v ./cmd/flex-provisioner
-	GOOS=linux go build ./cmd/flex-provisioner
+	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o flex-provisioner ./cmd/flex-provisioner
 .PHONY: all build
 
 container: build quick-container
 .PHONY: container
 
 quick-container:
-	cp flex-provisioner deploy/docker/flex-provisioner
-	docker build -t $(IMAGE):$(VERSION) deploy/docker
+	cp flex-provisioner deploy/docker
+	docker build -t $(MUTABLE_IMAGE) deploy/docker
+	docker tag $(MUTABLE_IMAGE) $(IMAGE)
 .PHONY: quick-container
 
 push: container
-	docker push $(IMAGE):$(VERSION)
+	docker push $(IMAGE)
+	docker push $(MUTABLE_IMAGE)
 .PHONY: push
 
 clean:
