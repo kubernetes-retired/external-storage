@@ -22,13 +22,11 @@ IMAGE = $(REGISTRY)glusterfs-simple-provisioner:$(VERSION)
 MUTABLE_IMAGE = $(REGISTRY)glusterfs-simple-provisioner:latest
 
 all build:
-	GOOS=linux go install -v ./cmd/glusterfs-simple-provisioner
-	GOOS=linux CGO_ENABLED=0 go build ./cmd/glusterfs-simple-provisioner
+	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o glusterfs-simple-provisioner ./cmd/glusterfs-simple-provisioner
 .PHONY: all build
 
 build-mac:
-	GOOS=darwin go install -v ./cmd/glusterfs-simple-provisioner
-	GOOS=darwin go build ./cmd/glusterfs-simple-provisioner
+	CGO_ENABLED=0 GOOS=darwin go build -a -ldflags '-extldflags "-static"' -o glusterfs-simple-provisioner ./cmd/glusterfs-simple-provisioner
 .PHONY: build-mac
 
 container: build quick-container
