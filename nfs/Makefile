@@ -40,11 +40,11 @@ push: container
 	docker push $(MUTABLE_IMAGE)
 .PHONY: push
 
-test: test-integration test-e2e
+test-all: test test-e2e
 
-test-integration:
+test:
 	go test `go list ./... | grep -v 'vendor\|test\|demo'`
-.PHONY: test-integration
+.PHONY: test
 
 test-e2e:
 	cd ./test/e2e; glide install -v
