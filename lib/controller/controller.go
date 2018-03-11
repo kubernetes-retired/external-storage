@@ -38,10 +38,10 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/pkg/api/v1/ref"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api/v1/helper"
+	ref "k8s.io/client-go/tools/reference"
+	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
 )
@@ -90,10 +90,13 @@ type ProvisionController struct {
 
 	claimSource      cache.ListerWatcher
 	claimController  cache.Controller
+	claimInformer    cache.SharedInformer
 	volumeSource     cache.ListerWatcher
 	volumeController cache.Controller
+	volumeInformer   cache.SharedInformer
 	classSource      cache.ListerWatcher
-	classReflector   *cache.Reflector
+	classController  cache.Controller
+	classInformer    cache.SharedInformer
 
 	volumes cache.Store
 	claims  cache.Store
@@ -275,7 +278,46 @@ func TermLimit(termLimit time.Duration) func(*ProvisionController) error {
 	}
 }
 
-// NewProvisionController creates a new provision controller
+// ClaimsInformer sets the informer to use for accessing PersistentVolumeClaims.
+// Defaults to using a private (non-shared) informer.
+func ClaimsInformer(informer cache.SharedInformer) func(*ProvisionController) error {
+	return func(c *ProvisionController) error {
+		if c.HasRun() {
+			return errRuntime
+		}
+		c.claimInformer = informer
+		return nil
+	}
+}
+
+// VolumesInformer sets the informer to use for accessing PersistentVolumes.
+// Defaults to using a private (non-shared) informer.
+func VolumesInformer(informer cache.SharedInformer) func(*ProvisionController) error {
+	return func(c *ProvisionController) error {
+		if c.HasRun() {
+			return errRuntime
+		}
+		c.volumeInformer = informer
+		return nil
+	}
+}
+
+// ClassesInformer sets the informer to use for accessing StorageClasses.
+// The informer must use the versioned resource appropriate for the Kubernetes cluster version
+// (that is, v1.StorageClass for >= 1.6, and v1beta1.StorageClass for < 1.6).
+// Defaults to using a private (non-shared) informer.
+func ClassesInformer(informer cache.SharedInformer) func(*ProvisionController) error {
+	return func(c *ProvisionController) error {
+		if c.HasRun() {
+			return errRuntime
+		}
+		c.classInformer = informer
+		return nil
+	}
+}
+
+// NewProvisionController creates a new provision controller using
+// the given configuration parameters and with private (non-shared) informers.
 func NewProvisionController(
 	client kubernetes.Interface,
 	provisionerName string,
@@ -285,7 +327,7 @@ func NewProvisionController(
 ) *ProvisionController {
 	identity := uuid.NewUUID()
 	broadcaster := record.NewBroadcaster()
-	broadcaster.StartRecordingToSink(&corev1.EventSinkImpl{Interface: client.Core().Events(v1.NamespaceAll)})
+	broadcaster.StartRecordingToSink(&corev1.EventSinkImpl{Interface: client.CoreV1().Events(v1.NamespaceAll)})
 	var eventRecorder record.EventRecorder
 	out, err := exec.Command("hostname").Output()
 	if err != nil {
@@ -328,46 +370,78 @@ func NewProvisionController(
 		option(controller)
 	}
 
+	// ----------------------
+	// PersistentVolumeClaims
+
 	controller.claimSource = &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			return client.Core().PersistentVolumeClaims(v1.NamespaceAll).List(options)
+			return client.CoreV1().PersistentVolumeClaims(v1.NamespaceAll).List(options)
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			return client.Core().PersistentVolumeClaims(v1.NamespaceAll).Watch(options)
+			return client.CoreV1().PersistentVolumeClaims(v1.NamespaceAll).Watch(options)
 		},
 	}
-	controller.claims, controller.claimController = cache.NewInformer(
-		controller.claimSource,
-		&v1.PersistentVolumeClaim{},
-		controller.resyncPeriod,
-		cache.ResourceEventHandlerFuncs{
-			AddFunc:    controller.addClaim,
-			UpdateFunc: controller.updateClaim,
-			DeleteFunc: nil,
-		},
-	)
+
+	claimHandler := cache.ResourceEventHandlerFuncs{
+		AddFunc:    controller.addClaim,
+		UpdateFunc: controller.updateClaim,
+		DeleteFunc: nil,
+	}
+
+	if controller.claimInformer != nil {
+		controller.claimInformer.AddEventHandlerWithResyncPeriod(claimHandler, controller.resyncPeriod)
+		controller.claims, controller.claimController =
+			controller.claimInformer.GetStore(),
+			controller.claimInformer.GetController()
+	} else {
+		controller.claims, controller.claimController =
+			cache.NewInformer(
+				controller.claimSource,
+				&v1.PersistentVolumeClaim{},
+				controller.resyncPeriod,
+				claimHandler,
+			)
+	}
+
+	// -----------------
+	// PersistentVolumes
 
 	controller.volumeSource = &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			return client.Core().PersistentVolumes().List(options)
+			return client.CoreV1().PersistentVolumes().List(options)
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			return client.Core().PersistentVolumes().Watch(options)
+			return client.CoreV1().PersistentVolumes().Watch(options)
 		},
 	}
-	controller.volumes, controller.volumeController = cache.NewInformer(
-		controller.volumeSource,
-		&v1.PersistentVolume{},
-		controller.resyncPeriod,
-		cache.ResourceEventHandlerFuncs{
-			AddFunc:    nil,
-			UpdateFunc: controller.updateVolume,
-			DeleteFunc: nil,
-		},
-	)
 
-	controller.classes = cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc)
+	volumeHandler := cache.ResourceEventHandlerFuncs{
+		AddFunc:    nil,
+		UpdateFunc: controller.updateVolume,
+		DeleteFunc: nil,
+	}
+
+	if controller.volumeInformer != nil {
+		controller.volumeInformer.AddEventHandlerWithResyncPeriod(volumeHandler, controller.resyncPeriod)
+		controller.volumes, controller.volumeController =
+			controller.volumeInformer.GetStore(),
+			controller.volumeInformer.GetController()
+	} else {
+		controller.volumes, controller.volumeController =
+			cache.NewInformer(
+				controller.volumeSource,
+				&v1.PersistentVolume{},
+				controller.resyncPeriod,
+				volumeHandler,
+			)
+	}
+
+	// --------------
+	// StorageClasses
+
+	var versionedClassType runtime.Object
 	if controller.kubeVersion.AtLeast(utilversion.MustParseSemantic("v1.6.0")) {
+		versionedClassType = &storage.StorageClass{}
 		controller.classSource = &cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				return client.StorageV1().StorageClasses().List(options)
@@ -376,13 +450,8 @@ func NewProvisionController(
 				return client.StorageV1().StorageClasses().Watch(options)
 			},
 		}
-		controller.classReflector = cache.NewReflector(
-			controller.classSource,
-			&storage.StorageClass{},
-			controller.classes,
-			controller.resyncPeriod,
-		)
 	} else {
+		versionedClassType = &storagebeta.StorageClass{}
 		controller.classSource = &cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				return client.StorageV1beta1().StorageClasses().List(options)
@@ -391,11 +460,27 @@ func NewProvisionController(
 				return client.StorageV1beta1().StorageClasses().Watch(options)
 			},
 		}
-		controller.classReflector = cache.NewReflector(
+	}
+
+	classHandler := cache.ResourceEventHandlerFuncs{
+		// We don't need an actual event handler for StorageClasses,
+		// but we must pass a non-nil one to cache.NewInformer()
+		AddFunc:    nil,
+		UpdateFunc: nil,
+		DeleteFunc: nil,
+	}
+
+	if controller.classInformer != nil {
+		// no resource event handler needed for StorageClasses
+		controller.classes, controller.classController =
+			controller.classInformer.GetStore(),
+			controller.classInformer.GetController()
+	} else {
+		controller.classes, controller.classController = cache.NewInformer(
 			controller.classSource,
-			&storagebeta.StorageClass{},
-			controller.classes,
+			versionedClassType,
 			controller.resyncPeriod,
+			classHandler,
 		)
 	}
 
@@ -410,7 +495,7 @@ func (ctrl *ProvisionController) Run(stopCh <-chan struct{}) {
 	ctrl.hasRunLock.Unlock()
 	go ctrl.claimController.Run(stopCh)
 	go ctrl.volumeController.Run(stopCh)
-	go ctrl.classReflector.RunUntil(stopCh)
+	go ctrl.classController.Run(stopCh)
 	<-stopCh
 }
 
@@ -535,15 +620,7 @@ func (ctrl *ProvisionController) isOnlyRecordUpdate(oldClaim, newClaim *v1.Persi
 // removeRecord returns a claim with its leader election record annotation and
 // ResourceVersion set blank
 func (ctrl *ProvisionController) removeRecord(claim *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
-	clone, err := scheme.Scheme.DeepCopy(claim)
-	if err != nil {
-		return nil, fmt.Errorf("Error cloning claim: %v", err)
-	}
-	claimClone, ok := clone.(*v1.PersistentVolumeClaim)
-	if !ok {
-		return nil, fmt.Errorf("Unexpected claim cast error: %v", claimClone)
-	}
-
+	claimClone := claim.DeepCopy()
 	if claimClone.Annotations == nil {
 		claimClone.Annotations = make(map[string]string)
 	}
@@ -569,26 +646,36 @@ func (ctrl *ProvisionController) shouldProvision(claim *v1.PersistentVolumeClaim
 		return false
 	}
 
-	// Kubernetes 1.5 provisioning with annStorageProvisioner
-	if provisioner, found := claim.Annotations[annStorageProvisioner]; found {
-		if provisioner == ctrl.provisionerName {
-			return true
+	if qualifier, ok := ctrl.provisioner.(Qualifier); ok {
+		if !qualifier.ShouldProvision(claim) {
+			return false
 		}
-		return false
 	}
 
-	// Kubernetes 1.4 provisioning, evaluating class.Provisioner
-	claimClass := helper.GetPersistentVolumeClaimClass(claim)
-	provisioner, _, err := ctrl.getStorageClassFields(claimClass)
-	if err != nil {
-		glog.Errorf("Error getting claim %q's StorageClass's fields: %v", claimToClaimKey(claim), err)
-		return false
-	}
-	if provisioner != ctrl.provisionerName {
-		return false
+	// Kubernetes 1.5 provisioning with annStorageProvisioner
+	if ctrl.kubeVersion.AtLeast(utilversion.MustParseSemantic("v1.5.0")) {
+		if provisioner, found := claim.Annotations[annStorageProvisioner]; found {
+			if provisioner == ctrl.provisionerName {
+				return true
+			}
+			return false
+		}
+	} else {
+		// Kubernetes 1.4 provisioning, evaluating class.Provisioner
+		claimClass := helper.GetPersistentVolumeClaimClass(claim)
+		provisioner, _, err := ctrl.getStorageClassFields(claimClass)
+		if err != nil {
+			glog.Errorf("Error getting claim %q's StorageClass's fields: %v", claimToClaimKey(claim), err)
+			return false
+		}
+		if provisioner != ctrl.provisionerName {
+			return false
+		}
+
+		return true
 	}
 
-	return true
+	return false
 }
 
 func (ctrl *ProvisionController) shouldDelete(volume *v1.PersistentVolume) bool {
@@ -752,7 +839,7 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 	//  the locks. Check that PV (with deterministic name) hasn't been provisioned
 	//  yet.
 	pvName := ctrl.getProvisionedVolumeNameForClaim(claim)
-	volume, err := ctrl.client.Core().PersistentVolumes().Get(pvName, metav1.GetOptions{})
+	volume, err := ctrl.client.CoreV1().PersistentVolumes().Get(pvName, metav1.GetOptions{})
 	if err == nil && volume != nil {
 		// Volume has been already provisioned, nothing to do.
 		glog.V(4).Infof("provisionClaimOperation [%s]: volume already exists, skipping", claimToClaimKey(claim))
@@ -780,9 +867,16 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 		return nil
 	}
 
+	reclaimPolicy := v1.PersistentVolumeReclaimDelete
+	if ctrl.kubeVersion.AtLeast(utilversion.MustParseSemantic("v1.8.0")) {
+		reclaimPolicy, err = ctrl.fetchReclaimPolicy(claimClass)
+		if err != nil {
+			return err
+		}
+	}
+
 	options := VolumeOptions{
-		// TODO SHOULD be set to `Delete` unless user manually congiures other reclaim policy.
-		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
+		PersistentVolumeReclaimPolicy: reclaimPolicy,
 		PVName:     pvName,
 		PVC:        claim,
 		Parameters: parameters,
@@ -792,6 +886,11 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 
 	volume, err = ctrl.provisioner.Provision(options)
 	if err != nil {
+		if ierr, ok := err.(*IgnoredError); ok {
+			// Provision ignored, do nothing and hope another provisioner will provision it.
+			glog.Infof("provision of claim %q ignored: %v", claimToClaimKey(claim), ierr)
+			return nil
+		}
 		strerr := fmt.Sprintf("Failed to provision volume with StorageClass %q: %v", claimClass, err)
 		glog.Errorf("Failed to provision volume for claim %q with StorageClass %q: %v", claimToClaimKey(claim), claimClass, err)
 		ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, "ProvisioningFailed", strerr)
@@ -813,7 +912,7 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 	// Try to create the PV object several times
 	for i := 0; i < ctrl.createProvisionedPVRetryCount; i++ {
 		glog.V(4).Infof("provisionClaimOperation [%s]: trying to save volume %s", claimToClaimKey(claim), volume.Name)
-		if _, err = ctrl.client.Core().PersistentVolumes().Create(volume); err == nil {
+		if _, err = ctrl.client.CoreV1().PersistentVolumes().Create(volume); err == nil {
 			// Save succeeded.
 			glog.Infof("volume %q for claim %q saved", volume.Name, claimToClaimKey(claim))
 			break
@@ -991,9 +1090,9 @@ func (ctrl *ProvisionController) watchPVC(claim *v1.PersistentVolumeClaim, stopC
 func (ctrl *ProvisionController) getPVCEventWatch(claim *v1.PersistentVolumeClaim, eventType, reason string) (watch.Interface, error) {
 	claimKind := "PersistentVolumeClaim"
 	claimUID := string(claim.UID)
-	fieldSelector := ctrl.client.Core().Events(claim.Namespace).GetFieldSelector(&claim.Name, &claim.Namespace, &claimKind, &claimUID).String() + ",type=" + eventType + ",reason=" + reason
+	fieldSelector := ctrl.client.CoreV1().Events(claim.Namespace).GetFieldSelector(&claim.Name, &claim.Namespace, &claimKind, &claimUID).String() + ",type=" + eventType + ",reason=" + reason
 
-	list, err := ctrl.client.Core().Events(claim.Namespace).List(metav1.ListOptions{
+	list, err := ctrl.client.CoreV1().Events(claim.Namespace).List(metav1.ListOptions{
 		FieldSelector: fieldSelector,
 	})
 	if err != nil {
@@ -1005,7 +1104,7 @@ func (ctrl *ProvisionController) getPVCEventWatch(claim *v1.PersistentVolumeClai
 		resourceVersion = list.Items[len(list.Items)-1].ResourceVersion
 	}
 
-	return ctrl.client.Core().Events(claim.Namespace).Watch(metav1.ListOptions{
+	return ctrl.client.CoreV1().Events(claim.Namespace).Watch(metav1.ListOptions{
 		FieldSelector:   fieldSelector,
 		Watch:           true,
 		ResourceVersion: resourceVersion,
@@ -1019,7 +1118,7 @@ func (ctrl *ProvisionController) deleteVolumeOperation(volume *v1.PersistentVolu
 	// Our check does not have to be as sophisticated as PV controller's, we can
 	// trust that the PV controller has set the PV to Released/Failed and it's
 	// ours to delete
-	newVolume, err := ctrl.client.Core().PersistentVolumes().Get(volume.Name, metav1.GetOptions{})
+	newVolume, err := ctrl.client.CoreV1().PersistentVolumes().Get(volume.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil
 	}
@@ -1045,7 +1144,7 @@ func (ctrl *ProvisionController) deleteVolumeOperation(volume *v1.PersistentVolu
 
 	glog.V(4).Infof("deleteVolumeOperation [%s]: success", volume.Name)
 	// Delete the volume
-	if err = ctrl.client.Core().PersistentVolumes().Delete(volume.Name, nil); err != nil {
+	if err = ctrl.client.CoreV1().PersistentVolumes().Delete(volume.Name, nil); err != nil {
 		// Oops, could not delete the volume and therefore the controller will
 		// try to delete the volume again on next update.
 		glog.Infof("failed to delete volume %q from database: %v", volume.Name, err)
@@ -1100,4 +1199,23 @@ func (ctrl *ProvisionController) getStorageClassFields(name string) (string, map
 
 func claimToClaimKey(claim *v1.PersistentVolumeClaim) string {
 	return fmt.Sprintf("%s/%s", claim.Namespace, claim.Name)
+}
+
+func (ctrl *ProvisionController) fetchReclaimPolicy(storageClassName string) (v1.PersistentVolumeReclaimPolicy, error) {
+	classObj, found, err := ctrl.classes.GetByKey(storageClassName)
+	if err != nil {
+		return "", err
+	}
+	if !found {
+		return "", fmt.Errorf("StorageClass %q not found", storageClassName)
+	}
+
+	switch class := classObj.(type) {
+	case *storage.StorageClass:
+		return *class.ReclaimPolicy, nil
+	case *storagebeta.StorageClass:
+		return *class.ReclaimPolicy, nil
+	}
+
+	return v1.PersistentVolumeReclaimDelete, fmt.Errorf("Cannot convert object to StorageClass: %+v", classObj)
 }

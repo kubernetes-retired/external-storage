@@ -27,20 +27,18 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 )
 
-func setupClient() *kubernetes.Clientset {
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		glog.Fatalf("Error creating InCluster config: %v\n", err)
-	}
+var provisionerConfig common.ProvisionerConfiguration
 
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		glog.Fatalf("Error creating clientset: %v\n", err)
+func init() {
+	provisionerConfig = common.ProvisionerConfiguration{
+		StorageClassConfig: make(map[string]common.MountConfig),
 	}
-	return clientset
+	if err := common.LoadProvisionerConfigs(&provisionerConfig); err != nil {
+		glog.Fatalf("Error parsing Provisioner's configuration: %#v. Exiting...\n", err)
+	}
+	glog.Infof("Configuration parsing has been completed, ready to run...")
 }
 
 func main() {
@@ -52,13 +50,14 @@ func main() {
 		glog.Fatalf("MY_NODE_NAME environment variable not set\n")
 	}
 
-	client := setupClient()
+	client := common.SetupClient()
 	node := getNode(client, nodeName)
 
 	glog.Info("Starting controller\n")
 	controller.StartLocalController(client, &common.UserConfig{
-		Node:         node,
-		DiscoveryMap: createDiscoveryMap(client),
+		Node:            node,
+		DiscoveryMap:    provisionerConfig.StorageClassConfig,
+		NodeLabelsForPV: provisionerConfig.NodeLabelsForPV,
 	})
 }
 
@@ -68,14 +67,4 @@ func getNode(client *kubernetes.Clientset, name string) *v1.Node {
 		glog.Fatalf("Could not get node information: %v", err)
 	}
 	return node
-}
-
-func createDiscoveryMap(client *kubernetes.Clientset) map[string]common.MountConfig {
-	config, err := common.GetVolumeConfigFromConfigMap(client, os.Getenv("MY_NAMESPACE"), os.Getenv("VOLUME_CONFIG_NAME"))
-	if err != nil {
-		glog.Infof("Could not get config map due to: %v, using default configmap", err)
-		config = common.GetDefaultVolumeConfig()
-	}
-	glog.Infof("Running provisioner with config %+v\n", config)
-	return config
 }

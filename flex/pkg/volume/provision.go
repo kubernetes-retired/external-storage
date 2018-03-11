@@ -17,14 +17,13 @@ limitations under the License.
 package volume
 
 import (
-	"os/exec"
-
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/utils/exec"
 )
 
 const (
@@ -32,22 +31,24 @@ const (
 	annCreatedBy = "kubernetes.io/createdby"
 	createdBy    = "flex-dynamic-provisioner"
 
-	// A PV annotation for the identity of the s3fsProvisioner that provisioned it
+	// A PV annotation for the identity of the flexProvisioner that provisioned it
 	annProvisionerID = "Provisioner_Id"
 )
 
 // NewFlexProvisioner creates a new flex provisioner
-func NewFlexProvisioner(client kubernetes.Interface, execCommand string) controller.Provisioner {
-	return newFlexProvisionerInternal(client, execCommand)
+func NewFlexProvisioner(client kubernetes.Interface, execCommand string, flexDriver string) controller.Provisioner {
+	return newFlexProvisionerInternal(client, execCommand, flexDriver)
 }
 
-func newFlexProvisionerInternal(client kubernetes.Interface, execCommand string) *flexProvisioner {
+func newFlexProvisionerInternal(client kubernetes.Interface, execCommand string, flexDriver string) *flexProvisioner {
 	var identity types.UID
 
 	provisioner := &flexProvisioner{
 		client:      client,
 		execCommand: execCommand,
+		flexDriver:  flexDriver,
 		identity:    identity,
+		runner:      exec.New(),
 	}
 
 	return provisioner
@@ -56,7 +57,9 @@ func newFlexProvisionerInternal(client kubernetes.Interface, execCommand string)
 type flexProvisioner struct {
 	client      kubernetes.Interface
 	execCommand string
+	flexDriver  string
 	identity    types.UID
+	runner      exec.Interface
 }
 
 var _ controller.Provisioner = &flexProvisioner{}
@@ -74,8 +77,8 @@ func (p *flexProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 
 	annotations[annProvisionerID] = string(p.identity)
 	/*
-		This PV won't work since there's nothing backing it.  the flex script
-		is in flex/flex/flex  (that many layers are required for the flex volume plugin)
+		The flex script for flexDriver=<vendor>/<driver> is in
+		/usr/libexec/kubernetes/kubelet-plugins/volume/exec/<vendor>~<driver>/<driver>
 	*/
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
@@ -90,11 +93,9 @@ func (p *flexProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 				v1.ResourceName(v1.ResourceStorage): options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)],
 			},
 			PersistentVolumeSource: v1.PersistentVolumeSource{
-
 				FlexVolume: &v1.FlexVolumeSource{
-					Driver:  "flex",
-					Options: map[string]string{},
-
+					Driver:   p.flexDriver,
+					Options:  map[string]string{},
 					ReadOnly: false,
 				},
 			},
@@ -105,12 +106,15 @@ func (p *flexProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 }
 
 func (p *flexProvisioner) createVolume(volumeOptions controller.VolumeOptions) error {
-	cmd := exec.Command(p.execCommand, "provision")
-	output, err := cmd.CombinedOutput()
+	extraOptions := map[string]string{}
+	extraOptions[optionPVorVolumeName] = volumeOptions.PVName
+
+	call := p.NewDriverCall(p.execCommand, provisionCmd)
+	call.AppendSpec(volumeOptions.Parameters, extraOptions)
+	output, err := call.Run()
 	if err != nil {
-		glog.Errorf("Failed to create volume %s, output: %s, error: %s", volumeOptions, output, err.Error())
+		glog.Errorf("Failed to create volume %s, output: %s, error: %s", volumeOptions, output.Message, err.Error())
 		return err
 	}
-
 	return nil
 }

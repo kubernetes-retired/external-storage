@@ -18,9 +18,6 @@ package main
 
 import (
 	"flag"
-	"io/ioutil"
-	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -45,6 +42,7 @@ var (
 	gracePeriod    = flag.Uint("grace-period", 90, "NFS Ganesha grace period to use in seconds, from 0-180. If the server is not expected to survive restarts, i.e. it is running as a pod & its export directory is not persisted, this can be set to 0. Can only be set if both run-server and use-ganesha are true. Default 90.")
 	enableXfsQuota = flag.Bool("enable-xfs-quota", false, "If the provisioner will set xfs quotas for each volume it provisions. Requires that the directory it creates volumes in ('/export') is xfs mounted with option prjquota/pquota, and that it has the privilege to run xfs_quota. Default false.")
 	serverHostname = flag.String("server-hostname", "", "The hostname for the NFS server to export from. Only applicable when running out-of-cluster i.e. it can only be set if either master or kubeconfig are set. If unset, the first IP output by `hostname -i` is used.")
+	maxExports     = flag.Int("max-exports", -1, "The maximum number of volumes to be exported by this provisioner. New claims will be ignored once this limit has been reached. A negative value is interpreted as 'unlimited'. Default -1.")
 )
 
 const (
@@ -81,42 +79,25 @@ func main() {
 	}
 
 	if *runServer {
-		glog.Infof("Starting NFS server!")
+		glog.Infof("Setting up NFS server!")
 		err := server.Setup(ganeshaConfig, *gracePeriod)
 		if err != nil {
 			glog.Fatalf("Error setting up NFS server: %v", err)
 		}
-		err = server.Start(ganeshaLog, ganeshaPid, ganeshaConfig)
-		if err != nil {
-			glog.Fatalf("Error starting NFS server: %v", err)
-		}
 		go func() {
 			for {
+				// This blocks until server exits (presumably due to an error)
+				err = server.Run(ganeshaLog, ganeshaPid, ganeshaConfig)
+				if err != nil {
+					glog.Errorf("NFS server Exited Unexpectedly with err: %v", err)
+				}
+
+				// take a moment before trying to restart
 				time.Sleep(time.Second)
-				read, err := ioutil.ReadFile(ganeshaPid)
-				if err != nil {
-					glog.Errorf("Error reading ganesha pid file %s: %v", ganeshaPid, err)
-					continue
-				}
-				pid, err := strconv.Atoi(strings.TrimSpace(string(read)))
-				if err != nil {
-					glog.Errorf("Error parsing ganesha pid %v from file %s: %v", read, ganeshaPid, err)
-					continue
-				}
-
-				process, _ := os.FindProcess(pid)
-				processState, err := process.Wait()
-				if err != nil {
-					glog.Errorf("Error waiting on NFS server process: %v", err)
-				}
-
-				glog.Errorf("NFS server stopped unexpectedly, restarting: Pid: %v, ProcessState: %v", process.Pid, processState)
-				err = server.Start(ganeshaLog, ganeshaPid, ganeshaConfig)
-				if err != nil {
-					glog.Fatalf("Error starting NFS server: %v", err)
-				}
 			}
 		}()
+		// Wait for NFS server to come up before continuing provisioner process
+		time.Sleep(5 * time.Second)
 	}
 
 	var config *rest.Config
@@ -143,7 +124,7 @@ func main() {
 
 	// Create the provisioner: it implements the Provisioner interface expected by
 	// the controller
-	nfsProvisioner := vol.NewNFSProvisioner(exportDir, clientset, outOfCluster, *useGanesha, ganeshaConfig, *enableXfsQuota, *serverHostname)
+	nfsProvisioner := vol.NewNFSProvisioner(exportDir, clientset, outOfCluster, *useGanesha, ganeshaConfig, *enableXfsQuota, *serverHostname, *maxExports)
 
 	// Start the provision controller which will dynamically provision NFS PVs
 	pc := controller.NewProvisionController(

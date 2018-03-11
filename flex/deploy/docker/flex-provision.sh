@@ -1,3 +1,5 @@
+#!/bin/sh
+
 # Copyright 2017 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,8 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#!/bin/sh
-
 # Set this to true to log the call output to /tmp/flex-provisioner.log
 INTERNAL_DEBUG=true
 
@@ -26,13 +26,12 @@ usage() {
 }
 
 err() {
-	echo -ne $* 1>&2
+    echo -ne $* 1>&2
 }
 
 log() {
-  	echo -n $* >&1
-  	debug "log() called:"$*
-
+    echo -n $* >&1
+    debug "log() called:"$*
 }
 
 # Saves debug output to a log file.
@@ -45,7 +44,6 @@ debug() {
 # checks if the resource is mounted
 ismounted() {
     debug "ismounted() called"
-
     echo 0
 }
 
@@ -61,36 +59,55 @@ provision(){
     debug "provision() called"
     log "{\"status\": \"Success\"}"
     exit 0
+}
 
+# get volume's name
+getvolumename() {
+    debug "getvolumename() called"
+    log "{\"status\": \"Success\"}"
+    exit 0
 }
 
 # attaches a volume to host
 attach() {
     debug "attach() called"
     log "{\"status\": \"Success\"}"
-	exit 0
+    exit 0
 }
 
 # detaches a volume from host
 detach() {
     debug "detach() called"
-	log "{\"status\": \"Success\"}"
-	exit 0
+    log "{\"status\": \"Success\"}"
+    exit 0
+}
+
+# mounts the volume to global path
+domountdevice() {
+    debug "domountdevice() called"
+    log "{\"status\": \"Success\"}"
+    exit 0
 }
 
 # mounts the volume
 domount() {
     debug "domount() called"
     log "{\"status\": \"Success\"}"
-	exit 0
+    exit 0
+}
+
+# unmounts the global path
+unmountdevice() {
+    debug "unmountdevice() called"
+    log "{\"status\": \"Success\"}"
+    exit 0
 }
 
 # unmounts the volume
 unmount() {
     debug "unmount() called"
-
-	log "{\"status\": \"Success\"}"
-	exit 0
+    log "{\"status\": \"Success\"}"
+    exit 0
 }
 
 # log CLI
@@ -107,6 +124,9 @@ fi
 
 shift
 case "$op" in
+        getvolumename)
+		getvolumename $*
+		;;
 	attach)
 		attach $*
 		;;
@@ -119,8 +139,14 @@ case "$op" in
 	delete)
         delete $*
         ;;
+        mountdevice)
+		domountdevice $*
+		;;
 	mount)
 		domount $*
+		;;
+	unmountdevice)
+		unmountdevice $*
 		;;
 	unmount)
 		unmount $*
@@ -130,4 +156,3 @@ case "$op" in
 esac
 
 exit 1
-

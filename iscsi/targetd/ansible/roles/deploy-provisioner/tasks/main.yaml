@@ -1,0 +1,127 @@
+---
+     - name: Determine if iscsi-provisioner project exists
+       command: >
+         /usr/bin/oc --config=/etc/origin/master/admin.kubeconfig
+         get projects {{ iscsi_provisioner_project }} -o json
+       failed_when: false
+       changed_when: false
+       register: project_test
+     
+     - name: Create iscsi-provisioner project
+       command: >
+         /usr/bin/oc adm --config=/etc/origin/master/admin.kubeconfig
+         new-project {{ iscsi_provisioner_project }}
+       when: project_test.rc == 1
+     
+     - name: test if iscsi-provisioner service account exists
+       command: >
+           /usr/bin/oc --config=/etc/origin/master/admin.kubeconfig 
+           get sa iscsi-provisioner -n {{ iscsi_provisioner_project }}
+       failed_when: false
+       changed_when: false
+       register: account_test
+     
+     - name: create the service account
+       shell: >
+           /usr/bin/oc --config=/etc/origin/master/admin.kubeconfig 
+           create sa iscsi-provisioner
+           -n {{ iscsi_provisioner_project }}
+       when: account_test.rc != 0
+   
+     - name: Determine if targetd-account secret exists
+       command: >
+         /usr/bin/oc --config=/etc/origin/master/admin.kubeconfig
+         get secret targetd-account -o json
+         -n {{ iscsi_provisioner_project }}
+       failed_when: false
+       changed_when: false
+       register: secret_test 
+       
+     - name: Delete existing targetd-account secret  
+       command: >
+         /usr/bin/oc --config=/etc/origin/master/admin.kubeconfig
+         delete secret targetd-account -n {{ iscsi_provisioner_project }}
+       when: secret_test.rc == 0
+   
+     - name: Create targetd-account secret 
+       command: >
+         /usr/bin/oc --config=/etc/origin/master/admin.kubeconfig
+         secret new-basicauth targetd-account --username={{ targetd_user }} 
+         --password={{ targetd_password }} -n {{ iscsi_provisioner_project }}
+   
+     - name: Add system:persistent-volume-provisioner role to service account
+       command: >
+         /usr/bin/oc adm --config=/etc/origin/master/admin.kubeconfig
+         policy add-cluster-role-to-user system:persistent-volume-provisioner system:serviceaccount:{{ iscsi_provisioner_project }}:iscsi-provisioner
+       failed_when: false
+       changed_when: system_role.rc == 0
+       register: system_role
+
+     - name: Create iscsi-provisioner-runner role and add to service account if system:persistent-volume-provisioner DNE
+       shell: >
+           /usr/bin/oc --config=/etc/origin/master/admin.kubeconfig
+           create -f ../templates/iscsi-auth.yaml
+       failed_when: "'already exists' not in iscsi_role.stderr and iscsi_role.rc != 0"
+       changed_when: "'already exists' not in iscsi_role.stderr"
+       register: iscsi_role
+       when: system_role.rc == 1
+
+     - name: create iscsi class template
+       template: 
+         src: ../templates/iscsi-provisioner-class.yaml.j2
+         dest:  /tmp/iscsi-provisioner-class.yaml
+   
+     - name: HACK trim final comma from initiator list
+       lineinfile:
+         dest:  /tmp/iscsi-provisioner-class.yaml
+         regexp: '^(.*), *$'
+         line: '\1'
+         backrefs: yes
+         state: present 
+     
+     - name: create the iscsi storage class 
+       shell: >
+           /usr/bin/oc --config=/etc/origin/master/admin.kubeconfig 
+           apply -f /tmp/iscsi-provisioner-class.yaml
+           -n {{ iscsi_provisioner_project }}
+
+     - name: create chap credential file, if necessary
+       template:
+         src: ../templates/session-chap-credential.properties.j2
+         dest:  /tmp/session-chap-credential.properties
+       when: chap_auth_session == true
+
+     - name: test if chap secret exists, if necessary
+       command: >
+          /usr/bin/oc --config=/etc/origin/master/admin.kubeconfig
+                     get secret chap-auth-secret -n {{ iscsi_provisioner_project }}
+       when: chap_auth_session == true
+       failed_when: false
+       changed_when: false
+       register: class_test
+
+     - name: delete chap secret if it exists, if necessary
+       command: >
+          /usr/bin/oc --config=/etc/origin/master/admin.kubeconfig
+                     delete secret chap-auth-secret -n {{ iscsi_provisioner_project }}
+       when: (chap_auth_session == true) and (class_test.rc != 1)        
+
+     - name: create chap secret, if necessary
+       shell: >
+           /usr/bin/oc --config=/etc/origin/master/admin.kubeconfig
+           create secret generic chap-auth-secret --from-file=/tmp/session-chap-credential.properties
+           -n {{ iscsi_provisioner_project }}
+       when: (chap_auth_session == true)
+
+
+     - name: create iscsi provisioner deployment config template
+       template: 
+         src: ../templates/iscsi-provisioner-dc.yaml.j2
+         dest:  /tmp/iscsi-provisioner-dc.yaml 
+     
+     - name: create the iscsi provisioner deployment config
+       shell: >
+           /usr/bin/oc --config=/etc/origin/master/admin.kubeconfig 
+           apply -f /tmp/iscsi-provisioner-dc.yaml
+           -n {{ iscsi_provisioner_project }}
+       

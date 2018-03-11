@@ -18,15 +18,19 @@ package discovery
 
 import (
 	"fmt"
+	esUtil "github.com/kubernetes-incubator/external-storage/lib/util"
+	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/cache"
+	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
+	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/deleter"
+	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/util"
 	"path/filepath"
 	"testing"
 
-	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/cache"
-	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
-	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/util"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api/v1/helper"
+	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/util/mount"
+	"reflect"
 )
 
 const (
@@ -36,12 +40,27 @@ const (
 	testProvisionerName = "test-provisioner"
 )
 
+var nodeLabels = map[string]string{
+	"failure-domain.beta.kubernetes.io/zone":   "west-1",
+	"failure-domain.beta.kubernetes.io/region": "west",
+	common.NodeLabelKey:                        testNodeName,
+	"label-that-pv-does-not-inherit":           "foo"}
+
+var nodeLabelsForPV = []string{
+	"failure-domain.beta.kubernetes.io/zone",
+	"failure-domain.beta.kubernetes.io/region",
+	common.NodeLabelKey,
+	"non-existent-label-that-pv-will-not-get"}
+
+var expectedPVLabels = map[string]string{
+	"failure-domain.beta.kubernetes.io/zone":   "west-1",
+	"failure-domain.beta.kubernetes.io/region": "west",
+	common.NodeLabelKey:                        testNodeName}
+
 var testNode = &v1.Node{
 	ObjectMeta: metav1.ObjectMeta{
-		Name: testNodeName,
-		Labels: map[string]string{
-			common.NodeLabelKey: testNodeName,
-		},
+		Name:   testNodeName,
+		Labels: nodeLabels,
 	},
 }
 
@@ -59,27 +78,28 @@ var scMapping = map[string]common.MountConfig{
 type testConfig struct {
 	// The directory layout for the test
 	// Key = directory, Value = list of volumes under that directory
-	dirLayout map[string][]*util.FakeFile
+	dirLayout map[string][]*util.FakeDirEntry
 	// The volumes that are expected to be created as PVs
 	// Key = directory, Value = list of volumes under that directory
-	expectedVolumes map[string][]*util.FakeFile
+	expectedVolumes map[string][]*util.FakeDirEntry
 	// True if testing api failure
 	apiShouldFail bool
 	// The rest are set during setup
-	volUtil *util.FakeVolumeUtil
-	apiUtil *util.FakeAPIUtil
-	cache   *cache.VolumeCache
+	volUtil   *util.FakeVolumeUtil
+	apiUtil   *util.FakeAPIUtil
+	cache     *cache.VolumeCache
+	procTable *deleter.ProcTableImpl
 }
 
 func TestDiscoverVolumes_Basic(t *testing.T) {
-	vols := map[string][]*util.FakeFile{
+	vols := map[string][]*util.FakeDirEntry{
 		"dir1": {
-			{Name: "mount1", Hash: 0xaaaafef5, Capacity: 100 * 1024},
-			{Name: "mount2", Hash: 0x79412c38, Capacity: 100 * 1024 * 1024},
+			{Name: "mount1", Hash: 0xaaaafef5, VolumeType: util.FakeEntryFile, Capacity: 100 * 1024},
+			{Name: "mount2", Hash: 0x79412c38, VolumeType: util.FakeEntryBlock, Capacity: 100 * 1024 * 1024},
 		},
 		"dir2": {
-			{Name: "mount1", Hash: 0xa7aafa3c},
-			{Name: "mount2", Hash: 0x7c4130f1},
+			{Name: "mount1", Hash: 0xa7aafa3c, VolumeType: util.FakeEntryFile},
+			{Name: "mount2", Hash: 0x7c4130f1, VolumeType: util.FakeEntryBlock},
 		},
 	}
 	test := &testConfig{
@@ -93,14 +113,14 @@ func TestDiscoverVolumes_Basic(t *testing.T) {
 }
 
 func TestDiscoverVolumes_BasicTwice(t *testing.T) {
-	vols := map[string][]*util.FakeFile{
+	vols := map[string][]*util.FakeDirEntry{
 		"dir1": {
-			{Name: "mount1", Hash: 0xaaaafef5},
-			{Name: "mount2", Hash: 0x79412c38},
+			{Name: "mount1", Hash: 0xaaaafef5, VolumeType: util.FakeEntryFile},
+			{Name: "mount2", Hash: 0x79412c38, VolumeType: util.FakeEntryBlock},
 		},
 		"dir2": {
-			{Name: "mount1", Hash: 0xa7aafa3c},
-			{Name: "mount2", Hash: 0x7c4130f1},
+			{Name: "mount1", Hash: 0xa7aafa3c, VolumeType: util.FakeEntryFile},
+			{Name: "mount2", Hash: 0x7c4130f1, VolumeType: util.FakeEntryBlock},
 		},
 	}
 	test := &testConfig{
@@ -113,13 +133,13 @@ func TestDiscoverVolumes_BasicTwice(t *testing.T) {
 	verifyCreatedPVs(t, test)
 
 	// Second time should not create any new volumes
-	test.expectedVolumes = map[string][]*util.FakeFile{}
+	test.expectedVolumes = map[string][]*util.FakeDirEntry{}
 	d.DiscoverLocalVolumes()
 	verifyCreatedPVs(t, test)
 }
 
 func TestDiscoverVolumes_NoDir(t *testing.T) {
-	vols := map[string][]*util.FakeFile{}
+	vols := map[string][]*util.FakeDirEntry{}
 	test := &testConfig{
 		dirLayout:       vols,
 		expectedVolumes: vols,
@@ -131,7 +151,7 @@ func TestDiscoverVolumes_NoDir(t *testing.T) {
 }
 
 func TestDiscoverVolumes_EmptyDir(t *testing.T) {
-	vols := map[string][]*util.FakeFile{
+	vols := map[string][]*util.FakeDirEntry{
 		"dir1": {},
 	}
 	test := &testConfig{
@@ -145,14 +165,14 @@ func TestDiscoverVolumes_EmptyDir(t *testing.T) {
 }
 
 func TestDiscoverVolumes_NewVolumesLater(t *testing.T) {
-	vols := map[string][]*util.FakeFile{
+	vols := map[string][]*util.FakeDirEntry{
 		"dir1": {
-			{Name: "mount1", Hash: 0xaaaafef5},
-			{Name: "mount2", Hash: 0x79412c38},
+			{Name: "mount1", Hash: 0xaaaafef5, VolumeType: util.FakeEntryFile},
+			{Name: "mount2", Hash: 0x79412c38, VolumeType: util.FakeEntryBlock},
 		},
 		"dir2": {
-			{Name: "mount1", Hash: 0xa7aafa3c},
-			{Name: "mount2", Hash: 0x7c4130f1},
+			{Name: "mount1", Hash: 0xa7aafa3c, VolumeType: util.FakeEntryFile},
+			{Name: "mount2", Hash: 0x7c4130f1, VolumeType: util.FakeEntryBlock},
 		},
 	}
 	test := &testConfig{
@@ -166,13 +186,13 @@ func TestDiscoverVolumes_NewVolumesLater(t *testing.T) {
 	verifyCreatedPVs(t, test)
 
 	// Some new mount points show up
-	newVols := map[string][]*util.FakeFile{
+	newVols := map[string][]*util.FakeDirEntry{
 		"dir1": {
-			{Name: "mount3", Hash: 0xf34b8003},
-			{Name: "mount4", Hash: 0x144e29de},
+			{Name: "mount3", Hash: 0xf34b8003, VolumeType: util.FakeEntryFile},
+			{Name: "mount4", Hash: 0x144e29de, VolumeType: util.FakeEntryBlock},
 		},
 	}
-	test.volUtil.AddNewFiles(testMountDir, newVols)
+	test.volUtil.AddNewDirEntries(testMountDir, newVols)
 	test.expectedVolumes = newVols
 
 	d.DiscoverLocalVolumes()
@@ -181,20 +201,20 @@ func TestDiscoverVolumes_NewVolumesLater(t *testing.T) {
 }
 
 func TestDiscoverVolumes_CreatePVFails(t *testing.T) {
-	vols := map[string][]*util.FakeFile{
+	vols := map[string][]*util.FakeDirEntry{
 		"dir1": {
-			{Name: "mount1", Hash: 0xaaaafef5},
-			{Name: "mount2", Hash: 0x79412c38},
+			{Name: "mount1", Hash: 0xaaaafef5, VolumeType: util.FakeEntryFile},
+			{Name: "mount2", Hash: 0x79412c38, VolumeType: util.FakeEntryFile},
 		},
 		"dir2": {
-			{Name: "mount1", Hash: 0xa7aafa3c},
-			{Name: "mount2", Hash: 0x7c4130f1},
+			{Name: "mount1", Hash: 0xa7aafa3c, VolumeType: util.FakeEntryFile},
+			{Name: "mount2", Hash: 0x7c4130f1, VolumeType: util.FakeEntryFile},
 		},
 	}
 	test := &testConfig{
 		apiShouldFail:   true,
 		dirLayout:       vols,
-		expectedVolumes: map[string][]*util.FakeFile{},
+		expectedVolumes: map[string][]*util.FakeDirEntry{},
 	}
 	d := testSetup(t, test)
 
@@ -205,14 +225,14 @@ func TestDiscoverVolumes_CreatePVFails(t *testing.T) {
 }
 
 func TestDiscoverVolumes_BadVolume(t *testing.T) {
-	vols := map[string][]*util.FakeFile{
+	vols := map[string][]*util.FakeDirEntry{
 		"dir1": {
-			{Name: "mount1", IsNotDir: true},
+			{Name: "mount1", VolumeType: util.FakeEntryUnknown},
 		},
 	}
 	test := &testConfig{
 		dirLayout:       vols,
-		expectedVolumes: map[string][]*util.FakeFile{},
+		expectedVolumes: map[string][]*util.FakeDirEntry{},
 	}
 	d := testSetup(t, test)
 
@@ -222,24 +242,77 @@ func TestDiscoverVolumes_BadVolume(t *testing.T) {
 	verifyPVsNotInCache(t, test)
 }
 
+func TestDiscoverVolumes_CleaningInProgress(t *testing.T) {
+	vols := map[string][]*util.FakeDirEntry{
+		"dir1": {
+			{Name: "mount1", Hash: 0xaaaafef5, VolumeType: util.FakeEntryFile, Capacity: 100 * 1024},
+			{Name: "mount2", Hash: 0x79412c38, VolumeType: util.FakeEntryBlock, Capacity: 100 * 1024 * 1024},
+		},
+		"dir2": {
+			{Name: "mount1", Hash: 0xa7aafa3c, VolumeType: util.FakeEntryFile},
+			{Name: "mount2", Hash: 0x7c4130f1, VolumeType: util.FakeEntryBlock},
+		},
+	}
+
+	// Don't expect dir1/mount2 to be created
+	expectedVols := map[string][]*util.FakeDirEntry{
+		"dir1": {
+			{Name: "mount1", Hash: 0xaaaafef5, VolumeType: util.FakeEntryFile, Capacity: 100 * 1024},
+		},
+		"dir2": {
+			{Name: "mount1", Hash: 0xa7aafa3c, VolumeType: util.FakeEntryFile},
+			{Name: "mount2", Hash: 0x7c4130f1, VolumeType: util.FakeEntryBlock},
+		},
+	}
+	test := &testConfig{
+		dirLayout:       vols,
+		expectedVolumes: expectedVols,
+	}
+	d := testSetup(t, test)
+
+	// Mark dir1/mount2 PV as being cleaned. This one should not get created
+	pvName := getPVName(vols["dir1"][1])
+	test.procTable.MarkRunning(pvName)
+
+	d.DiscoverLocalVolumes()
+	verifyCreatedPVs(t, test)
+}
+
 func testSetup(t *testing.T, test *testConfig) *Discoverer {
 	test.cache = cache.NewVolumeCache()
-	test.volUtil = util.NewFakeVolumeUtil(false)
-	test.volUtil.AddNewFiles(testMountDir, test.dirLayout)
+	test.volUtil = util.NewFakeVolumeUtil(false /*deleteShouldFail*/, map[string][]*util.FakeDirEntry{})
+	test.volUtil.AddNewDirEntries(testMountDir, test.dirLayout)
 	test.apiUtil = util.NewFakeAPIUtil(test.apiShouldFail, test.cache)
+	test.procTable = deleter.NewProcTable()
+
+	fm := &mount.FakeMounter{
+		MountPoints: []mount.MountPoint{
+			{Path: "/discoveryPath/dir1/mount1"},
+			{Path: "/discoveryPath/dir1/mount2"},
+			{Path: "/discoveryPath/dir2/mount1"},
+			{Path: "/discoveryPath/dir2/mount2"},
+			{Path: "/discoveryPath/dir1"},
+			{Path: "/discoveryPath/dir2"},
+			{Path: "/discoveryPath/dir1/mount3"},
+			{Path: "/discoveryPath/dir1/mount4"},
+		},
+	}
 
 	userConfig := &common.UserConfig{
-		Node:         testNode,
-		DiscoveryMap: scMapping,
+		Node:            testNode,
+		DiscoveryMap:    scMapping,
+		NodeLabelsForPV: nodeLabelsForPV,
 	}
 	runConfig := &common.RuntimeConfig{
-		UserConfig: userConfig,
-		Cache:      test.cache,
-		VolUtil:    test.volUtil,
-		APIUtil:    test.apiUtil,
-		Name:       testProvisionerName,
+		UserConfig:    userConfig,
+		Cache:         test.cache,
+		VolUtil:       test.volUtil,
+		APIUtil:       test.apiUtil,
+		Name:          testProvisionerName,
+		BlockDisabled: false,
+		Mounter:       fm,
 	}
-	d, err := NewDiscoverer(runConfig)
+	d, err := NewDiscoverer(runConfig, test.procTable)
 	if err != nil {
 		t.Fatalf("Error setting up test discoverer: %v", err)
 	}
@@ -300,6 +373,17 @@ func verifyNodeAffinity(t *testing.T, pv *v1.PersistentVolume) {
 	}
 }
 
+func verifyPVLabels(t *testing.T, pv *v1.PersistentVolume) {
+	if len(pv.Labels) == 0 {
+		t.Errorf("Labels not set")
+		return
+	}
+	eq := reflect.DeepEqual(pv.Labels, expectedPVLabels)
+	if !eq {
+		t.Errorf("Labels not as expected %v != %v", pv.Labels, expectedPVLabels)
+	}
+}
+
 func verifyProvisionerName(t *testing.T, pv *v1.PersistentVolume) {
 	if len(pv.Annotations) == 0 {
 		t.Errorf("Annotations not set")
@@ -324,7 +408,7 @@ func verifyCapacity(t *testing.T, createdPV *v1.PersistentVolume, expectedPV *te
 	if !ok {
 		t.Errorf("Unable to convert resource storage into int64")
 	}
-	if capacityInt != expectedPV.capacity {
+	if roundDownCapacityPretty(capacityInt) != expectedPV.capacity {
 		t.Errorf("Expected capacity %d, got %d", expectedPV.capacity, capacityInt)
 	}
 }
@@ -337,11 +421,15 @@ type testPVInfo struct {
 	storageClass string
 }
 
+func getPVName(entry *util.FakeDirEntry) string {
+	return fmt.Sprintf("local-pv-%x", entry.Hash)
+}
+
 func verifyCreatedPVs(t *testing.T, test *testConfig) {
 	expectedPVs := map[string]*testPVInfo{}
 	for dir, files := range test.expectedVolumes {
 		for _, file := range files {
-			pvName := fmt.Sprintf("local-pv-%x", file.Hash)
+			pvName := getPVName(file)
 			path := filepath.Join(testHostDir, dir, file.Name)
 			expectedPVs[pvName] = &testPVInfo{
 				pvName:       pvName,
@@ -377,7 +465,9 @@ func verifyCreatedPVs(t *testing.T, test *testConfig) {
 
 		verifyProvisionerName(t, createdPV)
 		verifyNodeAffinity(t, createdPV)
+		verifyPVLabels(t, createdPV)
 		verifyCapacity(t, createdPV, expectedPV)
+		// TODO: Verify volume type once that is supported in the API.
 	}
 }
 
@@ -391,4 +481,55 @@ func verifyPVsNotInCache(t *testing.T, test *testConfig) {
 			}
 		}
 	}
+}
+
+func TestRoundDownCapacityPretty(t *testing.T) {
+	var capTests = []struct {
+		n        int64 // input
+		expected int64 // expected result
+	}{
+		{100 * esUtil.KiB, 100 * esUtil.KiB},
+		{10 * esUtil.MiB, 10 * esUtil.MiB},
+		{100 * esUtil.MiB, 100 * esUtil.MiB},
+		{10 * esUtil.GiB, 10 * esUtil.GiB},
+		{10 * esUtil.TiB, 10 * esUtil.TiB},
+		{9*esUtil.GiB + 999*esUtil.MiB, 9*esUtil.GiB + 999*esUtil.MiB},
+		{10*esUtil.GiB + 5, 10 * esUtil.GiB},
+		{10*esUtil.MiB + 5, 10 * esUtil.MiB},
+		{10000*esUtil.MiB - 1, 9999 * esUtil.MiB},
+		{13*esUtil.GiB - 1, 12 * esUtil.GiB},
+		{63*esUtil.MiB - 10, 62 * esUtil.MiB},
+		{12345, 12345},
+		{10000*esUtil.GiB - 1, 9999 * esUtil.GiB},
+		{3*esUtil.TiB + 2*esUtil.GiB + 1*esUtil.MiB, 3*esUtil.TiB + 2*esUtil.GiB},
+	}
+	for _, tt := range capTests {
+		actual := roundDownCapacityPretty(tt.n)
+		if actual != tt.expected {
+			t.Errorf("roundDownCapacityPretty(%d): expected %d, actual %d", tt.n, tt.expected, actual)
+		}
+	}
+}
+
+func TestDiscoverVolumes_NotMountPoint(t *testing.T) {
+	vols := map[string][]*util.FakeDirEntry{
+		"dir1": {
+			{Name: "mount1", Hash: 0xaaaafef5, VolumeType: util.FakeEntryFile, Capacity: 100 * 1024},
+			// mount5 is not listed in the FakeMounter MountPoints setup for testing
+			{Name: "mount5", Hash: 0x79412c38, VolumeType: util.FakeEntryBlock, Capacity: 100 * 1024 * 1024},
+		},
+	}
+	expectedVols := map[string][]*util.FakeDirEntry{
+		"dir1": {
+			{Name: "mount1", Hash: 0xaaaafef5, VolumeType: util.FakeEntryFile, Capacity: 100 * 1024},
+		},
+	}
+	test := &testConfig{
+		dirLayout:       vols,
+		expectedVolumes: expectedVols,
+	}
+	d := testSetup(t, test)
+
+	d.DiscoverLocalVolumes()
+	verifyCreatedPVs(t, test)
 }

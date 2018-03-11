@@ -16,9 +16,6 @@ spec:
           env:
             -
               name: PROVISIONER_NAME
-              valueFrom:
-                configMapKeyRef:
-                  key: provisioner.name
-                  name: glusterblock-provisioner
+              value: gluster.org/glusterblock
           image: "quay.io/external_storage/glusterblock-provisioner:latest"
           name: glusterblock-provisioner

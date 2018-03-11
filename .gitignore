@@ -8,6 +8,9 @@ auto-save-list
 tramp
 .\#*
 
+# Vscode files
+.vscode
+
 # Org-mode
 .org-id-locations
 *_archive
@@ -38,6 +41,10 @@ flycheck_*.el
 # projectiles files
 .projectile
 
+# glusterfs-simple-provisioner binary
+/gluster/glusterfs/glusterfs-simple-provisioner
+/gluster/glusterfs/deploy/docker/glusterfs-simple-provisioner
+
 # nfs-provisioner binary
 /nfs/nfs-provisioner
 /nfs/deploy/docker/nfs-provisioner
@@ -52,3 +59,18 @@ flycheck_*.el
 /local-volume/bootstrapper/deployment/docker/local-volume-provisioner-bootstrap
 
 .idea/
+/.project
+
+# snapshot binaries
+/snapshot/_output
+/snapshot/deploy/docker/controller/snapshot-controller
+/snapshot/deploy/docker/provisioner/snapshot-provisioner
+
+# cinder binary
+/openstack/standalone-cinder/cinder-provisioner
+
+# digitalocean binaries
+/digitalocean/digitalocean-flexplugin
+/digitalocean/deploy/docker/digitalocean-flexplugin
+/digitalocean/digitalocean-provisioner
+/digitalocean/deploy/docker/digitalocean-provisioner

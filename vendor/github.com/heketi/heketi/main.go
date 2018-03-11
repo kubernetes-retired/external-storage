@@ -23,13 +23,14 @@ import (
 	"os/signal"
 	"syscall"
 
-	"k8s.io/kubernetes/pkg/client/restclient"
+	restclient "k8s.io/client-go/rest"
 )
 
 type Config struct {
-	Port        string                   `json:"port"`
-	AuthEnabled bool                     `json:"use_auth"`
-	JwtConfig   middleware.JwtAuthConfig `json:"jwt"`
+	Port                 string                   `json:"port"`
+	AuthEnabled          bool                     `json:"use_auth"`
+	JwtConfig            middleware.JwtAuthConfig `json:"jwt"`
+	BackupDbToKubeSecret bool                     `json:"backup_db_to_kube_secret"`
 }
 
 var (
@@ -83,6 +84,11 @@ func setWithEnvVariables(options *Config) {
 	env = os.Getenv("HEKETI_HTTP_PORT")
 	if "" != env {
 		options.Port = env
+	}
+
+	env = os.Getenv("HEKETI_BACKUP_DB_TO_KUBE_SECRET")
+	if "" != env {
+		options.BackupDbToKubeSecret = true
 	}
 }
 
@@ -172,11 +178,13 @@ func main() {
 		fmt.Println("Authorization loaded")
 	}
 
-	// Check if running in a Kubernetes environment
-	_, err = restclient.InClusterConfig()
-	if err == nil {
-		// Load middleware to backup database
-		n.UseFunc(glusterfsApp.BackupToKubernetesSecret)
+	if options.BackupDbToKubeSecret {
+		// Check if running in a Kubernetes environment
+		_, err = restclient.InClusterConfig()
+		if err == nil {
+			// Load middleware to backup database
+			n.UseFunc(glusterfsApp.BackupToKubernetesSecret)
+		}
 	}
 
 	// Add all endpoints after the middleware was added

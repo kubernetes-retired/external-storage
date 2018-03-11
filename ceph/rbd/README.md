@@ -8,16 +8,25 @@ It works just like in-tree dynamic provisioner. For more information on how
 dynamic provisioning works, see [the docs](http://kubernetes.io/docs/user-guide/persistent-volumes/)
 or [this blog post](http://blog.kubernetes.io/2016/10/dynamic-provisioning-and-storage-in-kubernetes.html).
 
-## Test instruction
+## Development
 
-* Build rbd-provisioner and container image
+Compile the provisioner
 
-```bash
-go build -o rbd-provisioner cmd/rbd-provisioner/main.go
-docker build -t rbd-provisioner .
+```console
+make
 ```
 
+Make the container image and push to the registry
+
+```console
+make push
+```
+
+## Test instruction
+
 * Start Kubernetes local cluster
+
+See https://kubernetes.io/.
 
 * Create a Ceph admin secret
 
@@ -32,7 +41,7 @@ kubectl create secret generic ceph-admin-secret --from-file=/tmp/secret --namesp
 ceph osd pool create kube 8 8
 ceph auth add client.kube mon 'allow r' osd 'allow rwx pool=kube'
 ceph auth get client.kube 2>&1 |grep "key = " |awk '{print  $3'} |xargs echo -n > /tmp/secret
-kubectl create secret generic ceph-secret --from-file=/tmp/secret --namespace=default
+kubectl create secret generic ceph-secret --from-file=/tmp/secret --namespace=kube-system
 ```
 
 * Start RBD provisioner
@@ -43,32 +52,28 @@ The following example uses `rbd-provisioner-1` as the identity for the instance 
 docker run -ti -v /root/.kube:/kube -v /var/run/kubernetes:/var/run/kubernetes --privileged --net=host rbd-provisioner /usr/local/bin/rbd-provisioner -master=http://127.0.0.1:8080 -kubeconfig=/kube/config -id=rbd-provisioner-1
 ```
 
-Alternatively, start a deployment:
-
-```bash
-kubectl create -f deployment.yaml
-```
+Alternatively, deploy it in kubernetes, see [deployment](deploy/README.md).
 
 * Create a RBD Storage Class
 
-Replace Ceph monitor's IP in [class.yaml](class.yaml) with your own and create storage class:
+Replace Ceph monitor's IP in [examples/class.yaml](examples/class.yaml) with your own and create storage class:
 
 ```bash
-kubectl create -f class.yaml
+kubectl create -f examples/class.yaml
 ```
 
 * Create a claim
 
 ```bash
-kubectl create -f claim.yaml
+kubectl create -f examples/claim.yaml
 ```
 
 * Create a Pod using the claim
 
 ```bash
-kubectl create -f test-pod.yaml
+kubectl create -f examples/test-pod.yaml
 ```
 
-# Acknowledgements
+## Acknowledgements
 
 - This provisioner is extracted from [Kubernetes core](https://github.com/kubernetes/kubernetes) with some modifications for this project.

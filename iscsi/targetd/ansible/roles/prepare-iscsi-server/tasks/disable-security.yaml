@@ -1,0 +1,3 @@
+---
+  - name: disable discovery auth, if necessary
+    command: targetcli iscsi/ set discovery_auth enable=0

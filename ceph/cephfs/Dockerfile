@@ -13,9 +13,14 @@
 # limitations under the License.
 
 FROM centos:7
-RUN rpm -Uvh https://download.ceph.com/rpm-jewel/el7/noarch/ceph-release-1-1.el7.noarch.rpm
-RUN yum install -y epel-release 
-RUN yum install -y ceph-common python-cephfs
-ADD cephfs-provisioner /usr/local/bin/cephfs-provisioner
-ADD cephfs_provisioner/cephfs_provisioner.py /usr/local/bin/cephfs_provisioner
-CMD chmod o+x /usr/local/bin/cephfs_provisioner
+
+ENV CEPH_VERSION "luminous"
+RUN rpm -Uvh https://download.ceph.com/rpm-$CEPH_VERSION/el7/noarch/ceph-release-1-1.el7.noarch.rpm && \
+  yum install -y epel-release && \
+  yum install -y --nogpgcheck ceph-common python-cephfs && \
+  yum clean all
+
+COPY cephfs-provisioner /usr/local/bin/cephfs-provisioner
+COPY cephfs_provisioner/cephfs_provisioner.py /usr/local/bin/cephfs_provisioner
+RUN chmod -v o+x /usr/local/bin/cephfs_provisioner
+

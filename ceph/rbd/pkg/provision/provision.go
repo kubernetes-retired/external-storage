@@ -19,17 +19,21 @@ package provision
 import (
 	"errors"
 	"fmt"
+	"net"
 	"strings"
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
-	"github.com/pborman/uuid"
+	"github.com/kubernetes-incubator/external-storage/lib/util"
+	"github.com/miekg/dns"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/api/v1/helper"
+	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 const (
@@ -49,15 +53,32 @@ var (
 	supportedFeatures = sets.NewString("layering")
 )
 
+// rbdProvisionOptions is internal representation of rbd provision options,
+// parsed out from storage class parameters.
+// https://github.com/kubernetes/website/blob/master/docs/concepts/storage/storage-classes.md#ceph-rbd
 type rbdProvisionOptions struct {
-	monitors       []string
-	pool           string
-	adminSecret    string
-	adminID        string
-	userID         string
+	// Ceph monitors.
+	monitors []string
+	// Ceph RBD pool. Default is "rbd".
+	pool string
+	// Ceph client ID that is capable of creating images in the pool. Default is "admin".
+	adminID string
+	// Secret of admin client ID.
+	adminSecret string
+	// Ceph client ID that is used to map the RBD image. Default is the same as admin client ID.
+	userID string
+	// The name of Ceph Secret for userID to map RBD image. This parameter is required.
 	userSecretName string
-	imageFormat    string
-	imageFeatures  []string
+	// The namespace of Ceph Secret for userID to map RBD image. This parameter is optional.
+	userSecretNamespace string
+	// fsType that is supported by kubernetes. Default: "ext4".
+	fsType string
+	// Ceph RBD image format, "1" or "2". Default is "1".
+	imageFormat string
+	// This parameter is optional and should only be used if you set
+	// imageFormat to "2". Currently supported features are layering only.
+	// Default is "", and no features are turned on.
+	imageFeatures []string
 }
 
 type rbdProvisioner struct {
@@ -67,6 +88,7 @@ type rbdProvisioner struct {
 	// provisioner's PVs.
 	identity string
 	rbdUtil  *RBDUtil
+	dnsip    string
 }
 
 // NewRBDProvisioner creates a Provisioner that provisions Ceph RBD PVs backed by Ceph RBD images.
@@ -90,7 +112,7 @@ func (p *rbdProvisioner) getAccessModes() []v1.PersistentVolumeAccessMode {
 
 // Provision creates a storage asset and returns a PV object representing it.
 func (p *rbdProvisioner) Provision(options controller.VolumeOptions) (*v1.PersistentVolume, error) {
-	if !AccessModesContainedInAll(p.getAccessModes(), options.PVC.Spec.AccessModes) {
+	if !util.AccessModesContainedInAll(p.getAccessModes(), options.PVC.Spec.AccessModes) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", options.PVC.Spec.AccessModes, p.getAccessModes())
 	}
 	if options.PVC.Spec.Selector != nil {
@@ -109,8 +131,11 @@ func (p *rbdProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 	}
 	glog.Infof("successfully created rbd image %q", image)
 
-	rbd.SecretRef = new(v1.LocalObjectReference)
+	rbd.SecretRef = new(v1.SecretReference)
 	rbd.SecretRef.Name = opts.userSecretName
+	if len(opts.userSecretNamespace) > 0 {
+		rbd.SecretRef.Namespace = opts.userSecretNamespace
+	}
 	rbd.RadosUser = opts.userID
 
 	pv := &v1.PersistentVolume{
@@ -164,6 +189,60 @@ func (p *rbdProvisioner) Delete(volume *v1.PersistentVolume) error {
 	return p.rbdUtil.DeleteImage(image, opts)
 }
 
+// Look up the cluster dns service by label "kube-dns"
+func findDNSIP(p *rbdProvisioner) (dnsip string) {
+	// find DNS server address through client API
+	// cache result in rbdProvisioner
+	if p.dnsip == "" {
+		dnssvc, err := p.client.CoreV1().Services(metav1.NamespaceSystem).Get("kube-dns", metav1.GetOptions{})
+		if err != nil {
+			glog.Errorf("error getting kube-dns service: %v\n", err)
+			return ""
+		}
+		if len(dnssvc.Spec.ClusterIP) == 0 {
+			glog.Errorf("kube-dns service ClusterIP bad\n")
+			return ""
+		}
+		p.dnsip = dnssvc.Spec.ClusterIP
+	}
+	return p.dnsip
+}
+
+// Look up hostname in dns server serverip.
+func lookuphost(hostname string, serverip string) (iplist []string, err error) {
+	glog.V(4).Infof("lookuphost %q on %q\n", hostname, serverip)
+	m := new(dns.Msg)
+	m.SetQuestion(dns.Fqdn(hostname), dns.TypeA)
+	in, err := dns.Exchange(m, joinHostPort(serverip, "53"))
+	if err != nil {
+		glog.Errorf("dns lookup of %q failed: err %v", hostname, err)
+		return nil, err
+	}
+	for _, a := range in.Answer {
+		glog.V(4).Infof("lookuphost answer: %v\n", a)
+		if t, ok := a.(*dns.A); ok {
+			iplist = append(iplist, t.A.String())
+		}
+	}
+
+	return iplist, nil
+}
+
+func splitHostPort(hostport string) (host, port string) {
+	host, port, err := net.SplitHostPort(hostport)
+	if err != nil {
+		host, port = hostport, ""
+	}
+	return host, port
+}
+
+func joinHostPort(host, port string) (hostport string) {
+	if port != "" {
+		return net.JoinHostPort(host, port)
+	}
+	return host
+}
+
 func (p *rbdProvisioner) parseParameters(parameters map[string]string) (*rbdProvisionOptions, error) {
 	// options with default values
 	opts := &rbdProvisionOptions{
@@ -181,10 +260,28 @@ func (p *rbdProvisioner) parseParameters(parameters map[string]string) (*rbdProv
 	for k, v := range parameters {
 		switch strings.ToLower(k) {
 		case "monitors":
+			// Try to find DNS info in local cluster DNS so that the kubernetes
+			// host DNS config doesn't have to know about cluster DNS
+			dnsip := findDNSIP(p)
+			glog.V(4).Infof("dnsip: %q\n", dnsip)
 			arr := strings.Split(v, ",")
 			for _, m := range arr {
-				opts.monitors = append(opts.monitors, m)
+				mhost, mport := splitHostPort(m)
+				if dnsip != "" {
+					var lookup []string
+					if lookup, err = lookuphost(mhost, dnsip); err == nil {
+						for _, a := range lookup {
+							glog.V(1).Infof("adding %+v from mon lookup\n", a)
+							opts.monitors = append(opts.monitors, joinHostPort(a, mport))
+						}
+					} else {
+						opts.monitors = append(opts.monitors, joinHostPort(mhost, mport))
+					}
+				} else {
+					opts.monitors = append(opts.monitors, joinHostPort(mhost, mport))
+				}
 			}
+			glog.V(4).Infof("final monitors list: %v\n", opts.monitors)
 			if len(opts.monitors) < 1 {
 				return nil, fmt.Errorf("missing Ceph monitors")
 			}
@@ -213,6 +310,8 @@ func (p *rbdProvisioner) parseParameters(parameters map[string]string) (*rbdProv
 				return nil, fmt.Errorf("missing user secret name")
 			}
 			opts.userSecretName = v
+		case "usersecretnamespace":
+			opts.userSecretNamespace = v
 		case "imageformat":
 			if v != rbdImageFormat1 && v != rbdImageFormat2 {
 				return nil, fmt.Errorf("invalid ceph imageformat %s, expecting %s or %s", v, rbdImageFormat1, rbdImageFormat2)
@@ -226,6 +325,8 @@ func (p *rbdProvisioner) parseParameters(parameters map[string]string) (*rbdProv
 				}
 				opts.imageFeatures = append(opts.imageFeatures, f)
 			}
+		case volume.VolumeParameterFSType:
+			opts.fsType = v
 		default:
 			return nil, fmt.Errorf("invalid option %q for %s provisioner", k, ProvisionerName)
 		}
@@ -254,7 +355,7 @@ func (p *rbdProvisioner) parsePVSecret(namespace, secretName string) (string, er
 	if p.client == nil {
 		return "", fmt.Errorf("Cannot get kube client")
 	}
-	secrets, err := p.client.Core().Secrets(namespace).Get(secretName, metav1.GetOptions{})
+	secrets, err := p.client.CoreV1().Secrets(namespace).Get(secretName, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}

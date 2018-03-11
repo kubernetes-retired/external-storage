@@ -1,0 +1,45 @@
+kind: Deployment
+apiVersion: extensions/v1beta1
+metadata:
+  name: snapshot-controller
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: snapshot-controller
+    spec:
+      serviceAccountName: snapshot-controller-runner
+      containers:
+        - name: snapshot-controller
+          image: "quay.io/external_storage/snapshot-controller:latest"
+          imagePullPolicy: "IfNotPresent"
+          args: ["-cloudprovider", "aws"]
+          env:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: awskeys
+                  key: access-key-id
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: awskeys
+                  key: secret-access-key
+        - name: snapshot-provisioner
+          image: "quay.io/external_storage/snapshot-provisioner:latest"
+          imagePullPolicy: "IfNotPresent"
+          args: ["-cloudprovider", "aws"]
+          env:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: awskeys
+                  key: access-key-id
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: awskeys
+                  key: secret-access-key

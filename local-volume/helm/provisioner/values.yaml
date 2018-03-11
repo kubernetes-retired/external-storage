@@ -1,0 +1,75 @@
+common:
+  #
+  # Defines whether to generate service account and role bindings.
+  #
+  rbac: true
+  #
+  # Defines the namespace where provisioner runs
+  #
+  namespace: default
+configmap:
+  #
+  # Defines the name of configmap used by Provisioner
+  #
+  configMapName: "local-provisioner-config"
+  #
+  # Defines storage classes in a format:
+  #
+  #  storageClass:
+  #    - {storage class name}:
+  #        hostDir: "{path on the host where local volume of this storage class are mounted}"
+  #        mountDir: "{Optional path where a local volume will be mounted inside of a container}"
+  #
+  # Note: At least one storage class must be configuredi, baremetal is used as default if no
+  # explicit environment is specified in helm template command line.
+  baremetal:
+    storageClass:
+    - fast-disks:
+        hostDir: /mnt/fast-disks
+  #
+  # Storage classes for GCE Pre-1.9
+  gcePre19:
+    storageClass:
+      - local-scsi:
+          hostDir: "/mnt/disks"
+  #
+  # Storage classes for GCE 1.9+
+  gcePost19:
+    storageClass:
+      - local-scsi:
+          hostDir: "/mnt/disks/by-uuid/google-local-ssds-scsi-fs"
+      - local-nvme:
+          hostDir: "/mnt/disks/by-uuid/google-local-ssds-nvme-fs" 
+  #
+  # Storage classes for GKE
+  gke:
+    storageClass:
+      - local-scsi:
+          hostDir: "/mnt/disks"
+  #
+daemonset:
+  #
+  # Defines the name of a Provisioner
+  #
+  name: "local-volume-provisioner"
+  #
+  # Defines Provisioner's image name including container registry.
+  #
+  image: quay.io/external_storage/local-volume-provisioner:latest
+  #
+  # Defines Image download policy, see kubernetes documentation for available values.
+  #
+  imagePullPolicy: Always
+  #
+  # Defines a name of the service account which Provisioner will use to communicate with API server.
+  #
+  serviceAccount: local-storage-admin
+  #
+  # If configured KubeConfigEnv will (optionally) specify the location of kubeconfig file on the node.
+  #  kubeConfigEnv: KUBECONFIG
+  #
+  # List of node labels to be copied to the PVs created by the provisioner in a format:
+  #
+  #  nodeLabels:
+  #    - failure-domain.beta.kubernetes.io/zone
+  #    - failure-domain.beta.kubernetes.io/region

@@ -1,5 +1,5 @@
-hash: 4ea16afc94e0bbd7447f76035be1cd4d77a43fed252af8fdbb2826e149c38583
-updated: 2017-05-31T17:00:01.044589482-04:00
+hash: 08346c54408b243ce985ff86cc89a9fd0ac71566d55415f51b4014e01c626801
+updated: 2017-08-03T15:41:36.461895401-05:00
 imports: []
 testImports:
 - name: bitbucket.org/ww/goautoneg
@@ -742,7 +742,6 @@ testImports:
   - pkg/kubelet/types
   - pkg/kubelet/util/format
   - pkg/kubelet/util/ioutils
-  - pkg/labels
   - pkg/master/ports
   - pkg/metrics
   - pkg/security/apparmor

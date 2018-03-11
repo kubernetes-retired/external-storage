@@ -1,0 +1,35 @@
+kind: StorageClass
+apiVersion: storage.k8s.io/v1beta1
+metadata:
+  name: iscsi-targetd-vg-targetd
+provisioner: iscsi-targetd
+parameters:
+# this id where the iscsi server is running
+  targetPortal: 192.168.99.100:3260
+
+# if you are using multipath, you can specify additional IPs here, default empty
+# portals: 192.168.99.101:3260,192.168.99.102:3260
+
+# this is the iscsi server iqn  
+  iqn: iqn.2003-01.org.linux-iscsi.minishift:targetd
+  
+# this is the iscsi interface to be used, the default is default
+# iscsiInterface: default
+
+# this must be on eof the volume groups condifgured in targed.yaml, the default is vg-targetd
+# volumeGroup: vg-targetd
+
+# this is a comma separated list of initiators that will be give access to the created volumes, they must correspond to what you have configured in your nodes.
+  initiators: iqn.2017-04.com.example:node1
+  
+# whether or not to use chap authentication for discovery operations  
+  chapAuthDiscovery: "true"
+ 
+# whether or not to use chap authentication for session operations  
+  chapAuthSession: "true"  
+
+# This is the filesystem you want your volume to be formatted with, default xfs
+# fsType: xfs
+
+# Whether the volume should be mounted in readonly mode, default false
+# readonly: false

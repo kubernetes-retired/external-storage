@@ -45,27 +45,30 @@ class CephFSNativeDriver(object):
 
 
     def _create_conf(self, cluster_name, mons):
-        """ Create conf using monitors 
+        """ Create conf using monitors
         Create a minimal ceph conf with monitors and cephx
         """
         conf_path = CONF_PATH + cluster_name + ".conf"
-        conf = open(conf_path, 'w')
-        conf.write("[global]\n")
-        conf.write("mon_host = " + mons + "\n")
-        conf.write("auth_cluster_required = cephx\nauth_service_required = cephx\nauth_client_required = cephx\n")
-        conf.close()
+        if not os.path.isfile(conf_path) or os.access(conf_path, os.W_OK):
+            conf = open(conf_path, 'w')
+            conf.write("[global]\n")
+            conf.write("mon_host = " + mons + "\n")
+            conf.write("auth_cluster_required = cephx\nauth_service_required = cephx\nauth_client_required = cephx\n")
+            conf.close()
         return conf_path
 
     def _create_keyring(self, cluster_name, id, key):
         """ Create client keyring using id and key
         """
-        keyring = open(CONF_PATH + cluster_name + "." + "client." + id + ".keyring", 'w')
-        keyring.write("[client." + id + "]\n")
-        keyring.write("key = " + key  + "\n")
-        keyring.write("caps mds = \"allow *\"\n")
-        keyring.write("caps mon = \"allow *\"\n")
-        keyring.write("caps osd = \"allow *\"\n")
-        keyring.close()
+        keyring_path = CONF_PATH + cluster_name + "." + "client." + id + ".keyring"
+        if not os.path.isfile(keyring_path) or os.access(keyring_path, os.W_OK):
+            keyring = open(keyring_path, 'w')
+            keyring.write("[client." + id + "]\n")
+            keyring.write("key = " + key  + "\n")
+            keyring.write("caps mds = \"allow *\"\n")
+            keyring.write("caps mon = \"allow *\"\n")
+            keyring.write("caps osd = \"allow *\"\n")
+            keyring.close()
 
     @property
     def volume_client(self):
@@ -196,7 +199,6 @@ class CephFSNativeDriver(object):
         assert caps[0]['entity'] == client_entity
         return caps[0]
 
-
     def create_share(self, path, user_id, size=None):
         """Create a CephFS volume.
         """
@@ -223,10 +225,69 @@ class CephFSNativeDriver(object):
         }
         return json.dumps(ret)
 
+    def _deauthorize(self, volume_path, auth_id):
+        """
+        The volume must still exist.
+        NOTE: In our `_authorize_ceph` method we give user extra mds `allow r`
+        cap to work around a kernel cephfs issue. So we need a customized
+        `_deauthorize` method to remove caps instead of using
+        `volume_client._deauthorize`.
+        This methid is modified from
+        https://github.com/ceph/ceph/blob/v13.0.0/src/pybind/ceph_volume_client.py#L1181.
+        """
+        client_entity = "client.{0}".format(auth_id)
+        path = self.volume_client._get_path(volume_path)
+        path = self.volume_client._get_path(volume_path)
+        pool_name = self.volume_client._get_ancestor_xattr(path, "ceph.dir.layout.pool")
+        namespace = self.volume_client.fs.getxattr(path, "ceph.dir.layout.pool_namespace")
+
+        # The auth_id might have read-only or read-write mount access for the
+        # volume path.
+        access_levels = ('r', 'rw')
+        want_mds_caps = {'allow {0} path={1}'.format(access_level, path)
+                         for access_level in access_levels}
+        want_osd_caps = {'allow {0} pool={1} namespace={2}'.format(
+                         access_level, pool_name, namespace)
+                         for access_level in access_levels}
+
+        try:
+            existing = self.volume_client._rados_command(
+                'auth get',
+                {
+                    'entity': client_entity
+                }
+            )
+
+            def cap_remove(orig, want):
+                cap_tokens = set(orig.split(","))
+                return ",".join(cap_tokens.difference(want))
+
+            cap = existing[0]
+            osd_cap_str = cap_remove(cap['caps'].get('osd', ""), want_osd_caps)
+            mds_cap_str = cap_remove(cap['caps'].get('mds', ""), want_mds_caps)
+
+            if (not osd_cap_str) and (not osd_cap_str or mds_cap_str == "allow r"):
+                # If osd caps are removed and mds caps are removed or only have "allow r", we can remove entity safely.
+                self.volume_client._rados_command('auth del', {'entity': client_entity}, decode=False)
+            else:
+                self.volume_client._rados_command(
+                    'auth caps',
+                    {
+                        'entity': client_entity,
+                        'caps': [
+                            'mds', mds_cap_str,
+                            'osd', osd_cap_str,
+                            'mon', cap['caps'].get('mon', 'allow r')]
+                    })
+
+        # FIXME: rados raising Error instead of ObjectNotFound in auth get failure
+        except rados.Error:
+            # Already gone, great.
+            return
 
     def delete_share(self, path, user_id):
         volume_path = ceph_volume_client.VolumePath(VOlUME_GROUP, path)
-        self.volume_client._deauthorize(volume_path, user_id)
+        self._deauthorize(volume_path, user_id)
         self.volume_client.delete_volume(volume_path)
         self.volume_client.purge_volume(volume_path)
 

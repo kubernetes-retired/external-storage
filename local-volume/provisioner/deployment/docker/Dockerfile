@@ -12,6 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM scratch
+FROM centos:7
+
+RUN yum update -y && \
+    yum install -y e2fsprogs && \
+    yum install -y hdparm && \
+    yum clean all
+
 ADD local-volume-provisioner /local-provisioner
+ADD scripts /scripts
 ENTRYPOINT ["/local-provisioner"]

@@ -1,0 +1,28 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: standalone-cinder-provisioner
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: standalone-cinder-provisioner
+    spec:
+      containers:
+      - name: standalone-cinder-provisioner
+        image: "quay.io/external_storage/standalone-cinder-provisioner:latest"
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: OS_AUTH_URL
+          value: http://192.168.2.16:5000/v2.0
+        - name: OS_USERNAME
+          value: admin
+        - name: OS_PASSWORD
+          value: password
+        - name: OS_TENANT_ID
+          value: 522e341dd2884e88a466a5c68ca54aa4
+        - name: OS_REGION_NAME
+          value: RegionOne

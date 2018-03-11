@@ -1,0 +1,104 @@
+{{- define "configStorageClass" }}
+{{- $classPath := . }}
+{{- range $tmp, $val := $classPath }}
+   {{- range $storageClass, $classConfig := $val }}
+{{ $storageClass }}:
+   hostDir: {{ $classConfig.hostDir }}
+   mountDir: {{ if $classConfig.mountDir }} {{$classConfig.mountDir }} {{ else }} {{ $classConfig.hostDir }} {{ end }}
+   {{- end}}
+{{- end}}
+{{- end }}
+{{- define "configVolumes" }}
+{{- $classPath := . }}
+{{- range $tmp, $val := $classPath }}
+   {{- range $storageClass, $classConfig := $val }}
+- name: {{ $storageClass }}
+  hostPath:
+    path: {{ $classConfig.hostDir }}
+   {{- end}}
+{{- end}}
+{{- end }}
+{{- define "configVolumeMounts" }}
+{{- $classPath := . }}
+{{- range $tmp, $val := $classPath }}
+   {{- range $storageClass, $classConfig := $val }}
+- mountPath: {{ if $classConfig.mountDir }} {{$classConfig.mountDir }} {{ else }} {{ $classConfig.hostDir }} {{ end }}
+  name: {{ $storageClass }}
+   {{- end}}
+{{- end}}
+{{- end }}
+{{- $configMapName := .Values.configmap.configMapName }}
+{{- $provisionerNamespace := .Values.common.namespace }}
+{{- $provisionerName := .Values.daemonset.name }}
+{{- $imageFull := .Values.daemonset.image }}
+{{- $imagePullPolicy := .Values.daemonset.imagePullPolicy }}
+{{- $serviceAccount := .Values.daemonset.serviceAccount }}
+{{- $kubeConfigEnv := .Values.daemonset.kubeConfigEnv }}
+{{- $nodeLabels := .Values.daemonset.nodeLabels }}
+{{- $engine := .Values.engine | default "baremetal" }} 
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $configMapName }} 
+  namespace: {{ $provisionerNamespace }} 
+data:
+{{- if $nodeLabels }}
+  nodeLabelsForPV: |
+   {{- range $label := $nodeLabels }}
+    - {{$label}}
+   {{- end }}
+{{- end }}
+  storageClassMap: |
+{{- if eq ( $engine | lower ) "gcepre19" }} {{ include "configStorageClass" (.Values.configmap.gcePre19.storageClass) | indent 4 }} {{ end }}
+{{- if eq ( $engine | lower ) "gcepost19" }} {{ include "configStorageClass" (.Values.configmap.gcePost19.storageClass) | indent 4 }} {{ end }}
+{{- if eq ( $engine | lower ) "gke" }} {{ include "configStorageClass" (.Values.configmap.gke.storageClass) | indent 4 }} {{ end }}
+{{- if eq ( $engine | lower ) "baremetal" }} {{ include "configStorageClass" (.Values.configmap.baremetal.storageClass) | indent 4 }} {{ end }}
+---
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: {{ $provisionerName }}
+  namespace: {{ $provisionerNamespace }}
+  labels:
+    app: local-volume-provisioner
+spec:
+  selector:
+    matchLabels:
+      app: local-volume-provisioner 
+  template:
+    metadata:
+      labels:
+        app: local-volume-provisioner
+    spec:
+      serviceAccountName: {{$serviceAccount}}
+      containers:
+        - image: "{{ $imageFull }}"
+          imagePullPolicy: {{ $imagePullPolicy | quote }}
+          name: provisioner 
+          securityContext:
+            privileged: true
+          env:
+          - name: MY_NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+{{- if $kubeConfigEnv }}
+            - name: KUBECONFIG
+              value: {{$kubeConfigEnv}}
+{{- end }}
+          volumeMounts:
+            - mountPath: /etc/provisioner/config 
+              name: provisioner-config
+              readOnly: true
+{{- if eq ( $engine | lower ) "gcepre19" }} {{ include "configVolumeMounts" (.Values.configmap.gcePre19.storageClass) | indent 12 }} {{ end }}
+{{- if eq ( $engine | lower ) "gcepost19" }} {{ include "configVolumeMounts" (.Values.configmap.gcePost19.storageClass) | indent 12 }} {{ end }}
+{{- if eq ( $engine | lower ) "gke" }} {{ include "configVolumeMounts" (.Values.configmap.gke.storageClass) | indent 12 }} {{ end }}
+{{- if eq ( $engine | lower ) "baremetal" }} {{ include "configVolumeMounts" (.Values.configmap.baremetal.storageClass) | indent 12 }} {{ end }}
+      volumes:
+        - name: provisioner-config
+          configMap:
+            name: {{ $configMapName }}
+{{- if eq ( $engine | lower ) "gcepre19" }} {{ include "configVolumes" (.Values.configmap.gcePre19.storageClass) | indent 8 }} {{ end }}
+{{- if eq ( $engine | lower ) "gcepost19" }} {{ include "configVolumes" (.Values.configmap.gcePost19.storageClass) | indent 8 }} {{ end }}
+{{- if eq ( $engine | lower ) "gke" }} {{ include "configVolumes" (.Values.configmap.gke.storageClass) | indent 8 }} {{ end }}
+{{- if eq ( $engine | lower ) "baremetal" }} {{ include "configVolumes" (.Values.configmap.baremetal.storageClass) | indent 8 }} {{ end }}

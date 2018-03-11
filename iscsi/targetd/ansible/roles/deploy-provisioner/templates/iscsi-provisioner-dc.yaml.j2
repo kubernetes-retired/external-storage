@@ -1,0 +1,47 @@
+kind: DeploymentConfig
+apiVersion: v1
+metadata:
+  name: iscsi-provisioner
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: iscsi-provisioner
+    spec:
+      containers:
+        - name: iscsi-provisioner
+          imagePullPolicy: Always
+          image: {{ iscsi_provisioner_pullspec }}
+          args:
+            - "start"
+          env:
+            - name: PROVISIONER_NAME
+              value: {{ provisioner_name }}   
+            - name: LOG_LEVEL
+              value: debug
+            - name: TARGETD_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: targetd-account
+                  key: username
+            - name: TARGETD_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: targetd-account
+                  key: password                    
+            - name: TARGETD_ADDRESS
+              value: {{ hostvars[groups['targetd'][0]]['ansible_default_ipv4']['address'] }}
+{% if chap_auth_session | bool %}
+          volumeMounts:
+          - name: chap-auth-volume
+            mountPath: /var/run/secrets/iscsi-provisioner
+{% endif %}
+      serviceAccount: iscsi-provisioner
+{% if chap_auth_session | bool %}
+      volumes:
+        - name: chap-auth-volume
+          secret:
+            secretName: chap-auth-secret
+{% endif %}
+

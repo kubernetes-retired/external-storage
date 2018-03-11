@@ -1,0 +1,43 @@
+apiVersion: apps/v1beta2
+kind: DaemonSet
+metadata:
+  labels:
+    app: digitalocean-flexplugin-deploy
+  name: digitalocean-flexplugin-deploy
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: digitalocean-flexplugin-deploy
+  template:
+    metadata:
+      labels:
+        app: digitalocean-flexplugin-deploy
+      name: digitalocean-flexplugin-deploy
+    spec:
+      containers:
+      - env:
+        - name: DIGITALOCEAN_ACCESS_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: access-token
+              name: digitalocean
+        image: quay.io/external_storage/digitalocean-flexplugin
+        imagePullPolicy: Always
+        name: flex-deploy
+        resources:
+          limits:
+            cpu: 25m
+            memory: 32Mi
+          requests:
+            cpu: 25m
+            memory: 32Mi
+        volumeMounts:
+        - mountPath: /flexmnt
+          name: flexvolume-mount
+      tolerations:
+      - operator: Exists
+      volumes:
+      - hostPath:
+          path: <flex volume plugin dir, default: /usr/libexec/kubernetes/kubelet-plugins/volume/exec/>
+        name: flexvolume-mount

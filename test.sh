@@ -75,6 +75,7 @@ if [ "$TEST_SUITE" = "nfs" ]; then
 elif [ "$TEST_SUITE" = "everything-else" ]; then
 	pushd ./lib
 	go test ./controller
+	go test ./allocator
 	popd
 	# Test building hostpath-provisioner demo
 	pushd ./docs/demo/hostpath-provisioner
@@ -87,7 +88,13 @@ elif [ "$TEST_SUITE" = "everything-else" ]; then
 	make ceph/rbd
 	make flex
 	make gluster/block
+	make gluster/glusterfs
+	make iscsi/targetd
+	make test-iscsi/targetd
 	make nfs-client
+	make snapshot
+	make test-snapshot
+	make test-openstack/standalone-cinder
 elif [ "$TEST_SUITE" = "local-volume" ]; then
 	make local-volume/provisioner
 	make test-local-volume/provisioner

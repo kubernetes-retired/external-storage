@@ -30,8 +30,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/efs"
 	"github.com/docker/docker/pkg/mount"
 	"github.com/golang/glog"
-	"github.com/kubernetes-incubator/external-storage/aws/efs/pkg/gidallocator"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
+	"github.com/kubernetes-incubator/external-storage/lib/gidallocator"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -109,7 +109,11 @@ func getMount(dnsName string) (string, string, error) {
 		}
 	}
 
-	return "", "", fmt.Errorf("no mount entry found for %s", dnsName)
+	entriesStr := ""
+	for _, e := range entries {
+		entriesStr += e.Source + ":" + e.Mountpoint + ", "
+	}
+	return "", "", fmt.Errorf("no mount entry found for %s among entries %s", dnsName, entriesStr)
 }
 
 var _ controller.Provisioner = &efsProvisioner{}
@@ -120,12 +124,32 @@ func (p *efsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 		return nil, fmt.Errorf("claim.Spec.Selector is not supported")
 	}
 
-	gid, err := p.allocator.AllocateNext(options)
-	if err != nil {
-		return nil, err
+	gidAllocate := true
+	for k, v := range options.Parameters {
+		switch strings.ToLower(k) {
+		case "gidmin":
+		// Let allocator handle
+		case "gidmax":
+		// Let allocator handle
+		case "gidallocate":
+			b, err := strconv.ParseBool(v)
+			if err != nil {
+				return nil, fmt.Errorf("invalid value %s for parameter %s: %v", v, k, err)
+			}
+			gidAllocate = b
+		}
 	}
 
-	err = p.createVolume(p.getLocalPath(options), gid)
+	var gid *int
+	if gidAllocate {
+		allocate, err := p.allocator.AllocateNext(options)
+		if err != nil {
+			return nil, err
+		}
+		gid = &allocate
+	}
+
+	err := p.createVolume(p.getLocalPath(options), gid)
 	if err != nil {
 		return nil, err
 	}
@@ -133,9 +157,6 @@ func (p *efsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: options.PVName,
-			Annotations: map[string]string{
-				gidallocator.VolumeGidAnnotationKey: strconv.FormatInt(int64(gid), 10),
-			},
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: options.PersistentVolumeReclaimPolicy,
@@ -152,12 +173,20 @@ func (p *efsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 			},
 		},
 	}
+	if gidAllocate {
+		pv.ObjectMeta.Annotations = map[string]string{
+			gidallocator.VolumeGidAnnotationKey: strconv.FormatInt(int64(*gid), 10),
+		}
+	}
 
 	return pv, nil
 }
 
-func (p *efsProvisioner) createVolume(path string, gid int) error {
-	perm := os.FileMode(0771 | os.ModeSetgid)
+func (p *efsProvisioner) createVolume(path string, gid *int) error {
+	perm := os.FileMode(0777)
+	if gid != nil {
+		perm = os.FileMode(0771 | os.ModeSetgid)
+	}
 
 	if err := os.MkdirAll(path, perm); err != nil {
 		return err
@@ -169,11 +198,13 @@ func (p *efsProvisioner) createVolume(path string, gid int) error {
 		return err
 	}
 
-	cmd := exec.Command("chgrp", strconv.Itoa(gid), path)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		os.RemoveAll(path)
-		return fmt.Errorf("chgrp failed with error: %v, output: %s", err, out)
+	if gid != nil {
+		cmd := exec.Command("chgrp", strconv.Itoa(*gid), path)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			os.RemoveAll(path)
+			return fmt.Errorf("chgrp failed with error: %v, output: %s", err, out)
+		}
 	}
 
 	return nil
