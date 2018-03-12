@@ -268,8 +268,8 @@ func insertSpaces(original string) string {
 
 // LoadProvisionerConfigs loads all configuration into a string and unmarshal it into ProvisionerConfiguration struct.
 // The configuration is stored in the configmap which is mounted as a volume.
-func LoadProvisionerConfigs(provisionerConfig *ProvisionerConfiguration) error {
-	files, err := ioutil.ReadDir(ProvisionerConfigPath)
+func LoadProvisionerConfigs(configPath string, provisionerConfig *ProvisionerConfiguration) error {
+	files, err := ioutil.ReadDir(configPath)
 	if err != nil {
 		return err
 	}
@@ -277,9 +277,9 @@ func LoadProvisionerConfigs(provisionerConfig *ProvisionerConfiguration) error {
 	for _, file := range files {
 		if !file.IsDir() {
 			if strings.Compare(file.Name(), "..data") != 0 {
-				fileContents, err := ioutil.ReadFile(path.Join(ProvisionerConfigPath, file.Name()))
+				fileContents, err := ioutil.ReadFile(path.Join(configPath, file.Name()))
 				if err != nil {
-					glog.Infof("Could not read file: %s due to: %v", path.Join(ProvisionerConfigPath, file.Name()), err)
+					glog.Infof("Could not read file: %s due to: %v", path.Join(configPath, file.Name()), err)
 					return err
 				}
 				data[file.Name()] = string(fileContents)

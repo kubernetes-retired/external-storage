@@ -17,6 +17,7 @@ limitations under the License.
 package common
 
 import (
+	"io/ioutil"
 	"os"
 	"testing"
 
@@ -67,5 +68,26 @@ func TestSetupClientByInCluster(t *testing.T) {
 	SetupClient()
 	if !methodInvoked {
 		t.Errorf("InClusterConfig not invoked")
+	}
+}
+
+func TestLoadProvisionerConfigs(t *testing.T) {
+	tmpConfigPath, err := ioutil.TempDir("", "local-provisioner-config")
+	if err != nil {
+		t.Fatalf("create temp dir error: %v", err)
+	}
+	defer func() {
+		os.RemoveAll(tmpConfigPath)
+	}()
+	provisionerConfig := &ProvisionerConfiguration{
+		StorageClassConfig: make(map[string]MountConfig),
+	}
+	err = LoadProvisionerConfigs(tmpConfigPath, provisionerConfig)
+	if err != nil {
+		t.Fatalf("LoadProvisionerConfigs error: %v", err)
+	}
+
+	if provisionerConfig.UseAlphaAPI == true {
+		t.Errorf("UseAlphaAPI should default to false")
 	}
 }

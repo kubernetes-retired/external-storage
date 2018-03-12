@@ -35,7 +35,7 @@ func init() {
 	provisionerConfig = common.ProvisionerConfiguration{
 		StorageClassConfig: make(map[string]common.MountConfig),
 	}
-	if err := common.LoadProvisionerConfigs(&provisionerConfig); err != nil {
+	if err := common.LoadProvisionerConfigs(common.ProvisionerConfigPath, &provisionerConfig); err != nil {
 		glog.Fatalf("Error parsing Provisioner's configuration: %#v. Exiting...\n", err)
 	}
 	glog.Infof("Configuration parsing has been completed, ready to run...")
