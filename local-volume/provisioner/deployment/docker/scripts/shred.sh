@@ -40,4 +40,4 @@ if ! [[ $iterations =~ ^[0-9]+$ ]]; then
     errorExit "Number of iterations is not a number $iterations"
 fi
 
-shred -vzf -n $iterations $LOCAL_PV_BLKDEVICE
+ionice -c 3 shred -vzf -n $iterations $LOCAL_PV_BLKDEVICE
