@@ -61,9 +61,8 @@ func giveBuf(buf *bytes.Buffer) {
 // name).
 //
 // Deprecated: Please note the issues described in the doc comment of
-// InstrumentHandler. You might want to consider using promhttp.Handler instead
-// (which is not instrumented, but can be instrumented with the tooling provided
-// in package promhttp).
+// InstrumentHandler. You might want to consider using
+// promhttp.InstrumentedHandler instead.
 func Handler() http.Handler {
 	return InstrumentHandler("prometheus", UninstrumentedHandler())
 }
@@ -96,7 +95,7 @@ func UninstrumentedHandler() http.Handler {
 			closer.Close()
 		}
 		if lastErr != nil && buf.Len() == 0 {
-			http.Error(w, "No metrics encoded, last error:\n\n"+err.Error(), http.StatusInternalServerError)
+			http.Error(w, "No metrics encoded, last error:\n\n"+lastErr.Error(), http.StatusInternalServerError)
 			return
 		}
 		header := w.Header()

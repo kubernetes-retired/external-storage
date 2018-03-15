@@ -1,13 +1,12 @@
-hash: bad5b8cc5504a88c060c3135c372b906550627273744530f1af8a53eedf50dac
-updated: 2018-03-05T14:22:31.127141222Z
+hash: d7946f2054f3842ecb95090bd3d8e55e82ec6ce68fb15d7fb95f8fb25a5d69cb
+updated: 2018-03-15T15:23:04.749605+01:00
 imports:
 - name: cloud.google.com/go
-  version: 3b1ae45394a234c385be014e9a488f2bb6eef821
+  version: ada5c911bc7ed125d88d725d368eb5b4f0f731ea
   subpackages:
   - compute/metadata
-  - internal
 - name: github.com/aws/aws-sdk-go
-  version: aace5875a5c3b85a3902c6d72b9caed301d64cce
+  version: 28d0127967e59b0c41cede1e8d548ed85374bbbc
   subpackages:
   - aws
   - aws/awserr
@@ -25,6 +24,7 @@ imports:
   - aws/request
   - aws/session
   - aws/signer/v4
+  - internal/sdkio
   - internal/sdkrand
   - internal/shareddefaults
   - private/protocol
@@ -53,7 +53,7 @@ imports:
 - name: github.com/dgrijalva/jwt-go
   version: 01aeca54ebda6e0fbfafd0a524d234159c05ec20
 - name: github.com/digitalocean/godo
-  version: 77ea48de76a7b31b234d854f15d003c68bb2fb90
+  version: 7a32b5ce17203924a21366d5031032fd326d5051
   subpackages:
   - context
 - name: github.com/docker/distribution
@@ -90,9 +90,9 @@ imports:
 - name: github.com/fsnotify/fsnotify
   version: f12c6236fe7b5cf6bcf30e5935d08cb079d78334
 - name: github.com/ghodss/yaml
-  version: 73d445a93680fa1a78ae23a5839bad48f32ba1ee
+  version: 0ca9ea5df5451ffdf184b4428c902747c2c11cd7
 - name: github.com/go-ini/ini
-  version: e88632e2fbbd517932de8a0af39beb223b03ae35
+  version: 6ecc596bd756a16c6e93e4ef9225ecdb9f54ed2c
 - name: github.com/gogo/protobuf
   version: c0656edd0d9eab7c66d1eb0c568f9039345796f7
   subpackages:
@@ -168,6 +168,7 @@ imports:
   subpackages:
   - hcl/ast
   - hcl/parser
+  - hcl/printer
   - hcl/scanner
   - hcl/strconv
   - hcl/token
@@ -195,13 +196,13 @@ imports:
 - name: github.com/lpabon/godbc
   version: 9577782540c1398b710ddae1b86268ba03a19b0c
 - name: github.com/magiconair/properties
-  version: 61b492c03cf472e0c6419be5899b8e0dc28b1b88
+  version: 2c9e9502788518c97fe44e8955cd069417ee89df
 - name: github.com/matttproud/golang_protobuf_extensions
   version: fc2b8d3a73c4867e51861bbdd5ae3c1f0869dd6a
   subpackages:
   - pbutil
 - name: github.com/miekg/dns
-  version: 906238edc6eb0ddface4a1923f6d41ef2a5ca59b
+  version: 5b169d1842fbc764c22df259de0a17085c48d8c2
 - name: github.com/mitchellh/mapstructure
   version: db1efb556f84b25a0a13a04aad883943538ad2e0
 - name: github.com/onsi/ginkgo
@@ -241,7 +242,7 @@ imports:
 - name: github.com/opencontainers/go-digest
   version: a6d0ee40d4207ea02364bd3b9e8e77b9159ba1eb
 - name: github.com/pborman/uuid
-  version: ca53cad383cad2479bbba7f7a1a05797ec1386e4
+  version: c65b2f87fee37d1c7854c9164a450713c28d50cd
 - name: github.com/pelletier/go-buffruneio
   version: df1e16fde7fc330a0ca68167c23bf7ed6ac31d6d
 - name: github.com/pelletier/go-toml
@@ -250,15 +251,16 @@ imports:
   version: 645ef00459ed84a119197bfb8d8205042c6df63d
 - name: github.com/pkg/sftp
   version: 4d0e916071f68db74f8a73926335f809396d6b42
+- name: github.com/pkg/xattr
+  version: bc67bfc801466b4b8e62df951397972652fa8414
 - name: github.com/powerman/rpc-codec
   version: 3e1ab3b635b7b0d5f771028cd45aa9a827fd9f31
   subpackages:
   - jsonrpc2
 - name: github.com/prometheus/client_golang
-  version: e7e903064f5e9eb5da98208bae10b475d4db0f8c
+  version: c3324c1198cf3374996e9d3098edd46a6b55afc9
   subpackages:
   - prometheus
-  - prometheus/promhttp
 - name: github.com/prometheus/client_model
   version: fa8ad6fec33561be4280a8f0514318c79d7f6cb6
   subpackages:
@@ -274,7 +276,7 @@ imports:
   subpackages:
   - xfs
 - name: github.com/Sirupsen/logrus
-  version: f4ee69125072b22721efbe639bd0da9c9d19b8cc
+  version: 90150a8ed11b6ce285e77e8af2b0109559ce4777
 - name: github.com/spf13/afero
   version: b28a7effac979219c2a2ed6205a4d70e4b1bcd02
   subpackages:
@@ -289,7 +291,7 @@ imports:
 - name: github.com/spf13/pflag
   version: 5ccb023bc27df288a957c5e994cd44fd19619465
 - name: github.com/spf13/viper
-  version: 7fb2782df3d83e0036cc89f461ed0422628776f4
+  version: aafc9e6bc7b7bb53ddaa75a5ef49a17d6e654be5
 - name: github.com/tent/http-link-go
   version: ac974c61c2f990f4115b119354b5e0b47550e888
 - name: golang.org/x/crypto
@@ -340,17 +342,11 @@ imports:
 - name: google.golang.org/api
   version: c0dae069ee96c9261a04c81efd9e0f1e55f565ac
   subpackages:
-  - cloudmonitoring/v2beta2
-  - compute/v0.alpha
-  - compute/v0.beta
   - compute/v1
   - container/v1
   - gensupport
   - googleapi
   - googleapi/internal/uritemplates
-  - logging/v2beta1
-  - monitoring/v3
-  - pubsub/v1
 - name: google.golang.org/appengine
   version: 5bee14b453b4c71be47ec1781b0fa61c2ea182db
   subpackages:
@@ -380,7 +376,7 @@ imports:
 - name: gopkg.in/warnings.v0
   version: 8a331561fe74dadba6edfc59f3be66c22c3b065d
 - name: gopkg.in/yaml.v2
-  version: 670d4cfef0544295bc27a114dbac37980d83185a
+  version: 7f97868eec74b32b0982dd158a51a446d1da7eb5
 - name: k8s.io/api
   version: 7aac3e00a1b32fa476b83078cebaaca606b2fb48
   subpackages:
@@ -689,11 +685,9 @@ imports:
   - pkg/volume
   - pkg/volume/util
 - name: k8s.io/utils
-  version: aedf551cdb8b0119df3a19c65fde413a13b34997
+  version: 258e2a2fa64568210fbd6267cf1d8fd87c3cb86e
   subpackages:
-  - clock
   - exec
-  - exec/testing
 testImports:
 - name: github.com/pmezard/go-difflib
   version: d8ed2627bdf02c080bf22230dbb337003b7aba2d
@@ -706,4 +700,3 @@ testImports:
   subpackages:
   - assert
   - mock
-  - require
