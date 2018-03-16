@@ -260,6 +260,11 @@ class CephFSNativeDriver(object):
             namespace = "{0}{1}".format(self.volume_client.pool_ns_prefix, volume_path.volume_id)
             log.info("create_volume: {0}, using rados namespace {1} to isolate data.".format(volume_path, namespace))
             self.volume_client.fs.setxattr(path, 'ceph.dir.layout.pool_namespace', namespace, 0)
+        else:
+            # If `ceph.dir.layout.pool_namespace` is not configured, `ceph.dir.layout.pool` is inherited from ancestor which may change.
+            # Make sure `ceph.dir.layout.pool` is configured on volume path, so we will not have any permission issues in future.
+            pool_name = self.volume_client._get_ancestor_xattr(path, "ceph.dir.layout.pool")
+            self.volume_client.fs.setxattr(path, 'ceph.dir.layout.pool', pool_name, 0)
 
         # Create a volume meta file, if it does not already exist, to store
         # data about auth ids having access to the volume
