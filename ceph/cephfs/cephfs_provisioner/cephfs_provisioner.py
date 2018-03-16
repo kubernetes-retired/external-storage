@@ -16,9 +16,11 @@
 
 import os
 import rados
+import cephfs
 import getopt
 import sys
 import json
+import logging
 
 """
 CEPH_CLUSTER_NAME=test CEPH_MON=172.24.0.4 CEPH_AUTH_ID=admin CEPH_AUTH_KEY=AQCMpH9YM4Q1BhAAXGNQyyOne8ZsXqWGon/dIQ== cephfs_provisioner.py -n foo -u bar
@@ -33,6 +35,8 @@ except ImportError as e:
 VOlUME_GROUP="kubernetes"
 CONF_PATH="/etc/ceph/"
 
+log = logging.getLogger(__name__)
+
 class CephFSNativeDriver(object):
     """Driver for the Ceph Filesystem.
 
@@ -41,6 +45,11 @@ class CephFSNativeDriver(object):
     """
 
     def __init__(self, *args, **kwargs):
+        try:
+            os.environ["CEPH_FEATURE_PNAMESPACE_DISABLED"]
+            self.ceph_feature_namespace_disabled = True
+        except KeyError:
+            self.ceph_feature_namespace_disabled = False
         self._volume_client = None
 
 
@@ -114,15 +123,23 @@ class CephFSNativeDriver(object):
         # First I need to work out what the data pool is for this share:
         # read the layout
         pool_name = self._volume_client._get_ancestor_xattr(path, "ceph.dir.layout.pool")
-        namespace = self._volume_client.fs.getxattr(path, "ceph.dir.layout.pool_namespace")
+        try:
+            namespace = self._volume_client.fs.getxattr(path, "ceph.dir.layout.pool_namespace")
+        except cephfs.NoData:
+            # ceph.dir.layout.pool_namespace is optional
+            namespace = ""
 
         # Now construct auth capabilities that give the guest just enough
         # permissions to access the share
         client_entity = "client.{0}".format(auth_id)
         want_access_level = 'r' if readonly else 'rw'
         want_mds_cap = 'allow r,allow {0} path={1}'.format(want_access_level, path)
-        want_osd_cap = 'allow {0} pool={1} namespace={2}'.format(
-            want_access_level, pool_name, namespace)
+        if namespace != "":
+            want_osd_cap = 'allow {0} pool={1} namespace={2}'.format(
+                want_access_level, pool_name, namespace)
+        else:
+            want_osd_cap = 'allow {0} pool={1}'.format(
+                want_access_level, pool_name)
 
         try:
             existing = self._volume_client._rados_command(
@@ -150,8 +167,12 @@ class CephFSNativeDriver(object):
             # auth caps.
             unwanted_access_level = 'r' if want_access_level is 'rw' else 'rw'
             unwanted_mds_cap = 'allow {0} path={1}'.format(unwanted_access_level, path)
-            unwanted_osd_cap = 'allow {0} pool={1} namespace={2}'.format(
-                unwanted_access_level, pool_name, namespace)
+            if namespace != "":
+                unwanted_osd_cap = 'allow {0} pool={1} namespace={2}'.format(
+                    unwanted_access_level, pool_name, namespace)
+            else:
+                unwanted_osd_cap = 'allow {0} pool={1}'.format(
+                    unwanted_access_level, pool_name)
 
             def cap_update(orig, want, unwanted):
                 # Updates the existing auth caps such that there is a single
@@ -199,13 +220,64 @@ class CephFSNativeDriver(object):
         assert caps[0]['entity'] == client_entity
         return caps[0]
 
+    def _create_volume(self, volume_path, size=None, data_isolated=False, namespace_enforced=True):
+        """
+        Linux kernel cephfs only support Rados Pool Namespace after 4.8:
+        https://github.com/torvalds/linux/commit/779fe0fb8e1883d5c479ac6bd85fbd237deed1f7.
+        This methid is modified from
+        https://github.com/ceph/ceph/blob/v13.0.0/src/pybind/ceph_volume_client.py#L603
+        and make namespace enforcement optional.
+        Set up metadata, pools and auth for a volume.
+        This function is idempotent.  It is safe to call this again
+        for an already-created volume, even if it is in use.
+        :param volume_path: VolumePath instance
+        :param size: In bytes, or None for no size limit
+        :param data_isolated: If true, create a separate OSD pool for this volume
+        :return:
+        """
+        path = self.volume_client._get_path(volume_path)
+        log.info("create_volume: {0}".format(path))
+
+        self.volume_client._mkdir_p(path)
+
+        if size is not None:
+            self.volume_client.fs.setxattr(path, 'ceph.quota.max_bytes', size.__str__(), 0)
+
+        # data_isolated means create a separate pool for this volume
+        if data_isolated:
+            pool_name = "{0}{1}".format(self.volume_client.POOL_PREFIX, volume_path.volume_id)
+            log.info("create_volume: {0}, create pool {1} as data_isolated =True.".format(volume_path, pool_name))
+            pool_id = self.volume_client._create_volume_pool(pool_name)
+            mds_map = self.volume_client._rados_command("mds dump", {})
+            if pool_id not in mds_map['data_pools']:
+                self.volume_client._rados_command("mds add_data_pool", {
+                    'pool': pool_name
+                })
+            self.volume_client.fs.setxattr(path, 'ceph.dir.layout.pool', pool_name, 0)
+
+        # enforce security isolation, use seperate namespace for this volume
+        if namespace_enforced:
+            namespace = "{0}{1}".format(self.volume_client.pool_ns_prefix, volume_path.volume_id)
+            log.info("create_volume: {0}, using rados namespace {1} to isolate data.".format(volume_path, namespace))
+            self.volume_client.fs.setxattr(path, 'ceph.dir.layout.pool_namespace', namespace, 0)
+
+        # Create a volume meta file, if it does not already exist, to store
+        # data about auth ids having access to the volume
+        fd = self.volume_client.fs.open(self.volume_client._volume_metadata_path(volume_path),
+                          os.O_CREAT, 0o755)
+        self.volume_client.fs.close(fd)
+
+        return {
+            'mount_path': path
+        }
+
     def create_share(self, path, user_id, size=None):
         """Create a CephFS volume.
         """
         volume_path = ceph_volume_client.VolumePath(VOlUME_GROUP, path)
 
         # Create the CephFS volume
-        volume = self.volume_client.create_volume(volume_path, size=size)
+        volume = self._create_volume(volume_path, size=size, namespace_enforced=not self.ceph_feature_namespace_disabled)
 
         # To mount this you need to know the mon IPs and the path to the volume
         mon_addrs = self.volume_client.get_mon_addrs()
@@ -239,16 +311,26 @@ class CephFSNativeDriver(object):
         path = self.volume_client._get_path(volume_path)
         path = self.volume_client._get_path(volume_path)
         pool_name = self.volume_client._get_ancestor_xattr(path, "ceph.dir.layout.pool")
-        namespace = self.volume_client.fs.getxattr(path, "ceph.dir.layout.pool_namespace")
+        try:
+            namespace = self.volume_client.fs.getxattr(path, "ceph.dir.layout.pool_namespace")
+        except cephfs.NoData:
+            # ceph.dir.layout.pool_namespace is optional
+            namespace = ""
 
         # The auth_id might have read-only or read-write mount access for the
         # volume path.
         access_levels = ('r', 'rw')
         want_mds_caps = {'allow {0} path={1}'.format(access_level, path)
                          for access_level in access_levels}
-        want_osd_caps = {'allow {0} pool={1} namespace={2}'.format(
-                         access_level, pool_name, namespace)
-                         for access_level in access_levels}
+        if namespace != "":
+            want_osd_caps = {'allow {0} pool={1} namespace={2}'.format(
+                             access_level, pool_name, namespace)
+                             for access_level in access_levels}
+        else:
+            want_osd_caps = {'allow {0} pool={1}'.format(
+                             access_level, pool_name)
+                             for access_level in access_levels}
+
 
         try:
             existing = self.volume_client._rados_command(
