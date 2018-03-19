@@ -10,7 +10,7 @@ This is an simple provisioner for DigitalOcean [Block Storage](https://www.digit
 2. Deploy the RBAC policies: `kubectl create -f manifests/rbac`
 3. Deploy the provisioner: `kubectl create -f manifests/digitalocean-provisioner.yaml`
 4. Adjust the `hostPath` in [manifests/digitalocean-flexplugin-deploy.yaml](manifests/digitalocean-flexplugin-deploy.yaml)  
-   Deploy the flex plugin "installer": `kubectl create -f manifests/digitalocean-flex-plugin-deploy.yaml`
+   Deploy the flex plugin "installer": `kubectl create -f manifests/digitalocean-flexplugin-deploy.yaml`
 5. Modify the zone in [manifests/sc.yaml](manifests/sc.yaml)  
    Deploy the default `StorageClass`: `kubectl create -f manifests/sc.yaml`
 6. (**optional**) Try it out with the example pod and PVC
