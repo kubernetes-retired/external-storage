@@ -4,7 +4,7 @@ metadata:
   name: snapshot-controller-runner
 ---
 kind: ClusterRole
-apiVersion: rbac.authorization.k8s.io/v1alpha1
+apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: snapshot-controller-role
 rules:
