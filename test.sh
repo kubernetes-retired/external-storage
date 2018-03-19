@@ -71,7 +71,7 @@ if [ "$TEST_SUITE" = "nfs" ]; then
 
 	# Build nfs-provisioner and run tests
 	make nfs
-	make test-nfs
+	make test-nfs-all
 elif [ "$TEST_SUITE" = "everything-else" ]; then
 	pushd ./lib
 	go test ./controller
