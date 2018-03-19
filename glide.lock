@@ -1,5 +1,5 @@
-hash: bad5b8cc5504a88c060c3135c372b906550627273744530f1af8a53eedf50dac
-updated: 2018-03-05T14:22:31.127141222Z
+hash: feffb5c6de8c3fece2000a0906d4ca698e9a96b5d314367fbc35a5d2455ac5df
+updated: 2018-03-19T20:25:28.773723513+08:00
 imports:
 - name: cloud.google.com/go
   version: 3b1ae45394a234c385be014e9a488f2bb6eef821
@@ -7,7 +7,7 @@ imports:
   - compute/metadata
   - internal
 - name: github.com/aws/aws-sdk-go
-  version: aace5875a5c3b85a3902c6d72b9caed301d64cce
+  version: f0872da8a448f8cb10f4f0c95c2100e4f7356448
   subpackages:
   - aws
   - aws/awserr
@@ -25,6 +25,7 @@ imports:
   - aws/request
   - aws/session
   - aws/signer/v4
+  - internal/sdkio
   - internal/sdkrand
   - internal/shareddefaults
   - private/protocol
@@ -53,7 +54,7 @@ imports:
 - name: github.com/dgrijalva/jwt-go
   version: 01aeca54ebda6e0fbfafd0a524d234159c05ec20
 - name: github.com/digitalocean/godo
-  version: 77ea48de76a7b31b234d854f15d003c68bb2fb90
+  version: 7a32b5ce17203924a21366d5031032fd326d5051
   subpackages:
   - context
 - name: github.com/docker/distribution
@@ -92,7 +93,7 @@ imports:
 - name: github.com/ghodss/yaml
   version: 73d445a93680fa1a78ae23a5839bad48f32ba1ee
 - name: github.com/go-ini/ini
-  version: e88632e2fbbd517932de8a0af39beb223b03ae35
+  version: 6ecc596bd756a16c6e93e4ef9225ecdb9f54ed2c
 - name: github.com/gogo/protobuf
   version: c0656edd0d9eab7c66d1eb0c568f9039345796f7
   subpackages:
@@ -190,8 +191,6 @@ imports:
   version: 0b12d6b521d83fc7f755e7cfc1b1fbdd35a01a74
 - name: github.com/json-iterator/go
   version: 13f86432b882000a51c6e610c620974462691a97
-- name: github.com/kr/fs
-  version: 2788f0dbd16903de03cb8186e5c7d97b69ad387b
 - name: github.com/lpabon/godbc
   version: 9577782540c1398b710ddae1b86268ba03a19b0c
 - name: github.com/magiconair/properties
@@ -201,7 +200,7 @@ imports:
   subpackages:
   - pbutil
 - name: github.com/miekg/dns
-  version: 906238edc6eb0ddface4a1923f6d41ef2a5ca59b
+  version: 5b169d1842fbc764c22df259de0a17085c48d8c2
 - name: github.com/mitchellh/mapstructure
   version: db1efb556f84b25a0a13a04aad883943538ad2e0
 - name: github.com/onsi/ginkgo
@@ -246,10 +245,6 @@ imports:
   version: df1e16fde7fc330a0ca68167c23bf7ed6ac31d6d
 - name: github.com/pelletier/go-toml
   version: 0049ab3dc4c4c70a9eee23087437b69c0dde2130
-- name: github.com/pkg/errors
-  version: 645ef00459ed84a119197bfb8d8205042c6df63d
-- name: github.com/pkg/sftp
-  version: 4d0e916071f68db74f8a73926335f809396d6b42
 - name: github.com/powerman/rpc-codec
   version: 3e1ab3b635b7b0d5f771028cd45aa9a827fd9f31
   subpackages:
@@ -274,9 +269,9 @@ imports:
   subpackages:
   - xfs
 - name: github.com/Sirupsen/logrus
-  version: f4ee69125072b22721efbe639bd0da9c9d19b8cc
+  version: 90150a8ed11b6ce285e77e8af2b0109559ce4777
 - name: github.com/spf13/afero
-  version: b28a7effac979219c2a2ed6205a4d70e4b1bcd02
+  version: ""
   subpackages:
   - mem
   - sftp
@@ -295,10 +290,8 @@ imports:
 - name: golang.org/x/crypto
   version: 81e90905daefcd6fd217b62423c0908922eadb30
   subpackages:
-  - curve25519
   - ed25519
   - ed25519/internal/edwards25519
-  - ssh
   - ssh/terminal
 - name: golang.org/x/net
   version: 1c05540f6879653db88113bc4a2b70aec4bd491f
@@ -641,6 +634,8 @@ imports:
   - util/jsonpath
   - util/retry
   - util/testing
+- name: k8s.io/code-generator
+  version: 7ead8f38b01cf8653249f5af80ce7b2c8aba12e2
 - name: k8s.io/kube-openapi
   version: 50ae88d24ede7b8bad68e23c805b5d3da5c8abaf
   subpackages:
@@ -706,4 +701,3 @@ testImports:
   subpackages:
   - assert
   - mock
-  - require
