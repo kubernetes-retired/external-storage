@@ -220,7 +220,7 @@ class CephFSNativeDriver(object):
         assert caps[0]['entity'] == client_entity
         return caps[0]
 
-    def _create_volume(self, volume_path, size=None, data_isolated=False, namespace_enforced=True):
+    def _create_volume(self, volume_path, size=None, namespace_enforced=True):
         """
         Linux kernel cephfs only support Rados Pool Namespace after 4.8:
         https://github.com/torvalds/linux/commit/779fe0fb8e1883d5c479ac6bd85fbd237deed1f7.
@@ -232,7 +232,7 @@ class CephFSNativeDriver(object):
         for an already-created volume, even if it is in use.
         :param volume_path: VolumePath instance
         :param size: In bytes, or None for no size limit
-        :param data_isolated: If true, create a separate OSD pool for this volume
+        :param namespace_enforced: If true, enforce security isolation, use seperate namespace for this volume.
         :return:
         """
         path = self.volume_client._get_path(volume_path)
@@ -242,18 +242,6 @@ class CephFSNativeDriver(object):
 
         if size is not None:
             self.volume_client.fs.setxattr(path, 'ceph.quota.max_bytes', size.__str__(), 0)
-
-        # data_isolated means create a separate pool for this volume
-        if data_isolated:
-            pool_name = "{0}{1}".format(self.volume_client.POOL_PREFIX, volume_path.volume_id)
-            log.info("create_volume: {0}, create pool {1} as data_isolated =True.".format(volume_path, pool_name))
-            pool_id = self.volume_client._create_volume_pool(pool_name)
-            mds_map = self.volume_client._rados_command("mds dump", {})
-            if pool_id not in mds_map['data_pools']:
-                self.volume_client._rados_command("mds add_data_pool", {
-                    'pool': pool_name
-                })
-            self.volume_client.fs.setxattr(path, 'ceph.dir.layout.pool', pool_name, 0)
 
         # enforce security isolation, use seperate namespace for this volume
         if namespace_enforced:
