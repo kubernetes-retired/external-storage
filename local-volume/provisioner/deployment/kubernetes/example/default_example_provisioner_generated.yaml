@@ -8,9 +8,12 @@ metadata:
   namespace: default 
 data:
   storageClassMap: |     
-    local-scsi:
-       hostDir: /mnt/disks
-       mountDir:  /mnt/disks  
+    fast-disks:
+       hostDir: /mnt/fast-disks
+       mountDir:  /mnt/fast-disks 
+       blockCleanerCommand:
+         - "/scripts/shred.sh"
+         - "2" 
 ---
 apiVersion: extensions/v1beta1
 kind: DaemonSet
@@ -30,7 +33,7 @@ spec:
     spec:
       serviceAccountName: local-storage-admin
       containers:
-        - image: "quay.io/external_storage/local-volume-provisioner:v2.0.0"
+        - image: "quay.io/external_storage/local-volume-provisioner:latest"
           imagePullPolicy: "Always"
           name: provisioner 
           securityContext:
@@ -44,21 +47,27 @@ spec:
             - mountPath: /etc/provisioner/config 
               name: provisioner-config
               readOnly: true             
-            - mountPath:  /mnt/disks 
-              name: local-scsi 
+            - mountPath:  /mnt/fast-disks 
+              name: fast-disks 
       volumes:
         - name: provisioner-config
           configMap:
             name: local-provisioner-config         
-        - name: local-scsi
+        - name: fast-disks
           hostPath:
-            path: /mnt/disks 
+            path: /mnt/fast-disks 
+
 ---
+# Source: provisioner/templates/provisioner-service-account.yaml
+
 apiVersion: v1
 kind: ServiceAccount
-metadata:
+metadata:  
   name: local-storage-admin
+
 ---
+# Source: provisioner/templates/provisioner-cluster-role-binding.yaml
+
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
