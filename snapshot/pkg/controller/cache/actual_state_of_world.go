@@ -24,7 +24,7 @@ import (
 	"sync"
 
 	"github.com/golang/glog"
-	crdv1 "github.com/kubernetes-incubator/external-storage/snapshot/pkg/apis/crd/v1"
+	crdv1 "github.com/kubernetes-incubator/external-storage/snapshot/pkg/apis/volumesnapshot/v1"
 )
 
 // ActualStateOfWorld defines a set of thread-safe operations supported on

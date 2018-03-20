@@ -22,7 +22,7 @@ import (
 
 	"github.com/golang/glog"
 
-	crdv1 "github.com/kubernetes-incubator/external-storage/snapshot/pkg/apis/crd/v1"
+	crdv1 "github.com/kubernetes-incubator/external-storage/snapshot/pkg/apis/volumesnapshot/v1"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/controller/cache"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume"
 	v1 "k8s.io/api/core/v1"

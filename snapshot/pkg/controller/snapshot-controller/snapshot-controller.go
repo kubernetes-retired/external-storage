@@ -31,7 +31,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	kcontroller "k8s.io/kubernetes/pkg/controller"
 
-	crdv1 "github.com/kubernetes-incubator/external-storage/snapshot/pkg/apis/crd/v1"
+	crdv1 "github.com/kubernetes-incubator/external-storage/snapshot/pkg/apis/volumesnapshot/v1"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/controller/cache"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/controller/reconciler"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/controller/snapshotter"

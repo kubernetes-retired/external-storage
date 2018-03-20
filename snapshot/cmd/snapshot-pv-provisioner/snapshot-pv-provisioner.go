@@ -23,7 +23,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
-	crdv1 "github.com/kubernetes-incubator/external-storage/snapshot/pkg/apis/crd/v1"
+	crdv1 "github.com/kubernetes-incubator/external-storage/snapshot/pkg/apis/volumesnapshot/v1"
 	crdclient "github.com/kubernetes-incubator/external-storage/snapshot/pkg/util"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/cloudprovider"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/cloudprovider/providers/aws"
@@ -247,7 +247,7 @@ func main() {
 	// build volume plugins map
 	buildVolumePlugins()
 
-	// make a crd client to list VolumeSnapshot
+	// make a volumesnapshot client to list VolumeSnapshot
 	snapshotClient, _, err := crdclient.NewClient(config)
 	if err != nil || snapshotClient == nil {
 		glog.Fatalf("Failed to make CRD client: %v", err)
