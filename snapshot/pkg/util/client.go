@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
 	"reflect"
 	"time"
 
@@ -30,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
+	"fmt"
 )
 
 const (
@@ -104,16 +106,24 @@ func CreateCRD(clientset apiextensionsclient.Interface) error {
 }
 
 // WaitForSnapshotResource waits for the snapshot resource
-func WaitForSnapshotResource(snapshotClient *rest.RESTClient) error {
+func WaitForSnapshotResource(clientset apiextensionsclient.Interface) error {
 	return wait.Poll(100*time.Millisecond, 60*time.Second, func() (bool, error) {
-		_, err := snapshotClient.Get().
-			Resource(crdv1.VolumeSnapshotDataResourcePlural).DoRaw()
-		if err == nil {
-			return true, nil
+		crd, err := clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Get(crdv1.VolumeSnapshotDataResourcePlural, metav1.GetOptions{})
+		if err != nil {
+			return false, err
 		}
-		if apierrors.IsNotFound(err) {
-			return false, nil
+		for _, cond := range crd.Status.Conditions {
+			switch cond.Type {
+			case apiextensionsv1beta1.Established:
+				if cond.Status == apiextensionsv1beta1.ConditionTrue {
+					return true, nil
+				}
+			case apiextensionsv1beta1.NamesAccepted:
+				if cond.Status == apiextensionsv1beta1.ConditionFalse {
+					return false, fmt.Errorf("Name conflict: %v", cond.Reason)
+				}
+			}
 		}
-		return false, err
+		return false, nil
 	})
 }

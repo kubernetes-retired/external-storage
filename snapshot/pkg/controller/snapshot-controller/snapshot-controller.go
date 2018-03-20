@@ -21,12 +21,7 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/runtime"
-
-	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	kcache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	kcontroller "k8s.io/kubernetes/pkg/controller"
@@ -38,6 +33,9 @@ import (
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume"
 
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/controller/populator"
+	snapshotclientset "github.com/kubernetes-incubator/external-storage/snapshot/pkg/client/clientset/versioned"
+	informers "github.com/kubernetes-incubator/external-storage/snapshot/pkg/client/informers/externalversions"
+	listers "github.com/kubernetes-incubator/external-storage/snapshot/pkg/client/listers/volumesnapshot/v1"
 )
 
 const (
@@ -59,8 +57,10 @@ type SnapshotController interface {
 }
 
 type snapshotController struct {
-	snapshotClient *rest.RESTClient
-	snapshotScheme *runtime.Scheme
+	snapshotClient snapshotclientset.Interface
+
+	volumeSnapshotLister listers.VolumeSnapshotLister
+	volumeSnapshotSynced kcache.InformerSynced
 
 	// desiredStateOfWorld is a data structure containing the desired state of
 	// the world according to this controller: i.e. what VolumeSnapshots need
@@ -84,50 +84,32 @@ type snapshotController struct {
 	// recorder is used to record events in the API server
 	recorder record.EventRecorder
 
-	snapshotStore      kcache.Store
-	snapshotController kcache.Controller
-
 	// desiredStateOfWorldPopulator runs an asynchronous periodic loop to
 	// populate the current snapshots using snapshotInformer.
 	desiredStateOfWorldPopulator populator.DesiredStateOfWorldPopulator
 }
 
 // NewSnapshotController creates a new SnapshotController
-func NewSnapshotController(client *rest.RESTClient,
-	scheme *runtime.Scheme,
+func NewSnapshotController(client snapshotclientset.Interface,
+	snapshotInformerFactory informers.SharedInformerFactory,
 	clientset kubernetes.Interface,
 	volumePlugins *map[string]volume.Plugin,
 	syncDuration time.Duration) SnapshotController {
 
+	snapshotInformer := snapshotInformerFactory.Volumesnapshot().V1().VolumeSnapshots()
+
 	sc := &snapshotController{
-		snapshotClient: client,
-		snapshotScheme: scheme,
+		snapshotClient:       client,
+		volumeSnapshotLister: snapshotInformer.Lister(),
+		volumeSnapshotSynced: snapshotInformer.Informer().HasSynced,
 	}
 
-	// Watch snapshot objects
-	source := kcache.NewListWatchFromClient(
-		sc.snapshotClient,
-		crdv1.VolumeSnapshotResourcePlural,
-		apiv1.NamespaceAll,
-		fields.Everything())
-
-	sc.snapshotStore, sc.snapshotController = kcache.NewInformer(
-		source,
-
-		// The object type.
-		&crdv1.VolumeSnapshot{},
-
-		// resyncPeriod
-		// Every resyncPeriod, all resources in the kcache will retrigger events.
-		// Set to 0 to disable the resync.
-		time.Minute*60,
-
-		// Your custom resource event handlers.
+	snapshotInformer.Informer().AddEventHandlerWithResyncPeriod(
 		kcache.ResourceEventHandlerFuncs{
-			AddFunc:    sc.onSnapshotAdd,
-			UpdateFunc: sc.onSnapshotUpdate,
-			DeleteFunc: sc.onSnapshotDelete,
-		})
+		AddFunc:    sc.onSnapshotAdd,
+		UpdateFunc: sc.onSnapshotUpdate,
+		DeleteFunc: sc.onSnapshotDelete,
+	}, time.Minute*60)
 
 	//eventBroadcaster := record.NewBroadcaster()
 	//eventBroadcaster.StartLogging(glog.Infof)
@@ -139,7 +121,6 @@ func NewSnapshotController(client *rest.RESTClient,
 
 	sc.snapshotter = snapshotter.NewVolumeSnapshotter(
 		client,
-		scheme,
 		clientset,
 		sc.actualStateOfWorld,
 		volumePlugins)
@@ -155,7 +136,7 @@ func NewSnapshotController(client *rest.RESTClient,
 	sc.desiredStateOfWorldPopulator = populator.NewDesiredStateOfWorldPopulator(
 		desiredStateOfWorldPopulatorLoopSleepPeriod,
 		desiredStateOfWorldPopulatorListSnapshotsRetryDuration,
-		sc.snapshotStore,
+		sc.volumeSnapshotLister,
 		sc.desiredStateOfWorld,
 	)
 
@@ -165,10 +146,7 @@ func NewSnapshotController(client *rest.RESTClient,
 // Run starts an Snapshot resource controller
 func (c *snapshotController) Run(ctx <-chan struct{}) {
 	glog.Infof("Starting snapshot controller")
-
-	go c.snapshotController.Run(ctx)
-
-	if !kcontroller.WaitForCacheSync("snapshot-controller", ctx, c.snapshotController.HasSynced) {
+	if !kcontroller.WaitForCacheSync("snapshot-controller", ctx, c.volumeSnapshotSynced) {
 		return
 	}
 

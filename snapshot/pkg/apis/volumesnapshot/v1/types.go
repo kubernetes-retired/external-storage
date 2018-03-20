@@ -17,11 +17,8 @@ limitations under the License.
 package v1
 
 import (
-	"encoding/json"
-
 	core_v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 const (
@@ -291,104 +288,4 @@ func GetSupportedVolumeFromSnapshotDataSpec(spec *VolumeSnapshotDataSpec) string
 		return "glusterfs"
 	}
 	return ""
-}
-
-// GetObjectKind is required to satisfy Object interface
-func (v *VolumeSnapshotData) GetObjectKind() schema.ObjectKind {
-	return &v.TypeMeta
-}
-
-// GetObjectMeta is required to satisfy ObjectMetaAccessor interface
-func (v *VolumeSnapshotData) GetObjectMeta() metav1.Object {
-	return &v.ObjectMeta
-}
-
-// GetObjectKind is required to satisfy Object interface
-func (vd *VolumeSnapshotDataList) GetObjectKind() schema.ObjectKind {
-	return &vd.TypeMeta
-}
-
-// GetListMeta is required to satisfy ListMetaAccessor interface
-func (vd *VolumeSnapshotDataList) GetListMeta() metav1.ListInterface {
-	return &vd.ListMeta
-}
-
-// GetObjectKind is required to satisfy Object interface
-func (v *VolumeSnapshot) GetObjectKind() schema.ObjectKind {
-	return &v.TypeMeta
-}
-
-// GetObjectMeta is required to satisfy ObjectMetaAccessor interface
-func (v *VolumeSnapshot) GetObjectMeta() metav1.Object {
-	return &v.ObjectMeta
-}
-
-// GetObjectKind is required to satisfy Object interface
-func (vd *VolumeSnapshotList) GetObjectKind() schema.ObjectKind {
-	return &vd.TypeMeta
-}
-
-// GetListMeta is required to satisfy ListMetaAccessor interface
-func (vd *VolumeSnapshotList) GetListMeta() metav1.ListInterface {
-	return &vd.ListMeta
-}
-
-// VolumeSnapshotDataListCopy is a VolumeSnapshotDataList type
-type VolumeSnapshotDataListCopy VolumeSnapshotDataList
-
-// VolumeSnapshotDataCopy is a VolumeSnapshotData type
-type VolumeSnapshotDataCopy VolumeSnapshotData
-
-// VolumeSnapshotListCopy is a VolumeSnapshotList type
-type VolumeSnapshotListCopy VolumeSnapshotList
-
-// VolumeSnapshotCopy is a VolumeSnapshot type
-type VolumeSnapshotCopy VolumeSnapshot
-
-// UnmarshalJSON unmarshalls json data
-func (v *VolumeSnapshot) UnmarshalJSON(data []byte) error {
-	tmp := VolumeSnapshotCopy{}
-	err := json.Unmarshal(data, &tmp)
-	if err != nil {
-		return err
-	}
-	tmp2 := VolumeSnapshot(tmp)
-	*v = tmp2
-	return nil
-}
-
-// UnmarshalJSON unmarshals json data
-func (vd *VolumeSnapshotList) UnmarshalJSON(data []byte) error {
-	tmp := VolumeSnapshotListCopy{}
-	err := json.Unmarshal(data, &tmp)
-	if err != nil {
-		return err
-	}
-	tmp2 := VolumeSnapshotList(tmp)
-	*vd = tmp2
-	return nil
-}
-
-// UnmarshalJSON unmarshals json data
-func (v *VolumeSnapshotData) UnmarshalJSON(data []byte) error {
-	tmp := VolumeSnapshotDataCopy{}
-	err := json.Unmarshal(data, &tmp)
-	if err != nil {
-		return err
-	}
-	tmp2 := VolumeSnapshotData(tmp)
-	*v = tmp2
-	return nil
-}
-
-// UnmarshalJSON unmarshals json data
-func (vd *VolumeSnapshotDataList) UnmarshalJSON(data []byte) error {
-	tmp := VolumeSnapshotDataListCopy{}
-	err := json.Unmarshal(data, &tmp)
-	if err != nil {
-		return err
-	}
-	tmp2 := VolumeSnapshotDataList(tmp)
-	*vd = tmp2
-	return nil
 }

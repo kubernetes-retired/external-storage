@@ -42,6 +42,8 @@ import (
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume/gluster"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume/hostpath"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	snapshotclientset "github.com/kubernetes-incubator/external-storage/snapshot/pkg/client/clientset/versioned"
+	informers "github.com/kubernetes-incubator/external-storage/snapshot/pkg/client/informers/externalversions"
 )
 
 const (
@@ -77,23 +79,28 @@ func main() {
 	}
 
 	// make a new config for our extension's API group, using the first config as a baseline
-	snapshotClient, snapshotScheme, err := util.NewClient(config)
+	snapshotClient, err := snapshotclientset.NewForConfig(config)
 	if err != nil {
 		panic(err)
 	}
 
 	// wait until CRD gets processed
-	err = util.WaitForSnapshotResource(snapshotClient)
+	err = util.WaitForSnapshotResource(aeclientset)
 	if err != nil {
 		panic(err)
 	}
 	// build volume plugins map
 	buildVolumePlugins()
 
+	stopCh := make(chan struct{})
+
+	snapshotInformerFactory := informers.NewSharedInformerFactory(snapshotClient, time.Minute*60)
+	go snapshotInformerFactory.Start(stopCh)
+
 	// start controller on instances of our CRD
 	glog.Infof("starting snapshot controller")
-	ssController := snapshotcontroller.NewSnapshotController(snapshotClient, snapshotScheme, clientset, &volumePlugins, defaultSyncDuration)
-	stopCh := make(chan struct{})
+	ssController := snapshotcontroller.NewSnapshotController(snapshotClient, snapshotInformerFactory, clientset, &volumePlugins, defaultSyncDuration)
+
 
 	go ssController.Run(stopCh)
 

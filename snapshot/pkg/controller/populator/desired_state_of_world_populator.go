@@ -20,11 +20,12 @@ package populator
 
 import (
 	"github.com/golang/glog"
-	crdv1 "github.com/kubernetes-incubator/external-storage/snapshot/pkg/apis/volumesnapshot/v1"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/controller/cache"
 	"k8s.io/apimachinery/pkg/util/wait"
-	k8scache "k8s.io/client-go/tools/cache"
 	"time"
+	listers "github.com/kubernetes-incubator/external-storage/snapshot/pkg/client/listers/volumesnapshot/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 // DesiredStateOfWorldPopulator periodically verifies that the snapshot in the
@@ -42,7 +43,7 @@ type DesiredStateOfWorldPopulator interface {
 func NewDesiredStateOfWorldPopulator(
 	loopSleepDuration time.Duration,
 	listSnapshotsRetryDuration time.Duration,
-	snapshotStore k8scache.Store,
+	snapshotStore listers.VolumeSnapshotLister,
 	desiredStateOfWorld cache.DesiredStateOfWorld) DesiredStateOfWorldPopulator {
 	return &desiredStateOfWorldPopulator{
 		loopSleepDuration:          loopSleepDuration,
@@ -57,7 +58,7 @@ type desiredStateOfWorldPopulator struct {
 	listSnapshotsRetryDuration time.Duration
 	timeOfLastListSnapshots    time.Time
 	desiredStateOfWorld        cache.DesiredStateOfWorld
-	snapshotStore              k8scache.Store
+	snapshotStore              listers.VolumeSnapshotLister
 }
 
 func (dswp *desiredStateOfWorldPopulator) Run(stopCh <-chan struct{}) {
@@ -86,22 +87,25 @@ func (dswp *desiredStateOfWorldPopulator) populatorLoopFunc() func() {
 // longer exist in the informer
 func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedSnapshots() {
 	for snapshotUID, snapshot := range dswp.desiredStateOfWorld.GetSnapshots() {
-		_, exists, err := dswp.snapshotStore.Get(snapshot)
+		_, err := dswp.snapshotStore.VolumeSnapshots(snapshot.ObjectMeta.Namespace).Get(snapshot.ObjectMeta.Name)
 		if err != nil {
-			glog.Errorf("get snapshot %s failed: %v", snapshotUID, err)
-			continue
-		}
-		if !exists {
-			glog.V(1).Infof("Removing snapshot %s from dsw because it does not exist in snapshot informer.", snapshotUID)
-			dswp.desiredStateOfWorld.DeleteSnapshot(cache.MakeSnapshotName(snapshot.ObjectMeta.Namespace, snapshot.ObjectMeta.Name))
+			if errors.IsNotFound(err) {
+				glog.V(1).Infof("Removing snapshot %s from dsw because it does not exist in snapshot informer.", snapshotUID)
+				dswp.desiredStateOfWorld.DeleteSnapshot(cache.MakeSnapshotName(snapshot.ObjectMeta.Namespace, snapshot.ObjectMeta.Name))
+			} else {
+				glog.Errorf("get snapshot %s failed: %v", snapshotUID, err)
+				continue
+			}
 		}
 	}
 }
 
 func (dswp *desiredStateOfWorldPopulator) findAndAddActiveSnapshots() {
-	for _, obj := range dswp.snapshotStore.List() {
-		snapshot := obj.(*crdv1.VolumeSnapshot)
-
+	snapshotList, err := dswp.snapshotStore.List(labels.Everything())
+	if err != nil {
+		glog.Errorf("get snapshot list failed: %v", err)
+	}
+	for _, snapshot := range snapshotList {
 		snapshotName := cache.MakeSnapshotName(snapshot.ObjectMeta.Namespace, snapshot.ObjectMeta.Name)
 		if !dswp.desiredStateOfWorld.SnapshotExists(snapshotName) {
 			glog.V(1).Infof("Adding snapshot %s to dsw because it exists in snapshot informer.", snapshotName)

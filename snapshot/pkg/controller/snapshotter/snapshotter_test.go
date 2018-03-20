@@ -17,25 +17,19 @@ limitations under the License.
 package snapshotter
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"io"
-	"io/ioutil"
-	"net/http"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
+
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/client-go/rest"
 
 	crdv1 "github.com/kubernetes-incubator/external-storage/snapshot/pkg/apis/volumesnapshot/v1"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/cloudprovider"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/controller/cache"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume"
+	snapshotfake "github.com/kubernetes-incubator/external-storage/snapshot/pkg/client/clientset/versioned/fake"
 )
 
 // TestPlugin methods
@@ -82,26 +76,6 @@ func (tp *TestPlugin) FindSnapshot(tags *map[string]string) (*crdv1.VolumeSnapsh
 
 func (tp *TestPlugin) VolumeDelete(pv *v1.PersistentVolume) error {
 	return nil
-}
-
-// Helper functions
-type roundTripperFunc func(*http.Request) (*http.Response, error)
-
-func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
-	return f(req)
-}
-
-func dummyRoundTripper(req *http.Request) (*http.Response, error) {
-	return nil, nil
-}
-
-func objBody(obj runtime.Object) io.ReadCloser {
-	encodedObj, err := json.Marshal(obj)
-	if err == nil {
-		return ioutil.NopCloser(bytes.NewReader(encodedObj))
-	}
-	return ioutil.NopCloser(bytes.NewReader([]byte("")))
-
 }
 
 func fakeVolumeSnapshotDataList() *crdv1.VolumeSnapshotDataList {
@@ -244,29 +218,6 @@ func fakePVC() *v1.PersistentVolumeClaim {
 	}
 }
 
-// Prepare testing scheme and REST client that uses the roundTripper for http transport
-func fakeSchemeAndClient(roundTripper func(*http.Request) (*http.Response, error)) (*runtime.Scheme, *rest.RESTClient, error) {
-	scheme := runtime.NewScheme()
-	if err := crdv1.AddToScheme(scheme); err != nil {
-		return nil, nil, err
-	}
-	config := rest.Config{
-		APIPath: "/apis",
-		ContentConfig: rest.ContentConfig{
-			GroupVersion:         &crdv1.SchemeGroupVersion,
-			ContentType:          runtime.ContentTypeJSON,
-			NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: serializer.NewCodecFactory(scheme)},
-		},
-		Transport: roundTripperFunc(roundTripper),
-	}
-	client, err := rest.RESTClientFor(&config)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return scheme, client, nil
-}
-
 // Tests
 func Test_NewVolumeSnapshotter(t *testing.T) {
 	var tp *TestPlugin = &TestPlugin{}
@@ -274,12 +225,9 @@ func Test_NewVolumeSnapshotter(t *testing.T) {
 	clientset := fake.NewSimpleClientset()
 	asw := cache.NewActualStateOfWorld()
 	plugins := map[string]volume.Plugin{"hostPath": tp}
-	scheme, client, err := fakeSchemeAndClient(dummyRoundTripper)
-	if err != nil {
-		t.Errorf("Failed to create test client: %v", err)
-	}
+	snapshotclient := snapshotfake.NewSimpleClientset()
 
-	vs := NewVolumeSnapshotter(client, scheme, clientset, asw, &plugins)
+	vs := NewVolumeSnapshotter(snapshotclient, clientset, asw, &plugins)
 	if vs == nil {
 		t.Errorf("Test failed: could not create volume snapshotter")
 	}
@@ -291,20 +239,9 @@ func Test_getSnapshotDataFromSnapshotName(t *testing.T) {
 	clientset := fake.NewSimpleClientset()
 	asw := cache.NewActualStateOfWorld()
 	plugins := map[string]volume.Plugin{"hostPath": tp}
-	scheme, client, err := fakeSchemeAndClient(func(req *http.Request) (*http.Response, error) {
-		header := http.Header{}
-		header.Set("Content-Type", runtime.ContentTypeJSON)
-		return &http.Response{
-			StatusCode: http.StatusOK,
-			Header:     header,
-			Body:       objBody(fakeVolumeSnapshotDataList()),
-		}, nil
-	})
-	if err != nil {
-		t.Errorf("Failed to create test client: %v", err)
-	}
+	snapshotclient := snapshotfake.NewSimpleClientset()
 
-	vsObj := NewVolumeSnapshotter(client, scheme, clientset, asw, &plugins)
+	vsObj := NewVolumeSnapshotter(snapshotclient, clientset, asw, &plugins)
 	if vsObj == nil {
 		t.Errorf("Test failed: could not create volume snapshotter")
 	}
@@ -326,12 +263,9 @@ func Test_takeSnapshot(t *testing.T) {
 	clientset := fake.NewSimpleClientset()
 	asw := cache.NewActualStateOfWorld()
 	plugins := map[string]volume.Plugin{"hostPath": tp}
-	scheme, client, err := fakeSchemeAndClient(dummyRoundTripper)
-	if err != nil {
-		t.Errorf("Failed to create test client: %v", err)
-	}
+	snapshotclient := snapshotfake.NewSimpleClientset()
 
-	vsObj := NewVolumeSnapshotter(client, scheme, clientset, asw, &plugins)
+	vsObj := NewVolumeSnapshotter(snapshotclient, clientset, asw, &plugins)
 	if vsObj == nil {
 		t.Errorf("Test failed: could not create volume snapshotter")
 	}
@@ -342,7 +276,7 @@ func Test_takeSnapshot(t *testing.T) {
 		"tag1": "tag value 1",
 		"tag2": "tag value 2",
 	}
-	_, _, err = vs.takeSnapshot(pv, &tags)
+	_, _, err := vs.takeSnapshot(pv, &tags)
 	if err != nil {
 		t.Errorf("Test failed, unexpected error: %v", err)
 	}
@@ -363,19 +297,16 @@ func Test_deleteSnapshot(t *testing.T) {
 	clientset := fake.NewSimpleClientset()
 	asw := cache.NewActualStateOfWorld()
 	plugins := map[string]volume.Plugin{"hostPath": tp}
-	scheme, client, err := fakeSchemeAndClient(dummyRoundTripper)
-	if err != nil {
-		t.Errorf("Failed to create test client: %v", err)
-	}
+	snapshotclient := snapshotfake.NewSimpleClientset()
 
-	vsObj := NewVolumeSnapshotter(client, scheme, clientset, asw, &plugins)
+	vsObj := NewVolumeSnapshotter(snapshotclient, clientset, asw, &plugins)
 	if vsObj == nil {
 		t.Errorf("Test failed: could not create volume snapshotter")
 	}
 	vs := vsObj.(*volumeSnapshotter)
 
 	snapDataList := fakeVolumeSnapshotDataList()
-	err = vs.deleteSnapshot(&snapDataList.Items[0].Spec)
+	err := vs.deleteSnapshot(&snapDataList.Items[0].Spec)
 	if err != nil {
 		t.Errorf("Test failed, unexpected error: %v", err)
 	}
@@ -396,21 +327,9 @@ func Test_createSnapshotData(t *testing.T) {
 	clientset := fake.NewSimpleClientset(fakePVC(), fakePV())
 	asw := cache.NewActualStateOfWorld()
 	plugins := map[string]volume.Plugin{"hostPath": tp}
-	scheme, client, err := fakeSchemeAndClient(func(req *http.Request) (*http.Response, error) {
-		header := http.Header{}
-		header.Set("Content-Type", runtime.ContentTypeJSON)
-		retObj, _ := req.GetBody() // Just return the VolumeSnapshotData as is
-		return &http.Response{
-			StatusCode: http.StatusOK,
-			Header:     header,
-			Body:       retObj,
-		}, nil
-	})
-	if err != nil {
-		t.Errorf("Failed to create test client: %v", err)
-	}
+	snapshotclient := snapshotfake.NewSimpleClientset()
 
-	vsObj := NewVolumeSnapshotter(client, scheme, clientset, asw, &plugins)
+	vsObj := NewVolumeSnapshotter(snapshotclient, clientset, asw, &plugins)
 	if vsObj == nil {
 		t.Errorf("Test failed: could not create volume snapshotter")
 	}

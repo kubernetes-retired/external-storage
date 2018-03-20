@@ -24,11 +24,12 @@ import (
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	crdv1 "github.com/kubernetes-incubator/external-storage/snapshot/pkg/apis/volumesnapshot/v1"
-	crdclient "github.com/kubernetes-incubator/external-storage/snapshot/pkg/util"
+	snapshotclientset "github.com/kubernetes-incubator/external-storage/snapshot/pkg/client/clientset/versioned"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/cloudprovider"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/cloudprovider/providers/aws"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/cloudprovider/providers/gce"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/cloudprovider/providers/openstack"
+	crdclient "github.com/kubernetes-incubator/external-storage/snapshot/pkg/util"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume/awsebs"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume/cinder"
@@ -53,13 +54,13 @@ type snapshotProvisioner struct {
 	// Kubernetes Client.
 	client kubernetes.Interface
 	// CRD client
-	crdclient *rest.RESTClient
+	crdclient snapshotclientset.Interface
 	// Identity of this snapshotProvisioner, generated. Used to identify "this"
 	// provisioner's PVs.
 	identity string
 }
 
-func newSnapshotProvisioner(client kubernetes.Interface, crdclient *rest.RESTClient, id string) controller.Provisioner {
+func newSnapshotProvisioner(client kubernetes.Interface, crdclient snapshotclientset.Interface, id string) controller.Provisioner {
 	return &snapshotProvisioner{
 		client:    client,
 		crdclient: crdclient,
@@ -121,13 +122,7 @@ func (p *snapshotProvisioner) Provision(options controller.VolumeOptions) (*v1.P
 		return nil, fmt.Errorf("snapshot annotation not found on PV")
 	}
 
-	var snapshot crdv1.VolumeSnapshot
-	err := p.crdclient.Get().
-		Resource(crdv1.VolumeSnapshotResourcePlural).
-		Namespace(options.PVC.Namespace).
-		Name(snapshotName).
-		Do().Into(&snapshot)
-
+	snapshot, err := p.crdclient.VolumesnapshotV1().VolumeSnapshots(options.PVC.Namespace).Get(snapshotName, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve VolumeSnapshot %s: %v", snapshotName, err)
 	}
@@ -135,18 +130,14 @@ func (p *snapshotProvisioner) Provision(options controller.VolumeOptions) (*v1.P
 	if len(snapshot.Spec.SnapshotDataName) == 0 {
 		return nil, fmt.Errorf("VolumeSnapshot %s is not bound to any VolumeSnapshotData", snapshotName)
 	}
-	var snapshotData crdv1.VolumeSnapshotData
-	err = p.crdclient.Get().
-		Resource(crdv1.VolumeSnapshotDataResourcePlural).
-		Name(snapshot.Spec.SnapshotDataName).
-		Do().Into(&snapshotData)
 
+	snapshotData, err := p.crdclient.VolumesnapshotV1().VolumeSnapshotDatas().Get(snapshot.Spec.SnapshotDataName, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve VolumeSnapshotData %s: %v", snapshot.Spec.SnapshotDataName, err)
 	}
 	glog.V(3).Infof("restore from VolumeSnapshotData %s", snapshot.Spec.SnapshotDataName)
 
-	pvSrc, labels, err := p.snapshotRestore(snapshot.Spec.SnapshotDataName, snapshotData, options)
+	pvSrc, labels, err := p.snapshotRestore(snapshot.Spec.SnapshotDataName, *snapshotData, options)
 	if err != nil || pvSrc == nil {
 		return nil, fmt.Errorf("failed to create a PV from snapshot %s: %v", snapshotName, err)
 	}
@@ -248,7 +239,7 @@ func main() {
 	buildVolumePlugins()
 
 	// make a volumesnapshot client to list VolumeSnapshot
-	snapshotClient, _, err := crdclient.NewClient(config)
+	snapshotClient, err := snapshotclientset.NewForConfig(config)
 	if err != nil || snapshotClient == nil {
 		glog.Fatalf("Failed to make CRD client: %v", err)
 	}
