@@ -44,7 +44,6 @@ container: build quick-container
 .PHONY: container
 
 quick-container:
-	mv targetd iscsi-controller
 	docker build -t $(MUTABLE_IMAGE) .
 	docker tag $(MUTABLE_IMAGE) $(IMAGE)
 .PHONY: quick-container
