@@ -1,13 +1,24 @@
+os:
+  - osx
+  - linux
+
 language: go
 go:
   - 1.8.3
 services: docker
 
+go_import_path: github.com/kubernetes-incubator/external-storage
+
 env:
-  - TEST_SUITE=local-volume
-  - TEST_SUITE=everything-else
-  - TEST_SUITE=nfs ETCD_VER=v3.0.14 KUBE_VERSION=1.5.4
-  - TEST_SUITE=nfs ETCD_VER=v3.0.17 KUBE_VERSION=1.6.0
+  - TEST_SUITE=osx
+  - TEST_SUITE=linux-local-volume
+  - TEST_SUITE=linux-everything-else
+  - TEST_SUITE=linux-nfs ETCD_VER=v3.0.14 KUBE_VERSION=1.5.4
+  - TEST_SUITE=linux-nfs ETCD_VER=v3.0.17 KUBE_VERSION=1.6.0
+
+before_install:
+  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then ulimit -n 8192; fi
+  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then mkdir -p $GOPATH/bin; fi
 
 install: true
 
@@ -19,4 +30,4 @@ deploy:
     script: ./deploy.sh
     on:
       tags: true
-      condition: $TEST_SUITE = local-volume
+      condition: $TEST_SUITE = linux-local-volume
