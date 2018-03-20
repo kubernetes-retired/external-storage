@@ -51,8 +51,8 @@ container-quick:
 	cp _output/bin/snapshot-controller deploy/docker/controller
 	cp _output/bin/snapshot-provisioner deploy/docker/provisioner
 	# Copy the root CA certificates -- cloudproviders need them
-	cp -r --remove-destination deploy/ca-certificates/* deploy/docker/controller/
-	cp -r --remove-destination deploy/ca-certificates/* deploy/docker/provisioner/
+	cp -Rf deploy/ca-certificates/* deploy/docker/controller/.
+	cp -Rf deploy/ca-certificates/* deploy/docker/provisioner/.
 	docker build -t $(MUTABLE_IMAGE_CONTROLLER) deploy/docker/controller
 	docker tag $(MUTABLE_IMAGE_CONTROLLER) $(IMAGE_CONTROLLER)
 	docker build -t $(MUTABLE_IMAGE_PROVISIONER) deploy/docker/provisioner
