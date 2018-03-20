@@ -106,13 +106,13 @@ func objBody(obj runtime.Object) io.ReadCloser {
 
 func fakeVolumeSnapshotDataList() *crdv1.VolumeSnapshotDataList {
 	return &crdv1.VolumeSnapshotDataList{
-		Metadata: metav1.ListMeta{
+		ListMeta: metav1.ListMeta{
 			ResourceVersion: "",
 			SelfLink:        "",
 		},
 		Items: []crdv1.VolumeSnapshotData{
 			{
-				Metadata: metav1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:              "snapshotdata-test-1",
 					Namespace:         "",
 					CreationTimestamp: metav1.Time{},
@@ -143,7 +143,7 @@ func fakeVolumeSnapshotDataList() *crdv1.VolumeSnapshotDataList {
 				},
 			},
 			{
-				Metadata: metav1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:              "snapshotdata-test-2",
 					Namespace:         "",
 					CreationTimestamp: metav1.Time{},
@@ -179,13 +179,13 @@ func fakeVolumeSnapshotDataList() *crdv1.VolumeSnapshotDataList {
 
 func fakeVolumeSnapshotList() *crdv1.VolumeSnapshotList {
 	return &crdv1.VolumeSnapshotList{
-		Metadata: metav1.ListMeta{
+		ListMeta: metav1.ListMeta{
 			ResourceVersion: "",
 			SelfLink:        "",
 		},
 		Items: []crdv1.VolumeSnapshot{
 			{
-				Metadata: metav1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:              "snapshot-test-1",
 					Namespace:         "",
 					CreationTimestamp: metav1.Time{},
@@ -200,7 +200,7 @@ func fakeVolumeSnapshotList() *crdv1.VolumeSnapshotList {
 
 func fakeNewVolumeSnapshot() *crdv1.VolumeSnapshot {
 	return &crdv1.VolumeSnapshot{
-		Metadata: metav1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:              "new-snapshot-test-1",
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{},
@@ -315,7 +315,7 @@ func Test_getSnapshotDataFromSnapshotName(t *testing.T) {
 	if snapData == nil {
 		t.Errorf("Failure: did not find VolumeSnpshotData by VolumeSnapshot name")
 	}
-	if snapData.Metadata.Name != "snapshotdata-test-1" {
+	if snapData.ObjectMeta.Name != "snapshotdata-test-1" {
 		t.Errorf("Failure: found incorrect VolumeSnpshotData for VumeSnapshot")
 	}
 }
