@@ -24,7 +24,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	crdv1 "github.com/kubernetes-incubator/external-storage/snapshot/pkg/apis/crd/v1"
-	crdclient "github.com/kubernetes-incubator/external-storage/snapshot/pkg/client"
+	crdclient "github.com/kubernetes-incubator/external-storage/snapshot/pkg/util"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/cloudprovider"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/cloudprovider/providers/aws"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/cloudprovider/providers/gce"

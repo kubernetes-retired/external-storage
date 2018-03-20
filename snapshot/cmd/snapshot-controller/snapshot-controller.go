@@ -29,7 +29,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
-	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/client"
+	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/util"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/cloudprovider"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/cloudprovider/providers/aws"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/cloudprovider/providers/gce"
@@ -71,19 +71,19 @@ func main() {
 	}
 
 	// initialize CRD resource if it does not exist
-	err = client.CreateCRD(aeclientset)
+	err = util.CreateCRD(aeclientset)
 	if err != nil {
 		panic(err)
 	}
 
 	// make a new config for our extension's API group, using the first config as a baseline
-	snapshotClient, snapshotScheme, err := client.NewClient(config)
+	snapshotClient, snapshotScheme, err := util.NewClient(config)
 	if err != nil {
 		panic(err)
 	}
 
 	// wait until CRD gets processed
-	err = client.WaitForSnapshotResource(snapshotClient)
+	err = util.WaitForSnapshotResource(snapshotClient)
 	if err != nil {
 		panic(err)
 	}
