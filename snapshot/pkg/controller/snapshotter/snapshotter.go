@@ -28,12 +28,12 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	snapshotclientset "github.com/kubernetes-incubator/external-storage/snapshot/pkg/client/clientset/versioned"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
-	snapshotclientset "github.com/kubernetes-incubator/external-storage/snapshot/pkg/client/clientset/versioned"
 )
 
 const (

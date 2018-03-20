@@ -32,10 +32,10 @@ import (
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/controller/snapshotter"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume"
 
-	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/controller/populator"
 	snapshotclientset "github.com/kubernetes-incubator/external-storage/snapshot/pkg/client/clientset/versioned"
 	informers "github.com/kubernetes-incubator/external-storage/snapshot/pkg/client/informers/externalversions"
 	listers "github.com/kubernetes-incubator/external-storage/snapshot/pkg/client/listers/volumesnapshot/v1"
+	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/controller/populator"
 )
 
 const (
@@ -106,10 +106,10 @@ func NewSnapshotController(client snapshotclientset.Interface,
 
 	snapshotInformer.Informer().AddEventHandlerWithResyncPeriod(
 		kcache.ResourceEventHandlerFuncs{
-		AddFunc:    sc.onSnapshotAdd,
-		UpdateFunc: sc.onSnapshotUpdate,
-		DeleteFunc: sc.onSnapshotDelete,
-	}, time.Minute*60)
+			AddFunc:    sc.onSnapshotAdd,
+			UpdateFunc: sc.onSnapshotUpdate,
+			DeleteFunc: sc.onSnapshotDelete,
+		}, time.Minute*60)
 
 	//eventBroadcaster := record.NewBroadcaster()
 	//eventBroadcaster.StartLogging(glog.Infof)

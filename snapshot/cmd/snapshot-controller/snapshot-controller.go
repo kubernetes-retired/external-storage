@@ -29,12 +29,14 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
-	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/util"
+	snapshotclientset "github.com/kubernetes-incubator/external-storage/snapshot/pkg/client/clientset/versioned"
+	informers "github.com/kubernetes-incubator/external-storage/snapshot/pkg/client/informers/externalversions"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/cloudprovider"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/cloudprovider/providers/aws"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/cloudprovider/providers/gce"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/cloudprovider/providers/openstack"
 	snapshotcontroller "github.com/kubernetes-incubator/external-storage/snapshot/pkg/controller/snapshot-controller"
+	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/util"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume/awsebs"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume/cinder"
@@ -42,8 +44,6 @@ import (
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume/gluster"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume/hostpath"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	snapshotclientset "github.com/kubernetes-incubator/external-storage/snapshot/pkg/client/clientset/versioned"
-	informers "github.com/kubernetes-incubator/external-storage/snapshot/pkg/client/informers/externalversions"
 )
 
 const (
@@ -100,7 +100,6 @@ func main() {
 	// start controller on instances of our CRD
 	glog.Infof("starting snapshot controller")
 	ssController := snapshotcontroller.NewSnapshotController(snapshotClient, snapshotInformerFactory, clientset, &volumePlugins, defaultSyncDuration)
-
 
 	go ssController.Run(stopCh)
 
