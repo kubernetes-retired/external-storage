@@ -32,17 +32,21 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 const (
-	provisionerName                    = "kubernetes.io/manila"
+	provisionerName                    = "externalstorage.k8s.io/manila"
 	minimumSupportedManilaMicroversion = "2.21"
 )
 
 type manilaProvisioner struct {
 }
 
-var _ controller.Provisioner = &manilaProvisioner{}
+var (
+	_          controller.Provisioner = &manilaProvisioner{}
+	kubeconfig                        = flag.String("kubeconfig", "", "Path to a kube config. Only required if out-of-cluster.")
+)
 
 func main() {
 	flag.Parse()
@@ -50,7 +54,7 @@ func main() {
 
 	// Create an InClusterConfig and use it to create a client for the controller
 	// to use to communicate with Kubernetes
-	config, err := rest.InClusterConfig()
+	config, err := buildConfig(*kubeconfig)
 	if err != nil {
 		glog.Fatalf("Failed to create config: %v", err)
 	}
@@ -75,6 +79,13 @@ func main() {
 	)
 
 	provisioner.Run(wait.NeverStop)
+}
+
+func buildConfig(kubeconfig string) (*rest.Config, error) {
+	if kubeconfig != "" {
+		return clientcmd.BuildConfigFromFlags("", kubeconfig)
+	}
+	return rest.InClusterConfig()
 }
 
 // Provision creates a new Manila share and returns a PV object representing it.
