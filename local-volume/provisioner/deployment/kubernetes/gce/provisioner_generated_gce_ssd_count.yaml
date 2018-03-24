@@ -30,7 +30,7 @@ spec:
     spec:
       serviceAccountName: local-storage-admin
       containers:
-        - image: "quay.io/external_storage/local-volume-provisioner:v2.0.0"
+        - image: "quay.io/external_storage/local-volume-provisioner:v2.1.0"
           imagePullPolicy: "Always"
           name: provisioner 
           securityContext:
