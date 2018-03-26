@@ -1,5 +1,11 @@
+# [v2.1.0](https://github.com/kubernetes-incubator/external-storage/releases/tag/local-volume-provisioner-v2.1.0)
+The following changes require Kubernetes 1.10 or higher.
+* Add block volumeMode discovery and cleanup.
+* **Important:** PV.NodeAffinity field is used by default. If running against an older K8s version,
+  the `useAlphaAPI` flag must be set in the configMap.
+
 # [v2.0.0](https://github.com/kubernetes-incubator/external-storage/releases/tag/local-volume-provisioner-v2.0.0)
-This version is incompatible and has breaking changes with v1!
+**Important:** This version is incompatible and has breaking changes with v1!
 * Remove default config, a configmap is now required.
 * Configmap data is changed from json to yaml syntax.
 * All local volumes must be mount points.  For directory-based volumes, a
