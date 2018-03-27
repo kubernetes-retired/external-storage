@@ -43,3 +43,22 @@ The generated specs can be further customized as needed (usually not necessary),
 
 Default values.yaml is located in local-volume/helm/provisioner folder, user should not remove variables from this file but can
 change any values of these variables.
+
+## Advanced options
+
+### Set engine
+In order to generate the environment specific provisioner's spec, **--set engine={gcepre19,gcepost19,gke,baremetal}** parameter
+can be used in helm template command. Example for GKE environment, the command line will look like:
+
+``` console
+helm template ./helm/provisioner --set engine=gke > ./provisioner/deployment/kubernetes/provisioner_generated.yaml
+```
+Parameter **--set engine=** can be used in conjunction with custom values.yaml file in the same command line.
+
+### Generating RBAC (Role Based Access Control) specs
+By default, common.rbac is set to "true" which generates the necessary ServiceAccount, ClusterRole, and ClusterRoleBinding
+for an RBAC enabled kubernetes cluster. If your cluster does not use RBAC, you should add --set common.rbac=false when
+running your helm install command, such as:
+
+``` console
+helm template ./helm/provisioner --set common.rbac=false > ./provisioner/deployment/kubernetes/provisioner_generated.yaml
