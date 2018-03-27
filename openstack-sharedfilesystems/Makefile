@@ -21,7 +21,9 @@ endif
 IMAGE = $(REGISTRY)manila-provisioner:$(VERSION)
 MUTABLE_IMAGE = $(REGISTRY)manila-provisioner:latest
 
-all build:
+all: manila-provisioner
+
+build:
 	@mkdir -p .go/src/github.com/kubernetes-incubator/external-storage/openstack-sharedfilesystems/vendor
 	@mkdir -p .go/bin
 	@mkdir -p .go/stdlib
@@ -39,6 +41,10 @@ all build:
 		golang:1.8.3-alpine \
 		go install -installsuffix "asdf" ./cmd/manila-provisioner
 .PHONY: all build
+
+manila-provisioner:
+	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o _output/bin/manila-provisioner cmd/manila-provisioner/main.go
+.PHONY: manila-provisioner
 
 container: build quick-container
 .PHONY: container
@@ -58,6 +64,7 @@ test:
 .PHONY: test
 
 clean:
-	rm -rf .go
-	rm -f manila-provisioner
+	-rm -rf .go
+	-rm -f manila-provisioner
+	-rm -rf _output
 .PHONY: clean
