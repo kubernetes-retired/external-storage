@@ -1,0 +1,22 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: local-volume-updater
+  labels:
+    app: local-volume-updater
+spec:
+  backoffLimit: 5
+  template:
+    spec:
+      serviceAccountName: local-storage-update
+      restartPolicy: Never
+      containers:
+      - name: updater
+        image: quay.io/external_storage/local-volume-update-pv-to-beta:latest
+        env:
+        # If you want provisioner to use a kubeconfig file to access API server, instead of the default
+              #  in-cluster config, then specify the following environment variable:
+              # - name: KUBECONFIG
+              #   value: /path/to/kubeconfig
+      # this is just a short-term workaround, need to set restartPolicy to "OnFailure" when kubernetes repo #58972 get merged
+      restartPolicy: Never
