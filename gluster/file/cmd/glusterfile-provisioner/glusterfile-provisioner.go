@@ -146,7 +146,8 @@ func (p *glusterfileProvisioner) Provision(options controller.VolumeOptions) (*v
 	glog.V(4).Infof("creating volume with configuration %+v", *cfg)
 
 	modeAnn := "url:" + cfg.url + "," + "user:" + cfg.user + "," + "secret:" + cfg.secretName + "," + "secretnamespace:" + cfg.secretNamespace
-	glog.V(1).Infof("Allocated GID %d for PVC %s", gid, options.PVC.Name)
+	glog.V(1).Infof("Allocated GID %d for PVC %s", *gid, options.PVC.Name)
+
 	gidStr := strconv.FormatInt(int64(*gid), 10)
 
 	volSize := options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
@@ -158,7 +159,7 @@ func (p *glusterfileProvisioner) Provision(options controller.VolumeOptions) (*v
 		glog.Errorf("failed to create volume: %v", err)
 		return nil, fmt.Errorf("failed to create volume: %v", err)
 	}
-
+	mode := v1.PersistentVolumeFilesystem
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: options.PVName,
@@ -174,6 +175,7 @@ func (p *glusterfileProvisioner) Provision(options controller.VolumeOptions) (*v
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: options.PersistentVolumeReclaimPolicy,
 			AccessModes:                   options.PVC.Spec.AccessModes,
+			VolumeMode:                    &mode,
 			Capacity: v1.ResourceList{
 				v1.ResourceName(v1.ResourceStorage): options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)],
 			},
@@ -595,9 +597,9 @@ func (p *glusterfileProvisioner) parseClassParameters(params map[string]string, 
 			cfg.user = v
 		case "restuserkey":
 			cfg.userKey = v
-		case "secretname":
+		case "restsecretname":
 			cfg.secretName = v
-		case "secretnamespace":
+		case "restsecretnamespace":
 			cfg.secretNamespace = v
 		case "clusterid":
 			if len(v) != 0 {
