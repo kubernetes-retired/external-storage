@@ -32,9 +32,9 @@ fi
 validateBlockDevice
 
 echo "Calling mkfs"
-mkfs -F $LOCAL_PV_BLKDEVICE
+ionice -c 3 mkfs -F $LOCAL_PV_BLKDEVICE
 
 echo "Calling wipefs"
-wipefs -a $LOCAL_PV_BLKDEVICE
+ionice -c 3 wipefs -a $LOCAL_PV_BLKDEVICE
 
 echo "Quick reset completed"
