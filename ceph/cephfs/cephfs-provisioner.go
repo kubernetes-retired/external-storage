@@ -116,13 +116,15 @@ func (p *cephFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 	if err != nil {
 		return nil, err
 	}
+	capacity := options.PVC.Spec.Resources.Requests[v1.ResourceStorage]
+	volumeSize := capacity.Value()
 	// create random share name
 	share := fmt.Sprintf("kubernetes-dynamic-pvc-%s", uuid.NewUUID())
 	// create random user id
 	user := fmt.Sprintf("kubernetes-dynamic-user-%s", uuid.NewUUID())
 	// provision share
 	// create cmd
-	cmd := exec.Command(provisionCmd, "-n", share, "-u", user)
+	cmd := exec.Command(provisionCmd, "-n", share, "-u", user, "-s", fmt.Sprintf("%d", volumeSize))
 	// set env
 	cmd.Env = []string{
 		"CEPH_CLUSTER_NAME=" + cluster,

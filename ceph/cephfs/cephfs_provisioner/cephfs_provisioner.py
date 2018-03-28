@@ -297,14 +297,17 @@ class CephFSNativeDriver(object):
             self._volume_client = None
 
 def main():
+    usage = "Usage: " + sys.argv[0] + " --remove -n share_name -u ceph_user_id -s volume_size"
+
     create = True
     share = ""
     user = ""
+    size = None
     cephfs = CephFSNativeDriver()
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "rn:u:", ["remove"])
+        opts, args = getopt.getopt(sys.argv[1:], "rn:u:s:", ["remove", "size"])
     except getopt.GetoptError:
-        print "Usage: " + sys.argv[0] + " --remove -n share_name -u ceph_user_id"
+        print usage
         sys.exit(1)
 
     for opt, arg in opts:
@@ -314,13 +317,15 @@ def main():
             user = arg
         elif opt in ("-r", "--remove"):
             create = False
+        elif opt in ("-s", "--size"):
+            size = arg
 
     if share == "" or user == "":
-        print "Usage: " + sys.argv[0] + " --remove -n share_name -u ceph_user_id"
+        print usage
         sys.exit(1)
 
     if create == True:
-        print cephfs.create_share(share, user)    
+        print cephfs.create_share(share, user, size)
     else:
         cephfs.delete_share(share, user)    
         
