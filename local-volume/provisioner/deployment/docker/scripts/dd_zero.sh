@@ -31,7 +31,7 @@ fi
 
 function doZero {
   # Fill device with zeros
-  cmdOut=$(dd if=/dev/zero of=$LOCAL_PV_BLKDEVICE bs=8096 2>&1 | tee /dev/stderr)
+  cmdOut=$(ionice -c 3 dd if=/dev/zero of=$LOCAL_PV_BLKDEVICE bs=8096 2>&1 | tee /dev/stderr)
   if [[ $cmdOut !=  *"No space left on device"* ]]; then
       errorExit "Failed to find expected output from dd"
   fi
