@@ -22,7 +22,7 @@ set -o pipefail
 CURR_DIR="$(pwd)"
 
 # Unit tests in */nfs/test/e2e/* are blacklisted because they need packages that are not in the vendor/ directory
-for UNITTEST in $(find . -name '*_test.go' -a -not -path '*/nfs/test/e2e/*' -prune -a -not -path '*/vendor/*' -prune)
+for UNITTEST in $(find . -name '*_test.go' -a -not -path '*/nfs/test/e2e/*' -prune -not -path '*/openebs/pkg/v1/*' -prune -a -not -path '*/vendor/*' -prune)
 do
   UNITTEST_DIR="$(dirname ${UNITTEST})"
   cd "${UNITTEST_DIR}"
