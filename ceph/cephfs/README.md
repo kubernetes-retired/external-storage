@@ -22,12 +22,11 @@ make push
 
 See https://kubernetes.io/.
 
-* Create a Ceph admin secret
+* Import the Ceph admin secret to Kubernetes
 
 ```bash
-ceph auth get client.admin 2>&1 |grep "key = " |awk '{print  $3'} |xargs echo -n > /tmp/secret
 kubectl create ns cephfs
-kubectl create secret generic ceph-secret-admin --from-file=/tmp/secret --namespace=cephfs
+kubectl create secret generic ceph-secret-admin --from-literal=secret="$(ceph auth get-key client.admin)" --namespace=cephfs
 ```
 
 * Start CephFS provisioner
