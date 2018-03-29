@@ -42,7 +42,12 @@ class CephFSNativeDriver(object):
 
     def __init__(self, *args, **kwargs):
         self._volume_client = None
-
+        try:
+            (self.volume_prefix, self.volume_group) = os.path.split(os.environ['CEPH_VOLUME_ROOT'])
+        except KeyError:
+            # Default volume_prefix to None; the CephFSVolumeClient constructor uses a ternary operator on the input argument to default it to /volumes
+            self.volume_prefix = None
+            self.volume_group = VOlUME_GROUP
 
     def _create_conf(self, cluster_name, mons):
         """ Create conf using monitors
@@ -99,7 +104,7 @@ class CephFSNativeDriver(object):
         self._create_keyring(cluster_name, auth_id, auth_key)
 
         self._volume_client = ceph_volume_client.CephFSVolumeClient(
-            auth_id, conf_path, cluster_name)
+            auth_id, conf_path, cluster_name, volume_prefix = self.volume_prefix)
         try:
             self._volume_client.connect(None)
         except Exception:
@@ -202,7 +207,7 @@ class CephFSNativeDriver(object):
     def create_share(self, path, user_id, size=None):
         """Create a CephFS volume.
         """
-        volume_path = ceph_volume_client.VolumePath(VOlUME_GROUP, path)
+        volume_path = ceph_volume_client.VolumePath(self.volume_group, path)
 
         # Create the CephFS volume
         volume = self.volume_client.create_volume(volume_path, size=size)
@@ -286,7 +291,7 @@ class CephFSNativeDriver(object):
             return
 
     def delete_share(self, path, user_id):
-        volume_path = ceph_volume_client.VolumePath(VOlUME_GROUP, path)
+        volume_path = ceph_volume_client.VolumePath(self.volume_group, path)
         self._deauthorize(volume_path, user_id)
         self.volume_client.delete_volume(volume_path)
         self.volume_client.purge_volume(volume_path)
