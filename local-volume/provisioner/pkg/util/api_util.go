@@ -21,6 +21,7 @@ import (
 
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/cache"
 
+	batch_v1 "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,6 +35,12 @@ type APIUtil interface {
 
 	// Delete PersistentVolume object
 	DeletePV(pvName string) error
+
+	// CreateJob Creates a Job execution.
+	CreateJob(job *batch_v1.Job) error
+
+	// DeleteJob deletes specified Job by its name and namespace.
+	DeleteJob(jobName string, namespace string) error
 }
 
 var _ APIUtil = &apiUtil{}
@@ -57,23 +64,44 @@ func (u *apiUtil) DeletePV(pvName string) error {
 	return u.client.CoreV1().PersistentVolumes().Delete(pvName, &metav1.DeleteOptions{})
 }
 
+func (u *apiUtil) CreateJob(job *batch_v1.Job) error {
+	_, err := u.client.BatchV1().Jobs(job.Namespace).Create(job)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (u *apiUtil) DeleteJob(jobName string, namespace string) error {
+	deleteProp := metav1.DeletePropagationForeground
+	if err := u.client.BatchV1().Jobs(namespace).Delete(jobName, &metav1.DeleteOptions{PropagationPolicy: &deleteProp}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 var _ APIUtil = &FakeAPIUtil{}
 
 // FakeAPIUtil is a fake API wrapper for unit testing
 type FakeAPIUtil struct {
-	createdPVs map[string]*v1.PersistentVolume
-	deletedPVs map[string]*v1.PersistentVolume
-	shouldFail bool
-	cache      *cache.VolumeCache
+	createdPVs  map[string]*v1.PersistentVolume
+	deletedPVs  map[string]*v1.PersistentVolume
+	CreatedJobs map[string]*batch_v1.Job
+	DeletedJobs map[string]string
+	shouldFail  bool
+	cache       *cache.VolumeCache
 }
 
 // NewFakeAPIUtil returns an APIUtil object that can be used for unit testing
 func NewFakeAPIUtil(shouldFail bool, cache *cache.VolumeCache) *FakeAPIUtil {
 	return &FakeAPIUtil{
-		createdPVs: map[string]*v1.PersistentVolume{},
-		deletedPVs: map[string]*v1.PersistentVolume{},
-		shouldFail: shouldFail,
-		cache:      cache,
+		createdPVs:  map[string]*v1.PersistentVolume{},
+		deletedPVs:  map[string]*v1.PersistentVolume{},
+		CreatedJobs: map[string]*batch_v1.Job{},
+		DeletedJobs: map[string]string{},
+		shouldFail:  shouldFail,
+		cache:       cache,
 	}
 }
 
@@ -118,4 +146,16 @@ func (u *FakeAPIUtil) GetAndResetDeletedPVs() map[string]*v1.PersistentVolume {
 	deletedPVs := u.deletedPVs
 	u.deletedPVs = map[string]*v1.PersistentVolume{}
 	return deletedPVs
+}
+
+// CreateJob mocks job create method.
+func (u *FakeAPIUtil) CreateJob(job *batch_v1.Job) error {
+	u.CreatedJobs[job.Namespace+"/"+job.Name] = job
+	return nil
+}
+
+// DeleteJob mocks delete jon method.
+func (u *FakeAPIUtil) DeleteJob(jobName string, namespace string) error {
+	u.DeletedJobs[namespace+"/"+jobName] = jobName
+	return nil
 }

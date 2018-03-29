@@ -61,13 +61,27 @@ func StartLocalController(client *kubernetes.Clientset, config *common.UserConfi
 	populator := populator.NewPopulator(runtimeConfig)
 	populator.Start()
 
-	ptable := deleter.NewProcTable()
-	discoverer, err := discovery.NewDiscoverer(runtimeConfig, ptable)
+	var jobController deleter.JobController
+	var err error
+	if runtimeConfig.UseJobForCleaning {
+		stopCh := make(chan struct{})
+
+		labels := map[string]string{common.NodeNameLabel: config.Node.Name}
+		jobController, err = deleter.NewJobController(client, runtimeConfig.Namespace, labels, runtimeConfig)
+		if err != nil {
+			glog.Fatalf("Error starting jobController: %v", err)
+		}
+		go jobController.Run(stopCh)
+		glog.Infof("Enabling Jobs based cleaning.")
+	}
+	cleanupTracker := &deleter.CleanupStatusTracker{ProcTable: deleter.NewProcTable(), JobController: jobController}
+
+	discoverer, err := discovery.NewDiscoverer(runtimeConfig, cleanupTracker)
 	if err != nil {
 		glog.Fatalf("Error starting discoverer: %v", err)
 	}
 
-	deleter := deleter.NewDeleter(runtimeConfig, ptable)
+	deleter := deleter.NewDeleter(runtimeConfig, cleanupTracker)
 
 	glog.Info("Controller started\n")
 	for {
