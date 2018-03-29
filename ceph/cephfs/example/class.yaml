@@ -7,5 +7,5 @@ parameters:
     monitors: 172.24.0.6:6789
     adminId: admin
     adminSecretName: ceph-secret-admin
-    adminSecretNamespace: "kube-system"
+    adminSecretNamespace: "cephfs"
 
