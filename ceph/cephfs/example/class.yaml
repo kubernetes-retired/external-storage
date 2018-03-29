@@ -8,4 +8,5 @@ parameters:
     adminId: admin
     adminSecretName: ceph-secret-admin
     adminSecretNamespace: "kube-system"
+    claimRoot: /volumes/kubernetes
 
