@@ -64,15 +64,15 @@ func (e *IgnoredError) Error() string {
 // https://github.com/kubernetes/kubernetes/blob/release-1.4/pkg/volume/plugins.go
 type VolumeOptions struct {
 	// Reclamation policy for a persistent volume
-	PersistentVolumeReclaimPolicy v1.PersistentVolumeReclaimPolicy
+	PersistentVolumeReclaimPolicy v1.PersistentVolumeReclaimPolicy `json:"reclaimPolicy,omitempty"`
 	// PV.Name of the appropriate PersistentVolume. Used to generate cloud
 	// volume name.
-	PVName string
+	PVName string `json:"name,omitempty"`
 	// PVC is reference to the claim that lead to provisioning of a new PV.
 	// Provisioners *must* create a PV that would be matched by this PVC,
 	// i.e. with required capacity, accessMode, labels matching PVC.Selector and
 	// so on.
-	PVC *v1.PersistentVolumeClaim
+	PVC *v1.PersistentVolumeClaim `json:"volumeClaim,omitempty"`
 	// Volume provisioning parameters from StorageClass
-	Parameters map[string]string
+	Parameters map[string]string `json:"parameters,omitempty"`
 }

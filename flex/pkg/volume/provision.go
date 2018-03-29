@@ -20,7 +20,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	"k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/utils/exec"
@@ -65,54 +64,52 @@ var _ controller.Provisioner = &flexProvisioner{}
 // Provision creates a volume i.e. the storage asset and returns a PV object for
 // the volume.
 func (p *flexProvisioner) Provision(options controller.VolumeOptions) (*v1.PersistentVolume, error) {
-	err := p.createVolume(options)
+	driverStatus, err := p.createVolume(&options)
 	if err != nil {
 		return nil, err
 	}
 
-	annotations := make(map[string]string)
-	annotations[annCreatedBy] = createdBy
-
-	annotations[annProvisionerID] = string(p.identity)
-	/*
-		This PV won't work since there's nothing backing it.  the flex script
-		is in flex/flex/flex  (that many layers are required for the flex volume plugin)
-	*/
-	pv := &v1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        options.PVName,
-			Labels:      map[string]string{},
-			Annotations: annotations,
-		},
-		Spec: v1.PersistentVolumeSpec{
-			PersistentVolumeReclaimPolicy: options.PersistentVolumeReclaimPolicy,
-			AccessModes:                   options.PVC.Spec.AccessModes,
-			Capacity: v1.ResourceList{
-				v1.ResourceName(v1.ResourceStorage): options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)],
-			},
-			PersistentVolumeSource: v1.PersistentVolumeSource{
-				FlexVolume: &v1.FlexPersistentVolumeSource{
-					Driver:   "flex",
-					Options:  map[string]string{},
-					ReadOnly: false,
-				},
-			},
-		},
+	if driverStatus.Volume.Name == "" {
+		driverStatus.Volume.Name = options.PVName
 	}
 
-	return pv, nil
+	driverStatus.Volume.Annotations[annCreatedBy] = createdBy
+	driverStatus.Volume.Annotations[annProvisionerID] = string(p.identity)
+
+	spec := &driverStatus.Volume.Spec
+	spec.PersistentVolumeReclaimPolicy = options.PersistentVolumeReclaimPolicy
+	spec.AccessModes = options.PVC.Spec.AccessModes
+	spec.Capacity = v1.ResourceList{
+		v1.ResourceName(v1.ResourceStorage): options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)],
+	}
+	if spec.PersistentVolumeSource.Size() == 0 {
+		// no one assigned a volume to it, so lets assign our own flex
+
+		/*
+			This PV won't work since there's nothing backing it.  the flex script
+			is in flex/flex/flex  (that many layers are required for the flex volume plugin)
+		*/
+		spec.PersistentVolumeSource.FlexVolume = &v1.FlexPersistentVolumeSource{
+			Driver:   "flex",
+			Options:  map[string]string{},
+			ReadOnly: false,
+		}
+
+	}
+	if driverStatus.Volume.Spec.PersistentVolumeSource.FlexVolume != nil && driverStatus.Volume.Spec.PersistentVolumeSource.FlexVolume.Options == nil {
+		driverStatus.Volume.Spec.PersistentVolumeSource.FlexVolume.Options = map[string]string{}
+	}
+
+	return &driverStatus.Volume, nil
 }
 
-func (p *flexProvisioner) createVolume(volumeOptions controller.VolumeOptions) error {
-	extraOptions := map[string]string{}
-	extraOptions[optionPVorVolumeName] = volumeOptions.PVName
-
+func (p *flexProvisioner) createVolume(volumeOptions *controller.VolumeOptions) (*DriverStatus, error) {
 	call := p.NewDriverCall(p.execCommand, provisionCmd)
-	call.AppendSpec(volumeOptions.Parameters, extraOptions)
+	call.AppendSpec(*volumeOptions)
 	output, err := call.Run()
 	if err != nil {
 		glog.Errorf("Failed to create volume %s, output: %s, error: %s", volumeOptions, output.Message, err.Error())
-		return err
+		return nil, err
 	}
-	return nil
+	return output, nil
 }

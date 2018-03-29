@@ -20,8 +20,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/golang/glog"
 	"time"
+
+	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -74,13 +77,8 @@ func (dc *DriverCall) Append(arg string) {
 }
 
 //AppendSpec add all option parameters to DriverCall
-func (dc *DriverCall) AppendSpec(volumeOptions, extraOptions map[string]string) error {
-	optionsForDriver, err := NewOptionsForDriver(volumeOptions, extraOptions)
-	if err != nil {
-		return err
-	}
-
-	jsonBytes, err := json.Marshal(optionsForDriver)
+func (dc *DriverCall) AppendSpec(options interface{}) error {
+	jsonBytes, err := json.Marshal(options)
 	if err != nil {
 		return fmt.Errorf("Failed to marshal spec, error: %s", err.Error())
 	}
@@ -125,63 +123,26 @@ func (dc *DriverCall) Run() (*DriverStatus, error) {
 	return status, nil
 }
 
-// OptionsForDriver represents the spec given to the driver.
-type OptionsForDriver map[string]string
-
-// NewOptionsForDriver assemble all option parameters
-func NewOptionsForDriver(volumeOptions, extraOptions map[string]string) (OptionsForDriver, error) {
-	options := map[string]string{}
-
-	for key, value := range extraOptions {
-		options[key] = value
-	}
-
-	for key, value := range volumeOptions {
-		options[key] = value
-	}
-
-	return OptionsForDriver(options), nil
-}
-
 // DriverStatus represents the return value of the driver callout.
 type DriverStatus struct {
 	// Status of the callout. One of "Success", "Failure" or "Not supported".
 	Status string `json:"status"`
 	// Reason for success/failure.
 	Message string `json:"message,omitempty"`
-	// Path to the device attached. This field is valid only for attach calls.
-	// ie: /dev/sdx
-	DevicePath string `json:"device,omitempty"`
-	// Cluster wide unique name of the volume.
-	VolumeName string `json:"volumeName,omitempty"`
-	// Represents volume is attached on the node
-	Attached bool `json:"attached,omitempty"`
-	// Returns capabilities of the driver.
-	// By default we assume all the capabilities are supported.
-	// If the plugin does not support a capability, it can return false for that capability.
-	Capabilities *DriverCapabilities `json:",omitempty"`
-}
-
-//DriverCapabilities represents the result of init command.
-type DriverCapabilities struct {
-	Attach         bool `json:"attach"`
-	SELinuxRelabel bool `json:"selinuxRelabel"`
-}
-
-func defaultCapabilities() *DriverCapabilities {
-	return &DriverCapabilities{
-		Attach:         true,
-		SELinuxRelabel: true,
-	}
+	// volume object for kubernetes
+	Volume v1.PersistentVolume `json:"volume,omitempty"`
 }
 
 // handleCmdResponse processes the command output and returns the appropriate
 // error code or message.
 func handleCmdResponse(cmd string, output []byte) (*DriverStatus, error) {
-	status := DriverStatus{
-		Capabilities: defaultCapabilities(),
-	}
-	if err := json.Unmarshal(output, &status); err != nil {
+	status := &DriverStatus{
+		Volume: v1.PersistentVolume{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{},
+				Labels:      map[string]string{},
+			}}}
+	if err := json.Unmarshal(output, status); err != nil {
 		glog.Errorf("Failed to unmarshal output for command: %s, output: %q, error: %s", cmd, string(output), err.Error())
 		return nil, err
 	} else if status.Status == StatusNotSupported {
@@ -193,5 +154,5 @@ func handleCmdResponse(cmd string, output []byte) (*DriverStatus, error) {
 		return nil, fmt.Errorf("%s", errMsg)
 	}
 
-	return &status, nil
+	return status, nil
 }

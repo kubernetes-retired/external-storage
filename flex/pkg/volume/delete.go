@@ -37,7 +37,7 @@ func (p *flexProvisioner) Delete(volume *v1.PersistentVolume) error {
 	}
 
 	call := p.NewDriverCall(p.execCommand, deleteCmd)
-	call.AppendSpec(volume.Spec.FlexVolume.Options, nil)
+	call.AppendSpec(*volume)
 	output, err := call.Run()
 
 	if err != nil {
