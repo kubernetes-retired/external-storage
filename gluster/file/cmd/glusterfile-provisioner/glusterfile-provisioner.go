@@ -45,7 +45,7 @@ import (
 const (
 	provisionerName           = "gluster.org/glusterfile"
 	provisionerNameKey        = "PROVISIONER_NAME"
-	descAnn                   = "Gluster-external: Dynamically provisioned PV"
+	descAnn                   = "glusterfile: Dynamically provisioned PV"
 	restStr                   = "server"
 	dynamicEpSvcPrefix        = "glusterfile-dynamic-"
 	replicaCount              = 3
@@ -65,11 +65,11 @@ const (
 )
 
 type glusterfileProvisioner struct {
-	client   kubernetes.Interface
-	identity string
-	provisionerConfig
+	client    kubernetes.Interface
 	allocator gidallocator.Allocator
 	options   controller.VolumeOptions
+	identity  string
+	provisionerConfig
 }
 
 type provisionerConfig struct {
@@ -88,8 +88,8 @@ type provisionerConfig struct {
 	thinPoolSnapFactor float32
 }
 
-//NewglusterfileProvisioner create a new provisioner.
-func NewglusterfileProvisioner(client kubernetes.Interface, id string) controller.Provisioner {
+// NewGlusterfileProvisioner create a new provisioner.
+func NewGlusterfileProvisioner(client kubernetes.Interface, id string) controller.Provisioner {
 	return &glusterfileProvisioner{
 		client:    client,
 		identity:  id,
@@ -146,10 +146,10 @@ func (p *glusterfileProvisioner) Provision(options controller.VolumeOptions) (*v
 	}
 
 	if !util.AccessModesContainedInAll(p.GetAccessModes(), options.PVC.Spec.AccessModes) {
-		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", options.PVC.Spec.AccessModes, p.GetAccessModes())
+		return nil, fmt.Errorf("invalid AccessModes %v, only AccessModes %v are supported", options.PVC.Spec.AccessModes, p.GetAccessModes())
 	}
 
-	glog.V(1).Infof("VolumeOptions %v", options)
+	glog.V(1).Infof("VolumeOptions: %v", options)
 	p.options = options
 	gidAllocate := true
 	for k, v := range options.Parameters {
@@ -193,8 +193,7 @@ func (p *glusterfileProvisioner) Provision(options controller.VolumeOptions) (*v
 	gidStr := strconv.FormatInt(int64(*gid), 10)
 
 	volSize := options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-	volSizeBytes := volSize.Value()
-	volszInt := int(util.RoundUpToGiB(volSizeBytes))
+	volSizeGiB := int(util.RoundUpToGiB(volSize.Value()))
 
 	if smartclone && (options.PVC.Annotations[CloneRequestAnn] != "") {
 		if sourcePVCRef, ok := options.PVC.Annotations[CloneRequestAnn]; ok {
@@ -252,7 +251,7 @@ func (p *glusterfileProvisioner) Provision(options controller.VolumeOptions) (*v
 			glog.Errorf("annotating PVC %v failed: %v", options.PVC.Name, annotateErr)
 
 		}
-		glog.V(1).Infof("successfully created Gluster File volume %+v with size and volID", glusterfs, sizeGiB, volID)
+		glog.V(1).Infof("successfully created GlusterFS volume %+v with size %d and ID %s", glusterfs, sizeGiB, volID)
 	}
 
 	if glusterfs == nil {
@@ -326,22 +325,22 @@ func (p *glusterfileProvisioner) createVolumeClone(sourceVolID string, config *p
 func (p *glusterfileProvisioner) createVolumeSource(cli *gcli.Client, volInfo *gapi.VolumeInfoResponse) (*v1.GlusterfsVolumeSource, error) {
 	dynamicHostIps, err := getClusterNodes(cli, volInfo.Cluster)
 	if err != nil {
-		glog.Errorf("error [%v] when getting cluster nodes for volume %s", err, volInfo.Name)
-		return nil, fmt.Errorf("error [%v] when getting cluster nodes for volume %s", err, volInfo.Name)
+		glog.Errorf("error when getting cluster nodes for volume %s: %v", volInfo.Name, err)
+		return nil, fmt.Errorf("error when getting cluster nodes for volume %s: %v", volInfo.Name, err)
 	}
 
 	epServiceName := dynamicEpSvcPrefix + p.options.PVC.Name
 	epNamespace := p.options.PVC.Namespace
 	endpoint, service, err := p.createEndpointService(epNamespace, epServiceName, dynamicHostIps, p.options.PVC.Name)
 	if err != nil {
-		glog.Errorf("failed to create endpoint/service %v/%v: %v", epNamespace, epServiceName, err)
+		glog.Errorf("failed to create service %v/%v: %v", epNamespace, epServiceName, err)
 		deleteErr := cli.VolumeDelete(volInfo.Id)
 		if deleteErr != nil {
-			glog.Errorf("error when deleting the volume: %v, manual deletion required", deleteErr)
+			glog.Errorf("error when deleting the volume, manual deletion required: %v", deleteErr)
 		}
-		return nil, fmt.Errorf("failed to create endpoint/service %v/%v: %v", epNamespace, epServiceName, err)
+		return nil, fmt.Errorf("failed to create service %v/%v: %v", epNamespace, epServiceName, err)
 	}
-	glog.V(3).Infof("dynamic endpoint %v and service %v", endpoint, service)
+	glog.V(3).Infof("dynamic endpoint %v and service %v created", endpoint, service)
 
 	return &v1.GlusterfsVolumeSource{
 		EndpointsName: endpoint.Name,
@@ -367,10 +366,11 @@ func (p *glusterfileProvisioner) annotateClonedPVC(VolID string, pvc *v1.Persist
 }
 
 func (p *glusterfileProvisioner) CreateVolume(gid *int, config *provisionerConfig, sz int) (r *v1.GlusterfsVolumeSource, size int, volID string, err error) {
+
 	var clusterIDs []string
 	customVolumeName := ""
 
-	glog.V(2).Infof("create volume of size %dGiB and configuration %+v", sz, config)
+	glog.V(2).Infof("create volume of size %d GiB and configuration %+v", sz, config)
 
 	if config.url == "" {
 		glog.Errorf("REST server endpoint is empty")
@@ -385,7 +385,7 @@ func (p *glusterfileProvisioner) CreateVolume(gid *int, config *provisionerConfi
 
 	if config.clusterID != "" {
 		clusterIDs = dstrings.Split(config.clusterID, ",")
-		glog.V(4).Infof("provided clusterIDs %v", clusterIDs)
+		glog.V(4).Infof("provided clusterIDs: %v", clusterIDs)
 	}
 
 	if config.volumeNamePrefix != "" {
@@ -406,8 +406,8 @@ func (p *glusterfileProvisioner) CreateVolume(gid *int, config *provisionerConfi
 
 	volume, err := cli.VolumeCreate(volumeReq)
 	if err != nil {
-		glog.Errorf("failed to create gluster volume: %v", err)
-		return nil, 0, "", fmt.Errorf("failed to create gluster volume: %v", err)
+		glog.Errorf("error creating volume: %v", err)
+		return nil, 0, "", fmt.Errorf("error creating volume: %v", err)
 	}
 
 	glog.V(1).Infof("volume with size %d and name %s created", volume.Size, volume.Name)
@@ -416,7 +416,7 @@ func (p *glusterfileProvisioner) CreateVolume(gid *int, config *provisionerConfi
 
 	volSource, volErr := p.createVolumeSource(cli, volume)
 	if volErr != nil {
-		return nil, 0, "", fmt.Errorf("error [%v] when creating volume source  for volume %s", err, volume.Name)
+		return nil, 0, "", fmt.Errorf("error when creating volume source for volume %s: %v", volume.Name, err)
 	}
 
 	if volSource == nil {
@@ -433,11 +433,11 @@ func (p *glusterfileProvisioner) RequiresFSResize() bool {
 func (p *glusterfileProvisioner) ExpandVolumeDevice(spec *volume.Spec, newSize resource.Quantity, oldSize resource.Quantity) (resource.Quantity, error) {
 	pvSpec := spec.PersistentVolume.Spec
 	volumeName := pvSpec.Glusterfs.Path
-	glog.V(2).Infof("Request to expand volume: [%s]", volumeName)
+	glog.V(2).Infof("Request to expand volume: %s", volumeName)
 	volumeID, err := getVolumeID(spec.PersistentVolume, volumeName)
 
 	if err != nil {
-		return oldSize, fmt.Errorf("failed to get volumeID for volume [%s], err: %v", volumeName, err)
+		return oldSize, fmt.Errorf("failed to get volumeID for volume %s: %v", volumeName, err)
 	}
 
 	heketiModeArgs, credErr := p.getRESTCredentials(spec.PersistentVolume)
@@ -466,7 +466,7 @@ func (p *glusterfileProvisioner) ExpandVolumeDevice(spec *volume.Spec, newSize r
 	//Check the existing volume size
 	currentVolumeInfo, err := cli.VolumeInfo(volumeID)
 	if err != nil {
-		glog.Errorf("error when fetching details of volume[%s]: %v", volumeName, err)
+		glog.Errorf("error when fetching details of volume %s: %v", volumeName, err)
 		return oldSize, err
 	}
 
@@ -480,7 +480,7 @@ func (p *glusterfileProvisioner) ExpandVolumeDevice(spec *volume.Spec, newSize r
 	// Expand the volume
 	volumeInfoRes, err := cli.VolumeExpand(volumeID, volumeExpandReq)
 	if err != nil {
-		glog.Errorf("error when expanding the volume[%s]: %v", volumeName, err)
+		glog.Errorf("error when expanding the volume %s: %v", volumeName, err)
 		return oldSize, err
 	}
 
@@ -518,8 +518,8 @@ func (p *glusterfileProvisioner) createEndpointService(namespace string, epServi
 		err = nil
 	}
 	if err != nil {
-		glog.Errorf("failed to create endpoint: %v", err)
-		return nil, nil, fmt.Errorf("failed to create endpoint: %v", err)
+		glog.Errorf("error creating endpoint %s: %v", endpoint, err)
+		return nil, nil, fmt.Errorf("error creating endpoint %s: %v", endpoint, err)
 	}
 
 	service = &v1.Service{
@@ -539,13 +539,14 @@ func (p *glusterfileProvisioner) createEndpointService(namespace string, epServi
 		err = nil
 	}
 	if err != nil {
-		glog.Errorf("failed to create service: %v", err)
-		return nil, nil, fmt.Errorf("error creating service: %v", err)
+		glog.Errorf("failed to create service %s: %v", endpoint, err)
+		return nil, nil, fmt.Errorf("error creating service %s: %v", endpoint, err)
 	}
 	return endpoint, service, nil
 }
 
 func getClusterNodes(cli *gcli.Client, cluster string) (dynamicHostIps []string, err error) {
+
 	clusterinfo, err := cli.ClusterInfo(cluster)
 	if err != nil {
 		glog.Errorf("failed to get cluster details: %v", err)
@@ -556,15 +557,16 @@ func getClusterNodes(cli *gcli.Client, cluster string) (dynamicHostIps []string,
 	// of the cluster on which provisioned volume belongs to, as there can be multiple
 	// clusters.
 	for _, node := range clusterinfo.Nodes {
-		nodei, err := cli.NodeInfo(string(node))
+		nodeStr := string(node)
+		nodeInfo, err := cli.NodeInfo(nodeStr)
 		if err != nil {
-			glog.Errorf("failed to get host ipaddress: %v", err)
-			return nil, fmt.Errorf("failed to get host ipaddress: %v", err)
+			glog.Errorf("failed to get host %s IP address: %v", nodeStr, err)
+			return nil, fmt.Errorf("failed to get host %s IP address: %v", nodeStr, err)
 		}
-		ipaddr := dstrings.Join(nodei.NodeAddRequest.Hostnames.Storage, "")
+		ipaddr := dstrings.Join(nodeInfo.NodeAddRequest.Hostnames.Storage, "")
 		dynamicHostIps = append(dynamicHostIps, ipaddr)
 	}
-	glog.V(3).Infof("host list :%v", dynamicHostIps)
+	glog.V(3).Infof("host list: %v", dynamicHostIps)
 	if len(dynamicHostIps) == 0 {
 		glog.Errorf("no hosts found: %v", err)
 		return nil, fmt.Errorf("no hosts found: %v", err)
@@ -574,6 +576,7 @@ func getClusterNodes(cli *gcli.Client, cluster string) (dynamicHostIps []string,
 
 // getVolumeID returns volumeID from the PV or volumename.
 func getVolumeID(pv *v1.PersistentVolume, volumeName string) (string, error) {
+
 	volumeID := ""
 
 	// Get volID from pvspec if available, else fill it from volumename.
@@ -628,7 +631,7 @@ func (p *glusterfileProvisioner) getRESTCredentials(pv *v1.PersistentVolume) (ma
 
 func (p *glusterfileProvisioner) Delete(volume *v1.PersistentVolume) error {
 
-	glog.V(1).Infof("deleting volume, path %s", volume.Spec.Glusterfs.Path)
+	glog.V(1).Infof("deleting volume %s", volume.Spec.Glusterfs.Path)
 
 	err := p.allocator.Release(volume)
 	if err != nil {
@@ -655,12 +658,12 @@ func (p *glusterfileProvisioner) Delete(volume *v1.PersistentVolume) error {
 
 	deleteErr := cli.VolumeDelete(volumeID)
 	if deleteErr != nil {
-		glog.Errorf("error when deleting the volume:%v", deleteErr)
+		glog.Errorf("error when deleting the volume: %v", deleteErr)
 		return deleteErr
 	}
 	glog.V(2).Infof("volume %s deleted successfully", volumeName)
 
-	//Deleter takes endpoint and endpointnamespace from pv spec.
+	// Deleter takes endpoint and endpointnamespace from pv spec.
 	pvSpec := volume.Spec
 	var dynamicEndpoint, dynamicNamespace string
 	if pvSpec.ClaimRef == nil {
@@ -675,28 +678,28 @@ func (p *glusterfileProvisioner) Delete(volume *v1.PersistentVolume) error {
 	if pvSpec.Glusterfs.EndpointsName != "" {
 		dynamicEndpoint = pvSpec.Glusterfs.EndpointsName
 	}
-	glog.V(3).Infof("dynamic namespace and endpoint : %v/%v", dynamicNamespace, dynamicEndpoint)
+	glog.V(3).Infof("namespace/endpoint %v/%v", dynamicNamespace, dynamicEndpoint)
 	err = p.deleteEndpointService(dynamicNamespace, dynamicEndpoint)
 	if err != nil {
 		glog.Errorf("error when deleting endpoint/service: %v", err)
 	} else {
-		glog.V(1).Infof("endpoint: %v/%v is deleted successfully", dynamicNamespace, dynamicEndpoint)
+		glog.V(1).Infof("endpoint %v/%v was deleted successfully", dynamicNamespace, dynamicEndpoint)
 	}
 	return nil
-
 }
 
 func (p *glusterfileProvisioner) deleteEndpointService(namespace string, epServiceName string) (err error) {
+
 	kubeClient := p.client
 	if kubeClient == nil {
-		return fmt.Errorf("failed to get kube client when deleting endpoint service")
+		return fmt.Errorf("failed to get kube client when deleting endpoint")
 	}
 	err = kubeClient.CoreV1().Services(namespace).Delete(epServiceName, nil)
 	if err != nil {
-		glog.Errorf("error deleting service %s/%s: %v", namespace, epServiceName, err)
-		return fmt.Errorf("error deleting service %s/%s: %v", namespace, epServiceName, err)
+		glog.Errorf("error deleting endpoint %s/%s: %v", namespace, epServiceName, err)
+		return fmt.Errorf("error deleting endpoint %s/%s: %v", namespace, epServiceName, err)
 	}
-	glog.V(1).Infof("service/endpoint %s/%s deleted successfully", namespace, epServiceName)
+	glog.V(1).Infof("endpoint %s/%s deleted successfully", namespace, epServiceName)
 	return nil
 }
 
@@ -724,6 +727,7 @@ func parseSecret(namespace, secretName string, kubeClient kubernetes.Interface) 
 
 // GetSecretForPV locates secret by name and namespace, verifies the secret type, and returns secret map
 func GetSecretForPV(restSecretNamespace, restSecretName, volumePluginName string, kubeClient kubernetes.Interface) (map[string]string, error) {
+
 	secret := make(map[string]string)
 	if kubeClient == nil {
 		return secret, fmt.Errorf("Cannot get kube client")
@@ -756,6 +760,7 @@ func convertVolumeParam(volumeString string) (int, error) {
 
 // parseClassParameters parses StorageClass.Parameters
 func (p *glusterfileProvisioner) parseClassParameters(params map[string]string, kubeclient kubernetes.Interface) (*provisionerConfig, error) {
+
 	var cfg provisionerConfig
 	var err error
 
@@ -823,7 +828,7 @@ func (p *glusterfileProvisioner) parseClassParameters(params map[string]string, 
 			if len(parseVolumeTypeInfo) >= 2 {
 				newReplicaCount, convertErr := convertVolumeParam(parseVolumeTypeInfo[1])
 				if convertErr != nil {
-					return nil, fmt.Errorf("error %v when parsing value %q of option %s for volume plugin %s", convertErr, parseVolumeTypeInfo[1], "volumetype", provisionerName)
+					return nil, fmt.Errorf("error when parsing value %q of option %s for volume plugin %s: %v", parseVolumeTypeInfo[1], "volumetype", provisionerName, convertErr)
 				}
 				cfg.volumeType = gapi.VolumeDurabilityInfo{Type: gapi.DurabilityReplicate, Replicate: gapi.ReplicaDurability{Replica: newReplicaCount}}
 			} else {
@@ -833,11 +838,11 @@ func (p *glusterfileProvisioner) parseClassParameters(params map[string]string, 
 			if len(parseVolumeTypeInfo) >= 3 {
 				newDisperseData, convertErr := convertVolumeParam(parseVolumeTypeInfo[1])
 				if err != nil {
-					return nil, fmt.Errorf("error %v when parsing value %q of option %s for volume plugin %s", parseVolumeTypeInfo[1], convertErr, "volumetype", provisionerName)
+					return nil, fmt.Errorf("error when parsing value %q of option %s for volume plugin %s: %v", parseVolumeTypeInfo[1], "volumetype", provisionerName, convertErr)
 				}
 				newDisperseRedundancy, convertErr := convertVolumeParam(parseVolumeTypeInfo[2])
 				if err != nil {
-					return nil, fmt.Errorf("error %v when parsing value %q of option %s for volume plugin %s", convertErr, parseVolumeTypeInfo[2], "volumetype", provisionerName)
+					return nil, fmt.Errorf("error when parsing value %q of option %s for volume plugin %s: %v", parseVolumeTypeInfo[2], "volumetype", provisionerName, convertErr)
 				}
 				cfg.volumeType = gapi.VolumeDurabilityInfo{Type: gapi.DurabilityEC, Disperse: gapi.DisperseDurability{Data: newDisperseData, Redundancy: newDisperseRedundancy}}
 			} else {
@@ -849,7 +854,23 @@ func (p *glusterfileProvisioner) parseClassParameters(params map[string]string, 
 			return nil, fmt.Errorf("error parsing value for option 'volumetype' for volume plugin %s", provisionerName)
 		}
 	}
-	if !authEnabled {
+
+	if authEnabled {
+		if len(cfg.secretName) != 0 || len(cfg.secretNamespace) != 0 {
+			// secretName + Namespace has precedence over userKey
+			if len(cfg.secretName) != 0 && len(cfg.secretNamespace) != 0 {
+
+				cfg.secretValue, err = parseSecret(cfg.secretNamespace, cfg.secretName, p.client)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				return nil, fmt.Errorf("StorageClass for provisioner %q must have secretNamespace and secretName either both set or both empty", provisionerName)
+			}
+		} else {
+			cfg.secretValue = cfg.userKey
+		}
+	} else {
 		cfg.user = ""
 		cfg.secretName = ""
 		cfg.secretNamespace = ""
@@ -857,33 +878,17 @@ func (p *glusterfileProvisioner) parseClassParameters(params map[string]string, 
 		cfg.secretValue = ""
 	}
 
-	if len(cfg.secretName) != 0 || len(cfg.secretNamespace) != 0 {
-		// secretName + Namespace has precedence over userKey
-		if len(cfg.secretName) != 0 && len(cfg.secretNamespace) != 0 {
-
-			cfg.secretValue, err = parseSecret(cfg.secretNamespace, cfg.secretName, p.client)
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			return nil, fmt.Errorf("StorageClass for provisioner %q must have secretNamespace and secretName either both set or both empty", provisionerName)
-		}
-	} else {
-		cfg.secretValue = cfg.userKey
+	if cfg.gidMin > cfg.gidMax {
+		return nil, fmt.Errorf("StorageClass for provisioner %q must have gidMax >= gidMin", provisionerName)
 	}
 
 	if len(parseVolumeOptions) != 0 {
-		volOptions := dstrings.Split(parseVolumeOptions, ",")
-		if len(volOptions) == 0 {
-			return nil, fmt.Errorf("StorageClass for provisioner %q must have valid (for e.g.,'client.ssl on') volume option", provisionerName)
-		}
-		cfg.volumeOptions = volOptions
-
+		cfg.volumeOptions = dstrings.Split(parseVolumeOptions, ",")
 	}
 
 	if len(parseVolumeNamePrefix) != 0 {
 		if dstrings.Contains(parseVolumeNamePrefix, "_") {
-			return nil, fmt.Errorf("Storageclass parameter 'volumenameprefix' should not contain '_' in its value")
+			return nil, fmt.Errorf("StorageClass parameter 'volumenameprefix' should not contain '_' in its value")
 		}
 		cfg.volumeNamePrefix = parseVolumeNamePrefix
 	}
@@ -908,6 +913,7 @@ var (
 )
 
 func main() {
+
 	flag.Parse()
 	flag.Set("logtostderr", "true")
 
@@ -926,33 +932,35 @@ func main() {
 		glog.Fatalf("Failed to create config: %v", err)
 	}
 
-	provName := provisionerName
-	provEnvName := os.Getenv(provisionerNameKey)
+	// Determine provisioner identity. Precedence:
+	//   - Environment variable
+	//   - Command line argument
+	//   - Built-in default
+	provName := os.Getenv(provisionerNameKey)
 
-	// Precedence is given for ProvisionerNameKey
-	if provEnvName != "" && *id != "" {
-		provName = provEnvName
-	}
-
-	if provEnvName == "" && *id != "" {
-		provName = *id
+	if provName == "" {
+		if *id != "" {
+			provName = *id
+		} else {
+			provName = provisionerName
+		}
 	}
 
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		glog.Fatalf("Failed to create client:%v", err)
+		glog.Fatalf("Failed to create client: %v", err)
 	}
 
 	// The controller needs to know what the server version is because out-of-tree
 	// provisioners aren't officially supported until 1.5
 	serverVersion, err := clientset.Discovery().ServerVersion()
 	if err != nil {
-		glog.Fatalf("Error getting server version:%v", err)
+		glog.Fatalf("Error getting server version: %v", err)
 	}
 
 	// Create the provisioner: it implements the Provisioner interface expected by
 	// the controller
-	glusterfileProvisioner := NewglusterfileProvisioner(clientset, provName)
+	glusterfileProvisioner := NewGlusterfileProvisioner(clientset, provName)
 
 	// Start the provision controller which will dynamically provision glusterfs
 	// PVs
