@@ -64,6 +64,19 @@ kubectl create -f example/test-pod.yaml
 
 * Kernel CephFS doesn't work with SELinux, setting SELinux label in Pod's securityContext will not work.
 * Kernel CephFS doesn't support quota or capacity, capacity requested by PVC is not enforced or validated.
+* If you don't set `PROVISIONER_SECRET_NAMESPACE` as in `deploy/rbac/deployment.yaml`, your serviceaccount will need create/delete permissions on secrets cluster-wide; the following changes to deploy/rbac/clusterrole.yaml will get it working:
+```diff
+--- deploy/rbac/clusterrole.yaml
++++ deploy/rbac/clusterrole.yaml
+@@ -16,3 +16,7 @@ rules:
+   - apiGroups: [""]
+     resources: ["events"]
+     verbs: ["list", "watch", "create", "update", "patch"]
++  - apiGroups: [""]
++    resources: ["secrets"]
++    verbs: ["create", "delete"]
++
+```
 
 ## Acknowledgement
 
