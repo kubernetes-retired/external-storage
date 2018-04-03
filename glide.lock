@@ -1,5 +1,5 @@
-hash: bad5b8cc5504a88c060c3135c372b906550627273744530f1af8a53eedf50dac
-updated: 2018-03-05T14:22:31.127141222Z
+hash: af8df3f9b96dc480d12f56e6518be30b310711b23912021696fc735a63332717
+updated: 2018-04-03T09:41:43.3067991-07:00
 imports:
 - name: cloud.google.com/go
   version: 3b1ae45394a234c385be014e9a488f2bb6eef821
@@ -7,7 +7,7 @@ imports:
   - compute/metadata
   - internal
 - name: github.com/aws/aws-sdk-go
-  version: aace5875a5c3b85a3902c6d72b9caed301d64cce
+  version: 5a33d0a4f5d9c27e6cd10b4c156e85b46c4501d7
   subpackages:
   - aws
   - aws/awserr
@@ -25,6 +25,7 @@ imports:
   - aws/request
   - aws/session
   - aws/signer/v4
+  - internal/sdkio
   - internal/sdkrand
   - internal/shareddefaults
   - private/protocol
@@ -53,7 +54,7 @@ imports:
 - name: github.com/dgrijalva/jwt-go
   version: 01aeca54ebda6e0fbfafd0a524d234159c05ec20
 - name: github.com/digitalocean/godo
-  version: 77ea48de76a7b31b234d854f15d003c68bb2fb90
+  version: 7a32b5ce17203924a21366d5031032fd326d5051
   subpackages:
   - context
 - name: github.com/docker/distribution
@@ -99,7 +100,7 @@ imports:
   - proto
   - sortkeys
 - name: github.com/golang/glog
-  version: 23def4e6c14b4da8ac2ed8007337bc5eb5007998
+  version: 44145f04b68cf362d9c4df2182967c2275eaefed
 - name: github.com/golang/groupcache
   version: 02826c3e79038b59d737d3b1c0a1d937f71a4433
   subpackages:
@@ -322,7 +323,7 @@ imports:
   - jws
   - jwt
 - name: golang.org/x/sys
-  version: a2e06a18b0d52d8cb2010e04b372a1965d8e3439
+  version: 378d26f46672a356c46195c28f61bdb4c0a781dd
   subpackages:
   - unix
   - windows
