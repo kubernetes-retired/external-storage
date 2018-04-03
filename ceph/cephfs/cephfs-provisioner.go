@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 
 	"github.com/golang/glog"
@@ -112,14 +113,20 @@ func (p *cephFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 	if options.PVC.Spec.Selector != nil {
 		return nil, fmt.Errorf("claim Selector is not supported")
 	}
-	cluster, adminID, adminSecret, pvcRoot, mon, err := p.parseParameters(options.Parameters)
+	cluster, adminID, adminSecret, pvcRoot, mon, deterministicNames, err := p.parseParameters(options.Parameters)
 	if err != nil {
 		return nil, err
 	}
-	// create random share name
-	share := fmt.Sprintf("kubernetes-dynamic-pvc-%s", uuid.NewUUID())
-	// create random user id
-	user := fmt.Sprintf("kubernetes-dynamic-user-%s", uuid.NewUUID())
+	var share, user string
+	if deterministicNames {
+		share = fmt.Sprintf(options.PVC.Name)
+		user = fmt.Sprintf("k8s.%s", options.PVC.Name)
+	} else {
+		// create random share name
+		share = fmt.Sprintf("kubernetes-dynamic-pvc-%s", uuid.NewUUID())
+		// create random user id
+		user = fmt.Sprintf("kubernetes-dynamic-user-%s", uuid.NewUUID())
+	}
 	// provision share
 	// create cmd
 	cmd := exec.Command(provisionCmd, "-n", share, "-u", user)
@@ -220,7 +227,7 @@ func (p *cephFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 	if err != nil {
 		return err
 	}
-	cluster, adminID, adminSecret, pvcRoot, mon, err := p.parseParameters(class.Parameters)
+	cluster, adminID, adminSecret, pvcRoot, mon, _, err := p.parseParameters(class.Parameters)
 	if err != nil {
 		return err
 	}
@@ -256,17 +263,19 @@ func (p *cephFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 	return nil
 }
 
-func (p *cephFSProvisioner) parseParameters(parameters map[string]string) (string, string, string, string, []string, error) {
+func (p *cephFSProvisioner) parseParameters(parameters map[string]string) (string, string, string, string, []string, bool, error) {
 	var (
 		err                                                                           error
 		mon                                                                           []string
 		cluster, adminID, adminSecretName, adminSecretNamespace, adminSecret, pvcRoot string
+		deterministicNames                                                            bool
 	)
 
 	adminSecretNamespace = "default"
 	adminID = "admin"
 	cluster = "ceph"
 	pvcRoot = "/volumes/kubernetes"
+	deterministicNames = false
 
 	for k, v := range parameters {
 		switch strings.ToLower(k) {
@@ -285,21 +294,24 @@ func (p *cephFSProvisioner) parseParameters(parameters map[string]string) (strin
 			adminSecretNamespace = v
 		case "claimroot":
 			pvcRoot = v
+		case "deterministicnames":
+			// On error, strconv.ParseBool() returns false; leave that, as it is a perfectly fine default
+			deterministicNames, _ = strconv.ParseBool(v)
 		default:
-			return "", "", "", "", nil, fmt.Errorf("invalid option %q", k)
+			return "", "", "", "", nil, false, fmt.Errorf("invalid option %q", k)
 		}
 	}
 	// sanity check
 	if adminSecretName == "" {
-		return "", "", "", "", nil, fmt.Errorf("missing Ceph admin secret name")
+		return "", "", "", "", nil, false, fmt.Errorf("missing Ceph admin secret name")
 	}
 	if adminSecret, err = p.parsePVSecret(adminSecretNamespace, adminSecretName); err != nil {
-		return "", "", "", "", nil, fmt.Errorf("failed to get admin secret from [%q/%q]: %v", adminSecretNamespace, adminSecretName, err)
+		return "", "", "", "", nil, false, fmt.Errorf("failed to get admin secret from [%q/%q]: %v", adminSecretNamespace, adminSecretName, err)
 	}
 	if len(mon) < 1 {
-		return "", "", "", "", nil, fmt.Errorf("missing Ceph monitors")
+		return "", "", "", "", nil, false, fmt.Errorf("missing Ceph monitors")
 	}
-	return cluster, adminID, adminSecret, pvcRoot, mon, nil
+	return cluster, adminID, adminSecret, pvcRoot, mon, deterministicNames, nil
 }
 
 func (p *cephFSProvisioner) parsePVSecret(namespace, secretName string) (string, error) {
