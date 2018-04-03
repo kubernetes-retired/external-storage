@@ -31,8 +31,6 @@ const (
 	// Option keys
 	provisionCmd = "provision"
 	deleteCmd    = "delete"
-
-	optionPVorVolumeName = "kubernetes.io/pvOrVolumeName"
 )
 
 // ErrorTimeout defines the time error
