@@ -252,6 +252,11 @@ func ConfigMapDataToVolumeConfig(data map[string]string, provisionerConfig *Prov
 			return fmt.Errorf("Storage Class %v is misconfigured, missing HostDir or MountDir parameter", class)
 		}
 		provisionerConfig.StorageClassConfig[class] = config
+		glog.Infof("StorageClass %q configured with MountDir %q, HostDir %q, BlockCleanerCommand %q",
+			class,
+			config.MountDir,
+			config.HostDir,
+			config.BlockCleanerCommand)
 	}
 	return nil
 }
