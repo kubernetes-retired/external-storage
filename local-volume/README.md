@@ -239,7 +239,7 @@ Please replace the following elements to reflect your configuration:
 
 ### Running
 ``` console
-go run hack/e2e.go -- -v --test --test_args="--ginkgo.focus=\[Feature:LocalPersistentVolumes\]"
+go run hack/e2e.go -- -v --test --test_args="--ginkgo.focus=PersistentVolumes-local"
 ```
 
 ### View CI Results
