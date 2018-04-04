@@ -15,7 +15,7 @@ import (
 func TestEndpointsList(t *testing.T) {
 	client, err := clients.NewIdentityV3Client()
 	if err != nil {
-		t.Fatalf("Unable to obtain an identity client: %v")
+		t.Fatalf("Unable to obtain an identity client: %v", err)
 	}
 
 	allPages, err := endpoints.List(client, nil).AllPages()
@@ -36,7 +36,7 @@ func TestEndpointsList(t *testing.T) {
 func TestEndpointsNavigateCatalog(t *testing.T) {
 	client, err := clients.NewIdentityV3Client()
 	if err != nil {
-		t.Fatalf("Unable to obtain an identity client: %v")
+		t.Fatalf("Unable to obtain an identity client: %v", err)
 	}
 
 	// Discover the service we're interested in.
@@ -51,7 +51,7 @@ func TestEndpointsNavigateCatalog(t *testing.T) {
 
 	allServices, err := services.ExtractServices(allPages)
 	if err != nil {
-		t.Fatalf("Unable to extract service: %v")
+		t.Fatalf("Unable to extract service: %v", err)
 	}
 
 	if len(allServices) != 1 {
@@ -74,7 +74,7 @@ func TestEndpointsNavigateCatalog(t *testing.T) {
 
 	allEndpoints, err := endpoints.ExtractEndpoints(allPages)
 	if err != nil {
-		t.Fatalf("Unable to extract endpoint: %v")
+		t.Fatalf("Unable to extract endpoint: %v", err)
 	}
 
 	if len(allEndpoints) != 1 {

@@ -8,6 +8,7 @@ import (
 
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/availabilityzones"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/diskconfig"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/extendedstatus"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"github.com/gophercloud/gophercloud/pagination"
 	th "github.com/gophercloud/gophercloud/testhelper"
@@ -66,6 +67,7 @@ func TestListAllServersWithExtensions(t *testing.T) {
 	type ServerWithExt struct {
 		servers.Server
 		availabilityzones.ServerAvailabilityZoneExt
+		extendedstatus.ServerExtendedStatusExt
 		diskconfig.ServerDiskConfigExt
 	}
 
@@ -77,6 +79,9 @@ func TestListAllServersWithExtensions(t *testing.T) {
 	th.AssertNoErr(t, err)
 	th.AssertEquals(t, 3, len(actual))
 	th.AssertEquals(t, "nova", actual[0].AvailabilityZone)
+	th.AssertEquals(t, "RUNNING", actual[0].PowerState.String())
+	th.AssertEquals(t, "", actual[0].TaskState)
+	th.AssertEquals(t, "active", actual[0].VmState)
 	th.AssertEquals(t, diskconfig.Manual, actual[0].DiskConfig)
 }
 
@@ -213,6 +218,22 @@ func TestGetServer(t *testing.T) {
 	th.CheckDeepEquals(t, ServerDerp, *actual)
 }
 
+func TestGetFaultyServer(t *testing.T) {
+	th.SetupHTTP()
+	defer th.TeardownHTTP()
+	HandleServerGetFaultSuccessfully(t)
+
+	client := client.ServiceClient()
+	actual, err := servers.Get(client, "1234asdf").Extract()
+	if err != nil {
+		t.Fatalf("Unexpected Get error: %v", err)
+	}
+
+	FaultyServer := ServerDerp
+	FaultyServer.Fault = DerpFault
+	th.CheckDeepEquals(t, FaultyServer, *actual)
+}
+
 func TestGetServerWithExtensions(t *testing.T) {
 	th.SetupHTTP()
 	defer th.TeardownHTTP()
@@ -221,12 +242,16 @@ func TestGetServerWithExtensions(t *testing.T) {
 	var s struct {
 		servers.Server
 		availabilityzones.ServerAvailabilityZoneExt
+		extendedstatus.ServerExtendedStatusExt
 		diskconfig.ServerDiskConfigExt
 	}
 
 	err := servers.Get(client.ServiceClient(), "1234asdf").ExtractInto(&s)
 	th.AssertNoErr(t, err)
 	th.AssertEquals(t, "nova", s.AvailabilityZone)
+	th.AssertEquals(t, "RUNNING", s.PowerState.String())
+	th.AssertEquals(t, "", s.TaskState)
+	th.AssertEquals(t, "active", s.VmState)
 	th.AssertEquals(t, diskconfig.Manual, s.DiskConfig)
 
 	err = servers.Get(client.ServiceClient(), "1234asdf").ExtractInto(s)

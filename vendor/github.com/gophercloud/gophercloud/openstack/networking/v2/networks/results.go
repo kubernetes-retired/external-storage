@@ -64,11 +64,18 @@ type Network struct {
 	// Subnets associated with this network.
 	Subnets []string `json:"subnets"`
 
-	// Owner of network.
+	// TenantID is the project owner of the network.
 	TenantID string `json:"tenant_id"`
+
+	// ProjectID is the project owner of the network.
+	ProjectID string `json:"project_id"`
 
 	// Specifies whether the network resource can be accessed by any tenant.
 	Shared bool `json:"shared"`
+
+	// Availability zone hints groups network nodes that run services like DHCP, L3, FW, and others.
+	// Used to make network resources highly available.
+	AvailabilityZoneHints []string `json:"availability_zone_hints"`
 }
 
 // NetworkPage is the page returned by a pager when traversing over a
