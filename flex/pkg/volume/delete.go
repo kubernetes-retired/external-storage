@@ -24,6 +24,11 @@ import (
 	"k8s.io/api/core/v1"
 )
 
+type DeleteOptions struct {
+	// volume that is getting deleted
+	Volume *v1.PersistentVolume `json:"volume,omitempty"`
+}
+
 func (p *flexProvisioner) Delete(volume *v1.PersistentVolume) error {
 	glog.Infof("Delete called for volume:", volume.Name)
 
@@ -37,11 +42,18 @@ func (p *flexProvisioner) Delete(volume *v1.PersistentVolume) error {
 	}
 
 	call := p.NewDriverCall(p.execCommand, deleteCmd)
-	call.AppendSpec(*volume)
+	call.AppendSpec(&DeleteOptions{
+		Volume: volume,
+	})
 	output, err := call.Run()
 
 	if err != nil {
-		glog.Errorf("Failed to delete volume %s, output: %s, error: %s", volume, output.Message, err.Error())
+		outputString := "nil"
+		if output != nil {
+			outputString = output.Message
+		}
+		glog.Errorf("Failed to delete volume %s, output: %s, error: %s", volume, outputString, err.Error())
+
 		return err
 	}
 	return nil
