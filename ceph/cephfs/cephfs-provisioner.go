@@ -120,7 +120,7 @@ func (p *cephFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 	var share, user string
 	if deterministicNames {
 		share = fmt.Sprintf(options.PVC.Name)
-		user = fmt.Sprintf("k8s.%s", options.PVC.Name)
+		user = fmt.Sprintf("k8s.%s.%s", options.PVC.Namespace, options.PVC.Name)
 	} else {
 		// create random share name
 		share = fmt.Sprintf("kubernetes-dynamic-pvc-%s", uuid.NewUUID())
@@ -137,6 +137,9 @@ func (p *cephFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 		"CEPH_AUTH_ID=" + adminID,
 		"CEPH_AUTH_KEY=" + adminSecret,
 		"CEPH_VOLUME_ROOT=" + pvcRoot}
+	if deterministicNames {
+		cmd.Env = append(cmd.Env, "CEPH_VOLUME_GROUP="+options.PVC.Namespace)
+	}
 
 	output, cmdErr := cmd.CombinedOutput()
 	if cmdErr != nil {
