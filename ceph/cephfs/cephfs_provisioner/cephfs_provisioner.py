@@ -42,12 +42,9 @@ class CephFSNativeDriver(object):
 
     def __init__(self, *args, **kwargs):
         self._volume_client = None
-        try:
-            (self.volume_prefix, self.volume_group) = os.path.split(os.environ['CEPH_VOLUME_ROOT'])
-        except KeyError:
-            # Default volume_prefix to None; the CephFSVolumeClient constructor uses a ternary operator on the input argument to default it to /volumes
-            self.volume_prefix = None
-            self.volume_group = VOlUME_GROUP
+        # Default volume_prefix to None; the CephFSVolumeClient constructor uses a ternary operator on the input argument to default it to /volumes
+        self.volume_prefix = os.environ.get('CEPH_VOLUME_ROOT', None)
+        self.volume_group = os.environ.get('CEPH_VOLUME_GROUP', VOlUME_GROUP)
 
     def _create_conf(self, cluster_name, mons):
         """ Create conf using monitors
