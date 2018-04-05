@@ -23,7 +23,7 @@ import (
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	"k8s.io/api/core/v1"
 )
-
+// DeleteOptions serializes parameters for calling delete to the driver.
 type DeleteOptions struct {
 	// volume that is getting deleted
 	Volume *v1.PersistentVolume `json:"volume,omitempty"`
