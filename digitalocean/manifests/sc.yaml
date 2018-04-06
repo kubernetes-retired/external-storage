@@ -2,6 +2,8 @@ apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
   name: default
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
 parameters:
   zone: <digitalocean zone: ex fra1>
 provisioner: external/digitalocean
