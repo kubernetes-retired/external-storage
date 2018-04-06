@@ -269,9 +269,21 @@ go run hack/e2e.go -- -v --test --test_args="--ginkgo.focus=PersistentVolumes-lo
 ```
 
 ### View CI Results
-[GCE Alpha](https://k8s-testgrid.appspot.com/sig-storage#gce-alpha)
+[GCE](https://k8s-testgrid.appspot.com/sig-storage#gce&include-filter-by-regex=PersistentVolumes-local)
 
-[GKE Alpha](https://k8s-testgrid.appspot.com/sig-storage#gke-alpha)
+[GKE](https://k8s-testgrid.appspot.com/sig-storage#gke&include-filter-by-regex=PersistentVolumes-local)
+
+[GCE Slow](https://k8s-testgrid.appspot.com/sig-storage#gce-slow&include-filter-by-regex=PersistentVolumes-local)
+
+[GKE Slow](https://k8s-testgrid.appspot.com/sig-storage#gke-slow&include-filter-by-regex=PersistentVolumes-local)
+
+[GCE Serial](https://k8s-testgrid.appspot.com/sig-storage#gce-serial&include-filter-by-regex=PersistentVolumes-local)
+
+[GKE Serial](https://k8s-testgrid.appspot.com/sig-storage#gke-serial&include-filter-by-regex=PersistentVolumes-local)
+
+[GCE Alpha](https://k8s-testgrid.appspot.com/sig-storage#gce-alpha&include-filter-by-regex=PersistentVolumes-local)
+
+[GKE Alpha](https://k8s-testgrid.appspot.com/sig-storage#gke-alpha&include-filter-by-regex=PersistentVolumes-local)
 
 
 ## Best Practices
