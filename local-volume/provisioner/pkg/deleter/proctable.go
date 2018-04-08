@@ -30,7 +30,15 @@ type ProcTable interface {
 	MarkRunning(pvName string) error
 	MarkFailed(pvName string) error
 	MarkSucceeded(pvName string) error
-	RemoveEntry(pvName string) (CleanupState, error)
+	RemoveEntry(pvName string) (CleanupState, *time.Time, error)
+	Stats() ProcTableStats
+}
+
+// ProcTableStats represents stats of ProcTable.
+type ProcTableStats struct {
+	Running   int
+	Succeeded int
+	Failed    int
 }
 
 var _ ProcTable = &ProcTableImpl{}
@@ -43,8 +51,10 @@ type ProcEntry struct {
 
 // ProcTableImpl Implementation of BLockCleaner interface
 type ProcTableImpl struct {
-	mutex     sync.Mutex
+	mutex     sync.RWMutex
 	procTable map[string]ProcEntry
+	succeeded int
+	failed    int
 }
 
 // NewProcTable returns a BlockCleaner
@@ -54,8 +64,8 @@ func NewProcTable() *ProcTableImpl {
 
 // IsRunning Check if cleanup process is still running
 func (v *ProcTableImpl) IsRunning(pvName string) bool {
-	v.mutex.Lock()
-	defer v.mutex.Unlock()
+	v.mutex.RLock()
+	defer v.mutex.RUnlock()
 
 	if entry, ok := v.procTable[pvName]; !ok || entry.Status != CSRunning {
 		return false
@@ -66,8 +76,8 @@ func (v *ProcTableImpl) IsRunning(pvName string) bool {
 
 // IsEmpty Check if any cleanup process is running
 func (v *ProcTableImpl) IsEmpty() bool {
-	v.mutex.Lock()
-	defer v.mutex.Unlock()
+	v.mutex.RLock()
+	defer v.mutex.RUnlock()
 	return len(v.procTable) == 0
 }
 
@@ -96,6 +106,13 @@ func (v *ProcTableImpl) MarkSucceeded(pvName string) error {
 func (v *ProcTableImpl) markStatus(pvName string, status CleanupState) error {
 	v.mutex.Lock()
 	defer v.mutex.Unlock()
+	defer func() {
+		if status == CSSucceeded {
+			v.succeeded++
+		} else if status == CSFailed {
+			v.failed++
+		}
+	}()
 	entry, ok := v.procTable[pvName]
 	if !ok {
 		return fmt.Errorf("failed to mark status %d for pv %q as it is not present in proctable", status, pvName)
@@ -106,23 +123,40 @@ func (v *ProcTableImpl) markStatus(pvName string, status CleanupState) error {
 	return nil
 }
 
-// RemoveEntry Removes proctable entry and returns final state of cleanup
+// RemoveEntry Removes proctable entry and returns final state and start time of cleanup.
 // Must only be called and cleanup that has ended, else error is returned.
-func (v *ProcTableImpl) RemoveEntry(pvName string) (CleanupState, error) {
+func (v *ProcTableImpl) RemoveEntry(pvName string) (CleanupState, *time.Time, error) {
 	v.mutex.Lock()
 	defer v.mutex.Unlock()
 	entry, ok := v.procTable[pvName]
 	if !ok {
-		return CSNotFound, nil
+		return CSNotFound, nil, nil
 	}
 	if entry.Status == CSRunning {
-		return CSUnknown, fmt.Errorf("cannot remove proctable entry for %q when it is still running", pvName)
+		return CSUnknown, nil, fmt.Errorf("cannot remove proctable entry for %q when it is still running", pvName)
 	}
 	if entry.Status == CSUnknown {
-		return CSUnknown, fmt.Errorf("proctable entry for %q in unexpected unknown state", pvName)
+		return CSUnknown, nil, fmt.Errorf("proctable entry for %q in unexpected unknown state", pvName)
 	}
 	delete(v.procTable, pvName)
-	return entry.Status, nil
+	return entry.Status, &entry.StartTime, nil
+}
+
+// Stats returns stats of ProcTable.
+func (v *ProcTableImpl) Stats() ProcTableStats {
+	v.mutex.RLock()
+	defer v.mutex.RUnlock()
+	running := 0
+	for _, entry := range v.procTable {
+		if entry.Status == CSRunning {
+			running++
+		}
+	}
+	return ProcTableStats{
+		Running:   running,
+		Succeeded: v.succeeded,
+		Failed:    v.failed,
+	}
 }
 
 // FakeProcTableImpl creates a mock proc table that enables testing.
@@ -136,6 +170,8 @@ type FakeProcTableImpl struct {
 	MarkDoneCount int
 	// RemoveCount keeps count of number of times Remove() was called
 	RemoveCount int
+	// StatsCount keeps count of number of times Stats() was called
+	StatsCount int
 }
 
 var _ ProcTable = &FakeProcTableImpl{}
@@ -175,7 +211,13 @@ func (f *FakeProcTableImpl) MarkSucceeded(pvName string) error {
 }
 
 // RemoveEntry removes the entry from the proc table.
-func (f *FakeProcTableImpl) RemoveEntry(pvName string) (CleanupState, error) {
+func (f *FakeProcTableImpl) RemoveEntry(pvName string) (CleanupState, *time.Time, error) {
 	f.RemoveCount++
 	return f.realTable.RemoveEntry(pvName)
+}
+
+// Stats returns stats of ProcTable.
+func (f *FakeProcTableImpl) Stats() ProcTableStats {
+	f.StatsCount++
+	return f.realTable.Stats()
 }

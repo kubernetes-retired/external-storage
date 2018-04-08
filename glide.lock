@@ -1,5 +1,5 @@
-hash: bad5b8cc5504a88c060c3135c372b906550627273744530f1af8a53eedf50dac
-updated: 2018-03-05T14:22:31.127141222Z
+hash: b7a0a8aabd23b8fb11f8a6104058aa9d6ae16cf8331dd32afe4a6beb3352d47b
+updated: 2018-04-18T10:57:49.549468703Z
 imports:
 - name: cloud.google.com/go
   version: 3b1ae45394a234c385be014e9a488f2bb6eef821
@@ -649,6 +649,10 @@ imports:
   version: 50ae88d24ede7b8bad68e23c805b5d3da5c8abaf
   subpackages:
   - pkg/util/proto
+- name: k8s.io/kube-state-metrics
+  version: 56fd3e93ab8a6a61473b33fc687a54c6a7f28421
+  subpackages:
+  - collectors/testutils
 - name: k8s.io/kubernetes
   version: 48b7bb56341914b85c76700becadc02b8009d9a0
   subpackages:

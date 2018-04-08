@@ -38,7 +38,7 @@ import (
 )
 
 // StartLocalController starts the sync loop for the local PV discovery and deleter
-func StartLocalController(client *kubernetes.Clientset, config *common.UserConfig) {
+func StartLocalController(client *kubernetes.Clientset, ptable deleter.ProcTable, config *common.UserConfig) {
 	glog.Info("Initializing volume cache\n")
 
 	provisionerName := fmt.Sprintf("local-volume-provisioner-%v-%v", config.Node.Name, config.Node.UID)
@@ -74,7 +74,7 @@ func StartLocalController(client *kubernetes.Clientset, config *common.UserConfi
 		go jobController.Run(stopCh)
 		glog.Infof("Enabling Jobs based cleaning.")
 	}
-	cleanupTracker := &deleter.CleanupStatusTracker{ProcTable: deleter.NewProcTable(), JobController: jobController}
+	cleanupTracker := &deleter.CleanupStatusTracker{ProcTable: ptable, JobController: jobController}
 
 	discoverer, err := discovery.NewDiscoverer(runtimeConfig, cleanupTracker)
 	if err != nil {
