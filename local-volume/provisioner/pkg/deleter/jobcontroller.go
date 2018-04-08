@@ -49,13 +49,19 @@ const (
 	PVUuidLabel = "pvuuid"
 	// DeviceAnnotation is the annotation that specifies the device path.
 	DeviceAnnotation = "device"
+	// StartTimeAnnotation is the annotation that specifies the job start time.
+	// This is the time when we begin to submit job to apiserver. We use this
+	// instead of job or pod start time to include k8s pod start latency into
+	// volume deletion time.
+	// Time is formatted in time.RFC3339Nano.
+	StartTimeAnnotation = "start-time"
 )
 
 // JobController defines the interface for the job controller.
 type JobController interface {
 	Run(stopCh <-chan struct{})
 	IsCleaningJobRunning(pvName string) bool
-	RemoveJob(pvName string) (CleanupState, error)
+	RemoveJob(pvName string) (CleanupState, *time.Time, error)
 }
 
 var _ JobController = &jobController{}
@@ -225,27 +231,37 @@ func (c *jobController) IsCleaningJobRunning(pvName string) bool {
 }
 
 // RemoveJob returns true and deletes the job if the cleaning job has completed.
-func (c *jobController) RemoveJob(pvName string) (CleanupState, error) {
+func (c *jobController) RemoveJob(pvName string) (CleanupState, *time.Time, error) {
 	jobName := generateCleaningJobName(pvName)
 	job, err := c.jobLister.Jobs(c.namespace).Get(jobName)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return CSNotFound, nil
+			return CSNotFound, nil, nil
 		}
-		return CSUnknown, fmt.Errorf("Failed to check whether job %s has succeeded. Error - %s",
+		return CSUnknown, nil, fmt.Errorf("Failed to check whether job %s has succeeded. Error - %s",
 			jobName, err.Error())
+	}
+
+	var startTime *time.Time
+	if startTimeStr, ok := job.Annotations[StartTimeAnnotation]; ok {
+		parsedStartTime, err := time.Parse(time.RFC3339Nano, startTimeStr)
+		if err == nil {
+			startTime = &parsedStartTime
+		} else {
+			glog.Errorf("Failed to parse start time %s: %v", startTimeStr, err)
+		}
 	}
 
 	if job.Status.Succeeded == 0 {
 		// Jobs has not yet succeeded. We assume failed jobs to be still running, until addressed by admin.
-		return CSUnknown, fmt.Errorf("Error deleting Job %q: Cannot remove job that has not succeeded", job.Name)
+		return CSUnknown, nil, fmt.Errorf("Error deleting Job %q: Cannot remove job that has not succeeded", job.Name)
 	}
 
 	if err := c.RuntimeConfig.APIUtil.DeleteJob(job.Name, c.namespace); err != nil {
-		return CSUnknown, fmt.Errorf("Error deleting Job %q: %s", job.Name, err.Error())
+		return CSUnknown, nil, fmt.Errorf("Error deleting Job %q: %s", job.Name, err.Error())
 	}
 
-	return CSSucceeded, nil
+	return CSSucceeded, startTime, nil
 }
 
 // NewCleanupJob creates manifest for a cleaning job.
@@ -289,7 +305,8 @@ func NewCleanupJob(pv *apiv1.PersistentVolume, imageName string, nodeName string
 
 	// Annotate job with useful information that cannot be set as labels due to label name restrictions.
 	annotations := map[string]string{
-		DeviceAnnotation: blkdevPath,
+		DeviceAnnotation:    blkdevPath,
+		StartTimeAnnotation: time.Now().Format(time.RFC3339Nano),
 	}
 
 	podTemplate := apiv1.Pod{}
@@ -353,14 +370,14 @@ func (c *FakeJobController) IsCleaningJobRunning(pvName string) bool {
 }
 
 // RemoveJob mocks the interface method.
-func (c *FakeJobController) RemoveJob(pvName string) (CleanupState, error) {
+func (c *FakeJobController) RemoveJob(pvName string) (CleanupState, *time.Time, error) {
 	c.RemoveCompletedCount++
 	status, exists := c.pvCleanupRunning[pvName]
 	if !exists {
-		return CSNotFound, nil
+		return CSNotFound, nil, nil
 	}
 	if status != CSSucceeded {
-		return CSUnknown, fmt.Errorf("cannot remove job that has not yet completed %s status %d", pvName, status)
+		return CSUnknown, nil, fmt.Errorf("cannot remove job that has not yet completed %s status %d", pvName, status)
 	}
-	return CSSucceeded, nil
+	return CSSucceeded, nil, nil
 }
