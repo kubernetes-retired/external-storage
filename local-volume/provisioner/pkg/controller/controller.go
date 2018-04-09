@@ -67,11 +67,11 @@ func StartLocalController(client *kubernetes.Clientset, config *common.UserConfi
 		glog.Fatalf("Error starting discoverer: %v", err)
 	}
 
-	deleter := deleter.NewDeleter(runtimeConfig, ptable)
+	del := deleter.NewDeleter(runtimeConfig, ptable)
 
 	glog.Info("Controller started\n")
 	for {
-		deleter.DeletePVs()
+		del.DeletePVs()
 		discoverer.DiscoverLocalVolumes()
 		time.Sleep(10 * time.Second)
 	}

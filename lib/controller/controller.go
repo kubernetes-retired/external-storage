@@ -723,7 +723,7 @@ func (ctrl *ProvisionController) shouldDelete(volume *v1.PersistentVolume) bool 
 // leader is tasked with provisioning & may try to do so
 func (ctrl *ProvisionController) lockProvisionClaimOperation(claim *v1.PersistentVolumeClaim) {
 	stoppedLeading := false
-	rl := rl.ProvisionPVCLock{
+	pvcLock := rl.ProvisionPVCLock{
 		PVCMeta: claim.ObjectMeta,
 		Client:  ctrl.client,
 		LockConfig: rl.Config{
@@ -732,7 +732,7 @@ func (ctrl *ProvisionController) lockProvisionClaimOperation(claim *v1.Persisten
 		},
 	}
 	le, err := leaderelection.NewLeaderElector(leaderelection.Config{
-		Lock:          &rl,
+		Lock:          &pvcLock,
 		LeaseDuration: ctrl.leaseDuration,
 		RenewDeadline: ctrl.renewDeadline,
 		RetryPeriod:   ctrl.retryPeriod,
