@@ -64,4 +64,4 @@ openstack cloud provider.
 | | | | Volume is marked as available |
 | | | Call cinder delete | |
 | | | | Delete volume from storage |
-| | Delete PV | | |
+| | | Delete PV | |
