@@ -50,7 +50,7 @@ Also see [known issues](KNOWN_ISSUES.md) and [CHANGELOG](CHANGELOG.md).
 
 * New PV.NodeAffinity field added.
 * **Important:** Alpha PV NodeAffinity annotation is deprecated. Users must manually update
-  their PVs to use the new NodeAffinity field or run a one-time update job (TBD).
+  their PVs to use the new NodeAffinity field or run a [one-time update job](utils/update-pv-to-beta).
 * Alpha: Raw block support added.
 
 ### 1.9: Alpha
