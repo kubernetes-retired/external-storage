@@ -88,6 +88,10 @@ If raw local block feature is needed,
 $ export KUBE_FEATURE_GATES="BlockVolume=true"
 ```
 
+Note: Kubernetes versions prior to 1.10 require [several additional
+feature-gates](https://github.com/kubernetes-incubator/external-storage/tree/local-volume-provisioner-v2.0.0/local-volume#enabling-the-alpha-feature-gates) 
+be enabled on all Kubernetes components, because the persistent lcoal volumes and other features were in alpha.
+
 #### Option 1: GCE
 
 GCE clusters brought up with kube-up.sh will automatically format and mount the
