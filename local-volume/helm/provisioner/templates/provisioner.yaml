@@ -29,6 +29,7 @@
    {{- range $storageClass, $classConfig := $val }}
 - mountPath: {{ if $classConfig.mountDir }} {{$classConfig.mountDir }} {{ else }} {{ $classConfig.hostDir }} {{ end }}
   name: {{ $storageClass }}
+  mountPropagation: "HostToContainer"
    {{- end}}
 {{- end}}
 {{- end }}

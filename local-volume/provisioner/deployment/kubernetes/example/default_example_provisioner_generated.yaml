@@ -48,7 +48,8 @@ spec:
               name: provisioner-config
               readOnly: true             
             - mountPath:  /mnt/fast-disks 
-              name: fast-disks 
+              name: fast-disks
+              mountPropagation: "HostToContainer" 
       volumes:
         - name: provisioner-config
           configMap:
