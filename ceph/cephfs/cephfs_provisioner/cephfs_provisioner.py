@@ -53,7 +53,7 @@ class CephFSNativeDriver(object):
             conf = open(conf_path, 'w')
             conf.write("[global]\n")
             conf.write("mon_host = " + mons + "\n")
-            conf.write("auth_cluster_required = cephx\nauth_service_required = cephx\nauth_client_required = cephx\n")
+            conf.write("auth_client_required = cephx,none\n")
             conf.close()
         return conf_path
 
