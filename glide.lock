@@ -42,6 +42,8 @@ imports:
   - service/efs
   - service/elb
   - service/sts
+- name: github.com/asaskevich/govalidator
+  version: 7d2e70ef918f16bd6455529af38304d6d025c952
 - name: github.com/beorn7/perks
   version: 3ac7bf7a47d159a033b107610db8a1b6575507a4
   subpackages:
@@ -93,6 +95,8 @@ imports:
   version: 73d445a93680fa1a78ae23a5839bad48f32ba1ee
 - name: github.com/go-ini/ini
   version: e88632e2fbbd517932de8a0af39beb223b03ae35
+- name: github.com/go-ozzo/ozzo-validation
+  version: 2c68ddd4ffc17941d8e940cb1264f68e1d8f0394
 - name: github.com/gogo/protobuf
   version: c0656edd0d9eab7c66d1eb0c568f9039345796f7
   subpackages:
@@ -175,7 +179,7 @@ imports:
   - json/scanner
   - json/token
 - name: github.com/heketi/heketi
-  version: 300752517908f3456e90d1ee2a773e7dd8ce1afe
+  version: af26821e74991e7b7236f503e6310ec6b1d91f73
   subpackages:
   - client/api/go-client
   - pkg/glusterfs/api

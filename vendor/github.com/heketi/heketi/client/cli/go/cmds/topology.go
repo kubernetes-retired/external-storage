@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	client "github.com/heketi/heketi/client/api/go-client"
 	"github.com/heketi/heketi/pkg/glusterfs/api"
@@ -321,14 +322,14 @@ var topologyInfoCommand = &cobra.Command{
 						"\tState: %v\n"+
 						"\tCluster Id: %v\n"+
 						"\tZone: %v\n"+
-						"\tManagement Hostname: %v\n"+
-						"\tStorage Hostname: %v\n",
+						"\tManagement Hostnames: %v\n"+
+						"\tStorage Hostnames: %v\n",
 						info.Id,
 						info.State,
 						info.ClusterId,
 						info.Zone,
-						info.Hostnames.Manage[0],
-						info.Hostnames.Storage[0])
+						strings.Join(info.Hostnames.Manage, ", "),
+						strings.Join(info.Hostnames.Storage, ", "))
 					fmt.Fprintf(stdout, "\tDevices:\n")
 
 					// format and print the device info
