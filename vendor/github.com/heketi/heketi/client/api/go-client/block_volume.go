@@ -47,6 +47,7 @@ func (c *Client) BlockVolumeCreate(request *api.BlockVolumeCreateRequest) (
 	if err != nil {
 		return nil, err
 	}
+	defer r.Body.Close()
 	if r.StatusCode != http.StatusAccepted {
 		return nil, utils.GetErrorFromResponse(r)
 	}
@@ -61,7 +62,6 @@ func (c *Client) BlockVolumeCreate(request *api.BlockVolumeCreateRequest) (
 
 	var blockvolume api.BlockVolumeInfoResponse
 	err = utils.GetJsonFromResponse(r, &blockvolume)
-	r.Body.Close()
 	if err != nil {
 		return nil, err
 	}
@@ -85,6 +85,7 @@ func (c *Client) BlockVolumeList() (*api.BlockVolumeListResponse, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer r.Body.Close()
 	if r.StatusCode != http.StatusOK {
 		return nil, utils.GetErrorFromResponse(r)
 	}
@@ -113,13 +114,13 @@ func (c *Client) BlockVolumeInfo(id string) (*api.BlockVolumeInfoResponse, error
 	if err != nil {
 		return nil, err
 	}
+	defer r.Body.Close()
 	if r.StatusCode != http.StatusOK {
 		return nil, utils.GetErrorFromResponse(r)
 	}
 
 	var blockvolume api.BlockVolumeInfoResponse
 	err = utils.GetJsonFromResponse(r, &blockvolume)
-	r.Body.Close()
 	if err != nil {
 		return nil, err
 	}
@@ -142,6 +143,7 @@ func (c *Client) BlockVolumeDelete(id string) error {
 	if err != nil {
 		return err
 	}
+	defer r.Body.Close()
 	if r.StatusCode != http.StatusAccepted {
 		return utils.GetErrorFromResponse(r)
 	}

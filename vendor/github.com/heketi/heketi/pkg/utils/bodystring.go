@@ -20,10 +20,10 @@ import (
 // Return the body from a response as a string
 func GetStringFromResponse(r *http.Response) (string, error) {
 	body, err := ioutil.ReadAll(io.LimitReader(r.Body, r.ContentLength))
+	defer r.Body.Close()
 	if err != nil {
 		return "", err
 	}
-	r.Body.Close()
 	return string(body), nil
 }
 
