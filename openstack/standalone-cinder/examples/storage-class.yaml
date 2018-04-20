@@ -1,0 +1,7 @@
+kind: StorageClass
+apiVersion: storage.k8s.io/v1beta1
+metadata:
+  name: cinder-iscsi
+provisioner: openstack.org/standalone-cinder
+parameters:
+  type: iscsi
