@@ -1,0 +1,33 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: standalone-cinder-provisioner
+  namespace: kube-system
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: standalone-cinder-provisioner
+    spec:
+      containers:
+      - name: standalone-cinder-provisioner
+        image: "quay.io/external_storage/standalone-cinder-provisioner:latest"
+        imagePullPolicy: IfNotPresent
+        env:
+          - name: OS_AUTH_URL
+            value: http://10.117.36.5:5000/v3 # We're using a system with Keystone Auth 
+          - name: OS_PROJECT_ID
+            value: 394337ba489a40678dc6ebf4d4c4af78 # TENANT-ID works here 
+          - name: OS_PROJECT_NAME
+            value: dev
+          - name: OS_USER_DOMAIN_NAME
+            value: Default
+          - name: OS_USERNAME
+            value: username
+          - name: OS_PASSWORD
+            value: userpasswd
+          - name: OS_REGION_NAME
+            value: RegionOne
