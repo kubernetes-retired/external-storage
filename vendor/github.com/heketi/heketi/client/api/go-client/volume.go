@@ -51,6 +51,7 @@ func (c *Client) VolumeCreate(request *api.VolumeCreateRequest) (
 	if err != nil {
 		return nil, err
 	}
+	defer r.Body.Close()
 	if r.StatusCode != http.StatusAccepted {
 		return nil, utils.GetErrorFromResponse(r)
 	}
@@ -67,7 +68,6 @@ func (c *Client) VolumeCreate(request *api.VolumeCreateRequest) (
 	// Read JSON response
 	var volume api.VolumeInfoResponse
 	err = utils.GetJsonFromResponse(r, &volume)
-	r.Body.Close()
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +75,6 @@ func (c *Client) VolumeCreate(request *api.VolumeCreateRequest) (
 	return &volume, nil
 
 }
-
 func (c *Client) VolumeExpand(id string, request *api.VolumeExpandRequest) (
 	*api.VolumeInfoResponse, error) {
 
@@ -105,6 +104,7 @@ func (c *Client) VolumeExpand(id string, request *api.VolumeExpandRequest) (
 	if err != nil {
 		return nil, err
 	}
+	defer r.Body.Close()
 	if r.StatusCode != http.StatusAccepted {
 		return nil, utils.GetErrorFromResponse(r)
 	}
@@ -121,7 +121,6 @@ func (c *Client) VolumeExpand(id string, request *api.VolumeExpandRequest) (
 	// Read JSON response
 	var volume api.VolumeInfoResponse
 	err = utils.GetJsonFromResponse(r, &volume)
-	r.Body.Close()
 	if err != nil {
 		return nil, err
 	}
@@ -149,6 +148,7 @@ func (c *Client) VolumeList() (*api.VolumeListResponse, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer r.Body.Close()
 	if r.StatusCode != http.StatusOK {
 		return nil, utils.GetErrorFromResponse(r)
 	}
@@ -182,6 +182,7 @@ func (c *Client) VolumeInfo(id string) (*api.VolumeInfoResponse, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer r.Body.Close()
 	if r.StatusCode != http.StatusOK {
 		return nil, utils.GetErrorFromResponse(r)
 	}
@@ -189,7 +190,6 @@ func (c *Client) VolumeInfo(id string) (*api.VolumeInfoResponse, error) {
 	// Read JSON response
 	var volume api.VolumeInfoResponse
 	err = utils.GetJsonFromResponse(r, &volume)
-	r.Body.Close()
 	if err != nil {
 		return nil, err
 	}
@@ -216,6 +216,7 @@ func (c *Client) VolumeDelete(id string) error {
 	if err != nil {
 		return err
 	}
+	defer r.Body.Close()
 	if r.StatusCode != http.StatusAccepted {
 		return utils.GetErrorFromResponse(r)
 	}

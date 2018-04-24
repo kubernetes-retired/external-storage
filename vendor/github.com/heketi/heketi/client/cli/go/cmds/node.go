@@ -35,7 +35,7 @@ func init() {
 	nodeCommand.AddCommand(nodeDisableCommand)
 	nodeCommand.AddCommand(nodeListCommand)
 	nodeCommand.AddCommand(nodeRemoveCommand)
-	nodeAddCommand.Flags().IntVar(&zone, "zone", -1, "The zone in which the node should reside")
+	nodeAddCommand.Flags().IntVar(&zone, "zone", 0, "The zone in which the node should reside")
 	nodeAddCommand.Flags().StringVar(&clusterId, "cluster", "", "The cluster in which the node should reside")
 	nodeAddCommand.Flags().StringVar(&managmentHostNames, "management-host-name", "", "Management host name")
 	nodeAddCommand.Flags().StringVar(&storageHostNames, "storage-host-name", "", "Storage host name")
@@ -64,7 +64,7 @@ var nodeAddCommand = &cobra.Command{
 `,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Check arguments
-		if zone == -1 {
+		if zone == 0 {
 			return errors.New("Missing zone")
 		}
 		if managmentHostNames == "" {
@@ -296,13 +296,15 @@ var nodeInfoCommand = &cobra.Command{
 					"State:%-10v"+
 					"Size (GiB):%-8v"+
 					"Used (GiB):%-8v"+
-					"Free (GiB):%-8v\n",
+					"Free (GiB):%-8v"+
+					"Bricks:%-8v\n",
 					d.Id,
 					d.Name,
 					d.State,
 					d.Storage.Total/(1024*1024),
 					d.Storage.Used/(1024*1024),
-					d.Storage.Free/(1024*1024))
+					d.Storage.Free/(1024*1024),
+					len(d.Bricks))
 			}
 		}
 		return nil

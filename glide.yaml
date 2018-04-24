@@ -29,7 +29,7 @@ import:
 - package: k8s.io/kubernetes
   version: v1.10.0-beta.0
 - package: github.com/heketi/heketi
-  version: 300752517908f3456e90d1ee2a773e7dd8ce1afe
+  version: af26821e74991e7b7236f503e6310ec6b1d91f73
   subpackages:
   - client/api/go-client
   - pkg/glusterfs/api
@@ -54,6 +54,10 @@ import:
   - unix
 - package: github.com/onsi/ginkgo
 - package: github.com/onsi/gomega
+- package: github.com/go-ozzo/ozzo-validation
+  version: 2c68ddd4ffc17941d8e940cb1264f68e1d8f0394
+- package: github.com/asaskevich/govalidator
+  version: 7d2e70ef918f16bd6455529af38304d6d025c952
 - package: github.com/digitalocean/godo
   version: ^1.1.1
 - package: github.com/miekg/dns

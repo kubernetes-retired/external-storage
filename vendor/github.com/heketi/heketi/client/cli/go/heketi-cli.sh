@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # bash completion for heketi-cli                           -*- shell-script -*-
 
 __debug()
@@ -66,7 +68,6 @@ __handle_reply()
                 __index_of_word "${flag}" "${flags_with_completion[@]}"
                 if [[ ${index} -ge 0 ]]; then
                     COMPREPLY=()
-                    PREFIX=""
                     cur="${cur#*=}"
                     ${flags_completion[${index}]}
                     if [ -n "${ZSH_VERSION}" ]; then
@@ -201,7 +202,7 @@ __handle_command()
     fi
     c=$((c+1))
     __debug "${FUNCNAME[0]}: looking for ${next_command}"
-    declare -F $next_command >/dev/null && $next_command
+    declare -F "$next_command" >/dev/null && "$next_command"
 }
 
 __handle_word()
@@ -653,6 +654,10 @@ _heketi-cli_setup-openshift-heketi-storage()
 
     flags+=("--listfile=")
     local_nonpersistent_flags+=("--listfile=")
+    flags+=("--durability=")
+    local_nonpersistent_flags+=("--durability=")
+    flags+=("--replica=")
+    local_nonpersistent_flags+=("--replica=")
     flags+=("--json")
     flags+=("--log-flush-frequency=")
     flags+=("--secret=")
@@ -942,6 +947,9 @@ _heketi-cli()
 __start_heketi-cli()
 {
     local cur prev words cword
+    # TODO: What is the use of flaghash?
+    # It seems it's filled but never read?!
+    # shellcheck disable=SC2034
     declare -A flaghash 2>/dev/null || :
     if declare -F _init_completion >/dev/null 2>&1; then
         _init_completion -s || return

@@ -47,6 +47,7 @@ func (c *Client) DeviceAdd(request *api.DeviceAddRequest) error {
 	if err != nil {
 		return err
 	}
+	defer r.Body.Close()
 	if r.StatusCode != http.StatusAccepted {
 		return utils.GetErrorFromResponse(r)
 	}
@@ -82,6 +83,7 @@ func (c *Client) DeviceInfo(id string) (*api.DeviceInfoResponse, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer r.Body.Close()
 	if r.StatusCode != http.StatusOK {
 		return nil, utils.GetErrorFromResponse(r)
 	}
@@ -89,7 +91,6 @@ func (c *Client) DeviceInfo(id string) (*api.DeviceInfoResponse, error) {
 	// Read JSON response
 	var device api.DeviceInfoResponse
 	err = utils.GetJsonFromResponse(r, &device)
-	r.Body.Close()
 	if err != nil {
 		return nil, err
 	}
@@ -116,6 +117,7 @@ func (c *Client) DeviceDelete(id string) error {
 	if err != nil {
 		return err
 	}
+	defer r.Body.Close()
 	if r.StatusCode != http.StatusAccepted {
 		return utils.GetErrorFromResponse(r)
 	}
@@ -161,6 +163,7 @@ func (c *Client) DeviceState(id string,
 	if err != nil {
 		return err
 	}
+	defer r.Body.Close()
 	if r.StatusCode != http.StatusAccepted {
 		return utils.GetErrorFromResponse(r)
 	}
@@ -196,6 +199,7 @@ func (c *Client) DeviceResync(id string) error {
 	if err != nil {
 		return err
 	}
+	defer r.Body.Close()
 	if r.StatusCode != http.StatusAccepted {
 		return utils.GetErrorFromResponse(r)
 	}
