@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/heketi/heketi/client/api/go-client"
@@ -21,8 +22,10 @@ import (
 )
 
 var (
-	cl_block bool
-	cl_file  bool
+	cl_block     bool
+	cl_file      bool
+	cl_block_str string
+	cl_file_str  string
 )
 
 func init() {
@@ -31,22 +34,35 @@ func init() {
 	clusterCommand.AddCommand(clusterDeleteCommand)
 	clusterCommand.AddCommand(clusterListCommand)
 	clusterCommand.AddCommand(clusterInfoCommand)
+	clusterCommand.AddCommand(clusterSetFlagsCommand)
 
 	clusterCreateCommand.Flags().BoolVar(&cl_block, "block", true,
-		"\n\tOptional: Control the possibility of creating block volumes"+
-			"\n\ton the cluster to be created. This is enabled by default."+
-			"\n\tUse '--block=false' to disable creation of block volumes"+
-			"\n\ton this cluster.")
+		"\n\tOptional: Allow the user to control the possibility of creating"+
+			"\n\tblock volumes on the cluster to be created. This is enabled"+
+			"\n\tby default. Use '--block=false' to disable creation of"+
+			"\n\tblock volumes on this cluster.")
 	clusterCreateCommand.Flags().BoolVar(&cl_file, "file", true,
-		"\n\tOptional: Control the possibility of creating regular file"+
-			"\n\tvolumes on the cluster to be created. This is enabled by"+
-			"\n\tdefault. Use '--file=false' to disable creation of file"+
-			"\n\tvolumes on this cluster.")
+		"\n\tOptional: Allow the user to control the possibility of creating"+
+			"\n\tregular file volumes on the cluster to be created."+
+			"\n\tThis is enabled by default. Use '--file=false' to"+
+			"\n\tdisable creation of file volumes on this cluster.")
+
+	clusterSetFlagsCommand.Flags().StringVar(&cl_block_str, "block", "",
+		"\n\tOptional: Allow the user to control the possibility of creating"+
+			"\n\tblock volumes on the cluster. Use '--block=true' to enable"+
+			"\n\tand '--block=false' to disable creation of block volumes"+
+			"\n\ton this cluster.")
+	clusterSetFlagsCommand.Flags().StringVar(&cl_file_str, "file", "",
+		"\n\tOptional: Allow the user to control the possibility of creating"+
+			"\n\tregular file volumes on the cluster. Use '--file=true'"+
+			"\n\tto enable and '--file=false' to disable creation of"+
+			"\n\tfile volumes on this cluster.")
 
 	clusterCreateCommand.SilenceUsage = true
 	clusterDeleteCommand.SilenceUsage = true
 	clusterInfoCommand.SilenceUsage = true
 	clusterListCommand.SilenceUsage = true
+	clusterSetFlagsCommand.SilenceUsage = true
 }
 
 var clusterCommand = &cobra.Command{
@@ -90,6 +106,64 @@ var clusterCreateCommand = &cobra.Command{
 			fmt.Fprintf(stdout, string(data))
 		} else {
 			fmt.Fprintf(stdout, "Cluster id: %v\n", cluster.Id)
+		}
+
+		return nil
+	},
+}
+
+var clusterSetFlagsCommand = &cobra.Command{
+	Use:   "setflags",
+	Short: "Set flags on a cluster",
+	Long:  "Set flags on a cluster",
+	Example: `  * Disable creation of file volumes on a cluster:
+      $ heketi-cli cluster set --file=false 886a86a868711bef83001
+
+  * Enable the creation of block volumes on a cluster:
+      $ heketi-cli cluster set --block=true 886a86a868711bef83001
+`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		s := cmd.Flags().Args()
+		if len(s) < 1 {
+			return errors.New("Cluster id missing")
+		}
+
+		if cl_block_str == "" && cl_file_str == "" {
+			return errors.New("At least one of --file or --block must be specified.")
+		}
+
+		clusterId := cmd.Flags().Arg(0)
+
+		heketi := client.NewClient(options.Url, options.User, options.Key)
+
+		info, err := heketi.ClusterInfo(clusterId)
+		if err != nil {
+			return err
+		}
+
+		req := &api.ClusterSetFlagsRequest{}
+
+		if cl_file_str == "" {
+			req.File = info.File
+		} else {
+			req.File, err = strconv.ParseBool(cl_file_str)
+			if err != nil {
+				return err
+			}
+		}
+
+		if cl_block_str == "" {
+			req.Block = info.Block
+		} else {
+			req.Block, err = strconv.ParseBool(cl_block_str)
+			if err != nil {
+				return err
+			}
+		}
+
+		err = heketi.ClusterSetFlags(clusterId, req)
+		if err != nil {
+			return err
 		}
 
 		return nil
@@ -142,7 +216,6 @@ var clusterInfoCommand = &cobra.Command{
 		// Create a client to talk to Heketi
 		heketi := client.NewClient(options.Url, options.User, options.Key)
 
-		// Create cluster
 		info, err := heketi.ClusterInfo(clusterId)
 		if err != nil {
 			return err

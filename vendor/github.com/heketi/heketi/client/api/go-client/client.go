@@ -72,6 +72,7 @@ func (c *Client) Hello() error {
 	if err != nil {
 		return err
 	}
+	defer r.Body.Close()
 	if r.StatusCode != http.StatusOK {
 		return utils.GetErrorFromResponse(r)
 	}
