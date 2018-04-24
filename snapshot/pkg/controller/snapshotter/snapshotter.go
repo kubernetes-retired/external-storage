@@ -702,10 +702,11 @@ func (vs *volumeSnapshotter) updateVolumeSnapshotMetadata(snapshot *crdv1.Volume
 	// Copy the snapshot object before updating it
 	snapshotCopy := snapshotObj.DeepCopy()
 
-	tags := make(map[string]string)
-	tags[snapshotMetadataTimeStamp] = fmt.Sprintf("%d", time.Now().UnixNano())
-	tags[snapshotMetadataPVName] = pvName
-	snapshotCopy.Metadata.Labels = tags
+	if snapshotCopy.Metadata.Labels == nil {
+		snapshotCopy.Metadata.Labels = make(map[string]string)
+	}
+	snapshotCopy.Metadata.Labels[snapshotMetadataTimeStamp] = fmt.Sprintf("%d", time.Now().UnixNano())
+	snapshotCopy.Metadata.Labels[snapshotMetadataPVName] = pvName
 	glog.Infof("updateVolumeSnapshotMetadata: Metadata UID: %s Metadata Name: %s Metadata Namespace: %s Setting tags in Metadata Labels: %#v.",
 		snapshotCopy.Metadata.UID, snapshotCopy.Metadata.Name, snapshotCopy.Metadata.Namespace, snapshotCopy.Metadata.Labels)
 
