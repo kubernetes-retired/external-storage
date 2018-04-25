@@ -46,6 +46,13 @@ import (
 const (
 	// AnnProvisionedBy is the external provisioner annotation in PV object
 	AnnProvisionedBy = "pv.kubernetes.io/provisioned-by"
+	// AnnSelectedNode is added to a PVC that has been triggered by scheduler to
+	// be dynamically provisioned. Its value is the name of the selected node.
+	AnnSelectedNode = "volume.alpha.kubernetes.io/selected-node"
+	// This annotation is added to a PVC that is supposed to be dynamically
+	// provisioned. Its value is name of volume plugin that is supposed to provision
+	// a volume for this PVC.
+	AnnStorageProvisioner = "volume.beta.kubernetes.io/storage-provisioner"
 	// NodeLabelKey is the label key that this provisioner uses for PV node affinity
 	// hostname is not the best choice, but it's what pod and node affinity also use
 	NodeLabelKey = apis.LabelHostname

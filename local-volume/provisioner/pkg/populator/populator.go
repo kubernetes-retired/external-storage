@@ -41,9 +41,9 @@ func NewPopulator(config *common.RuntimeConfig) *Populator {
 	return &Populator{RuntimeConfig: config}
 }
 
-// Start launches the PV informer
+// Start launches the PV and PVC informer
 func (p *Populator) Start() {
-	_, controller := kcache.NewInformer(
+	_, pvController := kcache.NewInformer(
 		&kcache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				pvs, err := p.Client.Core().PersistentVolumes().List(options)
@@ -82,15 +82,45 @@ func (p *Populator) Start() {
 		},
 	)
 
+	_, pvcController := kcache.NewInformer(
+		&kcache.ListWatch{
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return p.Client.CoreV1().PersistentVolumeClaims(v1.NamespaceAll).List(options)
+			},
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return p.Client.CoreV1().PersistentVolumeClaims(v1.NamespaceAll).Watch(options)
+			},
+		},
+		&v1.PersistentVolumeClaim{},
+		0,
+		kcache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				claim, ok := obj.(*v1.PersistentVolumeClaim)
+				if !ok {
+					glog.Errorf("Added object is not a v1.PersistentVolumeClaim type")
+				}
+				p.handlePVC(claim)
+			},
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				newClaim, ok := newObj.(*v1.PersistentVolumeClaim)
+				if !ok {
+					glog.Errorf("Updated object is not a v1.PersistentVolume type")
+				}
+				p.handlePVC(newClaim)
+			},
+		},
+	)
+
 	glog.Infof("Starting Informer controller")
 	// Controller never stops
-	go controller.Run(make(chan struct{}))
+	go pvController.Run(make(chan struct{}))
+	go pvcController.Run(make(chan struct{}))
 
 	glog.Infof("Waiting for Informer initial sync")
 	wait.Poll(time.Second, 5*time.Minute, func() (bool, error) {
-		return controller.HasSynced(), nil
+		return pvController.HasSynced() && pvcController.HasSynced(), nil
 	})
-	if !controller.HasSynced() {
+	if !pvController.HasSynced() || !pvcController.HasSynced() {
 		glog.Errorf("Informer controller initial sync timeout")
 		os.Exit(1)
 	}
@@ -119,5 +149,26 @@ func (p *Populator) handlePVDelete(pv *v1.PersistentVolume) {
 	if exists {
 		// Don't do cleanup, just delete from cache
 		p.Cache.DeletePV(pv.Name)
+	}
+}
+
+func (p *Populator) shouldProvision(claim *v1.PersistentVolumeClaim) bool {
+	if claim.Spec.VolumeName != "" {
+		// Already bound, skip
+		return false
+	}
+	if claim.Annotations[common.AnnSelectedNode] != p.Node.Name {
+		return false
+	}
+	if claim.Annotations[common.AnnStorageProvisioner] != p.ProvisionerName {
+		return false
+	}
+
+	return true
+}
+
+func (p *Populator) handlePVC(claim *v1.PersistentVolumeClaim) {
+	if p.shouldProvision(claim) {
+		p.ProvisionQueue.Add(claim)
 	}
 }

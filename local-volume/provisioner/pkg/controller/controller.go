@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/util/mount"
 )
 
@@ -48,14 +49,15 @@ func StartLocalController(client *kubernetes.Clientset, config *common.UserConfi
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: provisionerTag})
 
 	runtimeConfig := &common.RuntimeConfig{
-		UserConfig: config,
-		Cache:      cache.NewVolumeCache(),
-		VolUtil:    util.NewVolumeUtil(),
-		APIUtil:    util.NewAPIUtil(client),
-		Client:     client,
-		Tag:        provisionerTag,
-		Recorder:   recorder,
-		Mounter:    mount.New("" /* default mount path */),
+		UserConfig:     config,
+		Cache:          cache.NewVolumeCache(),
+		VolUtil:        util.NewVolumeUtil(),
+		APIUtil:        util.NewAPIUtil(client),
+		Client:         client,
+		Tag:            provisionerTag,
+		Recorder:       recorder,
+		Mounter:        mount.New("" /* default mount path */),
+		ProvisionQueue: workqueue.NewNamed("claimsToProvision"),
 	}
 
 	populator := populator.NewPopulator(runtimeConfig)
