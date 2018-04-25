@@ -23,6 +23,7 @@ import (
 	"github.com/golang/glog"
 
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/cache"
+	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/capacityreconciler"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/deleter"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/discovery"
@@ -91,6 +92,9 @@ func StartLocalController(client *kubernetes.Clientset, config *common.UserConfi
 	dynamicProvisioningManager.Start()
 
 	deleter := deleter.NewDeleter(runtimeConfig, cleanupTracker, dynamicProvisioningManager.DeleteLocalVolume)
+
+	capacityReconciler := capacityreconciler.NewReconciler(runtimeConfig, dynamicProvisioningManager.GetCapacity)
+	capacityReconciler.Reconcile()
 
 	glog.Info("Controller started\n")
 	for {
