@@ -80,7 +80,7 @@ func TestLoadProvisionerConfigs(t *testing.T) {
 		os.RemoveAll(tmpConfigPath)
 	}()
 	provisionerConfig := &ProvisionerConfiguration{
-		StorageClassConfig: make(map[string]MountConfig),
+		StorageClassConfig: make(map[string]StorageClassConfig),
 	}
 	err = LoadProvisionerConfigs(tmpConfigPath, provisionerConfig)
 	if err != nil {

@@ -91,7 +91,7 @@ func (d *Deleter) deletePV(pv *v1.PersistentVolume) error {
 		return fmt.Errorf("Unknown storage class name %s", pv.Spec.StorageClassName)
 	}
 
-	mountPath, err := common.GetContainerPath(pv, config)
+	mountPath, err := common.GetContainerPath(pv, *config.MountConfig)
 	if err != nil {
 		return err
 	}
@@ -137,10 +137,10 @@ func (d *Deleter) deletePV(pv *v1.PersistentVolume) error {
 
 	if runjob {
 		// If we are dealing with block volumes and using jobs based cleaning for it.
-		return d.runJob(pv, mountPath, config)
+		return d.runJob(pv, mountPath, *config.MountConfig)
 	}
 
-	return d.runProcess(pv, volMode, mountPath, config)
+	return d.runProcess(pv, volMode, mountPath, *config.MountConfig)
 }
 
 func (d *Deleter) runProcess(pv *v1.PersistentVolume, volMode v1.PersistentVolumeMode, mountPath string,

@@ -34,7 +34,7 @@ func main() {
 	flag.Parse()
 
 	provisionerConfig := common.ProvisionerConfiguration{
-		StorageClassConfig: make(map[string]common.MountConfig),
+		StorageClassConfig: make(map[string]common.StorageClassConfig),
 	}
 	if err := common.LoadProvisionerConfigs(common.ProvisionerConfigPath, &provisionerConfig); err != nil {
 		glog.Fatalf("Error parsing Provisioner's configuration: %#v. Exiting...\n", err)
@@ -57,18 +57,25 @@ func main() {
 		glog.Warningf("JOB_CONTAINER_IMAGE environment variable not set.\n")
 	}
 
+	provisionerName := os.Getenv("PROVISIONER_NAME")
+	if provisionerName == "" {
+		provisionerName = "local-volume-provisioner"
+	}
+
 	client := common.SetupClient()
 	node := getNode(client, nodeName)
 
 	glog.Info("Starting controller\n")
 	controller.StartLocalController(client, &common.UserConfig{
-		Node:              node,
-		DiscoveryMap:      provisionerConfig.StorageClassConfig,
-		NodeLabelsForPV:   provisionerConfig.NodeLabelsForPV,
-		UseAlphaAPI:       provisionerConfig.UseAlphaAPI,
-		UseJobForCleaning: provisionerConfig.UseJobForCleaning,
-		Namespace:         namespace,
-		JobContainerImage: jobImage,
+		Node:               node,
+		ProvisionerName:    provisionerName,
+		DiscoveryMap:       common.GetDiscoveryConfigsFromProvisionerConfigs(&provisionerConfig),
+		ProvisionSourceMap: common.GetStorageSourceConfigsFromProvisionerConfigs(&provisionerConfig),
+		NodeLabelsForPV:    provisionerConfig.NodeLabelsForPV,
+		UseAlphaAPI:        provisionerConfig.UseAlphaAPI,
+		UseJobForCleaning:  provisionerConfig.UseJobForCleaning,
+		Namespace:          namespace,
+		JobContainerImage:  jobImage,
 	})
 }
 

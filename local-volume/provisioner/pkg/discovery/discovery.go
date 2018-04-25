@@ -28,6 +28,7 @@ import (
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/deleter"
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/util/mount"
 )
 
 // Discoverer finds available volumes and creates PVs for them
@@ -141,7 +142,7 @@ func (d *Discoverer) DiscoverLocalVolumes() {
 	}
 }
 
-func (d *Discoverer) discoverVolumesAtPath(class string, config common.MountConfig) {
+func (d *Discoverer) discoverVolumesAtPath(class string, config common.DiscoveryConfig) {
 	glog.V(7).Infof("Discovering volumes at hostpath %q, mount path %q for storage class %q", config.HostDir, config.MountDir, class)
 
 	files, err := d.VolUtil.ReadDir(config.MountDir)
@@ -172,15 +173,7 @@ func (d *Discoverer) discoverVolumesAtPath(class string, config common.MountConf
 		}
 		// Check if PV already exists for it
 		pvName := generatePVName(file, d.Node.Name, class)
-		pv, exists := d.Cache.GetPV(pvName)
-		if exists {
-			if volMode == v1.PersistentVolumeBlock && (pv.Spec.VolumeMode == nil ||
-				*pv.Spec.VolumeMode != v1.PersistentVolumeBlock) {
-				errStr := fmt.Sprintf("Incorrect Volume Mode: PV %q (path %q) was not created in block mode. "+
-					"Please check if BlockVolume features gate has been enabled for the cluster.", pvName, filePath)
-				glog.Errorf(errStr)
-				d.Recorder.Eventf(pv, v1.EventTypeWarning, common.EventVolumeFailedDelete, errStr)
-			}
+		if _, exists := d.Cache.GetPV(pvName); exists {
 			continue
 		}
 
@@ -201,6 +194,16 @@ func (d *Discoverer) discoverVolumesAtPath(class string, config common.MountConf
 				glog.Errorf("Path %q block stats error: %v", filePath, err)
 				continue
 			}
+			// Check if device still in state of mounted
+			refs, err := getMountRefsByDev(mountPoints, filePath)
+			if err != nil {
+				glog.Errorf("Error retreiving mounting information of %s: %v", filePath, err)
+				continue
+			}
+			if len(refs) > 0 {
+				glog.Errorf("Path %s still mounted, skipping...", filePath)
+				continue
+			}
 		case v1.PersistentVolumeFilesystem:
 			// Validate that this path is an actual mountpoint
 			if _, isMntPnt := mountPointMap[filePath]; isMntPnt == false {
@@ -217,7 +220,7 @@ func (d *Discoverer) discoverVolumesAtPath(class string, config common.MountConf
 			continue
 		}
 
-		d.createPV(file, class, config, capacityByte, volMode)
+		d.createPV(file, class, config, capacityByte)
 	}
 }
 
@@ -252,21 +255,26 @@ func generatePVName(file, node, class string) string {
 	return fmt.Sprintf("local-pv-%x", h.Sum32())
 }
 
-func (d *Discoverer) createPV(file, class string, config common.MountConfig, capacityByte int64, volMode v1.PersistentVolumeMode) {
+func (d *Discoverer) createPV(file, class string, config common.DiscoveryConfig, capacityByte int64) {
 	pvName := generatePVName(file, d.Node.Name, class)
 	outsidePath := filepath.Join(config.HostDir, file)
 
 	glog.Infof("Found new volume of volumeMode %q at host path %q with capacity %d, creating Local PV %q",
-		volMode, outsidePath, capacityByte, pvName)
+		config.VolumeMode, outsidePath, capacityByte, pvName)
 
 	localPVConfig := &common.LocalPVConfig{
-		Name:            pvName,
-		HostPath:        outsidePath,
-		Capacity:        roundDownCapacityPretty(capacityByte),
-		StorageClass:    class,
-		ProvisionerName: d.Name,
-		VolumeMode:      volMode,
-		Labels:          d.Labels,
+		Name:           pvName,
+		HostPath:       outsidePath,
+		Capacity:       roundDownCapacityPretty(capacityByte),
+		StorageClass:   class,
+		ProvisionerTag: d.Tag,
+		VolumeMode:     config.VolumeMode,
+		Labels:         d.Labels,
+		AccessModes: []v1.PersistentVolumeAccessMode{
+			v1.ReadWriteOnce,
+		},
+		ReclaimPolicy: v1.PersistentVolumeReclaimDelete,
+		AdditionalAnn: map[string]string{},
 	}
 
 	if d.UseAlphaAPI {
@@ -301,4 +309,31 @@ func roundDownCapacityPretty(capacityBytes int64) int64 {
 		}
 	}
 	return capacityBytes
+}
+
+func getMountRefsByDev(mps []mount.MountPoint, mountPath string) ([]string, error) {
+	slTarget, err := filepath.EvalSymlinks(mountPath)
+	if err != nil {
+		slTarget = mountPath
+	}
+
+	// Finding the device mounted to mountPath
+	diskDev := ""
+	for i := range mps {
+		if slTarget == mps[i].Path {
+			diskDev = mps[i].Device
+			break
+		}
+	}
+
+	// Find all references to the device.
+	var refs []string
+	for i := range mps {
+		if mps[i].Device == diskDev || mps[i].Device == slTarget {
+			if mps[i].Path != slTarget {
+				refs = append(refs, mps[i].Path)
+			}
+		}
+	}
+	return refs, nil
 }

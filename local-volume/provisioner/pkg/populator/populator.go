@@ -102,11 +102,11 @@ func (p *Populator) handlePVUpdate(pv *v1.PersistentVolume) {
 		p.Cache.UpdatePV(pv)
 	} else {
 		if pv.Annotations != nil {
-			provisioner, found := pv.Annotations[common.AnnProvisionedBy]
+			provisionerTag, found := pv.Annotations[common.AnnProvisionedBy]
 			if !found {
 				return
 			}
-			if provisioner == p.Name {
+			if provisionerTag == p.Tag {
 				// This PV was created by this provisioner
 				p.Cache.AddPV(pv)
 			}

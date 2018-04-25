@@ -41,11 +41,11 @@ import (
 func StartLocalController(client *kubernetes.Clientset, config *common.UserConfig) {
 	glog.Info("Initializing volume cache\n")
 
-	provisionerName := fmt.Sprintf("local-volume-provisioner-%v-%v", config.Node.Name, config.Node.UID)
+	provisionerTag := fmt.Sprintf("local-volume-provisioner-%v-%v", config.Node.Name, config.Node.UID)
 
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(client.CoreV1().RESTClient()).Events("")})
-	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: provisionerName})
+	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: provisionerTag})
 
 	runtimeConfig := &common.RuntimeConfig{
 		UserConfig: config,
@@ -53,7 +53,7 @@ func StartLocalController(client *kubernetes.Clientset, config *common.UserConfi
 		VolUtil:    util.NewVolumeUtil(),
 		APIUtil:    util.NewAPIUtil(client),
 		Client:     client,
-		Name:       provisionerName,
+		Tag:        provisionerTag,
 		Recorder:   recorder,
 		Mounter:    mount.New("" /* default mount path */),
 	}

@@ -35,10 +35,10 @@ import (
 )
 
 const (
-	testHostDir         = "/mnt/disks"
-	testMountDir        = "/discoveryPath"
-	testNodeName        = "test-node"
-	testProvisionerName = "test-provisioner"
+	testHostDir        = "/mnt/disks"
+	testMountDir       = "/discoveryPath"
+	testNodeName       = "test-node"
+	testProvisionerTag = "test-provisioner"
 )
 
 var nodeLabels = map[string]string{
@@ -65,14 +65,18 @@ var testNode = &v1.Node{
 	},
 }
 
-var scMapping = map[string]common.MountConfig{
+var scMapping = map[string]common.DiscoveryConfig{
 	"sc1": {
-		HostDir:  testHostDir + "/dir1",
-		MountDir: testMountDir + "/dir1",
+		MountConfig: &common.MountConfig{
+			HostDir:  testHostDir + "/dir1",
+			MountDir: testMountDir + "/dir1",
+		},
 	},
 	"sc2": {
-		HostDir:  testHostDir + "/dir2",
-		MountDir: testMountDir + "/dir2",
+		MountConfig: &common.MountConfig{
+			HostDir:  testHostDir + "/dir2",
+			MountDir: testMountDir + "/dir2",
+		},
 	},
 }
 
@@ -297,6 +301,9 @@ func testSetup(t *testing.T, test *testConfig, useAlphaAPI bool) *Discoverer {
 			{Path: "/discoveryPath/dir2"},
 			{Path: "/discoveryPath/dir1/mount3"},
 			{Path: "/discoveryPath/dir1/mount4"},
+			{Path: "/discoveryPath/dir1/symlink2", Device: "device1"},
+			{Path: "/discoveryPath/dir2/symlink2", Device: "device2"},
+			{Path: "/discoveryPath/dir1/symlink3", Device: "device3"},
 		},
 	}
 
@@ -311,7 +318,7 @@ func testSetup(t *testing.T, test *testConfig, useAlphaAPI bool) *Discoverer {
 		Cache:      test.cache,
 		VolUtil:    test.volUtil,
 		APIUtil:    test.apiUtil,
-		Name:       testProvisionerName,
+		Tag:        testProvisionerTag,
 		Mounter:    fm,
 	}
 	d, err := NewDiscoverer(runConfig, test.cleanupTracker)
@@ -400,13 +407,13 @@ func verifyProvisionerName(t *testing.T, pv *v1.PersistentVolume) {
 		t.Errorf("Annotations not set")
 		return
 	}
-	name, found := pv.Annotations[common.AnnProvisionedBy]
+	tag, found := pv.Annotations[common.AnnProvisionedBy]
 	if !found {
 		t.Errorf("Provisioned by annotations not set")
 		return
 	}
-	if name != testProvisionerName {
-		t.Errorf("Provisioned name is %q, expected %q", name, testProvisionerName)
+	if tag != testProvisionerTag {
+		t.Errorf("Provisioned name is %q, expected %q", tag, testProvisionerTag)
 	}
 }
 

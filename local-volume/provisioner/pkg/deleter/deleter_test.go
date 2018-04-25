@@ -481,11 +481,13 @@ func testSetup(t *testing.T, config *testConfig, cleanupCmd []string, useJobForC
 	config.apiUtil = util.NewFakeAPIUtil(config.apiShouldFail, config.cache)
 
 	userConfig := &common.UserConfig{
-		DiscoveryMap: map[string]common.MountConfig{
+		DiscoveryMap: map[string]common.DiscoveryConfig{
 			testStorageClass: {
-				HostDir:             testHostDir,
-				MountDir:            testMountDir,
-				BlockCleanerCommand: cleanupCmd,
+				MountConfig: &common.MountConfig{
+					HostDir:             testHostDir,
+					MountDir:            testMountDir,
+					BlockCleanerCommand: cleanupCmd,
+				},
 			},
 		},
 		Node:              &v1.Node{ObjectMeta: meta_v1.ObjectMeta{Name: "somehost.acme.com"}},
