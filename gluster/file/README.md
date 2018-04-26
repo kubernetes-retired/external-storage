@@ -57,6 +57,8 @@ parameters:
     volumetype: "replicate:3"
     volumeoptions: "features.shard enable"
     volumenameprefix: "dept-dev"
+    smartclone: "true"
+    snapfactor: "10"
 ```
 
 * `resturl` : Gluster REST service/Heketi service url which provision gluster File volumes on demand. The general format should be `IPaddress:Port` and this is a mandatory parameter for glusterfile dynamic provisioner. If Heketi service is exposed as a routable service in openshift/kubernetes setup, this can have a format similar to
@@ -96,6 +98,11 @@ For available volume options and its administration refer: ([Administration Guid
 `volumenameprefix_Namespace_PVCname_randomUUID`
 
 Please note that, the value for this parameter cannot contain `_` in storageclass. This is an optional parameter.
+
+* `cloneenabled` : This option allows to create clone of PVCs if pvc is annotated with `k8s.io/CloneRequest`. The new PVC will be clone of pvc specified as the field value of `k8s.io/CloneRequest` annotation. This is an optional parameter and by default
+this option is false/disabled.
+
+* `snapfactor`: Dynamically provisioned volume's thinpool size can be configured with this parameter. The value for the parameter should be in range of 1-100, this value will be taken into account while creating thinpool for the provisioned volume. This is an optional parameter with default value of 1.
 
 Additional Reference:
 
