@@ -38,22 +38,30 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
 const (
-	provisionerName    = "gluster.org/glusterfile"
-	provisionerNameKey = "PROVISIONER_NAME"
-	descAnn            = "Gluster-external: Dynamically provisioned PV"
-	restStr            = "server"
-	dynamicEpSvcPrefix = "glusterfile-dynamic-"
-	replicaCount       = 3
-	secretKeyName      = "key" // key name used in secret
-	volPrefix          = "vol_"
-	mountStr           = "auto_unmount"
-	glusterTypeAnn     = "gluster.org/type"
-	heketiVolIDAnn     = "gluster.org/heketi-volume-id"
-	gidAnn             = "pv.beta.kubernetes.io/gid"
+	provisionerName           = "gluster.org/glusterfile"
+	provisionerNameKey        = "PROVISIONER_NAME"
+	descAnn                   = "Gluster-external: Dynamically provisioned PV"
+	restStr                   = "server"
+	dynamicEpSvcPrefix        = "glusterfile-dynamic-"
+	replicaCount              = 3
+	secretKeyName             = "key" // key name used in secret
+	volPrefix                 = "vol_"
+	mountStr                  = "auto_unmount"
+	glusterTypeAnn            = "gluster.org/type"
+	heketiVolIDAnn            = "gluster.org/heketi-volume-id"
+	gidAnn                    = "pv.beta.kubernetes.io/gid"
+	defaultThinPoolSnapFactor = float32(1.0) // thin pool snap factor default to 1.0
+
+	// CloneRequestAnn is an annotation to request that the PVC be provisioned as a clone of the referenced PVC
+	CloneRequestAnn = "k8s.io/CloneRequest"
+
+	// CloneOfAnn is an annotation to indicate that a PVC is a clone of the referenced PVC
+	CloneOfAnn = "k8s.io/CloneOf"
 )
 
 type glusterfileProvisioner struct {
@@ -65,18 +73,19 @@ type glusterfileProvisioner struct {
 }
 
 type provisionerConfig struct {
-	url              string
-	user             string
-	userKey          string
-	secretNamespace  string
-	secretName       string
-	secretValue      string
-	clusterID        string
-	gidMin           int
-	gidMax           int
-	volumeType       gapi.VolumeDurabilityInfo
-	volumeOptions    []string
-	volumeNamePrefix string
+	url                string
+	user               string
+	userKey            string
+	secretNamespace    string
+	secretName         string
+	secretValue        string
+	clusterID          string
+	gidMin             int
+	gidMax             int
+	volumeType         gapi.VolumeDurabilityInfo
+	volumeOptions      []string
+	volumeNamePrefix   string
+	thinPoolSnapFactor float32
 }
 
 //NewglusterfileProvisioner create a new provisioner.
@@ -98,9 +107,40 @@ func (p *glusterfileProvisioner) GetAccessModes() []v1.PersistentVolumeAccessMod
 	}
 }
 
+func (p *glusterfileProvisioner) getPVC(ns string, name string) (*v1.PersistentVolumeClaim, error) {
+	return p.client.CoreV1().PersistentVolumeClaims(ns).Get(name, metav1.GetOptions{})
+}
+
+func (p *glusterfileProvisioner) annotatePVC(ns string, name string, updates map[string]string) error {
+	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		// Retrieve the latest version of PVC before attempting update
+		// RetryOnConflict uses exponential backoff to avoid exhausting the apiserver
+		result, getErr := p.client.CoreV1().PersistentVolumeClaims(ns).Get(name, metav1.GetOptions{})
+		if getErr != nil {
+			panic(fmt.Errorf("Failed to get latest version of PVC: %v", getErr))
+		}
+
+		for k, v := range updates {
+			result.Annotations[k] = v
+		}
+		_, updateErr := p.client.CoreV1().PersistentVolumeClaims(ns).Update(result)
+		return updateErr
+	})
+	if retryErr != nil {
+		glog.Errorf("Update failed: %v", retryErr)
+		return retryErr
+	}
+	return nil
+}
+
 // Provision creates a storage asset and returns a PV object representing it.
 func (p *glusterfileProvisioner) Provision(options controller.VolumeOptions) (*v1.PersistentVolume, error) {
 
+	sourceVolID := ""
+	volID := ""
+	var glusterfs *v1.GlusterfsVolumeSource
+
+	smartclone := true
 	if options.PVC.Spec.Selector != nil {
 		return nil, fmt.Errorf("claim Selector is not supported")
 	}
@@ -114,6 +154,8 @@ func (p *glusterfileProvisioner) Provision(options controller.VolumeOptions) (*v
 	gidAllocate := true
 	for k, v := range options.Parameters {
 		switch dstrings.ToLower(k) {
+		case "smartclone":
+			smartclone = dstrings.ToLower(v) == "true"
 		case "gidmin":
 		// Let allocator handle
 		case "gidmax":
@@ -154,11 +196,70 @@ func (p *glusterfileProvisioner) Provision(options controller.VolumeOptions) (*v
 	volSizeBytes := volSize.Value()
 	volszInt := int(util.RoundUpToGiB(volSizeBytes))
 
-	glusterfs, sizeGiB, volID, err := p.CreateVolume(gid, cfg, volszInt)
-	if err != nil {
-		glog.Errorf("failed to create volume: %v", err)
-		return nil, fmt.Errorf("failed to create volume: %v", err)
+	if smartclone && (options.PVC.Annotations[CloneRequestAnn] != "") {
+		if sourcePVCRef, ok := options.PVC.Annotations[CloneRequestAnn]; ok {
+			var ns string
+			parts := dstrings.SplitN(sourcePVCRef, "/", 2)
+			if len(parts) < 2 {
+				ns = options.PVC.Namespace
+			} else {
+				ns = parts[0]
+			}
+			sourcePVCName := parts[len(parts)-1]
+			sourcePVC, err := p.getPVC(ns, sourcePVCName)
+			if err != nil {
+				return nil, fmt.Errorf("Unable to get PVC %s/%s", ns, sourcePVCName)
+			}
+			if sourceVolID, ok = sourcePVC.Annotations[heketiVolIDAnn]; ok {
+				glog.Infof("Requesting clone of heketi volumeID %s", sourceVolID)
+				cGlusterfs, sizeGiB, cVolID, createCloneErr := p.createVolumeClone(sourceVolID, cfg)
+				if createCloneErr != nil {
+					glog.Errorf("failed to create clone of %v: %v", sourceVolID, createCloneErr)
+					return nil, fmt.Errorf("failed to create clone of %v: %v", sourceVolID, createCloneErr)
+				}
+				if cGlusterfs != nil {
+					glusterfs = cGlusterfs
+				}
+				volID = cVolID
+				glog.Infof("glusterfs volume source %v with size %d retrieved", cGlusterfs, sizeGiB)
+				err = p.annotateClonedPVC(cVolID, options.PVC, sourceVolID)
+				if err != nil {
+					glog.Errorf("Failed to annotate cloned PVC: %v", err)
+					return nil, fmt.Errorf("failed to annotate cloned PVC %s :%v", options.PVC, err)
+					//todo: cleanup?
+				}
+			} else {
+				return nil, fmt.Errorf("PVC %s/%s missing %s annotation",
+					ns, sourcePVCName, heketiVolIDAnn)
+			}
+		}
+	} else {
+
+		nGlusterfs, sizeGiB, nVolID, createErr := p.CreateVolume(gid, cfg, volszInt)
+		if createErr != nil {
+			glog.Errorf("failed to create volume: %v", createErr)
+			return nil, fmt.Errorf("failed to create volume: %v", createErr)
+		}
+		glog.Infof("glusterfs volume source %v with size %d retrieved", nGlusterfs, sizeGiB)
+		if nGlusterfs != nil {
+			glusterfs = nGlusterfs
+		}
+		volID = nVolID
+		annotations := make(map[string]string, 2)
+		annotations[heketiVolIDAnn] = nVolID
+		annotateErr := p.annotatePVC(options.PVC.Namespace, options.PVC.Name, annotations)
+		if annotateErr != nil {
+			glog.Errorf("annotating PVC %v failed: %v", options.PVC.Name, annotateErr)
+
+		}
+		glog.V(1).Infof("successfully created Gluster File volume %+v with size and volID", glusterfs, sizeGiB, volID)
 	}
+
+	if glusterfs == nil {
+		glog.Errorf("retrieved glusterfs volume source is nil")
+		return nil, fmt.Errorf("retrieved glusterfs volume source is nil")
+	}
+
 	mode := v1.PersistentVolumeFilesystem
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
@@ -184,8 +285,71 @@ func (p *glusterfileProvisioner) Provision(options controller.VolumeOptions) (*v
 			},
 		},
 	}
-	glog.V(1).Infof("successfully created Gluster File volume %+v with size", pv.Spec.PersistentVolumeSource.Glusterfs, sizeGiB)
+
 	return pv, nil
+}
+
+func (p *glusterfileProvisioner) createVolumeClone(sourceVolID string, config *provisionerConfig) (r *v1.GlusterfsVolumeSource, size int, volID string, err error) {
+
+	if config.url == "" {
+		glog.Errorf("REST server endpoint is empty")
+		return nil, 0, "", fmt.Errorf("failed to create glusterfs REST client, REST URL is empty")
+	}
+
+	cli := gcli.NewClient(config.url, config.user, config.secretValue)
+	if cli == nil {
+		glog.Errorf("failed to create glusterfs REST client")
+		return nil, 0, "", fmt.Errorf("failed to create glusterfs REST client, REST server authentication failed")
+	}
+	cloneReq := &gapi.VolumeCloneRequest{}
+	cloneVolInfo, cloneErr := cli.VolumeClone(sourceVolID, cloneReq)
+	if cloneErr != nil {
+		glog.Errorf("failed to clone of volume %v: %v", sourceVolID, cloneErr)
+		return nil, 0, "", fmt.Errorf("failed to clone of volume %v: %v", sourceVolID, cloneErr)
+	}
+	glog.V(1).Infof("volume with size %d and name %s created", cloneVolInfo.Size, cloneVolInfo.Name)
+
+	volID = cloneVolInfo.Id
+	dynamicHostIps, err := getClusterNodes(cli, cloneVolInfo.Cluster)
+	if err != nil {
+		glog.Errorf("error [%v] when getting cluster nodes for volume %s", err, cloneVolInfo.Name)
+		return nil, 0, "", fmt.Errorf("error [%v] when getting cluster nodes for volume %s", err, cloneVolInfo.Name)
+	}
+
+	epServiceName := dynamicEpSvcPrefix + p.options.PVC.Name
+	epNamespace := p.options.PVC.Namespace
+	endpoint, service, err := p.createEndpointService(epNamespace, epServiceName, dynamicHostIps, p.options.PVC.Name)
+	if err != nil {
+		glog.Errorf("failed to create endpoint/service %v/%v: %v", epNamespace, epServiceName, err)
+		deleteErr := cli.VolumeDelete(cloneVolInfo.Id)
+		if deleteErr != nil {
+			glog.Errorf("error when deleting the volume: %v, manual deletion required", deleteErr)
+		}
+		return nil, 0, "", fmt.Errorf("failed to create endpoint/service %v/%v: %v", epNamespace, epServiceName, err)
+	}
+	glog.V(3).Infof("dynamic endpoint %v and service %v", endpoint, service)
+
+	return &v1.GlusterfsVolumeSource{
+		EndpointsName: endpoint.Name,
+		Path:          cloneVolInfo.Name,
+		ReadOnly:      false,
+	}, cloneVolInfo.Size, cloneVolInfo.Id, nil
+}
+
+func (p *glusterfileProvisioner) annotateClonedPVC(VolID string, pvc *v1.PersistentVolumeClaim, SourceVolID string) error {
+	annotations := make(map[string]string, 2)
+	annotations[heketiVolIDAnn] = VolID
+
+	// Add clone annotation if this is a cloned volume
+	if sourcePVCName, ok := pvc.Annotations[CloneRequestAnn]; ok {
+		if SourceVolID != "" {
+			glog.Infof("Annotating PVC %s/%s as a clone of PVC %s/%s",
+				pvc.Namespace, pvc.Name, pvc.Namespace, sourcePVCName)
+			annotations[CloneOfAnn] = sourcePVCName
+		}
+	}
+	err := p.annotatePVC(pvc.Namespace, pvc.Name, annotations)
+	return err
 }
 
 func (p *glusterfileProvisioner) CreateVolume(gid *int, config *provisionerConfig, sz int) (r *v1.GlusterfsVolumeSource, size int, volID string, err error) {
@@ -215,7 +379,17 @@ func (p *glusterfileProvisioner) CreateVolume(gid *int, config *provisionerConfi
 	}
 
 	gid64 := int64(*gid)
-	volumeReq := &gapi.VolumeCreateRequest{Size: sz, Name: customVolumeName, Clusters: clusterIDs, Gid: gid64, Durability: config.volumeType, GlusterVolumeOptions: p.volumeOptions}
+
+	snaps := struct {
+		Enable bool    `json:"enable"`
+		Factor float32 `json:"factor"`
+	}{
+		true,
+		config.thinPoolSnapFactor,
+	}
+
+	volumeReq := &gapi.VolumeCreateRequest{Size: sz, Name: customVolumeName, Clusters: clusterIDs, Gid: gid64, Durability: p.volumeType, GlusterVolumeOptions: p.volumeOptions, Snapshot: snaps}
+
 	volume, err := cli.VolumeCreate(volumeReq)
 	if err != nil {
 		glog.Errorf("failed to create gluster volume: %v", err)
@@ -588,6 +762,9 @@ func (p *glusterfileProvisioner) parseClassParameters(params map[string]string, 
 	parseVolumeType := ""
 	parseVolumeOptions := ""
 	parseVolumeNamePrefix := ""
+	parseThinPoolSnapFactor := ""
+
+	cfg.thinPoolSnapFactor = defaultThinPoolSnapFactor
 
 	for k, v := range params {
 		switch dstrings.ToLower(k) {
@@ -619,8 +796,13 @@ func (p *glusterfileProvisioner) parseClassParameters(params map[string]string, 
 			if len(v) != 0 {
 				parseVolumeNamePrefix = v
 			}
+		case "snapfactor":
+			if len(v) != 0 {
+				parseThinPoolSnapFactor = v
+			}
 		case "gidmin":
 		case "gidmax":
+		case "smartclone":
 		default:
 			return nil, fmt.Errorf("invalid option %q for volume plugin %s", k, provisionerName)
 		}
@@ -703,6 +885,17 @@ func (p *glusterfileProvisioner) parseClassParameters(params map[string]string, 
 			return nil, fmt.Errorf("Storageclass parameter 'volumenameprefix' should not contain '_' in its value")
 		}
 		cfg.volumeNamePrefix = parseVolumeNamePrefix
+	}
+
+	if len(parseThinPoolSnapFactor) != 0 {
+		thinPoolSnapFactor, err := strconv.ParseFloat(parseThinPoolSnapFactor, 32)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert snapfactor value %v to float32: %v", parseThinPoolSnapFactor, err)
+		}
+		if thinPoolSnapFactor < 1.0 || thinPoolSnapFactor > 100.0 {
+			return nil, fmt.Errorf("invalid snapshot factor %v, the value of snapfactor must be between 1 to 100", thinPoolSnapFactor)
+		}
+		cfg.thinPoolSnapFactor = float32(thinPoolSnapFactor)
 	}
 	return &cfg, nil
 }
