@@ -17,7 +17,10 @@ FROM centos:7
 RUN yum update -y && \
     yum install -y e2fsprogs && \
     yum install -y hdparm && \
+    yum install -y lvm2 && \
     yum clean all
+
+RUN sed -i.save -e "s#udev_sync = 1#udev_sync = 0#" -e "s#udev_rules = 1#udev_rules = 0#" -e "s#use_lvmetad = 1#use_lvmetad = 0#" /etc/lvm/lvm.conf
 
 ADD local-volume-provisioner /local-provisioner
 ADD scripts /scripts

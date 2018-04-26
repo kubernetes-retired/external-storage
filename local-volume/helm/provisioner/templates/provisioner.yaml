@@ -3,12 +3,21 @@
 {{- range $tmp, $val := $classPath }}
    {{- range $storageClass, $classConfig := $val }}
 {{ $storageClass }}:
+   {{- if $classConfig.hostDir }}
    hostDir: {{ $classConfig.hostDir }}
    mountDir: {{ if $classConfig.mountDir }} {{$classConfig.mountDir }} {{ else }} {{ $classConfig.hostDir }} {{ end }}
+   {{- end }}
    {{- if $classConfig.blockCleanerCommand }}
    blockCleanerCommand:
    {{- range $tmp, $val := $classConfig.blockCleanerCommand }}
      - "{{ $val -}}"{{- end}}
+   {{- end }}
+   {{- if $classConfig.volumeMode }}
+   volumeMode: {{ $classConfig.volumeMode }}
+   {{- end }}
+   {{- if $classConfig.lvmVolumeGroup }}
+   lvm:
+     volumeGroup: {{ $classConfig.lvmVolumeGroup }}
    {{- end }}
 {{- end}}
 {{- end}}
@@ -61,6 +70,7 @@ data:
 {{- if eq ( $engine | lower ) "gcepost19" }} {{ include "configStorageClass" (.Values.configmap.gcePost19.storageClass) | indent 4 }} {{ end }}
 {{- if eq ( $engine | lower ) "gke" }} {{ include "configStorageClass" (.Values.configmap.gke.storageClass) | indent 4 }} {{ end }}
 {{- if eq ( $engine | lower ) "baremetal" }} {{ include "configStorageClass" (.Values.configmap.baremetal.storageClass) | indent 4 }} {{ end }}
+{{- if .Values.common.dynamic }} {{ include "configStorageClass" (.Values.configmap.lvm.storageClass) | indent 4 }} {{- end }}
 ---
 apiVersion: extensions/v1beta1
 kind: DaemonSet
@@ -109,6 +119,10 @@ spec:
 {{- if eq ( $engine | lower ) "gcepost19" }} {{ include "configVolumeMounts" (.Values.configmap.gcePost19.storageClass) | indent 12 }} {{ end }}
 {{- if eq ( $engine | lower ) "gke" }} {{ include "configVolumeMounts" (.Values.configmap.gke.storageClass) | indent 12 }} {{ end }}
 {{- if eq ( $engine | lower ) "baremetal" }} {{ include "configVolumeMounts" (.Values.configmap.baremetal.storageClass) | indent 12 }} {{ end }}
+{{- if .Values.common.dynamic }}
+            - mountPath:  /dev
+              name: lvm-root
+{{- end }}
       volumes:
         - name: provisioner-config
           configMap:
@@ -117,3 +131,8 @@ spec:
 {{- if eq ( $engine | lower ) "gcepost19" }} {{ include "configVolumes" (.Values.configmap.gcePost19.storageClass) | indent 8 }} {{ end }}
 {{- if eq ( $engine | lower ) "gke" }} {{ include "configVolumes" (.Values.configmap.gke.storageClass) | indent 8 }} {{ end }}
 {{- if eq ( $engine | lower ) "baremetal" }} {{ include "configVolumes" (.Values.configmap.baremetal.storageClass) | indent 8 }} {{ end }}
+{{- if .Values.common.dynamic }}
+        - name: lvm-root
+          hostPath:
+            path: /dev
+{{- end }}

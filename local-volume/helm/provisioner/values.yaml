@@ -7,6 +7,10 @@ common:
   # Defines the namespace where provisioner runs
   #
   namespace: default
+  #
+  # Defines whether to enbale dynamic provisioning.
+  #
+  dynamic: true
 configmap:
   #
   # Defines the name of configmap used by Provisioner
@@ -19,8 +23,10 @@ configmap:
   #    - {storage class name}:
   #        hostDir: "{path on the host where local volume of this storage class are mounted}"
   #        mountDir: "{Optional path where a local volume will be mounted inside of a container}"
+  #        volumeMode: "{Optional field to specify intended volume mode of created pvs}"
+  #        lvmVolumeGroup: "{Optional field to specify input lvm volume group for dynamic provisioning}"
   #
-  # Note: At least one storage class must be configuredi, baremetal is used as default if no
+  # Note: At least one storage class must be configured, baremetal is used as default if no
   # explicit environment is specified in helm template command line.
   baremetal:
     storageClass:
@@ -66,6 +72,15 @@ configmap:
           hostDir: "/mnt/disks"
           blockCleanerCommand:
             - "/scripts/quick_reset.sh"
+  #
+  # Storage classes for LVM (dynamic provisioning)
+  lvm:
+    storageClass:
+      - dynamic-lvm:
+          lvmVolumeGroup: vg1
+          blockCleanerCommand:
+            - "/scripts/dd_zero.sh"
+            - "1"
   #
 daemonset:
   #

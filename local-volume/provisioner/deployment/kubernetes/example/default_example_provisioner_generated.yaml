@@ -13,7 +13,13 @@ data:
        mountDir:  /mnt/fast-disks 
        blockCleanerCommand:
          - "/scripts/shred.sh"
-         - "2" 
+         - "2"
+    dynamic-lvm:
+       blockCleanerCommand:
+         - "/scripts/dd_zero.sh"
+         - "1"
+       lvm:
+         volumeGroup: vg1
 ---
 apiVersion: extensions/v1beta1
 kind: DaemonSet
@@ -49,14 +55,19 @@ spec:
               readOnly: true             
             - mountPath:  /mnt/fast-disks 
               name: fast-disks
-              mountPropagation: "HostToContainer" 
+              mountPropagation: "HostToContainer"
+            - mountPath:  /dev
+              name: lvm-root
       volumes:
         - name: provisioner-config
           configMap:
             name: local-provisioner-config         
         - name: fast-disks
           hostPath:
-            path: /mnt/fast-disks 
+            path: /mnt/fast-disks
+        - name: lvm-root
+          hostPath:
+            path: /dev
 
 ---
 # Source: provisioner/templates/provisioner-service-account.yaml
