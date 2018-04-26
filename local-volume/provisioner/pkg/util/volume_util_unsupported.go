@@ -27,3 +27,8 @@ import (
 func (u *volumeUtil) GetBlockCapacityByte(fullPath string) (int64, error) {
 	return 0, fmt.Errorf("GetBlockCapacityByte is unsupported in this build")
 }
+
+// IsBlock for unsupported platform returns error.
+func (u *volumeUtil) IsBlock(fullPath string) (bool, error) {
+	return false, fmt.Errorf("IsBlock is unsupported in this build")
+}

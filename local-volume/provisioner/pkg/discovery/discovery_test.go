@@ -86,10 +86,10 @@ type testConfig struct {
 	// True if testing api failure
 	apiShouldFail bool
 	// The rest are set during setup
-	volUtil   *util.FakeVolumeUtil
-	apiUtil   *util.FakeAPIUtil
-	cache     *cache.VolumeCache
-	procTable *deleter.ProcTableImpl
+	volUtil        *util.FakeVolumeUtil
+	apiUtil        *util.FakeAPIUtil
+	cache          *cache.VolumeCache
+	cleanupTracker *deleter.CleanupStatusTracker
 }
 
 func TestDiscoverVolumes_Basic(t *testing.T) {
@@ -273,7 +273,7 @@ func TestDiscoverVolumes_CleaningInProgress(t *testing.T) {
 
 	// Mark dir1/mount2 PV as being cleaned. This one should not get created
 	pvName := getPVName(vols["dir1"][1])
-	test.procTable.MarkRunning(pvName)
+	test.cleanupTracker.ProcTable.MarkRunning(pvName)
 
 	d.DiscoverLocalVolumes()
 	verifyCreatedPVs(t, test)
@@ -284,7 +284,8 @@ func testSetup(t *testing.T, test *testConfig, useAlphaAPI bool) *Discoverer {
 	test.volUtil = util.NewFakeVolumeUtil(false /*deleteShouldFail*/, map[string][]*util.FakeDirEntry{})
 	test.volUtil.AddNewDirEntries(testMountDir, test.dirLayout)
 	test.apiUtil = util.NewFakeAPIUtil(test.apiShouldFail, test.cache)
-	test.procTable = deleter.NewProcTable()
+	test.cleanupTracker = &deleter.CleanupStatusTracker{ProcTable: deleter.NewProcTable(),
+		JobController: deleter.NewFakeJobController()}
 
 	fm := &mount.FakeMounter{
 		MountPoints: []mount.MountPoint{
@@ -313,7 +314,7 @@ func testSetup(t *testing.T, test *testConfig, useAlphaAPI bool) *Discoverer {
 		Name:       testProvisionerName,
 		Mounter:    fm,
 	}
-	d, err := NewDiscoverer(runConfig, test.procTable)
+	d, err := NewDiscoverer(runConfig, test.cleanupTracker)
 	if err != nil {
 		t.Fatalf("Error setting up test discoverer: %v", err)
 	}

@@ -29,6 +29,8 @@ import (
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/cache"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/util"
 
+	"hash/fnv"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -68,6 +70,9 @@ const (
 	LocalPVEnv = "LOCAL_PV_BLKDEVICE"
 	// KubeConfigEnv will (optionally) specify the location of kubeconfig file on the node.
 	KubeConfigEnv = "KUBECONFIG"
+
+	// NodeNameLabel is the name of the label that holds the nodename
+	NodeNameLabel = "kubernetes.io/hostname"
 )
 
 // UserConfig stores all the user-defined parameters to the provisioner
@@ -80,6 +85,12 @@ type UserConfig struct {
 	NodeLabelsForPV []string
 	// UseAlphaAPI shows if we need to use alpha API
 	UseAlphaAPI bool
+	// UseJobForCleaning indicates if Jobs should be spawned for cleaning block devices (as opposed to process),.
+	UseJobForCleaning bool
+	// Namespace of this Pod (optional)
+	Namespace string
+	// Image of container to use for jobs (optional)
+	JobContainerImage string
 }
 
 // MountConfig stores a configuration for discoverying a specific storageclass
@@ -145,6 +156,10 @@ type ProvisionerConfiguration struct {
 	NodeLabelsForPV []string `json:"nodeLabelsForPV" yaml:"nodeLabelsForPV"`
 	// UseAlphaAPI shows if we need to use alpha API, default to false
 	UseAlphaAPI bool `json:"useAlphaAPI" yaml:"useAlphaAPI"`
+	// UseJobForCleaning indicates if Jobs should be spawned for cleaning block devices (as opposed to process),
+	// default is false.
+	// +optional
+	UseJobForCleaning bool `json:"useJobForCleaning" yaml:"useJobForCleaning"`
 }
 
 // CreateLocalPVSpec returns a PV spec that can be used for PV creation
@@ -320,4 +335,12 @@ func SetupClient() *kubernetes.Clientset {
 		glog.Fatalf("Error creating clientset: %v\n", err)
 	}
 	return clientset
+}
+
+// GenerateMountName generates a volumeMount.name for pod spec, based on volume configuration.
+func GenerateMountName(mount *MountConfig) string {
+	h := fnv.New32a()
+	h.Write([]byte(mount.HostDir))
+	h.Write([]byte(mount.MountDir))
+	return fmt.Sprintf("mount-%x", h.Sum32())
 }

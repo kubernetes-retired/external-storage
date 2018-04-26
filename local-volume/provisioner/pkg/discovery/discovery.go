@@ -37,14 +37,14 @@ type Discoverer struct {
 	Labels map[string]string
 	// ProcTable is a reference to running processes so that we can prevent PV from being created while
 	// it is being cleaned
-	ProcTable       deleter.ProcTable
+	CleanupTracker  *deleter.CleanupStatusTracker
 	nodeAffinityAnn string
 	nodeAffinity    *v1.VolumeNodeAffinity
 }
 
 // NewDiscoverer creates a Discoverer object that will scan through
 // the configured directories and create local PVs for any new directories found
-func NewDiscoverer(config *common.RuntimeConfig, procTable deleter.ProcTable) (*Discoverer, error) {
+func NewDiscoverer(config *common.RuntimeConfig, cleanupTracker *deleter.CleanupStatusTracker) (*Discoverer, error) {
 	labelMap := make(map[string]string)
 	for _, labelName := range config.NodeLabelsForPV {
 		labelVal, ok := config.Node.Labels[labelName]
@@ -66,7 +66,7 @@ func NewDiscoverer(config *common.RuntimeConfig, procTable deleter.ProcTable) (*
 		return &Discoverer{
 			RuntimeConfig:   config,
 			Labels:          labelMap,
-			ProcTable:       procTable,
+			CleanupTracker:  cleanupTracker,
 			nodeAffinityAnn: tmpAnnotations[v1.AlphaStorageNodeAffinityAnnotation]}, nil
 	}
 
@@ -76,10 +76,10 @@ func NewDiscoverer(config *common.RuntimeConfig, procTable deleter.ProcTable) (*
 	}
 
 	return &Discoverer{
-		RuntimeConfig: config,
-		Labels:        labelMap,
-		ProcTable:     procTable,
-		nodeAffinity:  volumeNodeAffinity}, nil
+		RuntimeConfig:  config,
+		Labels:         labelMap,
+		CleanupTracker: cleanupTracker,
+		nodeAffinity:   volumeNodeAffinity}, nil
 }
 
 func generateNodeAffinity(node *v1.Node) (*v1.NodeAffinity, error) {
@@ -176,13 +176,19 @@ func (d *Discoverer) discoverVolumesAtPath(class string, config common.MountConf
 		if exists {
 			if volMode == v1.PersistentVolumeBlock && (pv.Spec.VolumeMode == nil ||
 				*pv.Spec.VolumeMode != v1.PersistentVolumeBlock) {
-				glog.Errorf("Incorrect Volume Mode: PV %q (path %q) was not created in block mode. "+
+				errStr := fmt.Sprintf("Incorrect Volume Mode: PV %q (path %q) was not created in block mode. "+
 					"Please check if BlockVolume features gate has been enabled for the cluster.", pvName, filePath)
+				glog.Errorf(errStr)
+				d.Recorder.Eventf(pv, v1.EventTypeWarning, common.EventVolumeFailedDelete, errStr)
 			}
 			continue
 		}
 
-		if d.ProcTable.IsRunning(pvName) {
+		usejob := false
+		if volMode == v1.PersistentVolumeBlock {
+			usejob = d.RuntimeConfig.UseJobForCleaning
+		}
+		if d.CleanupTracker.InProgress(pvName, usejob) {
 			glog.Infof("PV %s is still being cleaned, not going to recreate it", pvName)
 			continue
 		}
