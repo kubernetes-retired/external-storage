@@ -38,7 +38,7 @@ build:
 		-v $$(pwd):/go/bin \
 		-v $$(pwd)/.go/stdlib:/usr/local/go/pkg/linux_amd64_asdf \
 		-w /go/src/github.com/kubernetes-incubator/external-storage/openstack-sharedfilesystems/ \
-		golang:1.8.3-alpine \
+		golang:1.9.3-alpine \
 		go install -installsuffix "asdf" ./cmd/manila-provisioner
 .PHONY: all build
 
