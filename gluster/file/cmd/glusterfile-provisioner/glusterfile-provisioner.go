@@ -401,8 +401,8 @@ func (p *glusterfileProvisioner) CreateVolume(gid *int, config *provisionerConfi
 	volID = volume.Id
 	dynamicHostIps, err := getClusterNodes(cli, volume.Cluster)
 	if err != nil {
-		glog.Errorf("error [%v] when getting cluster nodes for volume %s", err, volume)
-		return nil, 0, "", fmt.Errorf("error [%v] when getting cluster nodes for volume %s", err, volume)
+		glog.Errorf("failed to get cluster nodes for volume %s, error: %v", volume, err)
+		return nil, 0, "", fmt.Errorf("failed to get cluster nodes for volume %s, error: %v", volume, err)
 	}
 
 	epServiceName := dynamicEpSvcPrefix + p.options.PVC.Name
@@ -432,11 +432,11 @@ func (p *glusterfileProvisioner) RequiresFSResize() bool {
 func (p *glusterfileProvisioner) ExpandVolumeDevice(spec *volume.Spec, newSize resource.Quantity, oldSize resource.Quantity) (resource.Quantity, error) {
 	pvSpec := spec.PersistentVolume.Spec
 	volumeName := pvSpec.Glusterfs.Path
-	glog.V(2).Infof("Request to expand volume: [%s]", volumeName)
+	glog.V(2).Infof("Request received to expand volume %s", volumeName)
 	volumeID, err := getVolumeID(spec.PersistentVolume, volumeName)
 
 	if err != nil {
-		return oldSize, fmt.Errorf("failed to get volumeID for volume [%s], err: %v", volumeName, err)
+		return oldSize, fmt.Errorf("failed to get volumeID for volume %s, error: %v", volumeName, err)
 	}
 
 	heketiModeArgs, credErr := p.getRESTCredentials(spec.PersistentVolume)
@@ -465,7 +465,7 @@ func (p *glusterfileProvisioner) ExpandVolumeDevice(spec *volume.Spec, newSize r
 	//Check the existing volume size
 	currentVolumeInfo, err := cli.VolumeInfo(volumeID)
 	if err != nil {
-		glog.Errorf("error when fetching details of volume[%s]: %v", volumeName, err)
+		glog.Errorf("error when fetching details of volume %s: %v", volumeName, err)
 		return oldSize, err
 	}
 
@@ -479,7 +479,7 @@ func (p *glusterfileProvisioner) ExpandVolumeDevice(spec *volume.Spec, newSize r
 	// Expand the volume
 	volumeInfoRes, err := cli.VolumeExpand(volumeID, volumeExpandReq)
 	if err != nil {
-		glog.Errorf("error when expanding the volume[%s]: %v", volumeName, err)
+		glog.Errorf("failed to expand volume %s, error: %v", volumeName, err)
 		return oldSize, err
 	}
 
