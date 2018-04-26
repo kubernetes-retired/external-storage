@@ -19,9 +19,10 @@ limitations under the License.
 package util
 
 import (
-	"golang.org/x/sys/unix"
 	"os"
 	"unsafe"
+
+	"golang.org/x/sys/unix"
 )
 
 // GetBlockCapacityByte returns  capacity in bytes of a block device.
@@ -41,4 +42,15 @@ func (u *volumeUtil) GetBlockCapacityByte(fullPath string) (int64, error) {
 	}
 
 	return size, err
+}
+
+// IsBlock checks if the given path is a block device
+func (u *volumeUtil) IsBlock(fullPath string) (bool, error) {
+	var st unix.Stat_t
+	err := unix.Stat(fullPath, &st)
+	if err != nil {
+		return false, err
+	}
+
+	return (st.Mode & unix.S_IFMT) == unix.S_IFBLK, nil
 }

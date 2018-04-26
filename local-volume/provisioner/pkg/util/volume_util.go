@@ -18,7 +18,6 @@ package util
 
 import (
 	"fmt"
-	"golang.org/x/sys/unix"
 	"os"
 	"path/filepath"
 
@@ -72,17 +71,6 @@ func (u *volumeUtil) IsDir(fullPath string) (bool, error) {
 	}
 
 	return stat.IsDir(), nil
-}
-
-// IsBlock checks if the given path is a block device
-func (u *volumeUtil) IsBlock(fullPath string) (bool, error) {
-	var st unix.Stat_t
-	err := unix.Stat(fullPath, &st)
-	if err != nil {
-		return false, err
-	}
-
-	return (st.Mode & unix.S_IFMT) == unix.S_IFBLK, nil
 }
 
 // ReadDir returns a list all the files under the given directory

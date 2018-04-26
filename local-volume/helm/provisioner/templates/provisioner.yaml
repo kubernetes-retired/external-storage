@@ -54,6 +54,8 @@ data:
     - {{$label}}
    {{- end }}
 {{- end }}
+  # Uncomment useJobForCleaning if you want to use Jobs to clean block devices.
+  #useJobForCleaning: "yes"
   storageClassMap: |
 {{- if eq ( $engine | lower ) "gcepre19" }} {{ include "configStorageClass" (.Values.configmap.gcePre19.storageClass) | indent 4 }} {{ end }}
 {{- if eq ( $engine | lower ) "gcepost19" }} {{ include "configStorageClass" (.Values.configmap.gcePost19.storageClass) | indent 4 }} {{ end }}
@@ -88,6 +90,13 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: spec.nodeName
+          - name: MY_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: JOB_CONTAINER_IMAGE
+            value: "{{ $imageFull }}"
+
 {{- if $kubeConfigEnv }}
             - name: KUBECONFIG
               value: {{$kubeConfigEnv}}

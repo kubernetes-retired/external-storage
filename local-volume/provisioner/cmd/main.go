@@ -46,15 +46,29 @@ func main() {
 		glog.Fatalf("MY_NODE_NAME environment variable not set\n")
 	}
 
+	namespace := os.Getenv("MY_NAMESPACE")
+	if namespace == "" {
+		glog.Warningf("MY_NAMESPACE environment variable not set, will be set to default.\n")
+		namespace = "default"
+	}
+
+	jobImage := os.Getenv("JOB_CONTAINER_IMAGE")
+	if jobImage == "" {
+		glog.Warningf("JOB_CONTAINER_IMAGE environment variable not set.\n")
+	}
+
 	client := common.SetupClient()
 	node := getNode(client, nodeName)
 
 	glog.Info("Starting controller\n")
 	controller.StartLocalController(client, &common.UserConfig{
-		Node:            node,
-		DiscoveryMap:    provisionerConfig.StorageClassConfig,
-		NodeLabelsForPV: provisionerConfig.NodeLabelsForPV,
-		UseAlphaAPI:     provisionerConfig.UseAlphaAPI,
+		Node:              node,
+		DiscoveryMap:      provisionerConfig.StorageClassConfig,
+		NodeLabelsForPV:   provisionerConfig.NodeLabelsForPV,
+		UseAlphaAPI:       provisionerConfig.UseAlphaAPI,
+		UseJobForCleaning: provisionerConfig.UseJobForCleaning,
+		Namespace:         namespace,
+		JobContainerImage: jobImage,
 	})
 }
 
