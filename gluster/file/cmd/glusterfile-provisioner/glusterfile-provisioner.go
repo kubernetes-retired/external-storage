@@ -43,18 +43,19 @@ import (
 )
 
 const (
-	provisionerName    = "gluster.org/glusterfile"
-	provisionerNameKey = "PROVISIONER_NAME"
-	descAnn            = "Gluster-external: Dynamically provisioned PV"
-	restStr            = "server"
-	dynamicEpSvcPrefix = "glusterfile-dynamic-"
-	replicaCount       = 3
-	secretKeyName      = "key" // key name used in secret
-	volPrefix          = "vol_"
-	mountStr           = "auto_unmount"
-	glusterTypeAnn     = "gluster.org/type"
-	heketiVolIDAnn     = "gluster.org/heketi-volume-id"
-	gidAnn             = "pv.beta.kubernetes.io/gid"
+	provisionerName           = "gluster.org/glusterfile"
+	provisionerNameKey        = "PROVISIONER_NAME"
+	descAnn                   = "Gluster-external: Dynamically provisioned PV"
+	restStr                   = "server"
+	dynamicEpSvcPrefix        = "glusterfile-dynamic-"
+	replicaCount              = 3
+	secretKeyName             = "key" // key name used in secret
+	volPrefix                 = "vol_"
+	mountStr                  = "auto_unmount"
+	glusterTypeAnn            = "gluster.org/type"
+	heketiVolIDAnn            = "gluster.org/heketi-volume-id"
+	gidAnn                    = "pv.beta.kubernetes.io/gid"
+	defaultThinPoolSnapFactor = float32(1.0) // thin pool snap factor default to 1.0
 
 	// CloneRequestAnn is an annotation to request that the PVC be provisioned as a clone of the referenced PVC
 	CloneRequestAnn = "k8s.io/CloneRequest"
@@ -289,7 +290,7 @@ func (p *glusterfileProvisioner) Provision(options controller.VolumeOptions) (*v
 }
 
 func (p *glusterfileProvisioner) createVolumeClone(sourceVolID string, config *provisionerConfig) (r *v1.GlusterfsVolumeSource, size int, volID string, err error) {
-	//cloneName := ""
+
 	if config.url == "" {
 		glog.Errorf("REST server endpoint is empty")
 		return nil, 0, "", fmt.Errorf("failed to create glusterfs REST client, REST URL is empty")
@@ -763,8 +764,7 @@ func (p *glusterfileProvisioner) parseClassParameters(params map[string]string, 
 	parseVolumeNamePrefix := ""
 	parseThinPoolSnapFactor := ""
 
-	//thin pool snap factor default to 1.0
-	cfg.thinPoolSnapFactor = float32(1.0)
+	cfg.thinPoolSnapFactor = defaultThinPoolSnapFactor
 
 	for k, v := range params {
 		switch dstrings.ToLower(k) {
