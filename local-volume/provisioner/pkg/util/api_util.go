@@ -23,6 +23,7 @@ import (
 
 	batch_v1 "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -41,6 +42,15 @@ type APIUtil interface {
 
 	// DeleteJob deletes specified Job by its name and namespace.
 	DeleteJob(jobName string, namespace string) error
+
+	// Get StorageClass object
+	GetStorageClass(className string) (*storagev1.StorageClass, error)
+
+	// Update StorageClass status
+	UpdateStorageClassStatus(class *storagev1.StorageClass) (*storagev1.StorageClass, error)
+
+	// Update PVC object
+	UpdatePVC(pvc *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error)
 }
 
 var _ APIUtil = &apiUtil{}
@@ -81,6 +91,21 @@ func (u *apiUtil) DeleteJob(jobName string, namespace string) error {
 	return nil
 }
 
+// GetStorageClass will get a StorageClass object
+func (u *apiUtil) GetStorageClass(className string) (*storagev1.StorageClass, error) {
+	return u.client.StorageV1().StorageClasses().Get(className, metav1.GetOptions{})
+}
+
+// GetStorageClass will update given StorageClass object
+func (u *apiUtil) UpdateStorageClassStatus(class *storagev1.StorageClass) (*storagev1.StorageClass, error) {
+	return u.client.StorageV1().StorageClasses().UpdateStatus(class)
+}
+
+// UpdatePVC will update given PVC object
+func (u *apiUtil) UpdatePVC(pvc *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
+	return u.client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Update(pvc)
+}
+
 var _ APIUtil = &FakeAPIUtil{}
 
 // FakeAPIUtil is a fake API wrapper for unit testing
@@ -91,10 +116,11 @@ type FakeAPIUtil struct {
 	DeletedJobs map[string]string
 	shouldFail  bool
 	cache       *cache.VolumeCache
+	classes     map[string]*storagev1.StorageClass
 }
 
 // NewFakeAPIUtil returns an APIUtil object that can be used for unit testing
-func NewFakeAPIUtil(shouldFail bool, cache *cache.VolumeCache) *FakeAPIUtil {
+func NewFakeAPIUtil(shouldFail bool, cache *cache.VolumeCache, scs map[string]*storagev1.StorageClass) *FakeAPIUtil {
 	return &FakeAPIUtil{
 		createdPVs:  map[string]*v1.PersistentVolume{},
 		deletedPVs:  map[string]*v1.PersistentVolume{},
@@ -102,6 +128,7 @@ func NewFakeAPIUtil(shouldFail bool, cache *cache.VolumeCache) *FakeAPIUtil {
 		DeletedJobs: map[string]string{},
 		shouldFail:  shouldFail,
 		cache:       cache,
+		classes:     scs,
 	}
 }
 
@@ -158,4 +185,30 @@ func (u *FakeAPIUtil) CreateJob(job *batch_v1.Job) error {
 func (u *FakeAPIUtil) DeleteJob(jobName string, namespace string) error {
 	u.DeletedJobs[namespace+"/"+jobName] = jobName
 	return nil
+}
+
+// GetStorageClass return the pre-installed class.
+func (u *FakeAPIUtil) GetStorageClass(className string) (*storagev1.StorageClass, error) {
+	class, ok := u.classes[className]
+	if !ok {
+		return nil, nil
+	}
+	return class.DeepCopy(), nil
+}
+
+// UpdateStorageClassStatus update cached class with given class.
+func (u *FakeAPIUtil) UpdateStorageClassStatus(class *storagev1.StorageClass) (*storagev1.StorageClass, error) {
+	if u.shouldFail {
+		return nil, fmt.Errorf("API failed")
+	}
+	u.classes[class.Name] = class
+	return class, nil
+}
+
+// UpdatePVC mocks update pvc method.
+func (u *FakeAPIUtil) UpdatePVC(pvc *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
+	if u.shouldFail {
+		return nil, fmt.Errorf("API failed")
+	}
+	return pvc, nil
 }

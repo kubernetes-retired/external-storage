@@ -55,7 +55,7 @@ func NewDiscoverer(config *common.RuntimeConfig, cleanupTracker *deleter.Cleanup
 	}
 
 	if config.UseAlphaAPI {
-		nodeAffinity, err := generateNodeAffinity(config.Node)
+		nodeAffinity, err := common.GenerateNodeAffinity(config.Node)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to generate node affinity: %v", err)
 		}
@@ -71,7 +71,7 @@ func NewDiscoverer(config *common.RuntimeConfig, cleanupTracker *deleter.Cleanup
 			nodeAffinityAnn: tmpAnnotations[v1.AlphaStorageNodeAffinityAnnotation]}, nil
 	}
 
-	volumeNodeAffinity, err := generateVolumeNodeAffinity(config.Node)
+	volumeNodeAffinity, err := common.GenerateVolumeNodeAffinity(config.Node)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to generate volume node affinity: %v", err)
 	}
@@ -81,58 +81,6 @@ func NewDiscoverer(config *common.RuntimeConfig, cleanupTracker *deleter.Cleanup
 		Labels:         labelMap,
 		CleanupTracker: cleanupTracker,
 		nodeAffinity:   volumeNodeAffinity}, nil
-}
-
-func generateNodeAffinity(node *v1.Node) (*v1.NodeAffinity, error) {
-	if node.Labels == nil {
-		return nil, fmt.Errorf("Node does not have labels")
-	}
-	nodeValue, found := node.Labels[common.NodeLabelKey]
-	if !found {
-		return nil, fmt.Errorf("Node does not have expected label %s", common.NodeLabelKey)
-	}
-
-	return &v1.NodeAffinity{
-		RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-			NodeSelectorTerms: []v1.NodeSelectorTerm{
-				{
-					MatchExpressions: []v1.NodeSelectorRequirement{
-						{
-							Key:      common.NodeLabelKey,
-							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{nodeValue},
-						},
-					},
-				},
-			},
-		},
-	}, nil
-}
-
-func generateVolumeNodeAffinity(node *v1.Node) (*v1.VolumeNodeAffinity, error) {
-	if node.Labels == nil {
-		return nil, fmt.Errorf("Node does not have labels")
-	}
-	nodeValue, found := node.Labels[common.NodeLabelKey]
-	if !found {
-		return nil, fmt.Errorf("Node does not have expected label %s", common.NodeLabelKey)
-	}
-
-	return &v1.VolumeNodeAffinity{
-		Required: &v1.NodeSelector{
-			NodeSelectorTerms: []v1.NodeSelectorTerm{
-				{
-					MatchExpressions: []v1.NodeSelectorRequirement{
-						{
-							Key:      common.NodeLabelKey,
-							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{nodeValue},
-						},
-					},
-				},
-			},
-		},
-	}, nil
 }
 
 // DiscoverLocalVolumes reads the configured discovery paths, and creates PVs for the new volumes

@@ -56,6 +56,9 @@ const (
 	// NodeLabelKey is the label key that this provisioner uses for PV node affinity
 	// hostname is not the best choice, but it's what pod and node affinity also use
 	NodeLabelKey = apis.LabelHostname
+	// This annotation is added to dynamically provisioned PVs, so that the scheduler
+	// can easily calculate the usage of the capacity.
+	AnnProvisionedTopology = "volume.alpha.kubernetes.io/provisioned-topology"
 
 	// DefaultBlockCleanerCommand is the default block device cleaning command
 	DefaultBlockCleanerCommand = "/scripts/quick_reset.sh"
@@ -476,4 +479,58 @@ func GenerateMountName(mount *MountConfig) string {
 	h.Write([]byte(mount.HostDir))
 	h.Write([]byte(mount.MountDir))
 	return fmt.Sprintf("mount-%x", h.Sum32())
+}
+
+// GenerateNodeAffinity generate NodeAffinity information basing on given node.
+func GenerateNodeAffinity(node *v1.Node) (*v1.NodeAffinity, error) {
+	if node.Labels == nil {
+		return nil, fmt.Errorf("Node does not have labels")
+	}
+	nodeValue, found := node.Labels[NodeLabelKey]
+	if !found {
+		return nil, fmt.Errorf("Node does not have expected label %s", NodeLabelKey)
+	}
+
+	return &v1.NodeAffinity{
+		RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+			NodeSelectorTerms: []v1.NodeSelectorTerm{
+				{
+					MatchExpressions: []v1.NodeSelectorRequirement{
+						{
+							Key:      NodeLabelKey,
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{nodeValue},
+						},
+					},
+				},
+			},
+		},
+	}, nil
+}
+
+// GenerateNodeAffinity generate VolumeNodeAffinity information basing on given node.
+func GenerateVolumeNodeAffinity(node *v1.Node) (*v1.VolumeNodeAffinity, error) {
+	if node.Labels == nil {
+		return nil, fmt.Errorf("Node does not have labels")
+	}
+	nodeValue, found := node.Labels[NodeLabelKey]
+	if !found {
+		return nil, fmt.Errorf("Node does not have expected label %s", NodeLabelKey)
+	}
+
+	return &v1.VolumeNodeAffinity{
+		Required: &v1.NodeSelector{
+			NodeSelectorTerms: []v1.NodeSelectorTerm{
+				{
+					MatchExpressions: []v1.NodeSelectorRequirement{
+						{
+							Key:      NodeLabelKey,
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{nodeValue},
+						},
+					},
+				},
+			},
+		},
+	}, nil
 }

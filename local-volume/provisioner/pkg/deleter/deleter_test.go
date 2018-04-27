@@ -431,7 +431,7 @@ func testSetupForJobCleaning(t *testing.T, config *testConfig, cleanupCmd []stri
 
 func testSetup(t *testing.T, config *testConfig, cleanupCmd []string, useJobForCleaning bool) *Deleter {
 	config.cache = cache.NewVolumeCache()
-	config.apiUtil = util.NewFakeAPIUtil(false, config.cache)
+	config.apiUtil = util.NewFakeAPIUtil(false, config.cache, nil)
 	config.procTable = NewFakeProcTable()
 	config.jobControl = NewFakeJobController()
 	config.volUtil = util.NewFakeVolumeUtil(config.volDeleteShouldFail, map[string][]*util.FakeDirEntry{})
@@ -478,7 +478,7 @@ func testSetup(t *testing.T, config *testConfig, cleanupCmd []string, useJobForC
 	// Update volume util
 	config.volUtil.AddNewDirEntries(testMountDir, newVols)
 
-	config.apiUtil = util.NewFakeAPIUtil(config.apiShouldFail, config.cache)
+	config.apiUtil = util.NewFakeAPIUtil(config.apiShouldFail, config.cache, nil)
 
 	userConfig := &common.UserConfig{
 		DiscoveryMap: map[string]common.DiscoveryConfig{

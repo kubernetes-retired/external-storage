@@ -287,7 +287,7 @@ func testSetup(t *testing.T, test *testConfig, useAlphaAPI bool) *Discoverer {
 	test.cache = cache.NewVolumeCache()
 	test.volUtil = util.NewFakeVolumeUtil(false /*deleteShouldFail*/, map[string][]*util.FakeDirEntry{})
 	test.volUtil.AddNewDirEntries(testMountDir, test.dirLayout)
-	test.apiUtil = util.NewFakeAPIUtil(test.apiShouldFail, test.cache)
+	test.apiUtil = util.NewFakeAPIUtil(test.apiShouldFail, test.cache, nil)
 	test.cleanupTracker = &deleter.CleanupStatusTracker{ProcTable: deleter.NewProcTable(),
 		JobController: deleter.NewFakeJobController()}
 

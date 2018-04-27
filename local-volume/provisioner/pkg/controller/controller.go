@@ -27,6 +27,7 @@ import (
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/deleter"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/discovery"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/populator"
+	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/provisioningmanager"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/util"
 
 	"k8s.io/api/core/v1"
@@ -82,6 +83,12 @@ func StartLocalController(client *kubernetes.Clientset, config *common.UserConfi
 	if err != nil {
 		glog.Fatalf("Error starting discoverer: %v", err)
 	}
+
+	dynamicProvisioningManager, err := provisioningmanager.NewManager(runtimeConfig)
+	if err != nil {
+		glog.Fatalf("Error starting dynamic provisioning manager: %v", err)
+	}
+	dynamicProvisioningManager.Start()
 
 	deleter := deleter.NewDeleter(runtimeConfig, cleanupTracker)
 
