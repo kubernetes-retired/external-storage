@@ -110,7 +110,7 @@ func (p *digitaloceanProvisioner) Provision(options controller.VolumeOptions) (*
 			},
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 
-				FlexVolume: &v1.FlexVolumeSource{
+				FlexVolume: &v1.FlexPersistentVolumeSource{
 					Driver:   fmt.Sprintf("%s/%s", flexvolumeVendor, flexvolumeDriver),
 					Options:  map[string]string{},
 					ReadOnly: false,
