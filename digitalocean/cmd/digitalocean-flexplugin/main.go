@@ -110,7 +110,7 @@ func (c *cloud) findNode(nodeName string) (int, error) {
 }
 
 func (c *cloud) getVolumeByName(volumeName string) (string, error) {
-	opt := &godo.ListVolumeParams{ListOptions: &godo.ListOptions{}}
+	opt := &godo.ListVolumeParams{ListOptions: &godo.ListOptions{PerPage: 200}}
 	// get all volumes by looping over pages
 	for {
 		volumes, resp, err := c.client.Storage.ListVolumes(c.ctx, opt)
