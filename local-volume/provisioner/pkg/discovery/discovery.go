@@ -114,7 +114,7 @@ func (d *Discoverer) discoverVolumesAtPath(class string, config common.Discovery
 
 	for _, file := range files {
 		filePath := filepath.Join(config.MountDir, file)
-		volMode, err := d.getVolumeMode(filePath)
+		volMode, err := common.GetVolumeMode(d.VolUtil, filePath)
 		if err != nil {
 			glog.Error(err)
 			continue
@@ -170,28 +170,6 @@ func (d *Discoverer) discoverVolumesAtPath(class string, config common.Discovery
 
 		d.createPV(file, class, config, capacityByte)
 	}
-}
-
-func (d *Discoverer) getVolumeMode(fullPath string) (v1.PersistentVolumeMode, error) {
-	isdir, errdir := d.VolUtil.IsDir(fullPath)
-	if isdir {
-		return v1.PersistentVolumeFilesystem, nil
-	}
-	// check for Block before returning errdir
-	isblk, errblk := d.VolUtil.IsBlock(fullPath)
-	if isblk {
-		return v1.PersistentVolumeBlock, nil
-	}
-
-	if errdir == nil && errblk == nil {
-		return "", fmt.Errorf("Skipping file %q: not a directory nor block device", fullPath)
-	}
-
-	// report the first error found
-	if errdir != nil {
-		return "", fmt.Errorf("Directory check for %q failed: %s", fullPath, errdir)
-	}
-	return "", fmt.Errorf("Block device check for %q failed: %s", fullPath, errblk)
 }
 
 func generatePVName(file, node, class string) string {

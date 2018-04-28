@@ -449,16 +449,14 @@ func testSetup(t *testing.T, config *testConfig, cleanupCmd []string, useJobForC
 	for pvName, vol := range config.vols {
 		fakePath := filepath.Join(testHostDir, "test1", "entry-"+pvName)
 		lpvConfig := common.LocalPVConfig{
-			Name:         pvName,
-			HostPath:     fakePath,
-			StorageClass: testStorageClass,
+			Name:          pvName,
+			HostPath:      fakePath,
+			StorageClass:  testStorageClass,
+			ReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 		}
-		// If volume mode has been explicitly specified in the volume config, then explicitly set it in the PV.
-		switch vol.VolumeMode {
-		case util.FakeEntryBlock:
-			lpvConfig.VolumeMode = v1.PersistentVolumeBlock
-		case util.FakeEntryFile:
-			lpvConfig.VolumeMode = v1.PersistentVolumeFilesystem
+		// Default volume mode to file if not specified.
+		if vol.VolumeMode == "" {
+			vol.VolumeMode = util.FakeEntryFile
 		}
 		pv := common.CreateLocalPVSpec(&lpvConfig)
 		pv.Status.Phase = vol.pvPhase
@@ -507,7 +505,7 @@ func testSetup(t *testing.T, config *testConfig, cleanupCmd []string, useJobForC
 	}
 
 	cleanupTracker := &CleanupStatusTracker{ProcTable: config.procTable, JobController: config.jobControl}
-	return NewDeleter(runtimeConfig, cleanupTracker)
+	return NewDeleter(runtimeConfig, cleanupTracker, func(*v1.PersistentVolume) error { return nil })
 }
 
 func verifyDeletedPVs(t *testing.T, config *testConfig) {

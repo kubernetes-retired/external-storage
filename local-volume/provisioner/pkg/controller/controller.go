@@ -90,7 +90,7 @@ func StartLocalController(client *kubernetes.Clientset, config *common.UserConfi
 	}
 	dynamicProvisioningManager.Start()
 
-	deleter := deleter.NewDeleter(runtimeConfig, cleanupTracker)
+	deleter := deleter.NewDeleter(runtimeConfig, cleanupTracker, dynamicProvisioningManager.DeleteLocalVolume)
 
 	glog.Info("Controller started\n")
 	for {

@@ -68,6 +68,8 @@ const (
 
 	// EventVolumeFailedDelete copied from k8s.io/kubernetes/pkg/controller/volume/events
 	EventVolumeFailedDelete = "VolumeFailedDelete"
+	// EventProvisioningCleanupFailed copied from k8s.io/kubernetes/pkg/controller/volume/events
+	EventProvisioningCleanupFailed = "ProvisioningCleanupFailed"
 	// ProvisionerConfigPath points to the path inside of the provisioner container where configMap volume is mounted
 	ProvisionerConfigPath = "/etc/provisioner/config/"
 	// ProvisonerStorageClassConfig defines file name of the file which stores storage class
@@ -533,4 +535,27 @@ func GenerateVolumeNodeAffinity(node *v1.Node) (*v1.VolumeNodeAffinity, error) {
 			},
 		},
 	}, nil
+}
+
+// GetVolumeMode check volume mode of given path.
+func GetVolumeMode(volUtil util.VolumeUtil, fullPath string) (v1.PersistentVolumeMode, error) {
+	isdir, errdir := volUtil.IsDir(fullPath)
+	if isdir {
+		return v1.PersistentVolumeFilesystem, nil
+	}
+	// check for Block before returning errdir
+	isblk, errblk := volUtil.IsBlock(fullPath)
+	if isblk {
+		return v1.PersistentVolumeBlock, nil
+	}
+
+	if errdir == nil && errblk == nil {
+		return "", fmt.Errorf("Path %q is not a directory nor block device", fullPath)
+	}
+
+	// report the first error found
+	if errdir != nil {
+		return "", fmt.Errorf("Directory check for %q failed: %s", fullPath, errdir)
+	}
+	return "", fmt.Errorf("Block device check for %q failed: %s", fullPath, errblk)
 }

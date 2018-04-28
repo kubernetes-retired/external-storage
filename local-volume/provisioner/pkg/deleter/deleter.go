@@ -47,19 +47,23 @@ const (
 	CSSucceeded
 )
 
+type provisionedVolumeDeleteFuncType func(*v1.PersistentVolume) error
+
 // Deleter handles PV cleanup and object deletion
 // For file-based volumes, it deletes the contents of the directory
 type Deleter struct {
 	*common.RuntimeConfig
-	CleanupStatus *CleanupStatusTracker
+	CleanupStatus               *CleanupStatusTracker
+	provisionedVolumeDeleteFunc provisionedVolumeDeleteFuncType
 }
 
 // NewDeleter creates a Deleter object to handle the cleanup and deletion of local PVs
 // allocated by this provisioner
-func NewDeleter(config *common.RuntimeConfig, cleanupTracker *CleanupStatusTracker) *Deleter {
+func NewDeleter(config *common.RuntimeConfig, cleanupTracker *CleanupStatusTracker, provisionedVolumeDeleteFunc provisionedVolumeDeleteFuncType) *Deleter {
 	return &Deleter{
-		RuntimeConfig: config,
-		CleanupStatus: cleanupTracker,
+		RuntimeConfig:               config,
+		CleanupStatus:               cleanupTracker,
+		provisionedVolumeDeleteFunc: provisionedVolumeDeleteFunc,
 	}
 }
 
@@ -67,7 +71,7 @@ func NewDeleter(config *common.RuntimeConfig, cleanupTracker *CleanupStatusTrack
 // delete them
 func (d *Deleter) DeletePVs() {
 	for _, pv := range d.Cache.ListPVs() {
-		if pv.Status.Phase == v1.VolumeReleased {
+		if pv.Status.Phase == v1.VolumeReleased && pv.Spec.PersistentVolumeReclaimPolicy == v1.PersistentVolumeReclaimDelete {
 			name := pv.Name
 			// Cleanup volume
 			err := d.deletePV(pv)
@@ -86,21 +90,30 @@ func (d *Deleter) deletePV(pv *v1.PersistentVolume) error {
 		return fmt.Errorf("Unsupported volume type")
 	}
 
-	config, ok := d.DiscoveryMap[pv.Spec.StorageClassName]
-	if !ok {
-		return fmt.Errorf("Unknown storage class name %s", pv.Spec.StorageClassName)
+	var mountConfig common.MountConfig
+	storageSourceConfig, volIsProvisioned := d.ProvisionSourceMap[pv.Spec.StorageClassName]
+	if volIsProvisioned {
+		mountConfig = *storageSourceConfig.MountConfig
+	} else {
+		discoveryConfig, volIsDiscovered := d.DiscoveryMap[pv.Spec.StorageClassName]
+		if !volIsDiscovered {
+			return fmt.Errorf("Unknown storage class name %s", pv.Spec.StorageClassName)
+		}
+		mountConfig = *discoveryConfig.MountConfig
 	}
 
-	mountPath, err := common.GetContainerPath(pv, *config.MountConfig)
+	mountPath, err := common.GetContainerPath(pv, mountConfig)
 	if err != nil {
 		return err
 	}
 
-	// Default is filesystem mode, so even if volume mode is not specified, mode should be filesystem.
-	volMode := v1.PersistentVolumeFilesystem
+	volMode, err := common.GetVolumeMode(d.VolUtil, mountPath)
+	if err != nil {
+		return err
+	}
+
 	runjob := false
-	if pv.Spec.VolumeMode != nil && *pv.Spec.VolumeMode == v1.PersistentVolumeBlock {
-		volMode = v1.PersistentVolumeBlock
+	if volMode == v1.PersistentVolumeBlock {
 		runjob = d.RuntimeConfig.UseJobForCleaning
 	}
 
@@ -119,6 +132,14 @@ func (d *Deleter) deletePV(pv *v1.PersistentVolume) error {
 	case CSSucceeded:
 		// Found a completed cleaning entry
 		glog.Infof("Deleting pv %s after successful cleanup", pv.Name)
+		// Should delete dynamically provisioned volumes
+		if volIsProvisioned {
+			if err := d.provisionedVolumeDeleteFunc(pv); err != nil {
+				d.RuntimeConfig.Recorder.Eventf(pv, v1.EventTypeWarning, common.EventProvisioningCleanupFailed,
+					err.Error())
+				return fmt.Errorf("Error cleaning provisioned volume for pv %q: %v.", pv.Name, err)
+			}
+		}
 		if err = d.APIUtil.DeletePV(pv.Name); err != nil {
 			if !errors.IsNotFound(err) {
 				d.RuntimeConfig.Recorder.Eventf(pv, v1.EventTypeWarning, common.EventVolumeFailedDelete,
@@ -137,10 +158,10 @@ func (d *Deleter) deletePV(pv *v1.PersistentVolume) error {
 
 	if runjob {
 		// If we are dealing with block volumes and using jobs based cleaning for it.
-		return d.runJob(pv, mountPath, *config.MountConfig)
+		return d.runJob(pv, mountPath, mountConfig)
 	}
 
-	return d.runProcess(pv, volMode, mountPath, *config.MountConfig)
+	return d.runProcess(pv, volMode, mountPath, mountConfig)
 }
 
 func (d *Deleter) runProcess(pv *v1.PersistentVolume, volMode v1.PersistentVolumeMode, mountPath string,
