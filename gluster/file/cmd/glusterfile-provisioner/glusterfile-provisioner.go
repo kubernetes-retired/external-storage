@@ -310,10 +310,24 @@ func (p *glusterfileProvisioner) createVolumeClone(sourceVolID string, config *p
 	glog.V(1).Infof("volume with size %d and name %s created", cloneVolInfo.Size, cloneVolInfo.Name)
 
 	volID = cloneVolInfo.Id
-	dynamicHostIps, err := getClusterNodes(cli, cloneVolInfo.Cluster)
+
+	volSource, volErr := p.createVolumeSource(cli, cloneVolInfo)
+	if volErr != nil {
+		return nil, 0, "", fmt.Errorf("error [%v] when creating volume source  for volume %s", err, cloneVolInfo.Name)
+	}
+
+	if volSource == nil {
+		return nil, 0, "", fmt.Errorf("Returned gluster volume is nil")
+	}
+
+	return volSource, cloneVolInfo.Size, cloneVolInfo.Id, nil
+}
+
+func (p *glusterfileProvisioner) createVolumeSource(cli *gcli.Client, volInfo *gapi.VolumeInfoResponse) (*v1.GlusterfsVolumeSource, error) {
+	dynamicHostIps, err := getClusterNodes(cli, volInfo.Cluster)
 	if err != nil {
-		glog.Errorf("error [%v] when getting cluster nodes for volume %s", err, cloneVolInfo.Name)
-		return nil, 0, "", fmt.Errorf("error [%v] when getting cluster nodes for volume %s", err, cloneVolInfo.Name)
+		glog.Errorf("error [%v] when getting cluster nodes for volume %s", err, volInfo.Name)
+		return nil, fmt.Errorf("error [%v] when getting cluster nodes for volume %s", err, volInfo.Name)
 	}
 
 	epServiceName := dynamicEpSvcPrefix + p.options.PVC.Name
@@ -321,19 +335,19 @@ func (p *glusterfileProvisioner) createVolumeClone(sourceVolID string, config *p
 	endpoint, service, err := p.createEndpointService(epNamespace, epServiceName, dynamicHostIps, p.options.PVC.Name)
 	if err != nil {
 		glog.Errorf("failed to create endpoint/service %v/%v: %v", epNamespace, epServiceName, err)
-		deleteErr := cli.VolumeDelete(cloneVolInfo.Id)
+		deleteErr := cli.VolumeDelete(volInfo.Id)
 		if deleteErr != nil {
 			glog.Errorf("error when deleting the volume: %v, manual deletion required", deleteErr)
 		}
-		return nil, 0, "", fmt.Errorf("failed to create endpoint/service %v/%v: %v", epNamespace, epServiceName, err)
+		return nil, fmt.Errorf("failed to create endpoint/service %v/%v: %v", epNamespace, epServiceName, err)
 	}
 	glog.V(3).Infof("dynamic endpoint %v and service %v", endpoint, service)
 
 	return &v1.GlusterfsVolumeSource{
 		EndpointsName: endpoint.Name,
-		Path:          cloneVolInfo.Name,
+		Path:          volInfo.Name,
 		ReadOnly:      false,
-	}, cloneVolInfo.Size, cloneVolInfo.Id, nil
+	}, nil
 }
 
 func (p *glusterfileProvisioner) annotateClonedPVC(VolID string, pvc *v1.PersistentVolumeClaim, SourceVolID string) error {
@@ -399,30 +413,17 @@ func (p *glusterfileProvisioner) CreateVolume(gid *int, config *provisionerConfi
 	glog.V(1).Infof("volume with size %d and name %s created", volume.Size, volume.Name)
 
 	volID = volume.Id
-	dynamicHostIps, err := getClusterNodes(cli, volume.Cluster)
-	if err != nil {
-		glog.Errorf("error [%v] when getting cluster nodes for volume %s", err, volume)
-		return nil, 0, "", fmt.Errorf("error [%v] when getting cluster nodes for volume %s", err, volume)
+
+	volSource, volErr := p.createVolumeSource(cli, volume)
+	if volErr != nil {
+		return nil, 0, "", fmt.Errorf("error [%v] when creating volume source  for volume %s", err, volume.Name)
 	}
 
-	epServiceName := dynamicEpSvcPrefix + p.options.PVC.Name
-	epNamespace := p.options.PVC.Namespace
-	endpoint, service, err := p.createEndpointService(epNamespace, epServiceName, dynamicHostIps, p.options.PVC.Name)
-	if err != nil {
-		glog.Errorf("failed to create endpoint/service %v/%v: %v", epNamespace, epServiceName, err)
-		deleteErr := cli.VolumeDelete(volume.Id)
-		if deleteErr != nil {
-			glog.Errorf("error when deleting the volume: %v, manual deletion required", deleteErr)
-		}
-		return nil, 0, "", fmt.Errorf("failed to create endpoint/service %v/%v: %v", epNamespace, epServiceName, err)
+	if volSource == nil {
+		return nil, 0, "", fmt.Errorf("Returned gluster volume is nil")
 	}
-	glog.V(3).Infof("dynamic endpoint %v and service %v", endpoint, service)
 
-	return &v1.GlusterfsVolumeSource{
-		EndpointsName: endpoint.Name,
-		Path:          volume.Name,
-		ReadOnly:      false,
-	}, sz, volID, nil
+	return volSource, sz, volID, nil
 }
 
 func (p *glusterfileProvisioner) RequiresFSResize() bool {
