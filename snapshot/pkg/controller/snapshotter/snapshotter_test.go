@@ -52,7 +52,7 @@ type TestPlugin struct {
 func (tp *TestPlugin) Init(cloudprovider.Interface) {
 }
 
-func (tp *TestPlugin) SnapshotCreate(*v1.PersistentVolume, *map[string]string) (*crdv1.VolumeSnapshotDataSource, *[]crdv1.VolumeSnapshotCondition, error) {
+func (tp *TestPlugin) SnapshotCreate(*crdv1.VolumeSnapshot, *v1.PersistentVolume, *map[string]string) (*crdv1.VolumeSnapshotDataSource, *[]crdv1.VolumeSnapshotCondition, error) {
 	tp.CreateCallCount = tp.CreateCallCount + 1
 	if tp.ShouldFail {
 		return nil, nil, fmt.Errorf("SnapshotCreate forced failure")
@@ -342,12 +342,13 @@ func Test_takeSnapshot(t *testing.T) {
 		"tag1": "tag value 1",
 		"tag2": "tag value 2",
 	}
-	_, _, err = vs.takeSnapshot(pv, &tags)
+	snapshot := fakeNewVolumeSnapshot()
+	_, _, err = vs.takeSnapshot(snapshot, pv, &tags)
 	if err != nil {
 		t.Errorf("Test failed, unexpected error: %v", err)
 	}
 	tp.ShouldFail = true
-	_, _, err = vs.takeSnapshot(pv, &tags)
+	_, _, err = vs.takeSnapshot(snapshot, pv, &tags)
 	if err != nil {
 		t.Errorf("Test failed, unexpected error: %v", err)
 	}
