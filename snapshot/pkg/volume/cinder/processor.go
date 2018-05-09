@@ -69,7 +69,11 @@ func (c *cinderPlugin) VolumeDelete(pv *v1.PersistentVolume) error {
 }
 
 // SnapshotCreate creates a VolumeSnapshot from a PersistentVolumeSpec
-func (c *cinderPlugin) SnapshotCreate(pv *v1.PersistentVolume, tags *map[string]string) (*crdv1.VolumeSnapshotDataSource, *[]crdv1.VolumeSnapshotCondition, error) {
+func (c *cinderPlugin) SnapshotCreate(
+	snapshot *crdv1.VolumeSnapshot,
+	pv *v1.PersistentVolume,
+	tags *map[string]string,
+) (*crdv1.VolumeSnapshotDataSource, *[]crdv1.VolumeSnapshotCondition, error) {
 	spec := &pv.Spec
 	if spec == nil || spec.Cinder == nil {
 		return nil, nil, fmt.Errorf("invalid PV spec %v", spec)

@@ -28,7 +28,7 @@ type Plugin interface {
 	// Init inits volume plugin
 	Init(cloudprovider.Interface)
 	// SnapshotCreate creates a VolumeSnapshot from a PersistentVolumeSpec
-	SnapshotCreate(*v1.PersistentVolume, *map[string]string) (*crdv1.VolumeSnapshotDataSource, *[]crdv1.VolumeSnapshotCondition, error)
+	SnapshotCreate(*crdv1.VolumeSnapshot, *v1.PersistentVolume, *map[string]string) (*crdv1.VolumeSnapshotDataSource, *[]crdv1.VolumeSnapshotCondition, error)
 	// SnapshotDelete deletes a VolumeSnapshot
 	// PersistentVolume is provided for volume types, if any, that need PV Spec to delete snapshot
 	SnapshotDelete(*crdv1.VolumeSnapshotDataSource, *v1.PersistentVolume) error

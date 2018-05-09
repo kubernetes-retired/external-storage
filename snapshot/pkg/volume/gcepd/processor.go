@@ -56,7 +56,11 @@ func (plugin *gcePersistentDiskPlugin) Init(cloud cloudprovider.Interface) {
 	plugin.cloud = cloud.(*gce.Cloud)
 }
 
-func (plugin *gcePersistentDiskPlugin) SnapshotCreate(pv *v1.PersistentVolume, tags *map[string]string) (*crdv1.VolumeSnapshotDataSource, *[]crdv1.VolumeSnapshotCondition, error) {
+func (plugin *gcePersistentDiskPlugin) SnapshotCreate(
+	snapshot *crdv1.VolumeSnapshot,
+	pv *v1.PersistentVolume,
+	tags *map[string]string,
+) (*crdv1.VolumeSnapshotDataSource, *[]crdv1.VolumeSnapshotCondition, error) {
 	spec := &pv.Spec
 	if spec == nil || spec.GCEPersistentDisk == nil {
 		return nil, nil, fmt.Errorf("invalid PV spec %v", spec)

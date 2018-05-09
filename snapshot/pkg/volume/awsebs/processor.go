@@ -53,7 +53,11 @@ func (a *awsEBSPlugin) Init(cloud cloudprovider.Interface) {
 	a.cloud = cloud.(*aws.Cloud)
 }
 
-func (a *awsEBSPlugin) SnapshotCreate(pv *v1.PersistentVolume, tags *map[string]string) (*crdv1.VolumeSnapshotDataSource, *[]crdv1.VolumeSnapshotCondition, error) {
+func (a *awsEBSPlugin) SnapshotCreate(
+	snapshot *crdv1.VolumeSnapshot,
+	pv *v1.PersistentVolume,
+	tags *map[string]string,
+) (*crdv1.VolumeSnapshotDataSource, *[]crdv1.VolumeSnapshotCondition, error) {
 	spec := &pv.Spec
 	if spec == nil || spec.AWSElasticBlockStore == nil {
 		return nil, nil, fmt.Errorf("invalid PV spec %v", spec)
