@@ -18,6 +18,7 @@ package sharedfilesystems
 
 import (
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 
@@ -171,7 +172,7 @@ func FillInPV(options controller.VolumeOptions, share shares.Share, exportLocati
 
 	storageSize := resource.MustParse(fmt.Sprintf("%dG", share.Size))
 	PVAccessMode := getPVAccessMode(options.PVC.Spec.AccessModes)
-	server, path, err := getServerAndPath(exportLocation.Path)
+	server, port, path, err := getServerAndPath(exportLocation.Path)
 	if err != nil {
 		return nil, err
 	}
@@ -199,6 +200,9 @@ func FillInPV(options controller.VolumeOptions, share shares.Share, exportLocati
 		},
 	}
 
+	if port != "" {
+		pv.Annotations[v1.MountOptionAnnotation] = "mountport=" + port
+	}
 	return pv, nil
 }
 
@@ -211,13 +215,21 @@ func GetShareIDfromPV(volume *v1.PersistentVolume) (string, error) {
 	return "", fmt.Errorf("did not find share ID in annotatins in PV (%v)", volume)
 }
 
-// FIXME: for IPv6
-func getServerAndPath(exportLocationPath string) (string, string, error) {
-	split := strings.SplitN(exportLocationPath, ":", 2)
-	if len(split) == 2 {
-		return split[0], split[1], nil
+func getServerAndPath(exportLocationPath string) (string, string, string, error) {
+	// The ":/" is the beginning of the export path
+	split := strings.SplitN(exportLocationPath, ":/", 2)
+	if len(split) != 2 {
+		return "", "", "", fmt.Errorf("failed to split export location %q into server and path parts", exportLocationPath)
 	}
-	return "", "", fmt.Errorf("failed to split export location %q into server and path parts", exportLocationPath)
+	hostport := split[0]
+	path := "/" + split[1]
+	host, port, err := net.SplitHostPort(hostport)
+	if err != nil {
+		// Failed to split the first part of export location to host:port
+		// assume the port was missing -- if there was other error the mount will fail later
+		return hostport, "", path, nil
+	}
+	return host, port, path, nil
 }
 
 func getPVAccessMode(PVCAccessMode []v1.PersistentVolumeAccessMode) []v1.PersistentVolumeAccessMode {
