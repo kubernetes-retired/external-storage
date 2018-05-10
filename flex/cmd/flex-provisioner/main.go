@@ -25,10 +25,15 @@ func main() {
 	// The flex script for flexDriver=<vendor>/<driver> is in
 	// /usr/libexec/kubernetes/kubelet-plugins/volume/exec/<vendor>~<driver>/<driver>
 	flexDriver := flag.String("flexDriver", "vendor/driver", "The FlexVolume driver.")
+	logDebug := flag.Bool("logDebug", false, "Enable debug logging.")
 	flag.Parse()
 
 	logger := log.New()
 	logger.Formatter = &log.JSONFormatter{}
+
+	if *logDebug {
+		log.SetLevel(log.DebugLevel)
+	}
 
 	if errs := validateProvisioner(*provisioner, field.NewPath("provisioner")); len(errs) != 0 {
 		logger.
