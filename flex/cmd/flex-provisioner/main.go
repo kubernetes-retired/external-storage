@@ -32,7 +32,7 @@ func main() {
 	logger.Formatter = &log.JSONFormatter{}
 
 	if *logDebug {
-		log.SetLevel(log.DebugLevel)
+		logger.SetLevel(log.DebugLevel)
 	}
 
 	if errs := validateProvisioner(*provisioner, field.NewPath("provisioner")); len(errs) != 0 {
