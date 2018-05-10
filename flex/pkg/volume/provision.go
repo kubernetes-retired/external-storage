@@ -1,6 +1,8 @@
 package volume
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
@@ -119,7 +121,7 @@ func (self *flexProvisioner) Delete(volume *v1.PersistentVolume) error {
 	defer logger.
 		WithField("volume_data", volume).
 		Debug("Done deleting the volume")
-	return self.runCommand(deleteCmd, volume.Spec.FlexVolume, map[string]string{}, logger)
+	return self.runCommand(deleteCmd, volume.Spec.FlexVolume.Options, map[string]string{}, logger)
 }
 
 func (self *flexProvisioner) provisioned(volume *v1.PersistentVolume) bool {
@@ -137,7 +139,7 @@ type driverResponse struct {
 
 func (self *flexProvisioner) runCommand(
 	command string,
-	volumeOptions controller.VolumeOptions,
+	volumeOptions map[string]string,
 	extraOptions map[string]string,
 	logger *log.Entry,
 ) error {
@@ -155,7 +157,6 @@ func (self *flexProvisioner) runCommand(
 		return err
 	}
 
-	cmd := fmt.Sprintf("%s %s %s", self.execCommand, command, string(options))
 	logger.Debug("Executing command")
 	output, err := self.runner.Command(self.execCommand, command, string(options)).CombinedOutput()
 	logger = logger.WithField("output", output)
@@ -172,29 +173,29 @@ func (self *flexProvisioner) runCommand(
 		logger.
 			WithField("err", err).
 			Error("Failed to unmarshal command output")
-		return nil, err
+		return err
 	} else if response.Status == StatusNotSupported {
 		logger.
 			WithField("err", err).
 			Error("Command not supported")
-		return nil, errors.New(response.Status)
+		return errors.New(response.Status)
 	} else if response.Status != StatusSuccess {
 		logger.
 			WithField("err", err).
 			Error("Command failed")
-		return nil, fmt.Errorf("Command failed with message \"%s\"", response.Message)
+		return fmt.Errorf("Command failed with message \"%s\"", response.Message)
 	}
 
 	logger.Debug("Done running the command")
 	return nil
 }
 
-func jsonOptions(volumeOptions controller.VolumeOptions, extraOptions map[string]string) (string, error) {
+func jsonOptions(volumeOptions map[string]string, extraOptions map[string]string) (string, error) {
 	options := map[string]string{}
 	for key, value := range extraOptions {
 		options[key] = value
 	}
-	for key, value := range volumeOptions.Parameters {
+	for key, value := range volumeOptions {
 		options[key] = value
 	}
 

@@ -4,9 +4,9 @@ import (
 	"flag"
 	"strings"
 
+	"github.com/kubernetes-incubator/external-storage/flex/pkg/volume"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	log "github.com/sirupsen/logrus"
-	"github.com/kubernetes-incubator/external-storage/flex/pkg/volume"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -74,7 +74,7 @@ func main() {
 
 	// Create the provisioner: it implements the Provisioner interface expected by
 	// the controller
-	flexProvisioner := volume.NewFlexProvisioner(client, *execCommand, *flexDriver)
+	flexProvisioner := volume.NewFlexProvisioner(client, *execCommand, *flexDriver, logger)
 
 	// Start the provision controller which will dynamically provision NFS PVs
 	provisionController := controller.NewProvisionController(
@@ -82,7 +82,6 @@ func main() {
 		*provisioner,
 		flexProvisioner,
 		serverVersion.GitVersion,
-		logger,
 	)
 
 	logger.
