@@ -18,8 +18,10 @@ package util
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/cache"
+	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/metrics"
 
 	batch_v1 "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
@@ -56,12 +58,26 @@ func NewAPIUtil(client *kubernetes.Clientset) APIUtil {
 
 // CreatePV will create a PersistentVolume
 func (u *apiUtil) CreatePV(pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
-	return u.client.CoreV1().PersistentVolumes().Create(pv)
+	startTime := time.Now()
+	metrics.APIServerRequestsTotal.WithLabelValues(metrics.APIServerRequestCreate).Inc()
+	pv, err := u.client.CoreV1().PersistentVolumes().Create(pv)
+	metrics.APIServerRequestsDurationSeconds.WithLabelValues(metrics.APIServerRequestCreate).Observe(time.Since(startTime).Seconds())
+	if err != nil {
+		metrics.APIServerRequestsFailedTotal.WithLabelValues(metrics.APIServerRequestCreate).Inc()
+	}
+	return pv, err
 }
 
 // DeletePV will delete a PersistentVolume
 func (u *apiUtil) DeletePV(pvName string) error {
-	return u.client.CoreV1().PersistentVolumes().Delete(pvName, &metav1.DeleteOptions{})
+	startTime := time.Now()
+	metrics.APIServerRequestsTotal.WithLabelValues(metrics.APIServerRequestDelete).Inc()
+	err := u.client.CoreV1().PersistentVolumes().Delete(pvName, &metav1.DeleteOptions{})
+	metrics.APIServerRequestsDurationSeconds.WithLabelValues(metrics.APIServerRequestDelete).Observe(time.Since(startTime).Seconds())
+	if err != nil {
+		metrics.APIServerRequestsFailedTotal.WithLabelValues(metrics.APIServerRequestDelete).Inc()
+	}
+	return err
 }
 
 func (u *apiUtil) CreateJob(job *batch_v1.Job) error {

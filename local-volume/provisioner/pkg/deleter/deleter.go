@@ -23,12 +23,14 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/golang/glog"
+	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
+	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/metrics"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-
-	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
 )
 
 // CleanupState indicates the state of the cleanup process.
@@ -72,6 +74,12 @@ func (d *Deleter) DeletePVs() {
 			// Cleanup volume
 			err := d.deletePV(pv)
 			if err != nil {
+				mode, runjob := d.getVolModeAndRunJob(pv)
+				deleteType := metrics.DeleteTypeProcess
+				if runjob {
+					deleteType = metrics.DeleteTypeJob
+				}
+				metrics.PersistentVolumeDeleteFailedTotal.WithLabelValues(string(mode), deleteType).Inc()
 				cleaningLocalPVErr := fmt.Errorf("Error cleaning PV %q: %v", name, err.Error())
 				d.RuntimeConfig.Recorder.Eventf(pv, v1.EventTypeWarning, common.EventVolumeFailedDelete, cleaningLocalPVErr.Error())
 				glog.Error(err)
@@ -79,6 +87,17 @@ func (d *Deleter) DeletePVs() {
 			}
 		}
 	}
+}
+
+func (d *Deleter) getVolModeAndRunJob(pv *v1.PersistentVolume) (v1.PersistentVolumeMode, bool) {
+	// Default is filesystem mode, so even if volume mode is not specified, mode should be filesystem.
+	volMode := v1.PersistentVolumeFilesystem
+	runjob := false
+	if pv.Spec.VolumeMode != nil && *pv.Spec.VolumeMode == v1.PersistentVolumeBlock {
+		volMode = v1.PersistentVolumeBlock
+		runjob = d.RuntimeConfig.UseJobForCleaning
+	}
+	return volMode, runjob
 }
 
 func (d *Deleter) deletePV(pv *v1.PersistentVolume) error {
@@ -96,13 +115,7 @@ func (d *Deleter) deletePV(pv *v1.PersistentVolume) error {
 		return err
 	}
 
-	// Default is filesystem mode, so even if volume mode is not specified, mode should be filesystem.
-	volMode := v1.PersistentVolumeFilesystem
-	runjob := false
-	if pv.Spec.VolumeMode != nil && *pv.Spec.VolumeMode == v1.PersistentVolumeBlock {
-		volMode = v1.PersistentVolumeBlock
-		runjob = d.RuntimeConfig.UseJobForCleaning
-	}
+	volMode, runjob := d.getVolModeAndRunJob(pv)
 
 	// Exit if cleaning is still in progress.
 	if d.CleanupStatus.InProgress(pv.Name, runjob) {
@@ -110,7 +123,7 @@ func (d *Deleter) deletePV(pv *v1.PersistentVolume) error {
 	}
 
 	// Check if cleaning was just completed.
-	state, err := d.CleanupStatus.RemoveStatus(pv.Name, runjob)
+	state, startTime, err := d.CleanupStatus.RemoveStatus(pv.Name, runjob)
 	if err != nil {
 		return err
 	}
@@ -125,6 +138,24 @@ func (d *Deleter) deletePV(pv *v1.PersistentVolume) error {
 					err.Error())
 				return fmt.Errorf("Error deleting PV %q: %v", pv.Name, err.Error())
 			}
+		}
+		mode := string(volMode)
+		deleteType := metrics.DeleteTypeProcess
+		if runjob {
+			deleteType = metrics.DeleteTypeJob
+		}
+		metrics.PersistentVolumeDeleteTotal.WithLabelValues(mode, deleteType).Inc()
+		if startTime != nil {
+			var capacityBytes int64
+			if capacity, ok := pv.Spec.Capacity[v1.ResourceStorage]; ok {
+				capacityBytes = capacity.Value()
+			}
+			capacityBreakDown := metrics.CapacityBreakDown(capacityBytes)
+			cleanupCommand := ""
+			if len(config.BlockCleanerCommand) > 0 {
+				cleanupCommand = config.BlockCleanerCommand[0]
+			}
+			metrics.PersistentVolumeDeleteDurationSeconds.WithLabelValues(mode, deleteType, capacityBreakDown, cleanupCommand).Observe(time.Since(*startTime).Seconds())
 		}
 		return nil
 	case CSFailed:
@@ -190,9 +221,7 @@ func (d *Deleter) cleanPV(pv *v1.PersistentVolume, volMode v1.PersistentVolumeMo
 	default:
 		err = fmt.Errorf("Unexpected volume mode %q for deleting path %q", volMode, pv.Spec.Local.Path)
 	}
-
 	return err
-
 }
 
 func (d *Deleter) cleanFilePV(pv *v1.PersistentVolume, mountPath string, config common.MountConfig) error {
@@ -316,9 +345,9 @@ func (c *CleanupStatusTracker) InProgress(pvName string, isJob bool) bool {
 	return c.ProcTable.IsRunning(pvName)
 }
 
-// RemoveStatus removes and returns the status of a completed cleaning process
-// The method returns an erro if the process has not yet completed.
-func (c *CleanupStatusTracker) RemoveStatus(pvName string, isJob bool) (CleanupState, error) {
+// RemoveStatus removes and returns the status and start time of a completed cleaning process.
+// The method returns an error if the process has not yet completed.
+func (c *CleanupStatusTracker) RemoveStatus(pvName string, isJob bool) (CleanupState, *time.Time, error) {
 	if isJob {
 		return c.JobController.RemoveJob(pvName)
 	}
