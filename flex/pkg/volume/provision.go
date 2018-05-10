@@ -108,7 +108,7 @@ func (self *flexProvisioner) createVolume(volumeOptions controller.VolumeOptions
 	}
 	return self.runCommand(provisionCmd, volumeOptions.Parameters, map[string]string{
 		optionPVorVolumeName: volumeOptions.PVName,
-		optionCapacity: strconv.FormatInt(storageCapacity, 10),
+		optionCapacity:       strconv.FormatInt(storageCapacity, 10),
 	}, logger)
 }
 
