@@ -170,7 +170,7 @@ func (self *flexProvisioner) runCommand(
 
 	logger.Debug("Executing command")
 	output, err := self.runner.Command(self.execCommand, command, string(options)).CombinedOutput()
-	logger = logger.WithField("output", output)
+	logger = logger.WithField("output", string(output))
 	if err != nil {
 		logger.
 			WithField("err", err).
