@@ -20,9 +20,11 @@ import (
 	"fmt"
 	"hash/fnv"
 	"path/filepath"
+	"time"
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
+	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/metrics"
 
 	esUtil "github.com/kubernetes-incubator/external-storage/lib/util"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/deleter"
@@ -164,6 +166,7 @@ func (d *Discoverer) discoverVolumesAtPath(class string, config common.MountConf
 	}
 
 	for _, file := range files {
+		startTime := time.Now()
 		filePath := filepath.Join(config.MountDir, file)
 		volMode, err := d.getVolumeMode(filePath)
 		if err != nil {
@@ -217,7 +220,7 @@ func (d *Discoverer) discoverVolumesAtPath(class string, config common.MountConf
 			continue
 		}
 
-		d.createPV(file, class, config, capacityByte, volMode)
+		d.createPV(file, class, config, capacityByte, volMode, startTime)
 	}
 }
 
@@ -252,7 +255,7 @@ func generatePVName(file, node, class string) string {
 	return fmt.Sprintf("local-pv-%x", h.Sum32())
 }
 
-func (d *Discoverer) createPV(file, class string, config common.MountConfig, capacityByte int64, volMode v1.PersistentVolumeMode) {
+func (d *Discoverer) createPV(file, class string, config common.MountConfig, capacityByte int64, volMode v1.PersistentVolumeMode, startTime time.Time) {
 	pvName := generatePVName(file, d.Node.Name, class)
 	outsidePath := filepath.Join(config.HostDir, file)
 
@@ -284,6 +287,9 @@ func (d *Discoverer) createPV(file, class string, config common.MountConfig, cap
 		return
 	}
 	glog.Infof("Created PV %q for volume at %q", pvName, outsidePath)
+	mode := string(volMode)
+	metrics.PersistentVolumeDiscoveryTotal.WithLabelValues(mode).Inc()
+	metrics.PersistentVolumeDiscoveryDurationSeconds.WithLabelValues(mode).Observe(time.Since(startTime).Seconds())
 }
 
 // Round down the capacity to an easy to read value.
