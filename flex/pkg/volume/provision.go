@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	log "github.com/sirupsen/logrus"
@@ -97,9 +98,17 @@ func (self *flexProvisioner) Provision(
 }
 
 func (self *flexProvisioner) createVolume(volumeOptions controller.VolumeOptions, logger *log.Entry) error {
+	storage := volumeOptions.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
+	storageCapacity, ok := storage.AsInt64()
+	if !ok {
+		logger.
+			WithField("storage", storage).
+			Error("Invalid storage capacity")
+		return errors.New(fmt.Sprintf("Invalid storage capacity %v", storage))
+	}
 	return self.runCommand(provisionCmd, volumeOptions.Parameters, map[string]string{
 		optionPVorVolumeName: volumeOptions.PVName,
-		optionCapacity:       volumeOptions.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)],
+		optionCapacity: strconv.FormatInt(storageCapacity, 10),
 	}, logger)
 }
 
