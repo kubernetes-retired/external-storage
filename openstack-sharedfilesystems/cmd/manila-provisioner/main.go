@@ -27,7 +27,9 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/sharedfilesystems/apiversions"
 	"github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/shares"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
-	sharedfilesystems "github.com/kubernetes-incubator/external-storage/openstack-sharedfilesystems/pkg/sharedfilesystems"
+	"github.com/kubernetes-incubator/external-storage/openstack-sharedfilesystems/pkg/sharedfilesystems"
+	"github.com/kubernetes-incubator/external-storage/openstack-sharedfilesystems/pkg/sharedfilesystems/sharebackends"
+	"github.com/kubernetes-incubator/external-storage/openstack-sharedfilesystems/pkg/sharedfilesystems/shareoptions"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
@@ -36,7 +38,6 @@ import (
 )
 
 const (
-	provisionerName                    = "externalstorage.k8s.io/manila"
 	minimumSupportedManilaMicroversion = "2.21"
 )
 
@@ -44,8 +45,10 @@ type manilaProvisioner struct {
 }
 
 var (
-	_          controller.Provisioner = &manilaProvisioner{}
-	kubeconfig                        = flag.String("kubeconfig", "", "Path to a kube config. Only required if out-of-cluster.")
+	_               controller.Provisioner = &manilaProvisioner{}
+	kubeconfig                             = flag.String("kubeconfig", "", "Path to a kube config. Only required if out-of-cluster.")
+	provisionerName                        = flag.String("provisioner", "externalstorage.k8s.io/manila", "Name of the provisioner. The provisioner will only provision volumes for claims that request a StorageClass with a provisioner field set equal to this name.")
+	clientset       *kubernetes.Clientset
 )
 
 func main() {
@@ -58,7 +61,8 @@ func main() {
 	if err != nil {
 		glog.Fatalf("Failed to create config: %v", err)
 	}
-	clientset, err := kubernetes.NewForConfig(config)
+
+	clientset, err = kubernetes.NewForConfig(config)
 	if err != nil {
 		glog.Fatalf("Failed to create client: %v", err)
 	}
@@ -73,7 +77,7 @@ func main() {
 	// Start the provision controller which will dynamically provision Manila PVs
 	provisioner := controller.NewProvisionController(
 		clientset,
-		provisionerName,
+		*provisionerName,
 		&manilaProvisioner{},
 		serverVersion.GitVersion,
 	)
@@ -89,105 +93,128 @@ func buildConfig(kubeconfig string) (*rest.Config, error) {
 }
 
 // Provision creates a new Manila share and returns a PV object representing it.
-func (p *manilaProvisioner) Provision(pvc controller.VolumeOptions) (*v1.PersistentVolume, error) {
-	if pvc.PVC.Spec.Selector != nil {
+func (p *manilaProvisioner) Provision(volOptions controller.VolumeOptions) (*v1.PersistentVolume, error) {
+	if volOptions.PVC.Spec.Selector != nil {
 		return nil, fmt.Errorf("claim Selector is not supported")
+	}
+
+	// Initialization
+
+	shareOptions, err := shareoptions.NewShareOptions(&volOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	shareBackend, err := sharedfilesystems.GetShareBackend(shareOptions.Backend)
+	if err != nil {
+		return nil, err
 	}
 
 	client := createManilaV2Client()
 
-	var err error
-	var createdShare shares.Share
-	var createReq shares.CreateOpts
-	if createReq, err = sharedfilesystems.PrepareCreateRequest(pvc); err != nil {
-		return nil, fmt.Errorf("failed to create Create Request: %v", err)
-	}
-	glog.V(4).Infof("successfully created a share Create Request: %v", createReq)
-	var createReqResponse *shares.Share
-	if createReqResponse, err = shares.Create(client, createReq).Extract(); err != nil {
+	// Share creation
+
+	share, err := p.createShare(&volOptions, shareOptions, client)
+	if err != nil {
 		return nil, fmt.Errorf("failed to create a share: %v", err)
 	}
-	glog.V(3).Infof("successfully created a share: (%v)", createReqResponse)
-	createdShare = *createReqResponse
-	if err = sharedfilesystems.WaitTillAvailable(client, createdShare.ID); err != nil {
-		errMsg := fmt.Errorf("waiting for the share %q to become created failed: %v", createdShare.ID, err)
-		glog.Errorf("%v", errMsg)
-		if resultingErr := deleteShare(client, createdShare.ID); resultingErr != nil {
-			return nil, resultingErr
-		}
-		return nil, errMsg
-	}
-	glog.V(4).Infof("the share %q is now in state created", createdShare.ID)
 
-	grantAccessReq := shares.GrantAccessOpts{
-		AccessType:  "ip",
-		AccessTo:    "0.0.0.0/0",
-		AccessLevel: "rw",
-	}
-	var grantAccessReqResponse *shares.AccessRight
-	if grantAccessReqResponse, err = shares.GrantAccess(client, createdShare.ID, grantAccessReq).Extract(); err != nil {
-		errMsg := fmt.Errorf("failed to grant access to the share %q: %v", createdShare.ID, err)
-		glog.Errorf("%v", errMsg)
-		if resultingErr := deleteShare(client, createdShare.ID); resultingErr != nil {
-			return nil, resultingErr
-		}
-		return nil, errMsg
-	}
-	glog.V(4).Infof("granted access to the share %q: (%v)", createdShare.ID, grantAccessReqResponse)
+	// Needed in deleteShare()
+	sharedfilesystems.RegisterBackendForShare(shareOptions.Backend, share.ID)
 
-	var chosenLocation shares.ExportLocation
-	var getExportLocationsReqResponse []shares.ExportLocation
-	if getExportLocationsReqResponse, err = shares.GetExportLocations(client, createdShare.ID).Extract(); err != nil {
-		errMsg := fmt.Errorf("failed to get export locations for the share %q: %v", createdShare.ID, err)
-		glog.Errorf("%v", errMsg)
-		if resultingErr := deleteShare(client, createdShare.ID); resultingErr != nil {
-			return nil, resultingErr
+	defer func() {
+		// Delete the share if any of its setup operations fail
+		if err != nil {
+			if delErr := deleteShare(client, share.ID); delErr != nil {
+				glog.Errorf("failed to delete share %s in a rollback procedure: %v", share.ID, delErr)
+			}
 		}
-		return nil, errMsg
+	}()
+
+	if err = sharedfilesystems.WaitTillAvailable(client, share.ID); err != nil {
+		return nil, fmt.Errorf("waiting for share %s to become created failed: %v", share.ID, err)
 	}
-	glog.V(4).Infof("got export locations for the share %q: (%v)", createdShare.ID, getExportLocationsReqResponse)
-	if chosenLocation, err = sharedfilesystems.ChooseExportLocation(getExportLocationsReqResponse); err != nil {
-		errMsg := fmt.Errorf("failed to choose an export location for the share %q: %q", createdShare.ID, err.Error())
-		fmt.Printf("%v", errMsg)
-		if resultingErr := deleteShare(client, createdShare.ID); resultingErr != nil {
-			return nil, resultingErr
-		}
-		return nil, errMsg
-	}
-	glog.V(4).Infof("selected export location for the share %q is: (%v)", createdShare.ID, chosenLocation)
-	pv, err := sharedfilesystems.FillInPV(pvc, createdShare, chosenLocation)
+
+	availableExportLocations, err := shares.GetExportLocations(client, share.ID).Extract()
 	if err != nil {
-		errMsg := fmt.Errorf("failed to fill in PV for the share %q: %q", createdShare.ID, err.Error())
-		glog.Errorf("%v", errMsg)
-		if resultingErr := deleteShare(client, createdShare.ID); resultingErr != nil {
-			return nil, resultingErr
-		}
-		return nil, errMsg
+		return nil, fmt.Errorf("failed to get export locations for share %s: %v", share.ID, err)
 	}
-	glog.V(4).Infof("resulting PV for the share %q: (%v)", createdShare.ID, pv)
 
-	return pv, nil
+	chosenExportLocation, err := sharedfilesystems.ChooseExportLocation(availableExportLocations)
+	if err != nil {
+		fmt.Errorf("failed to choose an export location for share %s: %v", share.ID, err)
+	}
+
+	accessRight, err := shareBackend.GrantAccess(&sharebackends.GrantAccessArgs{share, client})
+	if err != nil {
+		return nil, fmt.Errorf("failed to grant access for share %s: %v", share.ID, err)
+	}
+
+	volSource, err := shareBackend.CreateSource(&sharebackends.CreateSourceArgs{
+		Share:       share,
+		Options:     shareOptions,
+		Location:    &chosenExportLocation,
+		Clientset:   clientset,
+		AccessRight: accessRight,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("backend %s failed to create volume source for share %s: %v", shareBackend.Name(), share.ID, err)
+	}
+
+	return sharedfilesystems.CreatePersistentVolumeRequest(share, &volOptions, volSource), nil
+}
+
+func (p *manilaProvisioner) createShare(
+	volOptions *controller.VolumeOptions,
+	shareOptions *shareoptions.ShareOptions,
+	client *gophercloud.ServiceClient,
+) (*shares.Share, error) {
+	req, err := sharedfilesystems.PrepareCreateRequest(volOptions, shareOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	return shares.Create(client, *req).Extract()
 }
 
 // Delete deletes the share the volume is associated with
 func (p *manilaProvisioner) Delete(volume *v1.PersistentVolume) error {
 	client := createManilaV2Client()
+
 	shareID, err := sharedfilesystems.GetShareIDfromPV(volume)
 	if err != nil {
 		glog.Errorf("%q", err.Error())
 		return err
 	}
+
 	return deleteShare(client, shareID)
 }
 
 func deleteShare(client *gophercloud.ServiceClient, shareID string) error {
-	deleteResult := shares.Delete(client, shareID)
-	glog.V(4).Infof("share %q delete result: (%v)", shareID, deleteResult)
-	if deleteResult.Err != nil {
-		errMsg := fmt.Sprintf("failed to delete share %q", shareID)
-		glog.Errorf("%q", errMsg)
-		return fmt.Errorf("%q", errMsg)
+	r := shares.Delete(client, shareID)
+	if r.Err != nil {
+		msg := fmt.Errorf("failed to delete share %s: %v", shareID, r.Err)
+		glog.Errorln(msg)
+		return msg
 	}
+
+	backendName, err := sharedfilesystems.GetBackendNameForShare(shareID)
+	if err != nil {
+		glog.Errorln(err)
+		return err
+	}
+
+	shareBackend, err := sharedfilesystems.GetShareBackend(backendName)
+	if err != nil {
+		glog.Errorln(err)
+		return err
+	}
+
+	if err = shareBackend.Release(&sharebackends.ReleaseArgs{shareID, clientset}); err != nil {
+		glog.Errorln(err)
+		return err
+	}
+
 	return nil
 }
 

@@ -18,102 +18,48 @@ package sharedfilesystems
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/shares"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
+	"github.com/kubernetes-incubator/external-storage/openstack-sharedfilesystems/pkg/sharedfilesystems/shareoptions"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
-	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 const (
-	// ZonesSCParamName is the name of the Storage Class parameter in which a set of zones is specified.
-	// The persistent volume will be dynamically provisioned in one of these zones.
-	ZonesSCParamName = "zones"
-	// TypeSCParamName is the name of a share type configured by administrator of Manila service.
-	TypeSCParamName = "type"
-	// ProtocolNFS is the NFS shared filesystems protocol
-	ProtocolNFS = "NFS"
 	// ManilaAnnotationShareIDName identifies provisioned Share ID
 	ManilaAnnotationShareIDName = "manila.external-storage.incubator.kubernetes.io/" + "ID"
 	// shareAvailabilityTimeout is a timeout in secs for waiting until a newly created share becomes available.
 	shareAvailabilityTimeout = 120 /* secs */
 )
 
-func getPVCStorageSize(pvc *v1.PersistentVolumeClaim) (int, error) {
-	var storageSize resource.Quantity
-	var ok bool
-	errStorageSizeNotConfigured := fmt.Errorf("requested storage capacity must be set")
-	if pvc.Spec.Resources.Requests == nil {
-		return 0, errStorageSizeNotConfigured
-	}
-	if storageSize, ok = pvc.Spec.Resources.Requests[v1.ResourceStorage]; !ok {
-		return 0, errStorageSizeNotConfigured
-	}
-	if storageSize.IsZero() {
-		return 0, fmt.Errorf("requested storage size must not have zero value")
-	}
-	if storageSize.Sign() == -1 {
-		return 0, fmt.Errorf("requested storage size must be greater than zero")
-	}
-	canonicalValue, _ := storageSize.AsScale(resource.Giga)
-	var buf []byte
-	storageSizeAsByte, _ := canonicalValue.AsCanonicalBytes(buf)
-	var i int
-	var err error
-	if i, err = strconv.Atoi(string(storageSizeAsByte)); err != nil {
-		return 0, fmt.Errorf("requested storage size is not a number")
-	}
-	return i, nil
-}
-
 // PrepareCreateRequest return:
 // - success: ready to send shared filesystem create request data structure constructed from Persistent Volume Claim and corresponding Storage Class
 // - failure: an error
-func PrepareCreateRequest(options controller.VolumeOptions) (shares.CreateOpts, error) {
-	var storageSize int
-	var err error
-	// mandatory parameter
-	if storageSize, err = getPVCStorageSize(options.PVC); err != nil {
-		return shares.CreateOpts{}, err
+func PrepareCreateRequest(volOptions *controller.VolumeOptions, shareOptions *shareoptions.ShareOptions) (*shares.CreateOpts, error) {
+	var (
+		storageSize int
+		err         error
+	)
+
+	if storageSize, err = getPVCStorageSize(volOptions.PVC); err != nil {
+		return nil, err
 	}
 
-	shareType := ""
-	zone := "nova"
-	for index, value := range options.Parameters {
-		switch strings.ToLower(index) {
-		case ZonesSCParamName:
-			setOfZones, err := util.ZonesToSet(value)
-			if err != nil {
-				return shares.CreateOpts{}, err
-			}
-			zone = volume.ChooseZoneForVolume(setOfZones, options.PVC.Name)
-		case TypeSCParamName:
-			shareType = value
-		default:
-			return shares.CreateOpts{}, fmt.Errorf("invalid parameter %q", index)
-		}
-	}
-
-	shareName := "pvc-" + string(options.PVC.UID)
-	// Currently only the NFS shares are supported, that's why the NFS is hardcoded.
-	return shares.CreateOpts{
-		ShareProto: ProtocolNFS,
+	return &shares.CreateOpts{
+		ShareProto: shareOptions.Protocol,
 		Size:       storageSize,
-		Name:       shareName,
-		ShareType:  shareType,
+		Name:       shareOptions.ShareName,
+		ShareType:  shareOptions.Type,
 		Metadata: map[string]string{
-			persistentvolume.CloudVolumeCreatedForClaimNamespaceTag: options.PVC.Namespace,
-			persistentvolume.CloudVolumeCreatedForClaimNameTag:      options.PVC.Name,
-			persistentvolume.CloudVolumeCreatedForVolumeNameTag:     shareName,
+			persistentvolume.CloudVolumeCreatedForClaimNamespaceTag: volOptions.PVC.Namespace,
+			persistentvolume.CloudVolumeCreatedForClaimNameTag:      volOptions.PVC.Name,
+			persistentvolume.CloudVolumeCreatedForVolumeNameTag:     shareOptions.ShareName,
 		},
-		AvailabilityZone: zone,
 	}, nil
 }
 
@@ -166,40 +112,19 @@ func ChooseExportLocation(locs []shares.ExportLocation) (shares.ExportLocation, 
 	return shares.ExportLocation{}, fmt.Errorf("cannot find any non-admin export location")
 }
 
-// FillInPV creates the PV data structure from original PVC, provisioned share and the share export location
-func FillInPV(options controller.VolumeOptions, share shares.Share, exportLocation shares.ExportLocation) (*v1.PersistentVolume, error) {
-
-	storageSize := resource.MustParse(fmt.Sprintf("%dG", share.Size))
-	PVAccessMode := getPVAccessMode(options.PVC.Spec.AccessModes)
-	server, path, err := getServerAndPath(exportLocation.Path)
-	if err != nil {
-		return nil, err
-	}
-
-	pv := &v1.PersistentVolume{
+func CreatePersistentVolumeRequest(share *shares.Share, volOptions *controller.VolumeOptions, volSource *v1.PersistentVolumeSource) *v1.PersistentVolume {
+	return &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: options.PVName,
-			Annotations: map[string]string{
-				ManilaAnnotationShareIDName: share.ID,
-			},
+			Name:        volOptions.PVName,
+			Annotations: map[string]string{ManilaAnnotationShareIDName: share.ID},
 		},
 		Spec: v1.PersistentVolumeSpec{
-			PersistentVolumeReclaimPolicy: options.PersistentVolumeReclaimPolicy,
-			AccessModes:                   PVAccessMode,
-			Capacity: v1.ResourceList{
-				v1.ResourceStorage: storageSize,
-			},
-			PersistentVolumeSource: v1.PersistentVolumeSource{
-				NFS: &v1.NFSVolumeSource{
-					Server:   server,
-					Path:     path,
-					ReadOnly: false,
-				},
-			},
+			PersistentVolumeReclaimPolicy: volOptions.PersistentVolumeReclaimPolicy,
+			AccessModes:                   getPVAccessMode(volOptions.PVC.Spec.AccessModes),
+			Capacity:                      v1.ResourceList{v1.ResourceStorage: resource.MustParse(fmt.Sprintf("%dG", share.Size))},
+			PersistentVolumeSource:        *volSource,
 		},
 	}
-
-	return pv, nil
 }
 
 // GetShareIDfromPV returns:
@@ -209,24 +134,4 @@ func GetShareIDfromPV(volume *v1.PersistentVolume) (string, error) {
 		return shareID, nil
 	}
 	return "", fmt.Errorf("did not find share ID in annotatins in PV (%v)", volume)
-}
-
-// FIXME: for IPv6
-func getServerAndPath(exportLocationPath string) (string, string, error) {
-	split := strings.SplitN(exportLocationPath, ":", 2)
-	if len(split) == 2 {
-		return split[0], split[1], nil
-	}
-	return "", "", fmt.Errorf("failed to split export location %q into server and path parts", exportLocationPath)
-}
-
-func getPVAccessMode(PVCAccessMode []v1.PersistentVolumeAccessMode) []v1.PersistentVolumeAccessMode {
-	if len(PVCAccessMode) > 0 {
-		return PVCAccessMode
-	}
-	return []v1.PersistentVolumeAccessMode{
-		v1.ReadWriteOnce,
-		v1.ReadOnlyMany,
-		v1.ReadWriteMany,
-	}
 }
