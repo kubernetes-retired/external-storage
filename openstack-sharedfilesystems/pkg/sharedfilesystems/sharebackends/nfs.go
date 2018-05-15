@@ -17,9 +17,6 @@ limitations under the License.
 package sharebackends
 
 import (
-	"fmt"
-	"strings"
-
 	"github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/shares"
 	"k8s.io/api/core/v1"
 )
@@ -29,15 +26,15 @@ type NFS struct{}
 func (NFS) Name() string { return "nfs" }
 
 func (NFS) CreateSource(args *CreateSourceArgs) (*v1.PersistentVolumeSource, error) {
-	split := strings.SplitN(args.Location.Path, ":", 2)
-	if len(split) != 2 {
-		return nil, fmt.Errorf("failed to parse server and path from location '%s'", args.Location.Path)
+	server, path, err := splitExportLocation(args.Location)
+	if err != nil {
+		return nil, err
 	}
 
 	return &v1.PersistentVolumeSource{
 		NFS: &v1.NFSVolumeSource{
-			Server:   split[0],
-			Path:     split[1],
+			Server:   server,
+			Path:     path,
 			ReadOnly: false,
 		},
 	}, nil

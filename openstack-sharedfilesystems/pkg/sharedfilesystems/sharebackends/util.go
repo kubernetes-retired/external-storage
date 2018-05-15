@@ -16,6 +16,29 @@ limitations under the License.
 
 package sharebackends
 
+import (
+	"fmt"
+	"strings"
+
+	"github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/shares"
+)
+
 func getSecretName(shareID string) string {
 	return "manila-" + shareID
+}
+
+// Splits ExportLocation path "addr1:port,addr2:port,...:/location" into its address
+// and location parts. The last occurance of ':' is considered as the delimiter
+// between those two parts.
+func splitExportLocation(loc *shares.ExportLocation) (address, location string, err error) {
+	delimPos := strings.LastIndexByte(loc.Path, ':')
+	if delimPos <= 0 {
+		err = fmt.Errorf("failed to parse address and location from export location '%s'", loc.Path)
+		return
+	}
+
+	address = loc.Path[:delimPos]
+	location = loc.Path[delimPos+1:]
+
+	return
 }

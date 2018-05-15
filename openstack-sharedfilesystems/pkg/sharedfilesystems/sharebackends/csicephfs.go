@@ -18,7 +18,6 @@ package sharebackends
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/shares"
@@ -30,9 +29,9 @@ type CSICephFS struct{}
 func (CSICephFS) Name() string { return "csi-cephfs" }
 
 func (CSICephFS) CreateSource(args *CreateSourceArgs) (*v1.PersistentVolumeSource, error) {
-	delimPos := strings.LastIndexByte(args.Location.Path, ':')
-	if delimPos <= 0 {
-		return nil, fmt.Errorf("failed to parse monitors and root path from location '%s'", args.Location.Path)
+	monitors, rootPath, err := splitExportLocation(args.Location)
+	if err != nil {
+		return nil, err
 	}
 
 	sec := v1.Secret{
@@ -47,9 +46,6 @@ func (CSICephFS) CreateSource(args *CreateSourceArgs) (*v1.PersistentVolumeSourc
 	if err != nil {
 		return nil, fmt.Errorf("failed to create a secret: %v", err)
 	}
-
-	monitors := args.Location.Path[:delimPos]
-	rootPath := args.Location.Path[delimPos+1:]
 
 	return &v1.PersistentVolumeSource{
 		CSI: &v1.CSIPersistentVolumeSource{
@@ -85,7 +81,7 @@ func (CSICephFS) GrantAccess(args *GrantAccessArgs) (*shares.AccessRight, error)
 		return nil, err
 	}
 
-	var accessRight *shares.AccessRight
+	var accessRight shares.AccessRight
 
 	err := gophercloud.WaitFor(120, func() (bool, error) {
 		accessRights, err := shares.ListAccessRights(args.Client, args.Share.ID).Extract()
@@ -100,12 +96,12 @@ func (CSICephFS) GrantAccess(args *GrantAccessArgs) (*shares.AccessRight, error)
 		}
 
 		if accessRights[0].AccessKey != "" {
-			accessRight = &accessRights[0]
+			accessRight = accessRights[0]
 			return true, nil
 		}
 
 		return false, nil
 	})
 
-	return accessRight, err
+	return &accessRight, err
 }
