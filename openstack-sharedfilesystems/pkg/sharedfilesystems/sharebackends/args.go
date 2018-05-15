@@ -20,14 +20,14 @@ import (
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/shares"
 	"github.com/kubernetes-incubator/external-storage/openstack-sharedfilesystems/pkg/sharedfilesystems/shareoptions"
-	"k8s.io/client-go/kubernetes"
+	clientset "k8s.io/client-go/kubernetes"
 )
 
 type CreateSourceArgs struct {
 	Share       *shares.Share
 	Options     *shareoptions.ShareOptions
 	Location    *shares.ExportLocation
-	Clientset   *kubernetes.Clientset
+	Clientset   clientset.Interface
 	AccessRight *shares.AccessRight
 }
 
@@ -38,5 +38,5 @@ type GrantAccessArgs struct {
 
 type ReleaseArgs struct {
 	ShareID   string
-	Clientset *kubernetes.Clientset
+	Clientset clientset.Interface
 }

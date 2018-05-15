@@ -37,7 +37,7 @@ func init() {
 	registerShareBackend(&sharebackends.CSICephFS{})
 }
 
-func GetShareBackend(backendName string) (sharebackends.ShareBackend, error) {
+func getShareBackend(backendName string) (sharebackends.ShareBackend, error) {
 	if b, ok := shareBackends[backendName]; !ok {
 		return nil, fmt.Errorf("share backend %s not found", backendName)
 	} else {
@@ -45,7 +45,7 @@ func GetShareBackend(backendName string) (sharebackends.ShareBackend, error) {
 	}
 }
 
-func GetBackendNameForShare(shareName string) (string, error) {
+func getBackendNameForShare(shareName string) (string, error) {
 	if backendName, ok := shareBackendsMap[shareName]; !ok {
 		return "", fmt.Errorf("no backend registered for share %s", shareName)
 	} else {
@@ -57,6 +57,6 @@ func registerShareBackend(b sharebackends.ShareBackend) {
 	shareBackends[b.Name()] = b
 }
 
-func RegisterBackendForShare(backendName string, shareName string) {
+func registerBackendForShare(backendName, shareName string) {
 	shareBackendsMap[shareName] = backendName
 }
