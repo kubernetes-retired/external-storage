@@ -85,10 +85,10 @@ func (p *ManilaProvisioner) Provision(volOptions controller.VolumeOptions) (*v1.
 
 	chosenExportLocation, err := chooseExportLocation(availableExportLocations)
 	if err != nil {
-		fmt.Errorf("failed to choose an export location for share %s: %v", share.ID, err)
+		return nil, fmt.Errorf("failed to choose an export location for share %s: %v", share.ID, err)
 	}
 
-	accessRight, err := shareBackend.GrantAccess(&sharebackends.GrantAccessArgs{share, p.client})
+	accessRight, err := shareBackend.GrantAccess(&sharebackends.GrantAccessArgs{Share: share, Client: p.client})
 	if err != nil {
 		return nil, fmt.Errorf("failed to grant access for share %s: %v", share.ID, err)
 	}

@@ -18,5 +18,5 @@ package shareoptions
 
 type ProtocolOptions struct {
 	// Protocol specific options
-	// PROTOCOL_optionName string `name:"option-name",protocol:"PROTOCOL"
+	// PROTOCOL_optionName string `name:"option-name" protocol:"PROTOCOL"
 }

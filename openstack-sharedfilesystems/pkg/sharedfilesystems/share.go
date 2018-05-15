@@ -63,7 +63,7 @@ func deleteShare(shareId string, client *gophercloud.ServiceClient, clientset *k
 			return err
 		}
 
-		if err = shareBackend.Release(&sharebackends.ReleaseArgs{shareId, clientset}); err != nil {
+		if err = shareBackend.Release(&sharebackends.ReleaseArgs{ShareID: shareId, Clientset: clientset}); err != nil {
 			return err
 		}
 	}
