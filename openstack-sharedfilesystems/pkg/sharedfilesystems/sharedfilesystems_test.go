@@ -16,6 +16,7 @@ limitations under the License.
 
 package sharedfilesystems
 
+/*
 import (
 	"reflect"
 	"testing"
@@ -988,3 +989,4 @@ func TestGetShareIDfromPV(t *testing.T) {
 	}
 
 }
+*/
