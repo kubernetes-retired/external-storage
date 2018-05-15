@@ -16,8 +16,9 @@ limitations under the License.
 
 package shareoptions
 
+// BackendOptions contains backend-specific options
 type BackendOptions struct {
-	CSICEPHFS_driver string `name:"csi-driver" backend:"csi-cephfs" protocol:"CEPHFS"`
+	CSICEPHFSDriver string `name:"csi-driver" backend:"csi-cephfs" protocol:"CEPHFS"`
 
 	// Add more backend options here
 }

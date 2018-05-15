@@ -16,6 +16,7 @@ limitations under the License.
 
 package shareoptions
 
+// CommonOptions contains options common for any backend/protocol
 type CommonOptions struct {
 	Zones    string `name:"zones"`
 	Type     string `name:"type"`

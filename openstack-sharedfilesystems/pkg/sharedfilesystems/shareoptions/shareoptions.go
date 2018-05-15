@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
+// ShareOptions contains options for provisioning and attaching a share
 type ShareOptions struct {
 	ShareName string
 
@@ -32,6 +33,7 @@ type ShareOptions struct {
 	BackendOptions  // Backend specific options
 }
 
+// NewShareOptions creates new share options
 func NewShareOptions(volOptions *controller.VolumeOptions) (*ShareOptions, error) {
 	params := volOptions.Parameters
 	opts := &ShareOptions{}
@@ -44,38 +46,44 @@ func NewShareOptions(volOptions *controller.VolumeOptions) (*ShareOptions, error
 	setDefaultValue("type", params, "default")
 	setDefaultValue("zones", params, "nova")
 
+	var (
+		n   int
+		err error
+	)
+
 	// Required common options
-	if n, err := extractParams(&optionConstraints{}, params, &opts.CommonOptions); err != nil {
+	n, err = extractParams(&optionConstraints{}, params, &opts.CommonOptions)
+	if err != nil {
 		return nil, err
-	} else {
-		nParams -= n
 	}
+	nParams -= n
 
 	constraints := optionConstraints{protocol: opts.Protocol, backend: opts.Backend}
 
 	// Protocol specific options
-	if n, err := extractParams(&constraints, params, &opts.ProtocolOptions); err != nil {
+	n, err = extractParams(&constraints, params, &opts.ProtocolOptions)
+	if err != nil {
 		return nil, err
-	} else {
-		nParams -= n
 	}
+	nParams -= n
 
 	// Backend specific options
-	if n, err := extractParams(&constraints, params, &opts.BackendOptions); err != nil {
+	n, err = extractParams(&constraints, params, &opts.BackendOptions)
+	if err != nil {
 		return nil, err
-	} else {
-		nParams -= n
 	}
+	nParams -= n
 
 	if nParams != 0 {
 		return nil, fmt.Errorf("parameters contain invalid field(s)")
 	}
 
-	if setOfZones, err := util.ZonesToSet(opts.Zones); err != nil {
+	setOfZones, err := util.ZonesToSet(opts.Zones)
+	if err != nil {
 		return nil, err
-	} else {
-		opts.Zones = volume.ChooseZoneForVolume(setOfZones, volOptions.PVC.GetName())
 	}
+
+	opts.Zones = volume.ChooseZoneForVolume(setOfZones, volOptions.PVC.GetName())
 
 	return opts, nil
 }

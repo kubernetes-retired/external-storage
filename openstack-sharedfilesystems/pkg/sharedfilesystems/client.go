@@ -63,6 +63,8 @@ func compareVersionsLessThan(a, b string) bool {
 	return aMaj < bMaj || (aMaj == bMaj && aMin < bMin)
 }
 
+// NewManilaV2Client Creates Manila v2 client
+// Authenticates to the Manila service with credentials passed in env variables
 func NewManilaV2Client(allowReauth bool) (*gophercloud.ServiceClient, error) {
 	// Authenticate
 

@@ -89,11 +89,12 @@ func extractParams(c *optionConstraints, params map[string]string, opts interfac
 			continue
 		}
 
-		if value, err := extractParam(name, params); err != nil {
+		value, err := extractParam(name, params)
+		if err != nil {
 			return n, err
-		} else {
-			fv.SetString(value)
 		}
+
+		fv.SetString(value)
 	}
 
 	return n, nil

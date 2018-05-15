@@ -111,9 +111,9 @@ func getShareIDfromPV(volume *v1.PersistentVolume) (string, error) {
 	return "", fmt.Errorf("PV object for volume %s doesn't contain key %s in its annotations", volume.GetName(), ManilaAnnotationShareIDName)
 }
 
-func waitForShareStatus(shareId string, client *gophercloud.ServiceClient, desiredStatus string) error {
+func waitForShareStatus(shareID string, client *gophercloud.ServiceClient, desiredStatus string) error {
 	return gophercloud.WaitFor(shareAvailabilityTimeout, func() (bool, error) {
-		share, err := shares.Get(client, shareId).Extract()
+		share, err := shares.Get(client, shareID).Extract()
 		if err != nil {
 			return false, err
 		}

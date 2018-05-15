@@ -16,6 +16,7 @@ limitations under the License.
 
 package shareoptions
 
+// ProtocolOptions contains protocol-specific options
 type ProtocolOptions struct {
 	// Protocol specific options
 	// PROTOCOL_optionName string `name:"option-name" protocol:"PROTOCOL"

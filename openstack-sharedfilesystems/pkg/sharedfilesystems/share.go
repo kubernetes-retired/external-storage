@@ -51,19 +51,19 @@ func createShare(
 	return shares.Create(client, *req).Extract()
 }
 
-func deleteShare(shareId string, client *gophercloud.ServiceClient, clientset *kubernetes.Clientset) error {
-	r := shares.Delete(client, shareId)
+func deleteShare(shareID string, client *gophercloud.ServiceClient, clientset *kubernetes.Clientset) error {
+	r := shares.Delete(client, shareID)
 	if r.Err != nil {
 		return r.Err
 	}
 
-	if backendName, err := getBackendNameForShare(shareId); err == nil {
+	if backendName, err := getBackendNameForShare(shareID); err == nil {
 		shareBackend, err := getShareBackend(backendName)
 		if err != nil {
 			return err
 		}
 
-		if err = shareBackend.Release(&sharebackends.ReleaseArgs{ShareID: shareId, Clientset: clientset}); err != nil {
+		if err = shareBackend.Release(&sharebackends.ReleaseArgs{ShareID: shareID, Clientset: clientset}); err != nil {
 			return err
 		}
 	}

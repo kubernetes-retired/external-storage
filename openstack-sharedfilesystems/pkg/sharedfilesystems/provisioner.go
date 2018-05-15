@@ -29,11 +29,13 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+// ManilaProvisioner struct, implements controller.Provisioner interface
 type ManilaProvisioner struct {
 	client    *gophercloud.ServiceClient
 	clientset *kubernetes.Clientset
 }
 
+// NewManilaProvisioner creates a new instance of Manila provisioner
 func NewManilaProvisioner(client *gophercloud.ServiceClient, clientset *kubernetes.Clientset) *ManilaProvisioner {
 	return &ManilaProvisioner{
 		client:    client,
@@ -41,6 +43,7 @@ func NewManilaProvisioner(client *gophercloud.ServiceClient, clientset *kubernet
 	}
 }
 
+// Provision a share in Manila service
 func (p *ManilaProvisioner) Provision(volOptions controller.VolumeOptions) (*v1.PersistentVolume, error) {
 	if volOptions.PVC.Spec.Selector != nil {
 		return nil, fmt.Errorf("claim Selector is not supported")
@@ -110,14 +113,15 @@ func (p *ManilaProvisioner) Provision(volOptions controller.VolumeOptions) (*v1.
 	return buildPersistentVolume(share, &volOptions, volSource), nil
 }
 
+// Delete a share from Manila service
 func (p *ManilaProvisioner) Delete(volume *v1.PersistentVolume) error {
-	shareId, err := getShareIDfromPV(volume)
+	shareID, err := getShareIDfromPV(volume)
 	if err != nil {
 		return err
 	}
 
-	if err = deleteShare(shareId, p.client, p.clientset); err != nil {
-		return fmt.Errorf("failed to delete share %s: %v", shareId, err)
+	if err = deleteShare(shareID, p.client, p.clientset); err != nil {
+		return fmt.Errorf("failed to delete share %s: %v", shareID, err)
 	}
 
 	return nil

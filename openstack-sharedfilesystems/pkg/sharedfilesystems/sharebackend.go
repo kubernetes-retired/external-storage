@@ -38,19 +38,21 @@ func init() {
 }
 
 func getShareBackend(backendName string) (sharebackends.ShareBackend, error) {
-	if b, ok := shareBackends[backendName]; !ok {
+	b, ok := shareBackends[backendName]
+	if !ok {
 		return nil, fmt.Errorf("share backend %s not found", backendName)
-	} else {
-		return b, nil
 	}
+
+	return b, nil
 }
 
 func getBackendNameForShare(shareName string) (string, error) {
-	if backendName, ok := shareBackendsMap[shareName]; !ok {
+	backendName, ok := shareBackendsMap[shareName]
+	if !ok {
 		return "", fmt.Errorf("no backend registered for share %s", shareName)
-	} else {
-		return backendName, nil
 	}
+
+	return backendName, nil
 }
 
 func registerShareBackend(b sharebackends.ShareBackend) {

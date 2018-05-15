@@ -21,6 +21,9 @@ import (
 	"k8s.io/api/core/v1"
 )
 
+// ShareBackend fills differences between various kinds of shares.
+// Takes care of creating granting access to the share and building
+// PersistentVolumeSource used in the final PersistentVolume object.
 type ShareBackend interface {
 	// Name of the share backend
 	Name() string

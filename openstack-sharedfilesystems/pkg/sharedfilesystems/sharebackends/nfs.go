@@ -21,10 +21,13 @@ import (
 	"k8s.io/api/core/v1"
 )
 
+// NFS struct, implements ShareBackend interface for NFS
 type NFS struct{}
 
+// Name of the backend
 func (NFS) Name() string { return "nfs" }
 
+// CreateSource creates builds PersistentVolumeSource
 func (NFS) CreateSource(args *CreateSourceArgs) (*v1.PersistentVolumeSource, error) {
 	server, path, err := splitExportLocation(args.Location)
 	if err != nil {
@@ -40,10 +43,13 @@ func (NFS) CreateSource(args *CreateSourceArgs) (*v1.PersistentVolumeSource, err
 	}, nil
 }
 
+// Release does nothing - nothing to release
 func (NFS) Release(*ReleaseArgs) error {
 	return nil
 }
 
+// GrantAccess to NFS share. Allows read-write access to everyone!
+// TODO: make this configurable by StorageClass?
 func (NFS) GrantAccess(args *GrantAccessArgs) (*shares.AccessRight, error) {
 	return shares.GrantAccess(args.Client, args.Share.ID, shares.GrantAccessOpts{
 		AccessType:  "ip",

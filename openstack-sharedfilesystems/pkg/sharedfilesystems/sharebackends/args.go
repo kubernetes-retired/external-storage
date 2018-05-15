@@ -23,6 +23,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 )
 
+// CreateSourceArgs contains arguments for ShareBackend.CreateSource()
 type CreateSourceArgs struct {
 	Share       *shares.Share
 	Options     *shareoptions.ShareOptions
@@ -31,11 +32,13 @@ type CreateSourceArgs struct {
 	AccessRight *shares.AccessRight
 }
 
+// GrantAccessArgs contains arguments for ShareBackend.GrantAccess()
 type GrantAccessArgs struct {
 	Share  *shares.Share
 	Client *gophercloud.ServiceClient
 }
 
+// ReleaseArgs contains arguments for ShareBaceknd.Release()
 type ReleaseArgs struct {
 	ShareID   string
 	Clientset clientset.Interface
