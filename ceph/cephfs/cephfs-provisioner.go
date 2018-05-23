@@ -149,6 +149,9 @@ func (p *cephFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 	if deterministicNames {
 		cmd.Env = append(cmd.Env, "CEPH_VOLUME_GROUP="+options.PVC.Namespace)
 	}
+	if *disableCephNamespaceIsolation {
+		cmd.Env = append(cmd.Env, "CEPH_NAMESPACE_ISOLATION_DISABLED=true")
+	}
 
 	output, cmdErr := cmd.CombinedOutput()
 	if cmdErr != nil {
@@ -255,6 +258,9 @@ func (p *cephFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 		"CEPH_AUTH_ID=" + adminID,
 		"CEPH_AUTH_KEY=" + adminSecret,
 		"CEPH_VOLUME_ROOT=" + pvcRoot}
+	if *disableCephNamespaceIsolation {
+		cmd.Env = append(cmd.Env, "CEPH_NAMESPACE_ISOLATION_DISABLED=true")
+	}
 
 	output, cmdErr := cmd.CombinedOutput()
 	if cmdErr != nil {
@@ -345,12 +351,13 @@ func (p *cephFSProvisioner) parsePVSecret(namespace, secretName string) (string,
 }
 
 var (
-	master          = flag.String("master", "", "Master URL")
-	kubeconfig      = flag.String("kubeconfig", "", "Absolute path to the kubeconfig")
-	id              = flag.String("id", "", "Unique provisioner identity")
-	secretNamespace = flag.String("secret-namespace", "", "Namespace secrets will be created in (default: '', created in each PVC's namespace)")
-	enableQuota     = flag.Bool("enable-quota", false, "Enable PVC quota")
-	metricsPort     = flag.Int("metrics-port", 0, "The port of the metrics server (set to non-zero to enable)")
+	master                        = flag.String("master", "", "Master URL")
+	kubeconfig                    = flag.String("kubeconfig", "", "Absolute path to the kubeconfig")
+	id                            = flag.String("id", "", "Unique provisioner identity")
+	secretNamespace               = flag.String("secret-namespace", "", "Namespace secrets will be created in (default: '', created in each PVC's namespace)")
+	enableQuota                   = flag.Bool("enable-quota", false, "Enable PVC quota")
+	metricsPort                   = flag.Int("metrics-port", 0, "The port of the metrics server (set to non-zero to enable)")
+	disableCephNamespaceIsolation = flag.Bool("disable-ceph-namespace-isolation", false, "Disable ceph namespace isolation")
 )
 
 func main() {
