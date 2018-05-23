@@ -530,9 +530,10 @@ func (vs *volumeSnapshotter) createVolumeSnapshotData(uniqueSnapshotName, pvName
 		conditions := *snapStatus
 		ind := len(conditions) - 1
 		lastCondition = crdv1.VolumeSnapshotDataCondition{
-			Type:    (crdv1.VolumeSnapshotDataConditionType)(conditions[ind].Type),
-			Status:  conditions[ind].Status,
-			Message: conditions[ind].Message,
+			Type:               (crdv1.VolumeSnapshotDataConditionType)(conditions[ind].Type),
+			Status:             conditions[ind].Status,
+			Message:            conditions[ind].Message,
+			LastTransitionTime: metav1.Now(),
 		}
 	}
 	// Generate snapshotData name with the UID of snapshot object
@@ -735,6 +736,62 @@ func (vs *volumeSnapshotter) updateVolumeSnapshotMetadata(snapshot *crdv1.Volume
 	return &cloudTags, nil
 }
 
+// Propagates the VolumeSnapshot condition to VolumeSnapshotData
+func (vs *volumeSnapshotter) propagateVolumeSnapshotCondition(snapshotDataName string, condition *crdv1.VolumeSnapshotCondition) error {
+	var snapshotDataObj crdv1.VolumeSnapshotData
+	err := vs.restClient.Get().
+		Name(snapshotDataName).
+		Resource(crdv1.VolumeSnapshotDataResourcePlural).
+		Do().Into(&snapshotDataObj)
+	if err != nil {
+		return err
+	}
+
+	newCondition := &crdv1.VolumeSnapshotDataCondition{
+		Type:               (crdv1.VolumeSnapshotDataConditionType)(condition.Type),
+		Status:             condition.Status,
+		Message:            condition.Message,
+		LastTransitionTime: condition.LastTransitionTime,
+	}
+	oldStatus := snapshotDataObj.Status.DeepCopy()
+
+	status := snapshotDataObj.Status
+	isEqual := false
+	if oldStatus.Conditions == nil || len(oldStatus.Conditions) == 0 || newCondition.Type != oldStatus.Conditions[len(oldStatus.Conditions)-1].Type {
+		status.Conditions = append(status.Conditions, *newCondition)
+	} else {
+		oldCondition := oldStatus.Conditions[len(oldStatus.Conditions)-1]
+		if newCondition.Status == oldCondition.Status {
+			newCondition.LastTransitionTime = oldCondition.LastTransitionTime
+		}
+		status.Conditions[len(status.Conditions)-1] = *newCondition
+		isEqual = newCondition.Type == oldCondition.Type &&
+			newCondition.Status == oldCondition.Status &&
+			newCondition.Reason == oldCondition.Reason &&
+			newCondition.Message == oldCondition.Message &&
+			newCondition.LastTransitionTime.Equal(&oldCondition.LastTransitionTime)
+	}
+	if !isEqual {
+		var newSnapshotDataObj crdv1.VolumeSnapshotData
+		snapshotDataObj.Status = status
+		if snapshotDataObj.Status.CreationTimestamp.IsZero() && newCondition.Type == crdv1.VolumeSnapshotDataConditionReady {
+			snapshotDataObj.Status.CreationTimestamp = newCondition.LastTransitionTime
+		}
+		err = vs.restClient.Put().
+			Name(snapshotDataName).
+			Resource(crdv1.VolumeSnapshotDataResourcePlural).
+			Body(&snapshotDataObj).
+			Do().Into(&newSnapshotDataObj)
+		if err != nil {
+			return err
+		}
+		glog.Infof("VolumeSnapshot status propagated to VolumeSnapshotData")
+		return nil
+	}
+
+	return nil
+}
+
 // Update VolumeSnapshot status if the condition is changed.
 func (vs *volumeSnapshotter) UpdateVolumeSnapshotStatus(snapshot *crdv1.VolumeSnapshot, condition *crdv1.VolumeSnapshotCondition) (*crdv1.VolumeSnapshot, error) {
 	var snapshotObj crdv1.VolumeSnapshot
@@ -779,6 +836,10 @@ func (vs *volumeSnapshotter) UpdateVolumeSnapshotStatus(snapshot *crdv1.VolumeSn
 			return nil, err
 		}
 		glog.Infof("UpdateVolumeSnapshotStatus finishes %+v", newSnapshotObj)
+		err = vs.propagateVolumeSnapshotCondition(snapshotObj.Spec.SnapshotDataName, &snapshotObj.Status.Conditions[len(snapshotObj.Status.Conditions)-1])
+		if err != nil {
+			return nil, err
+		}
 		return &newSnapshotObj, nil
 	}
 
