@@ -123,7 +123,7 @@ There are a few uniqueness related to snapshots:
 
 * There are use cases that data from snapshots taken from one namespace need to be accessible by users in another namespace.
 
-* For security purpose, if a snapshot object is created by a user, kubernetes should prevent other users duplicating this object in a different namespace if they happen to get the snapshot name.
+* For security purpose, if a snapshot object is created by a user, kubernetes should prevent other users from duplicating this object in a different namespace if they happen to use the same snapshot name. The snapshot object names should be unique within a cluster. 
 
 * There might be some existing snapshots taken by admins/users and they want to use those snapshots through kubernetes API interface.
 
