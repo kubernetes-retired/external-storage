@@ -28,7 +28,7 @@ make push
 ## Design
 
 There is one provisioner instance on each node in the cluster.  Each instance is
-reponsible for monitoring and managing the local volumes on its node.
+responsible for monitoring and managing the local volumes on its node.
 
 The basic components of the provisioner are as follows:
 
