@@ -35,6 +35,8 @@
 {{- end }}
 {{- $configMapName := .Values.configmap.configMapName }}
 {{- $provisionerNamespace := .Values.common.namespace }}
+{{- $useAlphaAPI := .Values.common.useAlphaAPI }}
+{{- $useJobForCleaning := .Values.common.useJobForCleaning }}
 {{- $provisionerName := .Values.daemonset.name }}
 {{- $imageFull := .Values.daemonset.image }}
 {{- $imagePullPolicy := .Values.daemonset.imagePullPolicy }}
@@ -54,8 +56,12 @@ data:
     - {{$label}}
    {{- end }}
 {{- end }}
-  # Uncomment useJobForCleaning if you want to use Jobs to clean block devices.
-  #useJobForCleaning: "yes"
+{{- if $useAlphaAPI }}
+  useAlphaAPI: "true"
+{{- end }}
+{{- if $useJobForCleaning }}
+  useJobForCleaning: "yes"
+{{- end}}
   storageClassMap: |
 {{- if eq ( $engine | lower ) "gcepre19" }} {{ include "configStorageClass" (.Values.configmap.gcePre19.storageClass) | indent 4 }} {{ end }}
 {{- if eq ( $engine | lower ) "gcepost19" }} {{ include "configStorageClass" (.Values.configmap.gcePost19.storageClass) | indent 4 }} {{ end }}
