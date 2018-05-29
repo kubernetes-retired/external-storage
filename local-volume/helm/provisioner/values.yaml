@@ -7,6 +7,16 @@ common:
   # Defines the namespace where provisioner runs
   #
   namespace: default
+  #
+  # Beta PV.NodeAffinity field is used by default. If running against pre-1.10
+  # k8s version, the `useAlphaAPI` flag must be enabled in the configMap.
+  #
+  useAlphaAPI: false
+  #
+  # Provisioner clean volumes in process by default. If set to true, provisioner
+  # will use Jobs to clean.
+  #
+  useJobForCleaning: false
 configmap:
   #
   # Defines the name of configmap used by Provisioner
