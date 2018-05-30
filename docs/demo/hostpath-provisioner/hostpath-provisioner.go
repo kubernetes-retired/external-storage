@@ -24,6 +24,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
+	"github.com/kubernetes-incubator/external-storage/lib/util"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -66,6 +67,10 @@ func (p *hostPathProvisioner) Provision(options controller.VolumeOptions) (*v1.P
 
 	if err := os.MkdirAll(path, 0777); err != nil {
 		return nil, err
+	}
+
+	if util.CheckPersistentVolumeClaimModeBlock(options.PVC) {
+		return nil, fmt.Errorf("%s does not support block volume provisioning", provisionerName)
 	}
 
 	pv := &v1.PersistentVolume{

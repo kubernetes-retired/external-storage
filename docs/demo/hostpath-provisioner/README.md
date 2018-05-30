@@ -65,6 +65,10 @@ func (p *hostPathProvisioner) Provision(options controller.VolumeOptions) (*v1.P
 		return nil, err
 	}
 
+	if util.CheckPersistentVolumeClaimModeBlock(options.PVC) {
+		return nil, fmt.Errorf("%s does not support block volume provisioning", provisionerName)
+	}
+
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: options.PVName,

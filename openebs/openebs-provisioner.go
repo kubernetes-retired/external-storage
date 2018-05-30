@@ -81,6 +81,10 @@ var _ controller.Provisioner = &openEBSProvisioner{}
 // Provision creates a storage asset and returns a PV object representing it.
 func (p *openEBSProvisioner) Provision(options controller.VolumeOptions) (*v1.PersistentVolume, error) {
 
+	if util.CheckPersistentVolumeClaimModeBlock(options.PVC) {
+		return nil, fmt.Errorf("%s does not support block volume provisioning", provisionerName)
+	}
+
 	//Issue a request to Maya API Server to create a volume
 	var volume mayav1.Volume
 	var openebsVol mApiv1.OpenEBSVolume
