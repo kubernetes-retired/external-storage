@@ -69,8 +69,18 @@ func NewDeleter(config *common.RuntimeConfig, cleanupTracker *CleanupStatusTrack
 // delete them
 func (d *Deleter) DeletePVs() {
 	for _, pv := range d.Cache.ListPVs() {
-		if pv.Status.Phase == v1.VolumeReleased {
-			name := pv.Name
+		if pv.Status.Phase != v1.VolumeReleased {
+			continue
+		}
+		name := pv.Name
+		switch pv.Spec.PersistentVolumeReclaimPolicy {
+		case v1.PersistentVolumeReclaimRetain:
+			glog.V(4).Infof("reclaimVolume[%s]: policy is Retain, nothing to do", name)
+		case v1.PersistentVolumeReclaimRecycle:
+			glog.V(4).Infof("reclaimVolume[%s]: policy is Recycle which is not supported", name)
+			d.RuntimeConfig.Recorder.Eventf(pv, v1.EventTypeWarning, "VolumeUnsupportedReclaimPolicy", "Volume has unsupported PersistentVolumeReclaimPolicy: Recycle")
+		case v1.PersistentVolumeReclaimDelete:
+			glog.V(4).Infof("reclaimVolume[%s]: policy is Delete", name)
 			// Cleanup volume
 			err := d.deletePV(pv)
 			if err != nil {
@@ -85,6 +95,9 @@ func (d *Deleter) DeletePVs() {
 				glog.Error(err)
 				continue
 			}
+		default:
+			// Unknown PersistentVolumeReclaimPolicy
+			d.RuntimeConfig.Recorder.Eventf(pv, v1.EventTypeWarning, "VolumeUnknownReclaimPolicy", "Volume has unrecognized PersistentVolumeReclaimPolicy")
 		}
 	}
 }
