@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/golang/glog"
 	esUtil "github.com/kubernetes-incubator/external-storage/lib/util"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/cache"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
@@ -29,7 +30,12 @@ import (
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/util"
 
 	"k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/util/mount"
 )
@@ -62,6 +68,23 @@ var testNode = &v1.Node{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:   testNodeName,
 		Labels: nodeLabels,
+	},
+}
+
+var reclaimPolicyDelete = v1.PersistentVolumeReclaimDelete
+
+var testStorageClasses = []*storagev1.StorageClass{
+	{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "sc1",
+		},
+		ReclaimPolicy: &reclaimPolicyDelete,
+	},
+	{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "sc2",
+		},
+		ReclaimPolicy: &reclaimPolicyDelete,
 	},
 }
 
@@ -306,17 +329,32 @@ func testSetup(t *testing.T, test *testConfig, useAlphaAPI bool) *Discoverer {
 		NodeLabelsForPV: nodeLabelsForPV,
 		UseAlphaAPI:     useAlphaAPI,
 	}
+	objects := make([]runtime.Object, 0)
+	for _, o := range testStorageClasses {
+		objects = append(objects, runtime.Object(o))
+	}
+	client := fake.NewSimpleClientset(objects...)
 	runConfig := &common.RuntimeConfig{
-		UserConfig: userConfig,
-		Cache:      test.cache,
-		VolUtil:    test.volUtil,
-		APIUtil:    test.apiUtil,
-		Name:       testProvisionerName,
-		Mounter:    fm,
+		UserConfig:      userConfig,
+		Cache:           test.cache,
+		VolUtil:         test.volUtil,
+		APIUtil:         test.apiUtil,
+		Name:            testProvisionerName,
+		Mounter:         fm,
+		Client:          client,
+		InformerFactory: informers.NewSharedInformerFactory(client, 0),
 	}
 	d, err := NewDiscoverer(runConfig, test.cleanupTracker)
 	if err != nil {
 		t.Fatalf("Error setting up test discoverer: %v", err)
+	}
+	// Start informers after all event listeners are registered.
+	runConfig.InformerFactory.Start(wait.NeverStop)
+	// Wait for all started informers' cache were synced.
+	for v, synced := range runConfig.InformerFactory.WaitForCacheSync(wait.NeverStop) {
+		if !synced {
+			glog.Fatalf("Error syncing informer for %v", v)
+		}
 	}
 	return d
 }

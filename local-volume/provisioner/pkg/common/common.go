@@ -110,7 +110,7 @@ type RuntimeConfig struct {
 	// Unique name of this provisioner
 	Name string
 	// K8s API client
-	Client *kubernetes.Clientset
+	Client kubernetes.Interface
 	// Cache to store PVs managed by this provisioner
 	Cache *cache.VolumeCache
 	// K8s API layer
@@ -133,6 +133,7 @@ type LocalPVConfig struct {
 	HostPath        string
 	Capacity        int64
 	StorageClass    string
+	ReclaimPolicy   v1.PersistentVolumeReclaimPolicy
 	ProvisionerName string
 	UseAlphaAPI     bool
 	AffinityAnn     string
@@ -176,7 +177,7 @@ func CreateLocalPVSpec(config *LocalPVConfig) *v1.PersistentVolume {
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{
-			PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
+			PersistentVolumeReclaimPolicy: config.ReclaimPolicy,
 			Capacity: v1.ResourceList{
 				v1.ResourceName(v1.ResourceStorage): *resource.NewQuantity(int64(config.Capacity), resource.BinarySI),
 			},
