@@ -34,6 +34,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -122,6 +123,8 @@ type RuntimeConfig struct {
 	BlockDisabled bool
 	// Mounter used to verify mountpoints
 	Mounter mount.Interface
+	// InformerFactory gives access to informers for the controller.
+	InformerFactory informers.SharedInformerFactory
 }
 
 // LocalPVConfig defines the parameters for creating a local PV
