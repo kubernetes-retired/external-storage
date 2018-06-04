@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-all: aws/efs ceph/cephfs ceph/rbd flex gluster/block gluster/glusterfs gluster/file iscsi/targetd local-volume/provisioner nfs-client nfs snapshot openstack/standalone-cinder openstack-sharedfilesystems
+all: aws/efs ceph/cephfs ceph/rbd flex gluster/block gluster/glusterfs gluster/file iscsi/targetd local-volume/provisioner nfs-client nfs snapshot openstack/standalone-cinder
 .PHONY: all
 
-clean: clean-aws/efs clean-ceph/cephfs clean-ceph/rbd clean-flex clean-gluster/block clean-gluster/glusterfs clean-iscsi/targetd clean-local-volume/provisioner clean-nfs-client clean-nfs clean-openebs clean-snapshot clean-openstack/standalone-cinder clean-openstack-sharedfilesystems
+clean: clean-aws/efs clean-ceph/cephfs clean-ceph/rbd clean-flex clean-gluster/block clean-gluster/glusterfs clean-iscsi/targetd clean-local-volume/provisioner clean-nfs-client clean-nfs clean-openebs clean-snapshot clean-openstack/standalone-cinder
 .PHONY: clean
 
 
-test: test-aws/efs test-local-volume/provisioner test-nfs test-snapshot test-openstack/standalone-cinder test-openstack-sharedfilesystems
+test: test-aws/efs test-local-volume/provisioner test-nfs test-snapshot test-openstack/standalone-cinder
 .PHONY: test
 
 verify:
@@ -201,22 +201,6 @@ test-snapshot:
 	cd snapshot; \
 	make test
 .PHONY: test-snapshot
-
-openstack-sharedfilesystems:
-	cd openstack-sharedfilesystems; \
-	make container
-.PHONY: openstack-sharedfilesystems
-
-test-openstack-sharedfilesystems:
-	cd openstack-sharedfilesystems; \
-	make test
-.PHONY: test-openstack-sharedfilesystems
-
-clean-openstack-sharedfilesystems:
-	cd openstack-sharedfilesystems; \
-	make clean
-.PHONY: clean-openstack-sharedfilesystems
-
 
 push-cephfs-provisioner:
 	cd ceph/cephfs; \
