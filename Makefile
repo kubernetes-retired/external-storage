@@ -204,7 +204,7 @@ test-snapshot:
 
 openstack-sharedfilesystems:
 	cd openstack-sharedfilesystems; \
-	make container
+	make
 .PHONY: openstack-sharedfilesystems
 
 test-openstack-sharedfilesystems:

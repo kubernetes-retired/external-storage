@@ -94,6 +94,7 @@ elif [ "$TEST_SUITE" = "everything-else" ]; then
 	make nfs-client
 	make snapshot
 	make test-snapshot
+	make openstack-sharedfilesystems
 	make test-openstack/standalone-cinder
 elif [ "$TEST_SUITE" = "local-volume" ]; then
 	make local-volume/provisioner
