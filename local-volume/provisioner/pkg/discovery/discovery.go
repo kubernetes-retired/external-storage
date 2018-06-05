@@ -29,6 +29,8 @@ import (
 	esUtil "github.com/kubernetes-incubator/external-storage/lib/util"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/deleter"
 	"k8s.io/api/core/v1"
+	storagev1listers "k8s.io/client-go/listers/storage/v1"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 )
 
@@ -42,11 +44,21 @@ type Discoverer struct {
 	CleanupTracker  *deleter.CleanupStatusTracker
 	nodeAffinityAnn string
 	nodeAffinity    *v1.VolumeNodeAffinity
+	classLister     storagev1listers.StorageClassLister
 }
 
 // NewDiscoverer creates a Discoverer object that will scan through
 // the configured directories and create local PVs for any new directories found
 func NewDiscoverer(config *common.RuntimeConfig, cleanupTracker *deleter.CleanupStatusTracker) (*Discoverer, error) {
+	sharedInformer := config.InformerFactory.Storage().V1().StorageClasses()
+	sharedInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		// We don't need an actual event handler for StorageClasses,
+		// but we must pass a non-nil one to cache.NewInformer()
+		AddFunc:    nil,
+		UpdateFunc: nil,
+		DeleteFunc: nil,
+	})
+
 	labelMap := make(map[string]string)
 	for _, labelName := range config.NodeLabelsForPV {
 		labelVal, ok := config.Node.Labels[labelName]
@@ -69,6 +81,7 @@ func NewDiscoverer(config *common.RuntimeConfig, cleanupTracker *deleter.Cleanup
 			RuntimeConfig:   config,
 			Labels:          labelMap,
 			CleanupTracker:  cleanupTracker,
+			classLister:     sharedInformer.Lister(),
 			nodeAffinityAnn: tmpAnnotations[v1.AlphaStorageNodeAffinityAnnotation]}, nil
 	}
 
@@ -81,6 +94,7 @@ func NewDiscoverer(config *common.RuntimeConfig, cleanupTracker *deleter.Cleanup
 		RuntimeConfig:  config,
 		Labels:         labelMap,
 		CleanupTracker: cleanupTracker,
+		classLister:    sharedInformer.Lister(),
 		nodeAffinity:   volumeNodeAffinity}, nil
 }
 
@@ -143,8 +157,30 @@ func (d *Discoverer) DiscoverLocalVolumes() {
 	}
 }
 
+func (d *Discoverer) getReclaimPolicyFromStorageClass(name string) (v1.PersistentVolumeReclaimPolicy, error) {
+	class, err := d.classLister.Get(name)
+	if err != nil {
+		return "", err
+	}
+	if class.ReclaimPolicy != nil {
+		return *class.ReclaimPolicy, nil
+	}
+	return v1.PersistentVolumeReclaimDelete, nil
+}
+
 func (d *Discoverer) discoverVolumesAtPath(class string, config common.MountConfig) {
 	glog.V(7).Infof("Discovering volumes at hostpath %q, mount path %q for storage class %q", config.HostDir, config.MountDir, class)
+
+	reclaimPolicy, err := d.getReclaimPolicyFromStorageClass(class)
+	if err != nil {
+		glog.Errorf("Failed to get ReclaimPolicy from storage class %q: %v", class, err)
+		return
+	}
+
+	if reclaimPolicy != v1.PersistentVolumeReclaimRetain && reclaimPolicy != v1.PersistentVolumeReclaimDelete {
+		glog.Errorf("Unsupported ReclaimPolicy %q from storage class %q, supported policy are Retain and Delete.", reclaimPolicy, class)
+		return
+	}
 
 	files, err := d.VolUtil.ReadDir(config.MountDir)
 	if err != nil {
@@ -220,7 +256,7 @@ func (d *Discoverer) discoverVolumesAtPath(class string, config common.MountConf
 			continue
 		}
 
-		d.createPV(file, class, config, capacityByte, volMode, startTime)
+		d.createPV(file, class, reclaimPolicy, config, capacityByte, volMode, startTime)
 	}
 }
 
@@ -255,7 +291,7 @@ func generatePVName(file, node, class string) string {
 	return fmt.Sprintf("local-pv-%x", h.Sum32())
 }
 
-func (d *Discoverer) createPV(file, class string, config common.MountConfig, capacityByte int64, volMode v1.PersistentVolumeMode, startTime time.Time) {
+func (d *Discoverer) createPV(file, class string, reclaimPolicy v1.PersistentVolumeReclaimPolicy, config common.MountConfig, capacityByte int64, volMode v1.PersistentVolumeMode, startTime time.Time) {
 	pvName := generatePVName(file, d.Node.Name, class)
 	outsidePath := filepath.Join(config.HostDir, file)
 
@@ -267,6 +303,7 @@ func (d *Discoverer) createPV(file, class string, config common.MountConfig, cap
 		HostPath:        outsidePath,
 		Capacity:        roundDownCapacityPretty(capacityByte),
 		StorageClass:    class,
+		ReclaimPolicy:   reclaimPolicy,
 		ProvisionerName: d.Name,
 		VolumeMode:      volMode,
 		Labels:          d.Labels,

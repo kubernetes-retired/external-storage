@@ -68,28 +68,28 @@ var _ JobController = &jobController{}
 
 type jobController struct {
 	*common.RuntimeConfig
-	namespace   string
-	client      kubernetes.Interface
-	queue       workqueue.RateLimitingInterface
-	jobInformer cache.SharedIndexInformer
-	jobLister   batchlisters.JobLister
+	namespace string
+	queue     workqueue.RateLimitingInterface
+	jobLister batchlisters.JobLister
 }
 
 // NewJobController instantiates  a new job controller.
-func NewJobController(client kubernetes.Interface, namespace string, labelmap map[string]string,
-	config *common.RuntimeConfig) (JobController, error) {
+func NewJobController(labelmap map[string]string, config *common.RuntimeConfig) (JobController, error) {
+	namespace := config.Namespace
 	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 	labelset := labels.Set(labelmap)
 	optionsModifier := func(options *meta_v1.ListOptions) {
 		options.LabelSelector = labels.SelectorFromSet(labelset).String()
 	}
 
-	informer := cache.NewSharedIndexInformer(
-		cache.NewFilteredListWatchFromClient(client.BatchV1().RESTClient(), "jobs", namespace, optionsModifier),
-		&batch_v1.Job{},
-		resyncPeriod,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
-	)
+	informer := config.InformerFactory.InformerFor(&batch_v1.Job{}, func(client kubernetes.Interface, _ time.Duration) cache.SharedIndexInformer {
+		return cache.NewSharedIndexInformer(
+			cache.NewFilteredListWatchFromClient(client.BatchV1().RESTClient(), "jobs", namespace, optionsModifier),
+			&batch_v1.Job{},
+			resyncPeriod,
+			cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		)
+	})
 
 	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -119,10 +119,8 @@ func NewJobController(client kubernetes.Interface, namespace string, labelmap ma
 	return &jobController{
 		RuntimeConfig: config,
 		namespace:     namespace,
-		client:        client,
 		queue:         queue,
 		jobLister:     batchlisters.NewJobLister(informer.GetIndexer()),
-		jobInformer:   informer,
 	}, nil
 
 }
@@ -134,15 +132,6 @@ func (c *jobController) Run(stopCh <-chan struct{}) {
 
 	glog.Infof("Starting Job controller")
 	defer glog.Infof("Shutting down Job controller")
-
-	go c.jobInformer.Run(stopCh)
-	// wait for the caches to synchronize before starting the worker
-	if !cache.WaitForCacheSync(stopCh, c.jobInformer.HasSynced) {
-		utilruntime.HandleError(fmt.Errorf("Timed out waiting for caches to sync"))
-		return
-	}
-
-	glog.Infof("Job controller synced and ready")
 
 	// runWorker will loop until "something bad" happens.  The .Until will
 	// then rekick the worker after one second
