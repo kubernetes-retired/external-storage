@@ -62,8 +62,9 @@ type testConfig struct {
 }
 
 type testVol struct {
-	pvPhase    v1.PersistentVolumePhase
-	VolumeMode string
+	pvPhase       v1.PersistentVolumePhase
+	VolumeMode    string
+	reclaimPolicy v1.PersistentVolumeReclaimPolicy
 }
 
 func TestDeleteVolumes_Basic(t *testing.T) {
@@ -82,6 +83,10 @@ func TestDeleteVolumes_Basic(t *testing.T) {
 		},
 		"pv5": {
 			pvPhase: v1.VolumeFailed,
+		},
+		"pv6": {
+			pvPhase:       v1.VolumeReleased,
+			reclaimPolicy: v1.PersistentVolumeReclaimRetain,
 		},
 	}
 	expectedDeletedPVs := map[string]string{"pv4": ""}
@@ -180,6 +185,76 @@ func TestDeleteVolumes_DeletePVNotFound(t *testing.T) {
 	select {
 	case err := <-recorderChan:
 		t.Errorf("error deletePV %v", err)
+	default:
+	}
+}
+
+func TestDeleteVolumes_UnsupportedReclaimPolicy(t *testing.T) {
+	vols := map[string]*testVol{
+		"pv4": {
+			pvPhase:       v1.VolumeReleased,
+			reclaimPolicy: v1.PersistentVolumeReclaimRecycle,
+		},
+	}
+	test := &testConfig{
+		apiShouldFail:      false,
+		vols:               vols,
+		expectedDeletedPVs: map[string]string{},
+	}
+	d := testSetupForProcCleaning(t, test, nil)
+
+	d.DeletePVs()
+	waitForAsyncToComplete(t, d)
+	verifyDeletedPVs(t, test)
+
+	err := d.deletePV(test.generatedPVs["pv4"])
+	if err != nil {
+		t.Error(err)
+	}
+	waitForAsyncToComplete(t, d)
+
+	expectedEvent := "Warning VolumeUnsupportedReclaimPolicy Volume has unsupported PersistentVolumeReclaimPolicy: Recycle"
+	recorderChan := d.RuntimeConfig.Recorder.(*record.FakeRecorder).Events
+	select {
+	case event := <-recorderChan:
+		if event != expectedEvent {
+			t.Errorf("expected event %q, got %q", expectedEvent, event)
+		}
+	default:
+	}
+}
+
+func TestDeleteVolumes_UnknownReclaimPolicy(t *testing.T) {
+	vols := map[string]*testVol{
+		"pv4": {
+			pvPhase:       v1.VolumeReleased,
+			reclaimPolicy: v1.PersistentVolumeReclaimPolicy("unknown"),
+		},
+	}
+	test := &testConfig{
+		apiShouldFail:      false,
+		vols:               vols,
+		expectedDeletedPVs: map[string]string{},
+	}
+	d := testSetupForProcCleaning(t, test, nil)
+
+	d.DeletePVs()
+	waitForAsyncToComplete(t, d)
+	verifyDeletedPVs(t, test)
+
+	err := d.deletePV(test.generatedPVs["pv4"])
+	if err != nil {
+		t.Error(err)
+	}
+	waitForAsyncToComplete(t, d)
+
+	expectedEvent := "Warning VolumeUnknownReclaimPolicy Volume has unrecognized PersistentVolumeReclaimPolicy"
+	recorderChan := d.RuntimeConfig.Recorder.(*record.FakeRecorder).Events
+	select {
+	case event := <-recorderChan:
+		if event != expectedEvent {
+			t.Errorf("expected event %q, got %q", expectedEvent, event)
+		}
 	default:
 	}
 }
@@ -459,6 +534,11 @@ func testSetup(t *testing.T, config *testConfig, cleanupCmd []string, useJobForC
 			lpvConfig.VolumeMode = v1.PersistentVolumeBlock
 		case util.FakeEntryFile:
 			lpvConfig.VolumeMode = v1.PersistentVolumeFilesystem
+		}
+		if vol.reclaimPolicy != "" {
+			lpvConfig.ReclaimPolicy = vol.reclaimPolicy
+		} else {
+			lpvConfig.ReclaimPolicy = v1.PersistentVolumeReclaimDelete
 		}
 		pv := common.CreateLocalPVSpec(&lpvConfig)
 		pv.Status.Phase = vol.pvPhase
