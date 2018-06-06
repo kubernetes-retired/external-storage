@@ -5,7 +5,7 @@ metadata:
 spec:
   containers:
     - name: nfs-provisioner
-      image: quay.io/kubernetes_incubator/nfs-provisioner:v1.0.8
+      image: quay.io/kubernetes_incubator/nfs-provisioner:v1.0.9
       ports:
         - name: nfs
           containerPort: 2049
