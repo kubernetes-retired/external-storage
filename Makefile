@@ -19,7 +19,7 @@ clean: clean-aws/efs clean-ceph/cephfs clean-ceph/rbd clean-flex clean-gluster/b
 .PHONY: clean
 
 
-test: test-aws/efs test-local-volume/provisioner test-nfs test-snapshot test-openstack/standalone-cinder test-openstack-sharedfilesystems
+test: test-aws/efs test-local-volume/provisioner test-local-volume/helm test-nfs test-snapshot test-openstack/standalone-cinder test-openstack-sharedfilesystems
 .PHONY: test
 
 verify:
@@ -126,6 +126,11 @@ test-local-volume/provisioner:
 	cd local-volume/provisioner; \
 	go test ./...
 .PHONY: test-local-volume/provisioner
+
+test-local-volume/helm:
+	cd local-volume/helm; \
+	./test/run.sh
+.PHONY: test-local-volume/helm
 
 clean-local-volume/provisioner:
 	cd local-volume/provisioner; \
