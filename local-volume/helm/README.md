@@ -44,21 +44,47 @@ The generated specs can be further customized as needed (usually not necessary),
 Default values.yaml is located in local-volume/helm/provisioner folder, user should not remove variables from this file but can
 change any values of these variables.
 
-## Advanced options
+## Configurations
 
-### Set engine
-In order to generate the environment specific provisioner's spec, **--set engine={gcepre19,gcepost19,gke,baremetal}** parameter
-can be used in helm template command. Example for GKE environment, the command line will look like:
+The following table lists the configurable parameters of the local volume
+provisioner chart and their default values.
 
-``` console
-helm template ./helm/provisioner --set engine=gke > ./provisioner/deployment/kubernetes/provisioner_generated.yaml
+| Parameter                              | Description                                                                                           | Type     | Default                                                    |
+| ---                                    | ---                                                                                                   | ---      | ---                                                        |
+| common.rbac                            | Generating RBAC (Role Based Access Control) objects.                                                  | bool     | `true`                                                     |
+| common.namespace                       | Namespace where provisioner runs.                                                                     | str      | `default`                                                  |
+| common.useAlphaAPI                     | If running against pre-1.10 k8s version, the `useAlphaAPI` flag must be enabled.                      | bool     | `false`                                                    |
+| common.useJobForCleaning               | Is set to true, provisioner will use jobs-based block cleaning.                                       | bool     | `false`                                                    |
+| common.configMapName                   | Provisioner ConfigMap name.                                                                           | str      | `local-provisioner-config`                                 |
+| classes.[n].name                       | StorageClass name.                                                                                    | str      | `-`                                                        |
+| classes.[n].hostDir                    | Path on the host where local volumes of this storage class are mounted under.                         | str      | `-`                                                        |
+| classes.[n].mountDir                   | Optionally specify mount path of local volumes. By default, we use same path as hostDir in container. | str      | `-`                                                        |
+| classes.[n].blockCleanerCommand        | List of command and arguments of block cleaner command.                                               | list     | `-`                                                        |
+| classes.[n].storageClass               | Create storage class for this class and configure it optionally.                                      | bool/map | `false`                                                    |
+| classes.[n].storageClass.reclaimPolicy | Specify reclaimPolicy of storage class, available: Delete/Retain.                                     | str      | `Delete`                                                   |
+| daemonset.name                         | Provisioner DaemonSet name.                                                                           | str      | `local-volume-provisioner`                                 |
+| daemonset.image                        | Provisioner image.                                                                                    | str      | `quay.io/external_storage/local-volume-provisioner:v2.1.0` |
+| daemonset.imagePullPolicy              | Provisioner DaemonSet image pull policy.                                                              | str      | `-`                                                        |
+| daemonset.serviceAccount               | Provisioner DaemonSet service account.                                                                | str      | `local-storage-admin`                                      |
+| daemonset.kubeConfigEnv                | Specify the location of kubernetes config file.                                                       | str      | `-`                                                        |
+| daemonset.nodeLabels                   | List of node labels to be copied to the PVs created by the provisioner.                               | list     | `-`                                                        |
+
+Note: `classes` is a list of objects, you can specify one or more classes.
+
+## Examples
+
+To try out one of the [examples](examples/). you can run, e.g. for gce:
+
+```console
+$ helm template ./helm/provisioner -f helm/examples/gce.yaml > ./provisioner/deployment/kubernetes/provisioner_generated.yaml
 ```
-Parameter **--set engine=** can be used in conjunction with custom values.yaml file in the same command line.
 
-### Generating RBAC (Role Based Access Control) specs
-By default, common.rbac is set to "true" which generates the necessary ServiceAccount, ClusterRole, and ClusterRoleBinding
-for an RBAC enabled kubernetes cluster. If your cluster does not use RBAC, you should add --set common.rbac=false when
-running your helm install command, such as:
+Currently you can try the following examples:
 
-``` console
-helm template ./helm/provisioner --set common.rbac=false > ./provisioner/deployment/kubernetes/provisioner_generated.yaml
+* [examples/baremetal-cleanbyjobs.yaml](examples/baremetal-cleanbyjobs.yaml)
+* [examples/baremetal-without-rbac.yaml](examples/baremetal-without-rbac.yaml)
+* [examples/baremetal.yaml](examples/baremetal.yaml)
+* [examples/gce-pre1.9.yaml](examples/gce-pre1.9.yaml)
+* [examples/gce-retain.yaml](examples/gce-retain.yaml)
+* [examples/gce.yaml](examples/gce.yaml)
+* [examples/gke.yaml](examples/gke.yaml)

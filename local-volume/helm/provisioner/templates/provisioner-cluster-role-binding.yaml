@@ -36,12 +36,12 @@ roleRef:
   kind: ClusterRole
   name: local-storage-provisioner-node-clusterrole
   apiGroup: rbac.authorization.k8s.io
-{{- end }}
+{{- if .Values.common.useJobForCleaning }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: jobsrole
+  name: local-storage-provisioner-jobs-role
   namespace: {{ .Values.common.namespace }}
 rules:
 - apiGroups:
@@ -54,7 +54,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: local-storage-provisioner-job-binding
+  name: local-storage-provisioner-jobs-rolebinding
   namespace: {{ .Values.common.namespace }}
 subjects:
 - kind: ServiceAccount
@@ -62,5 +62,7 @@ subjects:
   namespace: {{ .Values.common.namespace }}
 roleRef:
   kind: Role
-  name: jobsrole
+  name: local-storage-provisioner
   apiGroup: rbac.authorization.k8s.io
+{{- end }}
+{{- end }}
