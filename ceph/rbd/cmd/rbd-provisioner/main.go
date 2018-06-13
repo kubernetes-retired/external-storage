@@ -30,9 +30,10 @@ import (
 )
 
 var (
-	master     = flag.String("master", "", "Master URL")
-	kubeconfig = flag.String("kubeconfig", "", "Absolute path to the kubeconfig")
-	id         = flag.String("id", "", "Unique provisioner identity")
+	master      = flag.String("master", "", "Master URL")
+	kubeconfig  = flag.String("kubeconfig", "", "Absolute path to the kubeconfig")
+	id          = flag.String("id", "", "Unique provisioner identity")
+	metricsPort = flag.Int("metrics-port", 0, "The port of the metrics server (set to non-zero to enable)")
 )
 
 const (
@@ -91,6 +92,7 @@ func main() {
 		prName,
 		rbdProvisioner,
 		serverVersion.GitVersion,
+		controller.MetricsPort(int32(*metricsPort)),
 	)
 
 	pc.Run(wait.NeverStop)
