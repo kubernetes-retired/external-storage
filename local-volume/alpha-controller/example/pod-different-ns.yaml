@@ -1,0 +1,16 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  name: nginx
+  namespace: test
+spec:
+  containers:
+    - name: nginx
+      image: nginx:1.13
+      volumeMounts:
+      - mountPath: "/var/www/html"
+        name: mylocalpv
+  volumes:
+    - name: mylocalpv
+      persistentVolumeClaim:
+        claimName: myclaim

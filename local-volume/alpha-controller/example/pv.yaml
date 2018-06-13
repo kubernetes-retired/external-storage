@@ -1,0 +1,32 @@
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: local-pv
+  labels:
+    kubernetes.io/hostname: node-1
+  annotations:
+    volume.alpha.kubernetes.io/node-affinity: >
+      {
+        "requiredDuringSchedulingIgnoredDuringExecution": {
+          "nodeSelectorTerms": [
+            {
+              "matchExpressions": [
+                {
+                  "key": "kubernetes.io/e2e-az-name",
+                  "operator": "In",
+                  "values": ["e2e-az1", "e2e-az2"]
+                }
+              ]
+            }
+          ]
+        }
+      }
+spec:
+  capacity:
+    storage: 10Gi
+  local:
+    path: /tmp/local-pv
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: local-fast
