@@ -1,94 +1,56 @@
-{{- define "configStorageClass" }}
-{{- $classPath := . }}
-{{- range $tmp, $val := $classPath }}
-   {{- range $storageClass, $classConfig := $val }}
-{{ $storageClass }}:
-   hostDir: {{ $classConfig.hostDir }}
-   mountDir: {{ if $classConfig.mountDir }} {{$classConfig.mountDir }} {{ else }} {{ $classConfig.hostDir }} {{ end }}
-   {{- if $classConfig.blockCleanerCommand }}
-   blockCleanerCommand:
-   {{- range $tmp, $val := $classConfig.blockCleanerCommand }}
-     - "{{ $val -}}"{{- end}}
-   {{- end }}
-{{- end}}
-{{- end}}
-{{- end }}
-{{- define "configVolumes" }}
-{{- $classPath := . }}
-{{- range $tmp, $val := $classPath }}
-   {{- range $storageClass, $classConfig := $val }}
-- name: {{ $storageClass }}
-  hostPath:
-    path: {{ $classConfig.hostDir }}
-   {{- end}}
-{{- end}}
-{{- end }}
-{{- define "configVolumeMounts" }}
-{{- $classPath := . }}
-{{- range $tmp, $val := $classPath }}
-   {{- range $storageClass, $classConfig := $val }}
-- mountPath: {{ if $classConfig.mountDir }} {{$classConfig.mountDir }} {{ else }} {{ $classConfig.hostDir }} {{ end }}
-  name: {{ $storageClass }}
-  mountPropagation: "HostToContainer"
-   {{- end}}
-{{- end}}
-{{- end }}
-{{- $configMapName := .Values.configmap.configMapName }}
-{{- $provisionerNamespace := .Values.common.namespace }}
-{{- $useAlphaAPI := .Values.common.useAlphaAPI }}
-{{- $useJobForCleaning := .Values.common.useJobForCleaning }}
-{{- $provisionerName := .Values.daemonset.name }}
-{{- $imageFull := .Values.daemonset.image }}
-{{- $imagePullPolicy := .Values.daemonset.imagePullPolicy }}
-{{- $serviceAccount := .Values.daemonset.serviceAccount }}
-{{- $kubeConfigEnv := .Values.daemonset.kubeConfigEnv }}
-{{- $nodeLabels := .Values.daemonset.nodeLabels }}
-{{- $engine := .Values.engine | default "baremetal" }} 
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ $configMapName }} 
-  namespace: {{ $provisionerNamespace }} 
+  name: {{ .Values.common.configMapName }}
+  namespace: {{ .Values.common.namespace }}
 data:
-{{- if $nodeLabels }}
+{{- if .Values.daemonset.nodeLabels }}
   nodeLabelsForPV: |
-   {{- range $label := $nodeLabels }}
+   {{- range $label := .Values.daemonset.nodeLabels }}
     - {{$label}}
    {{- end }}
 {{- end }}
-{{- if $useAlphaAPI }}
+{{- if .Values.common.useAlphaAPI }}
   useAlphaAPI: "true"
 {{- end }}
-{{- if $useJobForCleaning }}
+{{- if .Values.common.useJobForCleaning }}
   useJobForCleaning: "yes"
 {{- end}}
   storageClassMap: |
-{{- if eq ( $engine | lower ) "gcepre19" }} {{ include "configStorageClass" (.Values.configmap.gcePre19.storageClass) | indent 4 }} {{ end }}
-{{- if eq ( $engine | lower ) "gcepost19" }} {{ include "configStorageClass" (.Values.configmap.gcePost19.storageClass) | indent 4 }} {{ end }}
-{{- if eq ( $engine | lower ) "gke" }} {{ include "configStorageClass" (.Values.configmap.gke.storageClass) | indent 4 }} {{ end }}
-{{- if eq ( $engine | lower ) "baremetal" }} {{ include "configStorageClass" (.Values.configmap.baremetal.storageClass) | indent 4 }} {{ end }}
+    {{- range $classConfig := .Values.classes }}
+    {{ $classConfig.name }}:
+       hostDir: {{ $classConfig.hostDir }}
+       mountDir: {{ if $classConfig.mountDir }} {{- $classConfig.mountDir -}} {{ else }} {{- $classConfig.hostDir -}} {{ end }}
+       {{- if $classConfig.blockCleanerCommand }}
+       blockCleanerCommand:
+       {{- range $val := $classConfig.blockCleanerCommand }}
+         - "{{ $val -}}"{{- end}}
+       {{- end }}
+    {{- end }}
 ---
 apiVersion: extensions/v1beta1
 kind: DaemonSet
 metadata:
-  name: {{ $provisionerName }}
-  namespace: {{ $provisionerNamespace }}
+  name: {{ .Values.daemonset.name }}
+  namespace: {{ .Values.common.namespace }}
   labels:
     app: local-volume-provisioner
 spec:
   selector:
     matchLabels:
-      app: local-volume-provisioner 
+      app: local-volume-provisioner
   template:
     metadata:
       labels:
         app: local-volume-provisioner
     spec:
-      serviceAccountName: {{$serviceAccount}}
+      serviceAccountName: {{.Values.daemonset.serviceAccount}}
       containers:
-        - image: "{{ $imageFull }}"
-          imagePullPolicy: {{ $imagePullPolicy | quote }}
-          name: provisioner 
+        - image: "{{ .Values.daemonset.image }}"
+          {{- if .Values.daemonset.imagePullPolicy }}
+          imagePullPolicy: {{ .Values.daemonset.imagePullPolicy | quote }}
+          {{- end }}
+          name: provisioner
           securityContext:
             privileged: true
           env:
@@ -101,25 +63,39 @@ spec:
               fieldRef:
                 fieldPath: metadata.namespace
           - name: JOB_CONTAINER_IMAGE
-            value: "{{ $imageFull }}"
-
-{{- if $kubeConfigEnv }}
+            value: "{{ .Values.daemonset.image }}"
+          {{- if .Values.daemonset.kubeConfigEnv }}
             - name: KUBECONFIG
-              value: {{$kubeConfigEnv}}
-{{- end }}
+              value: {{.Values.daemonset.kubeConfigEnv}}
+          {{- end }}
           volumeMounts:
-            - mountPath: /etc/provisioner/config 
+            - mountPath: /etc/provisioner/config
               name: provisioner-config
               readOnly: true
-{{- if eq ( $engine | lower ) "gcepre19" }} {{ include "configVolumeMounts" (.Values.configmap.gcePre19.storageClass) | indent 12 }} {{ end }}
-{{- if eq ( $engine | lower ) "gcepost19" }} {{ include "configVolumeMounts" (.Values.configmap.gcePost19.storageClass) | indent 12 }} {{ end }}
-{{- if eq ( $engine | lower ) "gke" }} {{ include "configVolumeMounts" (.Values.configmap.gke.storageClass) | indent 12 }} {{ end }}
-{{- if eq ( $engine | lower ) "baremetal" }} {{ include "configVolumeMounts" (.Values.configmap.baremetal.storageClass) | indent 12 }} {{ end }}
+            {{- range $classConfig := .Values.classes }}
+            - mountPath: {{ if $classConfig.mountDir }} {{- $classConfig.mountDir -}} {{ else }} {{- $classConfig.hostDir -}} {{ end }}
+              name: {{ $classConfig.name }}
+              mountPropagation: "HostToContainer"
+            {{- end }}
       volumes:
         - name: provisioner-config
           configMap:
-            name: {{ $configMapName }}
-{{- if eq ( $engine | lower ) "gcepre19" }} {{ include "configVolumes" (.Values.configmap.gcePre19.storageClass) | indent 8 }} {{ end }}
-{{- if eq ( $engine | lower ) "gcepost19" }} {{ include "configVolumes" (.Values.configmap.gcePost19.storageClass) | indent 8 }} {{ end }}
-{{- if eq ( $engine | lower ) "gke" }} {{ include "configVolumes" (.Values.configmap.gke.storageClass) | indent 8 }} {{ end }}
-{{- if eq ( $engine | lower ) "baremetal" }} {{ include "configVolumes" (.Values.configmap.baremetal.storageClass) | indent 8 }} {{ end }}
+            name: {{ .Values.common.configMapName }}
+        {{- range $classConfig := .Values.classes }}
+        - name: {{ $classConfig.name }}
+          hostPath:
+            path: {{ $classConfig.hostDir }}
+        {{- end }}
+{{- range $val := .Values.classes }}
+{{- if $val.storageClass }}
+{{- $reclaimPolicy := $val.reclaimPolicy | default "Delete" }}
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ $val.name }}
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: {{ $reclaimPolicy }}
+{{- end }}
+{{- end }}
