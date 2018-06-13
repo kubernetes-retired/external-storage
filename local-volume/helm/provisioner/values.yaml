@@ -1,3 +1,6 @@
+#
+# Common options.
+#
 common:
   #
   # Defines whether to generate service account and role bindings.
@@ -17,66 +20,40 @@ common:
   # will use Jobs to clean.
   #
   useJobForCleaning: false
-configmap:
   #
   # Defines the name of configmap used by Provisioner
   #
   configMapName: "local-provisioner-config"
-  #
-  # Defines storage classes in a format:
-  #
-  #  storageClass:
-  #    - {storage class name}:
-  #        hostDir: "{path on the host where local volume of this storage class are mounted}"
-  #        mountDir: "{Optional path where a local volume will be mounted inside of a container}"
-  #
-  # Note: At least one storage class must be configuredi, baremetal is used as default if no
-  # explicit environment is specified in helm template command line.
-  baremetal:
-    storageClass:
-    - fast-disks:
-        hostDir: /mnt/fast-disks
-        blockCleanerCommand:
-        #  Do a quick reset of the block device during its cleanup.
-        #  - "/scripts/quick_reset.sh"
-        #  or use dd to zero out block dev in two iterations by uncommenting these lines
-        #  - "/scripts/dd_zero.sh"
-        #  - "2"
-        # or run shred utility for 2 iteration.s
-           - "/scripts/shred.sh"
-           - "2"
-        # or blkdiscard utility by uncommenting the line below.
-        #  - "/scripts/blkdiscard.sh"
- 
-  #
-  # Storage classes for GCE Pre-1.9
-  gcePre19:
-    storageClass:
-      - local-scsi:
-          hostDir: "/mnt/disks"
-          blockCleanerCommand:
-            - "/scripts/quick_reset.sh"
-  #
-  # Storage classes for GCE 1.9+
-  gcePost19:
-    storageClass:
-      - local-scsi:
-          hostDir: "/mnt/disks/by-uuid/google-local-ssds-scsi-fs"
-          blockCleanerCommand:
-            - "/scripts/quick_reset.sh"
-      - local-nvme:
-          hostDir: "/mnt/disks/by-uuid/google-local-ssds-nvme-fs" 
-          blockCleanerCommand:
-            - "/scripts/quick_reset.sh"
-  #
-  # Storage classes for GKE
-  gke:
-    storageClass:
-      - local-scsi:
-          hostDir: "/mnt/disks"
-          blockCleanerCommand:
-            - "/scripts/quick_reset.sh"
-  #
+#
+# Configure storage classes.
+#
+classes:
+- name: fast-disks # Defines name of storage classe.
+  # Path on the host where local volumes of this storage class are mounted
+  # under.
+  hostDir: /mnt/fast-disks
+  # Optionally specify mount path of local volumes. By default, we use same
+  # path as hostDir in container.
+  # mountDir: /mnt/fast-disks
+  blockCleanerCommand:
+  #  Do a quick reset of the block device during its cleanup.
+  #  - "/scripts/quick_reset.sh"
+  #  or use dd to zero out block dev in two iterations by uncommenting these lines
+  #  - "/scripts/dd_zero.sh"
+  #  - "2"
+  # or run shred utility for 2 iteration.s
+     - "/scripts/shred.sh"
+     - "2"
+  # or blkdiscard utility by uncommenting the line below.
+  #  - "/scripts/blkdiscard.sh"
+  # Uncomment to create storage class object with default configuration.
+  # storageClass: true
+  # Uncomment to create storage class object and configure it.
+  # storageClass:
+    # reclaimPolicy: Delete # Avaiable reclaim policies: Delete/Retain, defaults: Delete.
+#
+# Configure DaemonSet for provisioner.
+# 
 daemonset:
   #
   # Defines the name of a Provisioner
@@ -89,7 +66,7 @@ daemonset:
   #
   # Defines Image download policy, see kubernetes documentation for available values.
   #
-  imagePullPolicy: Always
+  #imagePullPolicy: Always
   #
   # Defines a name of the service account which Provisioner will use to communicate with API server.
   #
