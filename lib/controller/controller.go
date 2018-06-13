@@ -18,15 +18,21 @@ package controller
 
 import (
 	"fmt"
+	"net"
+	"net/http"
 	"os/exec"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/kubernetes-incubator/external-storage/lib/controller/metrics"
 	"github.com/kubernetes-incubator/external-storage/lib/leaderelection"
 	rl "github.com/kubernetes-incubator/external-storage/lib/leaderelection/resourcelock"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	storagebeta "k8s.io/api/storage/v1beta1"
@@ -34,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -122,6 +129,13 @@ type ProvisionController struct {
 	failedProvisionStats, failedDeleteStats           map[types.UID]int
 	failedProvisionStatsMutex, failedDeleteStatsMutex *sync.Mutex
 
+	// The port for metrics server to serve on.
+	metricsPort int32
+	// The IP address for metrics server to serve on.
+	metricsAddress string
+	// The path of metrics endpoint path.
+	metricsPath string
+
 	// Parameters of leaderelection.LeaderElectionConfig. Leader election is for
 	// when multiple controllers are running: they race to lock (lead) every PVC
 	// so that only one calls Provision for it (saving API calls, CPU cycles...)
@@ -156,6 +170,12 @@ const (
 	DefaultRetryPeriod = 2 * time.Second
 	// DefaultTermLimit is used when option function TermLimit is omitted
 	DefaultTermLimit = 30 * time.Second
+	// DefaultMetricsPort is used when option function MetricsPort is omitted
+	DefaultMetricsPort = 0
+	// DefaultMetricsAddress is used when option function MetricsAddress is omitted
+	DefaultMetricsAddress = "0.0.0.0"
+	// DefaultMetricsPath is used when option function MetricsPath is omitted
+	DefaultMetricsPath = "/metrics"
 )
 
 var errRuntime = fmt.Errorf("cannot call option functions after controller has Run")
@@ -316,6 +336,39 @@ func ClassesInformer(informer cache.SharedInformer) func(*ProvisionController) e
 	}
 }
 
+// MetricsPort sets the port that metrics server serves on. Default: 0, set to non-zero to enable.
+func MetricsPort(metricsPort int32) func(*ProvisionController) error {
+	return func(c *ProvisionController) error {
+		if c.HasRun() {
+			return errRuntime
+		}
+		c.metricsPort = metricsPort
+		return nil
+	}
+}
+
+// MetricsAddress sets the ip address that metrics serve serves on.
+func MetricsAddress(metricsAddress string) func(*ProvisionController) error {
+	return func(c *ProvisionController) error {
+		if c.HasRun() {
+			return errRuntime
+		}
+		c.metricsAddress = metricsAddress
+		return nil
+	}
+}
+
+// MetricsPath sets the endpoint path of metrics server.
+func MetricsPath(metricsPath string) func(*ProvisionController) error {
+	return func(c *ProvisionController) error {
+		if c.HasRun() {
+			return errRuntime
+		}
+		c.metricsPath = metricsPath
+		return nil
+	}
+}
+
 // NewProvisionController creates a new provision controller using
 // the given configuration parameters and with private (non-shared) informers.
 func NewProvisionController(
@@ -360,6 +413,9 @@ func NewProvisionController(
 		renewDeadline:                 DefaultRenewDeadline,
 		retryPeriod:                   DefaultRetryPeriod,
 		termLimit:                     DefaultTermLimit,
+		metricsPort:                   DefaultMetricsPort,
+		metricsAddress:                DefaultMetricsAddress,
+		metricsPath:                   DefaultMetricsPath,
 		leaderElectors:                make(map[types.UID]*leaderelection.LeaderElector),
 		leaderElectorsMutex:           &sync.Mutex{},
 		hasRun:                        false,
@@ -493,6 +549,25 @@ func (ctrl *ProvisionController) Run(stopCh <-chan struct{}) {
 	ctrl.hasRunLock.Lock()
 	ctrl.hasRun = true
 	ctrl.hasRunLock.Unlock()
+	if ctrl.metricsPort > 0 {
+		prometheus.MustRegister([]prometheus.Collector{
+			metrics.PersistentVolumeClaimProvisionTotal,
+			metrics.PersistentVolumeClaimProvisionFailedTotal,
+			metrics.PersistentVolumeClaimProvisionDurationSeconds,
+			metrics.PersistentVolumeDeleteTotal,
+			metrics.PersistentVolumeDeleteFailedTotal,
+			metrics.PersistentVolumeDeleteDurationSeconds,
+		}...)
+		http.Handle(ctrl.metricsPath, promhttp.Handler())
+		address := net.JoinHostPort(ctrl.metricsAddress, strconv.FormatInt(int64(ctrl.metricsPort), 10))
+		glog.Infof("Starting metrics server at %s\n", address)
+		go wait.Forever(func() {
+			err := http.ListenAndServe(address, nil)
+			if err != nil {
+				glog.Errorf("Failed to listen on %s: %v", address, err)
+			}
+		}, 5*time.Second)
+	}
 	go ctrl.claimController.Run(stopCh)
 	go ctrl.volumeController.Run(stopCh)
 	go ctrl.classController.Run(stopCh)
@@ -536,8 +611,9 @@ func (ctrl *ProvisionController) addClaim(obj interface{}) {
 		if ok && le.IsLeader() {
 			opName := fmt.Sprintf("provision-%s[%s]", claimToClaimKey(claim), string(claim.UID))
 			ctrl.scheduleOperation(opName, func() error {
+				startTime := time.Now()
 				err := ctrl.provisionClaimOperation(claim)
-				ctrl.updateProvisionStats(claim, err)
+				ctrl.updateProvisionStats(claim, err, startTime)
 				return err
 			})
 		} else {
@@ -596,8 +672,9 @@ func (ctrl *ProvisionController) updateVolume(oldObj, newObj interface{}) {
 	if ctrl.shouldDelete(volume) {
 		opName := fmt.Sprintf("delete-%s[%s]", volume.Name, string(volume.UID))
 		ctrl.scheduleOperation(opName, func() error {
+			startTime := time.Now()
 			err := ctrl.deleteVolumeOperation(volume)
-			ctrl.updateDeleteStats(volume, err)
+			ctrl.updateDeleteStats(volume, err, startTime)
 			return err
 		})
 	}
@@ -741,8 +818,9 @@ func (ctrl *ProvisionController) lockProvisionClaimOperation(claim *v1.Persisten
 			OnStartedLeading: func(_ <-chan struct{}) {
 				opName := fmt.Sprintf("provision-%s[%s]", claimToClaimKey(claim), string(claim.UID))
 				ctrl.scheduleOperation(opName, func() error {
+					startTime := time.Now()
 					err := ctrl.provisionClaimOperation(claim)
-					ctrl.updateProvisionStats(claim, err)
+					ctrl.updateProvisionStats(claim, err, startTime)
 					return err
 				})
 			},
@@ -785,9 +863,20 @@ func (ctrl *ProvisionController) lockProvisionClaimOperation(claim *v1.Persisten
 	ctrl.leaderElectorsMutex.Unlock()
 }
 
-func (ctrl *ProvisionController) updateProvisionStats(claim *v1.PersistentVolumeClaim, err error) {
+func (ctrl *ProvisionController) updateProvisionStats(claim *v1.PersistentVolumeClaim, err error, startTime time.Time) {
 	ctrl.failedProvisionStatsMutex.Lock()
 	defer ctrl.failedProvisionStatsMutex.Unlock()
+
+	class := ""
+	if claim.Spec.StorageClassName != nil {
+		class = *claim.Spec.StorageClassName
+	}
+	if err != nil {
+		metrics.PersistentVolumeClaimProvisionFailedTotal.WithLabelValues(class).Inc()
+	} else {
+		metrics.PersistentVolumeClaimProvisionDurationSeconds.WithLabelValues(class).Observe(time.Since(startTime).Seconds())
+		metrics.PersistentVolumeClaimProvisionTotal.WithLabelValues(class).Inc()
+	}
 
 	// Do not record the failed claim info when failedProvisionThreshold is not set
 	if ctrl.failedProvisionThreshold <= 0 {
@@ -806,9 +895,17 @@ func (ctrl *ProvisionController) updateProvisionStats(claim *v1.PersistentVolume
 	}
 }
 
-func (ctrl *ProvisionController) updateDeleteStats(volume *v1.PersistentVolume, err error) {
+func (ctrl *ProvisionController) updateDeleteStats(volume *v1.PersistentVolume, err error, startTime time.Time) {
 	ctrl.failedDeleteStatsMutex.Lock()
 	defer ctrl.failedDeleteStatsMutex.Unlock()
+
+	class := volume.Spec.StorageClassName
+	if err != nil {
+		metrics.PersistentVolumeDeleteFailedTotal.WithLabelValues(class).Inc()
+	} else {
+		metrics.PersistentVolumeDeleteDurationSeconds.WithLabelValues(class).Observe(time.Since(startTime).Seconds())
+		metrics.PersistentVolumeDeleteTotal.WithLabelValues(class).Inc()
+	}
 
 	// Do not record the failed volume info when failedDeleteThreshold is not set
 	if ctrl.failedDeleteThreshold <= 0 {
