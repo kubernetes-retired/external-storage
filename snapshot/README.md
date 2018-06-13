@@ -16,6 +16,11 @@ Pre-alpha
  - [AWS EBS](doc/examples/aws/README.md)
 
  - [GCE PD](doc/examples/gce/README.md)
+ 
+## Docs
+
+ - [User Guide](doc/user-guide.md)
+ - [Kubernetes Snapshotting Proposal](doc/volume-snapshotting-proposal.md)
 
 ## Snapshot Volume Plugin Interface
 
