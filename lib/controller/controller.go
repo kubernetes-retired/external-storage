@@ -930,22 +930,23 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 		strerr := fmt.Sprintf("Error creating provisioned PV object for claim %s: %v. Deleting the volume.", claimToClaimKey(claim), err)
 		glog.Error(strerr)
 		ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, "ProvisioningFailed", strerr)
-
+		// To preserve the orignal error experienced during provisioning PV, introduce new error var.
+		var err2 error
 		for i := 0; i < ctrl.createProvisionedPVRetryCount; i++ {
-			if err = ctrl.provisioner.Delete(volume); err == nil {
+			if err2 = ctrl.provisioner.Delete(volume); err2 == nil {
 				// Delete succeeded
 				glog.V(4).Infof("provisionClaimOperation [%s]: cleaning volume %s succeeded", claimToClaimKey(claim), volume.Name)
 				break
 			}
 			// Delete failed, try again after a while.
-			glog.Infof("failed to delete volume %q: %v", volume.Name, err)
+			glog.Infof("failed to delete volume %q: %v", volume.Name, err2)
 			time.Sleep(ctrl.createProvisionedPVInterval)
 		}
 
-		if err != nil {
+		if err2 != nil {
 			// Delete failed several times. There is an orphaned volume and there
 			// is nothing we can do about it.
-			strerr := fmt.Sprintf("Error cleaning provisioned volume for claim %s: %v. Please delete manually.", claimToClaimKey(claim), err)
+			strerr := fmt.Sprintf("Error cleaning provisioned volume for claim %s: %v. Please delete manually.", claimToClaimKey(claim), err2)
 			glog.Error(strerr)
 			ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, "ProvisioningCleanupFailed", strerr)
 		}
@@ -955,7 +956,7 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 		ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, "ProvisioningSucceeded", msg)
 	}
 
-	return nil
+	return err
 }
 
 // watchProvisioning returns a channel to which it sends the results of all
