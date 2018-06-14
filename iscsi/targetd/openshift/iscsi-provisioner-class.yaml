@@ -32,4 +32,3 @@ parameters:
 
 # whether or not to use chap authentication for session operations
   chapAuthSession: "true"
-  
