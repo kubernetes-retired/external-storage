@@ -1,0 +1,8 @@
+common:
+  minResyncPeriod: 1h
+classes:
+- name: local-storage
+  hostDir: /mnt/disks
+  blockCleanerCommand:
+  - "/scripts/quick_reset.sh"
+  storageClass: true

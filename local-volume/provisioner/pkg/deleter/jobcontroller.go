@@ -37,8 +37,7 @@ import (
 )
 
 const (
-	resyncPeriod = 120 * time.Second
-	maxRetries   = 10
+	maxRetries = 10
 	// JobContainerName is name of the container running the cleanup process.
 	JobContainerName = "cleaner"
 	// JobNamePrefix is the prefix of the name of the cleaning job.
@@ -82,7 +81,7 @@ func NewJobController(labelmap map[string]string, config *common.RuntimeConfig) 
 		options.LabelSelector = labels.SelectorFromSet(labelset).String()
 	}
 
-	informer := config.InformerFactory.InformerFor(&batch_v1.Job{}, func(client kubernetes.Interface, _ time.Duration) cache.SharedIndexInformer {
+	informer := config.InformerFactory.InformerFor(&batch_v1.Job{}, func(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
 		return cache.NewSharedIndexInformer(
 			cache.NewFilteredListWatchFromClient(client.BatchV1().RESTClient(), "jobs", namespace, optionsModifier),
 			&batch_v1.Job{},

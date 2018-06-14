@@ -19,8 +19,10 @@ package main
 import (
 	"flag"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
@@ -42,6 +44,7 @@ var (
 )
 
 func main() {
+	rand.Seed(time.Now().UTC().UnixNano())
 	flag.StringVar(&optListenAddress, "listen-address", ":8080", "address on which to expose metrics")
 	flag.StringVar(&optMetricsPath, "metrics-path", "/metrics", "path under which to expose metrics")
 	flag.Set("logtostderr", "true")
@@ -49,11 +52,13 @@ func main() {
 
 	provisionerConfig := common.ProvisionerConfiguration{
 		StorageClassConfig: make(map[string]common.MountConfig),
+		MinResyncPeriod:    metav1.Duration{5 * time.Minute},
 	}
 	if err := common.LoadProvisionerConfigs(common.ProvisionerConfigPath, &provisionerConfig); err != nil {
 		glog.Fatalf("Error parsing Provisioner's configuration: %#v. Exiting...\n", err)
 	}
-	glog.Infof("Configuration parsing has been completed, ready to run...")
+	glog.Infof("Loaded configuration: %+v", provisionerConfig)
+	glog.Infof("Ready to run...")
 
 	nodeName := os.Getenv("MY_NODE_NAME")
 	if nodeName == "" {
@@ -82,6 +87,7 @@ func main() {
 		NodeLabelsForPV:   provisionerConfig.NodeLabelsForPV,
 		UseAlphaAPI:       provisionerConfig.UseAlphaAPI,
 		UseJobForCleaning: provisionerConfig.UseJobForCleaning,
+		MinResyncPeriod:   provisionerConfig.MinResyncPeriod,
 		Namespace:         namespace,
 		JobContainerImage: jobImage,
 	})
