@@ -19,8 +19,12 @@ package common
 import (
 	"io/ioutil"
 	"os"
+	"path/filepath"
+	"reflect"
 	"testing"
+	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 )
 
@@ -79,15 +83,63 @@ func TestLoadProvisionerConfigs(t *testing.T) {
 	defer func() {
 		os.RemoveAll(tmpConfigPath)
 	}()
-	provisionerConfig := &ProvisionerConfiguration{
-		StorageClassConfig: make(map[string]MountConfig),
+	testcases := []struct {
+		data     map[string]string
+		expected ProvisionerConfiguration
+	}{
+		{
+			nil,
+			ProvisionerConfiguration{},
+		},
+		{
+			map[string]string{
+				"useAlphaAPI": "true",
+			},
+			ProvisionerConfiguration{
+				UseAlphaAPI: true,
+			},
+		},
+		{
+			map[string]string{
+				"storageClassMap": `local-storage:
+   hostDir: /mnt/disks
+   mountDir: /mnt/disks
+   blockCleanerCommand:
+     - "/scripts/shred.sh"
+     - "2"
+`,
+				"useAlphaAPI":     "true",
+				"minResyncPeriod": "1h30m",
+			},
+			ProvisionerConfiguration{
+				StorageClassConfig: map[string]MountConfig{
+					"local-storage": {
+						HostDir:             "/mnt/disks",
+						MountDir:            "/mnt/disks",
+						BlockCleanerCommand: []string{"/scripts/shred.sh", "2"},
+					},
+				},
+				UseAlphaAPI: true,
+				MinResyncPeriod: metav1.Duration{
+					time.Hour + time.Minute*30,
+				},
+			},
+		},
 	}
-	err = LoadProvisionerConfigs(tmpConfigPath, provisionerConfig)
-	if err != nil {
-		t.Fatalf("LoadProvisionerConfigs error: %v", err)
-	}
-
-	if provisionerConfig.UseAlphaAPI == true {
-		t.Errorf("UseAlphaAPI should default to false")
+	for _, v := range testcases {
+		for name, value := range v.data {
+			err := ioutil.WriteFile(filepath.Join(tmpConfigPath, name), []byte(value), 0644)
+			if err != nil {
+				t.Fatalf("Failed to write data into directory %s", tmpConfigPath)
+			}
+		}
+		provisionerConfig := ProvisionerConfiguration{}
+		err = LoadProvisionerConfigs(tmpConfigPath, &provisionerConfig)
+		if err != nil {
+			t.Fatalf("LoadProvisionerConfigs error: %v", err)
+		}
+		if !reflect.DeepEqual(provisionerConfig, v.expected) {
+			t.Errorf("Failed to parse config from data %q, expected %+v, got %+v", v.data, v.expected, provisionerConfig)
+		}
 	}
 }

@@ -16,6 +16,9 @@ data:
 {{- if .Values.common.useJobForCleaning }}
   useJobForCleaning: "yes"
 {{- end}}
+{{- if .Values.common.minResyncPeriod }}
+  minResyncPeriod: {{ .Values.common.minResyncPeriod | quote }}
+{{- end}}
   storageClassMap: |
     {{- range $classConfig := .Values.classes }}
     {{ $classConfig.name }}:
