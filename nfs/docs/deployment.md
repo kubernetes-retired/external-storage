@@ -22,7 +22,7 @@ $ make container
 If you are running in Kubernetes, it will pull the image from Quay for you. Or you can do it yourself.
 
 ```
-$ docker pull quay.io/kubernetes_incubator/nfs-provisioner:v1.0.8
+$ docker pull quay.io/kubernetes_incubator/nfs-provisioner:v1.0.9
 ```
 
 ## Deploying the provisioner
@@ -103,7 +103,7 @@ You may want to specify the hostname the NFS server exports from, i.e. the serve
 $ docker run --cap-add DAC_READ_SEARCH --cap-add SYS_RESOURCE \
 --security-opt seccomp:deploy/docker/nfs-provisioner-seccomp.json \
 -v $HOME/.kube:/.kube:Z \
-quay.io/kubernetes_incubator/nfs-provisioner:v1.0.8 \
+quay.io/kubernetes_incubator/nfs-provisioner:v1.0.9 \
 -provisioner=example.com/nfs \
 -kubeconfig=/.kube/config
 ```
@@ -111,7 +111,7 @@ or
 ```
 $ docker run --cap-add DAC_READ_SEARCH --cap-add SYS_RESOURCE \
 --security-opt seccomp:deploy/docker/nfs-provisioner-seccomp.json \
-quay.io/kubernetes_incubator/nfs-provisioner:v1.0.8 \
+quay.io/kubernetes_incubator/nfs-provisioner:v1.0.9 \
 -provisioner=example.com/nfs \
 -master=http://172.17.0.1:8080
 ```
@@ -126,7 +126,7 @@ With the two above options, the run command will look something like this.
 $ docker run --privileged \
 -v $HOME/.kube:/.kube:Z \
 -v /xfs:/export:Z \
-quay.io/kubernetes_incubator/nfs-provisioner:v1.0.8 \
+quay.io/kubernetes_incubator/nfs-provisioner:v1.0.9 \
 -provisioner=example.com/nfs \
 -kubeconfig=/.kube/config \
 -enable-xfs-quota=true

@@ -2,7 +2,7 @@
 
 [![Docker Repository on Quay](https://quay.io/repository/kubernetes_incubator/nfs-provisioner/status "Docker Repository on Quay")](https://quay.io/repository/kubernetes_incubator/nfs-provisioner)
 ```
-quay.io/kubernetes_incubator/nfs-provisioner:v1.0.8
+quay.io/kubernetes_incubator/nfs-provisioner:v1.0.9
 ```
 
 nfs-provisioner is an out-of-tree dynamic provisioner for Kubernetes 1.4. You can use it to quickly & easily deploy shared storage that works almost anywhere. Or it can help you write your own out-of-tree dynamic provisioner by serving as an example implementation of the requirements detailed in [the proposal](https://github.com/kubernetes/kubernetes/pull/30285). Go [here](./docs/demo) for a demo of how to use it and [here](../docs/demo/hostpath-provisioner) for an example of how to write your own.
