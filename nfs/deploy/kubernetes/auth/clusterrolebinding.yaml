@@ -2,10 +2,12 @@ kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: run-nfs-provisioner
+  namespace: default
 subjects:
   - kind: ServiceAccount
     name: nfs-provisioner
     namespace: default
+# update namespace above to your namespace in order to make this work 
 roleRef:
   kind: ClusterRole
   name: nfs-provisioner-runner
