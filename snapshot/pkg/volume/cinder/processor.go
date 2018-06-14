@@ -221,5 +221,5 @@ func (c *cinderPlugin) FindSnapshot(tags *map[string]string) (*crdv1.VolumeSnaps
 		}, c.convertSnapshotStatus(statuses[0]), nil
 	}
 
-	return nil, nil, nil
+	return nil, nil, fmt.Errorf("Snapshot not found")
 }

@@ -93,7 +93,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedSnapshots() {
 		}
 		if !exists {
 			glog.V(1).Infof("Removing snapshot %s from dsw because it does not exist in snapshot informer.", snapshotUID)
-			dswp.desiredStateOfWorld.DeleteSnapshot(cache.MakeSnapshotName(snapshot.Metadata.Namespace, snapshot.Metadata.Name))
+			dswp.desiredStateOfWorld.DeleteSnapshot(cache.MakeSnapshotName(snapshot))
 		}
 	}
 }
@@ -102,7 +102,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndAddActiveSnapshots() {
 	for _, obj := range dswp.snapshotStore.List() {
 		snapshot := obj.(*crdv1.VolumeSnapshot)
 
-		snapshotName := cache.MakeSnapshotName(snapshot.Metadata.Namespace, snapshot.Metadata.Name)
+		snapshotName := cache.MakeSnapshotName(snapshot)
 		if !dswp.desiredStateOfWorld.SnapshotExists(snapshotName) {
 			glog.V(1).Infof("Adding snapshot %s to dsw because it exists in snapshot informer.", snapshotName)
 			dswp.desiredStateOfWorld.AddSnapshot(snapshot)

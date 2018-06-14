@@ -70,7 +70,7 @@ func (asw *actualStateOfWorld) AddSnapshot(snapshot *crdv1.VolumeSnapshot) error
 	asw.Lock()
 	defer asw.Unlock()
 
-	snapshotName := MakeSnapshotName(snapshot.Metadata.Namespace, snapshot.Metadata.Name)
+	snapshotName := MakeSnapshotName(snapshot)
 	glog.Infof("Adding new snapshot to actual state of world: %s", snapshotName)
 	asw.snapshots[snapshotName] = snapshot
 	return nil

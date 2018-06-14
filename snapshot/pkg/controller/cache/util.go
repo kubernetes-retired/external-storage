@@ -22,22 +22,11 @@ reference them.
 package cache
 
 import (
-	"fmt"
-	"strings"
+	crdv1 "github.com/kubernetes-incubator/external-storage/snapshot/pkg/apis/crd/v1"
 )
 
 // MakeSnapshotName makes a full name for a snapshot that includes
 // the namespace and the short name
-func MakeSnapshotName(namespace, name string) string {
-	return namespace + "/" + name
-}
-
-// GetNameAndNameSpaceFromSnapshotName retrieves the namespace and
-// the short name of a snapshot from its full name
-func GetNameAndNameSpaceFromSnapshotName(name string) (string, string, error) {
-	strs := strings.Split(name, "/")
-	if len(strs) != 2 {
-		return "", "", fmt.Errorf("invalid snapshot name")
-	}
-	return strs[0], strs[1], nil
+func MakeSnapshotName(snapshot *crdv1.VolumeSnapshot) string {
+	return snapshot.Metadata.Namespace + "/" + snapshot.Metadata.Name + "-" + string(snapshot.Metadata.UID)
 }
