@@ -183,8 +183,7 @@ func (p *cephFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 					Monitors: mon,
 					Path:     res.Path[strings.Index(res.Path, "/"):],
 					SecretRef: &v1.SecretReference{
-						Name: secretName,
-						// TODO https://github.com/kubernetes-incubator/external-storage/issues/309
+						Name:      secretName,
 						Namespace: nameSpace,
 					},
 					User: user,
