@@ -21,6 +21,39 @@ Support for cinder backends without a corresponding kubernetes raw
 volume implementation could be added in the future by providing a
 FlexVolume implementation for the type.
 
+## Quick Start
+We assume you have a running Cinder installation ready to go. If you're
+not actively developing/modifying the provisioner you can just pull the
+latest image form quay.io
+
+If you already have a running cluster (including minikube) you can
+use the published image from quay.io to deploy this service as a 
+pod running in your current deployment.
+
+This repo includes manifest files for not only the service deployment,
+but also the necessary files to setup RBAC.
+
+We provide manifests files in `manifests/` for setting up RBAC and Deployment
+of the provisioner.  Note that if you're doing active development and want to
+test your changes you'll need to deploy the provisioner yourself, the provided
+manifest will just download the latest from quay.io.  Or you can upload and tag
+your image locally of course.
+
+In addition to the setup and deploy manifests we also provide some example
+files for creating StorageClasses and PVC's in hte `examples/` directory.  If
+you use this without modification you'll need to ensure your cinder deployment
+has a volume type named `iscsi` configured.
+
+1. Set up RBAC policies:  `kubectl create -f manifests/rbac`
+2. Deploy the provisioner `kubectl create -f manifests/deploy.yaml`
+3. Create a Storage Class: `kubectl create -f examples/storage-class.yaml`
+4. Create a PVC from the Storage Class `kubectl create -f examples/pvc-1.yaml`
+
+Note that with the RBAC settings you'll need to specify `kube-system` to access
+these resources from kubectl.  You can also just use the `--all-namespaces`
+argument as well ( `kubectl get pods --all-namespaces` )
+
+## Detailed deployment using standalone application
 ### Connecting to cinder
 The provisioner directly uses the gophercloud SDK to connect to
 cinder (as opposed to use of the cloudprovider interface).  The
