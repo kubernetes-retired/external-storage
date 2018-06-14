@@ -20,8 +20,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/golang/glog"
 	"time"
+
+	"github.com/golang/glog"
 )
 
 const (
@@ -180,6 +181,7 @@ func defaultCapabilities() *DriverCapabilities {
 func handleCmdResponse(cmd string, output []byte) (*DriverStatus, error) {
 	status := DriverStatus{
 		Capabilities: defaultCapabilities(),
+		Message:      "",
 	}
 	if err := json.Unmarshal(output, &status); err != nil {
 		glog.Errorf("Failed to unmarshal output for command: %s, output: %q, error: %s", cmd, string(output), err.Error())

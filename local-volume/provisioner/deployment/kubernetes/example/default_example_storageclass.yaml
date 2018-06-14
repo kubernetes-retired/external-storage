@@ -5,3 +5,5 @@ metadata:
   name: fast-disks
 provisioner: kubernetes.io/no-provisioner
 volumeBindingMode: WaitForFirstConsumer
+# Supported policies: Delete, Retain
+reclaimPolicy: Delete
