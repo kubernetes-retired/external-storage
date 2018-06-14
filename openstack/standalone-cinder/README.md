@@ -132,4 +132,4 @@ OS_TENANT_NAME=admin
 | | | | Volume is marked as available |
 | | | Call cinder delete | |
 | | | | Delete volume from storage |
-| | Delete PV | | |
+| | | Delete PV | |
