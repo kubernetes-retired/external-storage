@@ -14,5 +14,5 @@
 
 FROM centos:7
 LABEL authors="Raffaele Spazzoli <rspazzol@redhat.com>" 
-ADD iscsi-controller /iscsi-controller
+ADD targetd /iscsi-controller
 ENTRYPOINT ["/iscsi-controller"]

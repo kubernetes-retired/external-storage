@@ -34,6 +34,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -109,7 +110,7 @@ type RuntimeConfig struct {
 	// Unique name of this provisioner
 	Name string
 	// K8s API client
-	Client *kubernetes.Clientset
+	Client kubernetes.Interface
 	// Cache to store PVs managed by this provisioner
 	Cache *cache.VolumeCache
 	// K8s API layer
@@ -122,6 +123,8 @@ type RuntimeConfig struct {
 	BlockDisabled bool
 	// Mounter used to verify mountpoints
 	Mounter mount.Interface
+	// InformerFactory gives access to informers for the controller.
+	InformerFactory informers.SharedInformerFactory
 }
 
 // LocalPVConfig defines the parameters for creating a local PV
@@ -130,6 +133,7 @@ type LocalPVConfig struct {
 	HostPath        string
 	Capacity        int64
 	StorageClass    string
+	ReclaimPolicy   v1.PersistentVolumeReclaimPolicy
 	ProvisionerName string
 	UseAlphaAPI     bool
 	AffinityAnn     string
@@ -173,7 +177,7 @@ func CreateLocalPVSpec(config *LocalPVConfig) *v1.PersistentVolume {
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{
-			PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
+			PersistentVolumeReclaimPolicy: config.ReclaimPolicy,
 			Capacity: v1.ResourceList{
 				v1.ResourceName(v1.ResourceStorage): *resource.NewQuantity(int64(config.Capacity), resource.BinarySI),
 			},

@@ -111,7 +111,11 @@ func (p *flexProvisioner) createVolume(volumeOptions controller.VolumeOptions) e
 	call.AppendSpec(volumeOptions.Parameters, extraOptions)
 	output, err := call.Run()
 	if err != nil {
-		glog.Errorf("Failed to create volume %s, output: %s, error: %s", volumeOptions, output.Message, err.Error())
+		if output == nil || output.Message == "" {
+			glog.Errorf("Failed to create volume %s, output: %s, error: %s", volumeOptions, "<missing>", err.Error())
+		} else {
+			glog.Errorf("Failed to create volume %s, output: %s, error: %s", volumeOptions, output.Message, err.Error())
+		}
 		return err
 	}
 	return nil

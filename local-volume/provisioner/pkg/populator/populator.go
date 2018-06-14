@@ -17,18 +17,11 @@ limitations under the License.
 package populator
 
 import (
-	"os"
-	"time"
-
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
 
 	"k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apimachinery/pkg/watch"
-	kcache "k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/cache"
 )
 
 // The Populator uses an Informer to populate the VolumeCache.
@@ -38,62 +31,35 @@ type Populator struct {
 
 // NewPopulator returns a Populator object to update the PV cache
 func NewPopulator(config *common.RuntimeConfig) *Populator {
-	return &Populator{RuntimeConfig: config}
-}
-
-// Start launches the PV informer
-func (p *Populator) Start() {
-	_, controller := kcache.NewInformer(
-		&kcache.ListWatch{
-			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				pvs, err := p.Client.Core().PersistentVolumes().List(options)
-				return pvs, err
-			},
-			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				// TODO: can we just watch for changes on the phase field?
-				w, err := p.Client.Core().PersistentVolumes().Watch(options)
-				return w, err
-			},
+	p := &Populator{RuntimeConfig: config}
+	sharedInformer := config.InformerFactory.Core().V1().PersistentVolumes()
+	sharedInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			pv, ok := obj.(*v1.PersistentVolume)
+			if !ok {
+				glog.Errorf("Added object is not a v1.PersistentVolume type")
+				return
+			}
+			p.handlePVUpdate(pv)
 		},
-		&v1.PersistentVolume{},
-		0,
-		kcache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
-				pv, ok := obj.(*v1.PersistentVolume)
-				if !ok {
-					glog.Errorf("Added object is not a v1.PersistentVolume type")
-				}
-				p.handlePVUpdate(pv)
-			},
-			UpdateFunc: func(oldObj, newObj interface{}) {
-				newPV, ok := newObj.(*v1.PersistentVolume)
-				if !ok {
-					glog.Errorf("Updated object is not a v1.PersistentVolume type")
-				}
-				p.handlePVUpdate(newPV)
-			},
-			DeleteFunc: func(obj interface{}) {
-				pv, ok := obj.(*v1.PersistentVolume)
-				if !ok {
-					glog.Errorf("Added object is not a v1.PersistentVolume type")
-				}
-				p.handlePVDelete(pv)
-			},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			newPV, ok := newObj.(*v1.PersistentVolume)
+			if !ok {
+				glog.Errorf("Updated object is not a v1.PersistentVolume type")
+				return
+			}
+			p.handlePVUpdate(newPV)
 		},
-	)
-
-	glog.Infof("Starting Informer controller")
-	// Controller never stops
-	go controller.Run(make(chan struct{}))
-
-	glog.Infof("Waiting for Informer initial sync")
-	wait.Poll(time.Second, 5*time.Minute, func() (bool, error) {
-		return controller.HasSynced(), nil
+		DeleteFunc: func(obj interface{}) {
+			pv, ok := obj.(*v1.PersistentVolume)
+			if !ok {
+				glog.Errorf("Added object is not a v1.PersistentVolume type")
+				return
+			}
+			p.handlePVDelete(pv)
+		},
 	})
-	if !controller.HasSynced() {
-		glog.Errorf("Informer controller initial sync timeout")
-		os.Exit(1)
-	}
+	return p
 }
 
 func (p *Populator) handlePVUpdate(pv *v1.PersistentVolume) {

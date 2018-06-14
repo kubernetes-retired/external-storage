@@ -18,8 +18,7 @@ all: aws/efs ceph/cephfs ceph/rbd flex gluster/block gluster/glusterfs gluster/f
 clean: clean-aws/efs clean-ceph/cephfs clean-ceph/rbd clean-flex clean-gluster/block clean-gluster/glusterfs clean-iscsi/targetd clean-local-volume/provisioner clean-nfs-client clean-nfs clean-openebs clean-snapshot clean-openstack/standalone-cinder
 .PHONY: clean
 
-
-test: test-aws/efs test-local-volume/provisioner test-nfs test-snapshot test-openstack/standalone-cinder
+test: test-aws/efs test-local-volume/provisioner test-local-volume/helm test-nfs test-snapshot test-openstack/standalone-cinder
 .PHONY: test
 
 verify:
@@ -126,6 +125,11 @@ test-local-volume/provisioner:
 	cd local-volume/provisioner; \
 	go test ./...
 .PHONY: test-local-volume/provisioner
+
+test-local-volume/helm:
+	cd local-volume/helm; \
+	./test/run.sh
+.PHONY: test-local-volume/helm
 
 clean-local-volume/provisioner:
 	cd local-volume/provisioner; \
