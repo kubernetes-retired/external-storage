@@ -256,8 +256,8 @@ storage classes should look like the following
 kind: StorageClass
 apiVersion: storage.k8s.io/v1
 metadata:
-  name: iscsi
-provisioner: iscsi
+  name: iscsi-targetd-vg-targetd
+provisioner: iscsi-targetd
 parameters:
 # this id where the iscsi server is running
   targetPortal: 192.168.99.100:3260
