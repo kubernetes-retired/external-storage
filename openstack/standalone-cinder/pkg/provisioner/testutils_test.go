@@ -17,7 +17,10 @@ limitations under the License.
 package provisioner
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
+
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	"github.com/kubernetes-incubator/external-storage/openstack/standalone-cinder/pkg/volumeservice"
@@ -79,31 +82,42 @@ func createCinderProvisioner() *cinderProvisioner {
 }
 
 type failureInjector struct {
-	failOn map[string]bool
+	operationLog bytes.Buffer
+	failOn       map[string]bool
 }
 
-func (vsb *failureInjector) set(method string) {
-	if vsb.failOn == nil {
-		vsb.failOn = make(map[string]bool)
+func (fi *failureInjector) set(method string) {
+	if fi.failOn == nil {
+		fi.failOn = make(map[string]bool)
 	}
-	vsb.failOn[method] = true
+	fi.failOn[method] = true
 }
 
-func (vsb *failureInjector) isSet(method string) bool {
-	if vsb.failOn == nil {
+func (fi *failureInjector) isSet(method string) bool {
+	if fi.failOn == nil {
 		return false
 	}
-	value, ok := vsb.failOn[method]
+	value, ok := fi.failOn[method]
 	if !ok {
 		return false
 	}
 	return value
 }
 
-func (vsb *failureInjector) ret(method string) error {
-	if vsb.isSet(method) {
+func (fi *failureInjector) ret(method string) error {
+	if fi.isSet(method) {
+		err := fmt.Sprintf("%s: injected error for testing", method)
+		return errors.New(err)
+	}
+	return nil
+}
+
+func (fi *failureInjector) logRet(fn string) error {
+	if fi.isSet(fn) {
 		return errors.New("injected error for testing")
 	}
+	fi.operationLog.WriteString(fn)
+	fi.operationLog.WriteString(".")
 	return nil
 }
 
