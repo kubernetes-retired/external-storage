@@ -27,6 +27,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/sharedfilesystems/apiversions"
 	"github.com/gophercloud/gophercloud/openstack/sharedfilesystems/v2/shares"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
+	"github.com/kubernetes-incubator/external-storage/lib/util"
 	sharedfilesystems "github.com/kubernetes-incubator/external-storage/openstack-sharedfilesystems/pkg/sharedfilesystems"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -92,6 +93,9 @@ func buildConfig(kubeconfig string) (*rest.Config, error) {
 func (p *manilaProvisioner) Provision(pvc controller.VolumeOptions) (*v1.PersistentVolume, error) {
 	if pvc.PVC.Spec.Selector != nil {
 		return nil, fmt.Errorf("claim Selector is not supported")
+	}
+	if util.CheckPersistentVolumeClaimModeBlock(options.PVC) {
+		return nil, fmt.Errorf("%s does not support block volume provisioning", provisionerName)
 	}
 
 	client := createManilaV2Client()

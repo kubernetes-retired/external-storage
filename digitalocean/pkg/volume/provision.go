@@ -82,6 +82,9 @@ func (p *digitaloceanProvisioner) Provision(options controller.VolumeOptions) (*
 	if !util.AccessModesContainedInAll(p.getAccessModes(), options.PVC.Spec.AccessModes) {
 		return nil, fmt.Errorf("Invalid Access Modes: %v, Supported Access Modes: %v", options.PVC.Spec.AccessModes, p.getAccessModes())
 	}
+	if util.CheckPersistentVolumeClaimModeBlock(options.PVC) {
+		return nil, fmt.Errorf("%s does not support block volume provisioning", createdBy)
+	}
 
 	vol, err := p.createVolume(options)
 	if err != nil {

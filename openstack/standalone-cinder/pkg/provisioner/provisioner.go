@@ -24,6 +24,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/gophercloud/gophercloud"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
+	"github.com/kubernetes-incubator/external-storage/lib/util"
 	"github.com/kubernetes-incubator/external-storage/openstack/standalone-cinder/pkg/volumeservice"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -116,6 +117,10 @@ func (p *cinderProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 
 	if options.PVC.Spec.Selector != nil {
 		return nil, fmt.Errorf("claim Selector is not supported")
+	}
+
+	if util.CheckPersistentVolumeClaimModeBlock(options.PVC) {
+		return nil, fmt.Errorf("%s does not support block volume provisioning", ProvisionerName)
 	}
 
 	// TODO: Check access mode

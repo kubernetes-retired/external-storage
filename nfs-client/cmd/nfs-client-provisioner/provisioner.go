@@ -26,6 +26,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
+	"github.com/kubernetes-incubator/external-storage/lib/util"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -54,6 +55,10 @@ func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 		return nil, fmt.Errorf("claim Selector is not supported")
 	}
 	glog.V(4).Infof("nfs provisioner: VolumeOptions %v", options)
+
+	if util.CheckPersistentVolumeClaimModeBlock(options.PVC) {
+		return nil, fmt.Errorf("%s does not support block volume provisioning", provisionerName)
+	}
 
 	pvcNamespace := options.PVC.Namespace
 	pvcName := options.PVC.Name

@@ -149,6 +149,10 @@ func (p *glusterfileProvisioner) Provision(options controller.VolumeOptions) (*v
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", options.PVC.Spec.AccessModes, p.GetAccessModes())
 	}
 
+	if util.CheckPersistentVolumeClaimModeBlock(options.PVC) {
+		return nil, fmt.Errorf("%s does not support block volume provisioning", provisionerName)
+	}
+
 	glog.V(1).Infof("VolumeOptions %v", options)
 	p.options = options
 	gidAllocate := true

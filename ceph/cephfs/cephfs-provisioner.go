@@ -27,6 +27,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
+	"github.com/kubernetes-incubator/external-storage/lib/util"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -115,6 +116,9 @@ func (p *cephFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 	cluster, adminID, adminSecret, mon, err := p.parseParameters(options.Parameters)
 	if err != nil {
 		return nil, err
+	}
+	if util.CheckPersistentVolumeClaimModeBlock(options.PVC) {
+		return nil, fmt.Errorf("%s does not support block volume provisioning", provisionerName)
 	}
 	// create random share name
 	share := fmt.Sprintf("kubernetes-dynamic-pvc-%s", uuid.NewUUID())

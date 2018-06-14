@@ -59,3 +59,10 @@ func AccessModesContainedInAll(indexedModes []v1.PersistentVolumeAccessMode, req
 	}
 	return true
 }
+
+// CheckPersistentVolumeClaimModeBlock checks VolumeMode.
+// If the mode is Block, return true otherwise return false.
+func CheckPersistentVolumeClaimModeBlock(pvc *v1.PersistentVolumeClaim) bool {
+	// TODO Check if features.BlockVolume is enabled. (Currently, no way to check it in external provisioner.)
+	return pvc.Spec.VolumeMode != nil && *pvc.Spec.VolumeMode == v1.PersistentVolumeBlock
+}

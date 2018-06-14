@@ -29,6 +29,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
+	"github.com/kubernetes-incubator/external-storage/lib/util"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -192,6 +193,10 @@ func (p *nfsProvisioner) ShouldProvision(claim *v1.PersistentVolumeClaim) bool {
 // Provision creates a volume i.e. the storage asset and returns a PV object for
 // the volume.
 func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.PersistentVolume, error) {
+	if util.CheckPersistentVolumeClaimModeBlock(options.PVC) {
+		return nil, fmt.Errorf("%s does not support block volume provisioning", createdBy)
+	}
+
 	volume, err := p.createVolume(options)
 	if err != nil {
 		return nil, err
