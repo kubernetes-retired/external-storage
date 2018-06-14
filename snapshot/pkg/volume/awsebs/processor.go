@@ -110,11 +110,7 @@ func (a *awsEBSPlugin) FindSnapshot(tags *map[string]string) (*crdv1.VolumeSnaps
 	glog.Infof("FindSnapshot by tags: %#v", *tags)
 
 	// TODO: Implement FindSnapshot
-	return &crdv1.VolumeSnapshotDataSource{
-		AWSElasticBlockStore: &crdv1.AWSElasticBlockStoreVolumeSnapshotSource{
-			SnapshotID: "",
-		},
-	}, nil, nil
+	return nil, nil, fmt.Errorf("Snapshot not found")
 }
 
 func (a *awsEBSPlugin) SnapshotRestore(snapshotData *crdv1.VolumeSnapshotData, pvc *v1.PersistentVolumeClaim, pvName string, parameters map[string]string) (*v1.PersistentVolumeSource, map[string]string, error) {
