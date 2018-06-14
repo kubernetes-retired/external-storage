@@ -237,7 +237,6 @@ class CephFSNativeDriver(object):
         """
         client_entity = "client.{0}".format(auth_id)
         path = self.volume_client._get_path(volume_path)
-        path = self.volume_client._get_path(volume_path)
         pool_name = self.volume_client._get_ancestor_xattr(path, "ceph.dir.layout.pool")
         namespace = self.volume_client.fs.getxattr(path, "ceph.dir.layout.pool_namespace")
 
