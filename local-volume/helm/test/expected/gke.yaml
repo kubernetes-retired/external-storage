@@ -48,6 +48,8 @@ spec:
             - mountPath: /etc/provisioner/config
               name: provisioner-config
               readOnly: true
+            - mountPath: /dev
+              name: provisioner-dev
             - mountPath: /mnt/disks
               name: local-scsi
               mountPropagation: "HostToContainer"
@@ -55,6 +57,9 @@ spec:
         - name: provisioner-config
           configMap:
             name: local-provisioner-config
+        - name: provisioner-dev
+          hostPath:
+            path: /dev
         - name: local-scsi
           hostPath:
             path: /mnt/disks
