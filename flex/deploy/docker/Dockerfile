@@ -12,9 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM centos:7
-MAINTAINER bradley childs, bchilds@gmail.com
-RUN yum update -y
+FROM gcr.io/google-containers/debian-base-amd64:0.3
 
 # install the shell flex script that the provisioner uses.
 RUN mkdir -p  /opt/storage_drivers
