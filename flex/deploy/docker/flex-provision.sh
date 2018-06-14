@@ -20,23 +20,23 @@ INTERNAL_DEBUG=true
 INTERNAL_DEBUG=${INTERNAL_DEBUG:-"false"}
 
 usage() {
-    echo "Invalid usage of flex provisioner CLI.. :"
-    debug "Invalid usage of flex provisioner CLI.. :"
+    echo "Invalid usage of flex provisioner CLI.. :"$*
+    debug "Invalid usage of flex provisioner CLI.. :"$*
     exit 1
 }
 
 err() {
-    echo -ne $* 1>&2
+    echo -n $* 1>&2
 }
 
 log() {
     echo -n $* >&1
-    debug "log() called:"$*
+    debug "flex[$$]: log() called:"$*
 }
 
 # Saves debug output to a log file.
 debug() {
-    if [ "${INTERNAL_DEBUG}" == "true" ]; then
+    if [ "${INTERNAL_DEBUG}" = "true" ]; then
         echo $* >> /tmp/flex-provisioner.log
     fi
 }
@@ -45,6 +45,12 @@ debug() {
 ismounted() {
     debug "ismounted() called"
     echo 0
+}
+# init
+doinit(){
+    debug "init() called"
+    log "{\"status\": \"Success\"}"
+    exit 0
 }
 
 # deletes a provisioned volume
@@ -113,8 +119,6 @@ unmount() {
 # log CLI
 # debug $@
 
-log "hello"
-
 op=$1
 
 if [ "$op" = "init" ]; then
@@ -124,6 +128,9 @@ fi
 
 shift
 case "$op" in
+	init)
+		doinit $*
+		;;
         getvolumename)
 		getvolumename $*
 		;;
@@ -152,7 +159,7 @@ case "$op" in
 		unmount $*
 		;;
 	*)
-		usage
+		usage $op $*
 esac
 
 exit 1
