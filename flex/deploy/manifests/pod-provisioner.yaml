@@ -1,0 +1,23 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  name: flex-provisioner
+spec:
+  serviceAccountName: flex-provisioner
+  containers:
+    - name: flex-provisioner
+      image: childsb/flex-provisioner
+      securityContext:
+      args:
+        - "-provisioner=external/flex-simple"
+        - "-execCommand=/usr/libexec/kubernetes/kubelet-plugins/volume/exec/flex/flex"
+        - "-flexDriver=flex"
+      imagePullPolicy: "IfNotPresent"
+      volumeMounts:
+      - mountPath: /usr/libexec/kubernetes/kubelet-plugins/volume/exec
+        name: flexvolume-dir
+  volumes:
+  - hostPath:
+      path: /usr/libexec/kubernetes/kubelet-plugins/volume/exec
+      type: DirectoryOrCreate
+    name: flexvolume-dir

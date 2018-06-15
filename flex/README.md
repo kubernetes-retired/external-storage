@@ -18,5 +18,19 @@ make
 
 **To Deploy**
 
-You can use the example provisioner pod to deploy ```kubectl create -f examples/pod-provisioner.yaml```
+You can use the example provisioner pod to deploy:
 
+```
+mkdir -p /usr/libexec/kubernetes/kubelet-plugins/volume/exec/flex
+cp deploy/flex-provision.sh /usr/libexec/kubernetes/kubelet-plugins/volume/exec/flex/flex
+chmod ugo+x /usr/libexec/kubernetes/kubelet-plugins/volume/exec/flex/flex
+
+kubectl create -f deploy/manifests/pod-provisioner.yaml \
+               -f deploy/manifests/rbac.yaml \
+               -f deploy/manifests/sc.yaml
+```
+
+You can test it with:
+```
+kubectl create -f examples/pvc.yaml -f examples/pod-application.yaml
+```
