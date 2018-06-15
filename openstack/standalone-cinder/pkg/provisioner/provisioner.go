@@ -41,6 +41,9 @@ const (
 
 	// CinderVolumeID is an annotation to store the ID of the associated cinder volume
 	CinderVolumeID = "cinderVolumeId"
+
+	// ShouldProvisionVolumeAnn is an annotation to idetify whether to create new cinder volume or using existing volume
+	ShouldProvisionVolumeAnn = "pv.kubernetes.io/cinder-volume-id"
 )
 
 type cinderProvisioner struct {
@@ -107,19 +110,37 @@ func getCreateOptions(options controller.VolumeOptions) (volumes_v2.CreateOpts, 
 // Provision creates a storage asset and returns a PV object representing it.
 func (p *cinderProvisioner) Provision(options controller.VolumeOptions) (*v1.PersistentVolume, error) {
 	var (
-		volumeID   string
-		connection volumeservice.VolumeConnection
-		mapper     volumeMapper
-		pv         *v1.PersistentVolume
-		cleanupErr error
+		connection        volumeservice.VolumeConnection
+		mapper            volumeMapper
+		pv                *v1.PersistentVolume
+		volumeID          string
+		err               error
+		cleanupErr        error
+		useExistingVolume bool
+		volumeState       string
+		createOptions     volumes_v2.CreateOpts
 	)
 
 	if options.PVC.Spec.Selector != nil {
 		return nil, fmt.Errorf("claim Selector is not supported")
 	}
 
+	if volumeID, useExistingVolume = options.PVC.Annotations[ShouldProvisionVolumeAnn]; useExistingVolume {
+		volumeState, err = p.vsb.getCinderVolumeStatus(p.VolumeService, volumeID)
+		if err != nil {
+			glog.Errorf("Failed to get volume %s, err: %v", volumeID, err)
+			goto ERROR
+		}
+		if strings.ToLower(volumeState) != "available" {
+			glog.Errorf("Volume %s state is not available, current state %v", volumeID, volumeState)
+			err = fmt.Errorf("Volume %s state is not available, current state %v", volumeID, volumeState)
+			goto ERROR
+		}
+		goto CONNECT
+	}
+
 	// TODO: Check access mode
-	createOptions, err := getCreateOptions(options)
+	createOptions, err = getCreateOptions(options)
 	if err != nil {
 		glog.Error(err)
 		goto ERROR
@@ -136,6 +157,7 @@ func (p *cinderProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 		goto ERROR_DELETE
 	}
 
+CONNECT:
 	err = p.vsb.reserveCinderVolume(p.VolumeService, volumeID)
 	if err != nil {
 		glog.Errorf("Failed to reserve volume %s: %v", volumeID, err)
@@ -171,6 +193,10 @@ func (p *cinderProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 		glog.Errorf("Failed to build PV: %v", err)
 		goto ERROR_DETACH
 	}
+	if useExistingVolume {
+		pv.Annotations[ShouldProvisionVolumeAnn] = volumeID
+	}
+
 	return pv, nil
 
 ERROR_DETACH:
@@ -191,11 +217,13 @@ ERROR_UNRESERVE:
 	}
 	glog.V(3).Infof("Volume %s unreserved", volumeID)
 ERROR_DELETE:
-	cleanupErr = p.vsb.deleteCinderVolume(p.VolumeService, volumeID)
-	if cleanupErr != nil {
-		glog.Errorf("Failed to delete volume %s: %v", volumeID, cleanupErr)
+	if !useExistingVolume {
+		cleanupErr = p.vsb.deleteCinderVolume(p.VolumeService, volumeID)
+		if cleanupErr != nil {
+			glog.Errorf("Failed to delete volume %s: %v", volumeID, cleanupErr)
+		}
+		glog.V(3).Infof("Volume %s deleted", volumeID)
 	}
-	glog.V(3).Infof("Volume %s deleted", volumeID)
 ERROR:
 	return nil, err // Return the original error
 }
@@ -245,6 +273,11 @@ func (p *cinderProvisioner) Delete(pv *v1.PersistentVolume) error {
 		// TODO: Create placeholder PV?
 		glog.Errorf("Failed to unreserve volume %s: %v", volumeID, err)
 		return err
+	}
+
+	if _, useExistingVolume := pv.Annotations[ShouldProvisionVolumeAnn]; useExistingVolume {
+		glog.V(2).Infof("Using existing cinder volume %s, no deletion", volumeID)
+		return nil
 	}
 
 	err = p.vsb.deleteCinderVolume(p.VolumeService, volumeID)
