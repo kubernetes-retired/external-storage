@@ -1,0 +1,40 @@
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: flex-provisioner-runner
+rules:
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "update"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["list", "watch", "create", "update", "patch"]
+
+---
+
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: run-flex-provisioner
+subjects:
+  - kind: ServiceAccount
+    name: flex-provisioner
+    namespace: default
+roleRef:
+  kind: ClusterRole
+  name: flex-provisioner-runner
+  apiGroup: rbac.authorization.k8s.io
+
+---
+
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: flex-provisioner
+
