@@ -171,6 +171,7 @@ func (p *efsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 					ReadOnly: false,
 				},
 			},
+			MountOptions: []string{"vers=4.1"},
 		},
 	}
 	if gidAllocate {
