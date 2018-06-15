@@ -19,7 +19,7 @@ package main
 import (
 	"testing"
 
-	"github.com/kubernetes-incubator/external-storage/local-volume/utils/update-helm-values/pkg/chartutil"
+	"github.com/kubernetes-incubator/external-storage/local-volume/utils/update-helm-values-pre-v2.2.0/pkg/chartutil"
 )
 
 func TestUpgrade(t *testing.T) {

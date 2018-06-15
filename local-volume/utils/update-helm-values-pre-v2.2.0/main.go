@@ -22,7 +22,7 @@ import (
 	"os"
 
 	"github.com/golang/glog"
-	"github.com/kubernetes-incubator/external-storage/local-volume/utils/update-helm-values/pkg/chartutil"
+	"github.com/kubernetes-incubator/external-storage/local-volume/utils/update-helm-values-pre-v2.2.0/pkg/chartutil"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -63,7 +63,7 @@ func upgrade(val chartutil.Values, engine string) (chartutil.Values, error) {
 	}
 	if err == nil {
 		outCommon, err1 := out.Table("common")
-		if err1 != nil && !isNoTableError(err) {
+		if err1 != nil && !isNoTableError(err1) {
 			return out, err1
 		}
 		if isNoTableError(err1) {
