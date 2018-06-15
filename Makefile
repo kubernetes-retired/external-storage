@@ -256,15 +256,20 @@ push-nfs-provisioner:
 	make push
 .PHONY: push-nfs-provisioner
 
+push-flex-provisioner:
+	cd flex; \
+	make push
+.PHONY: push-flex-provisioner
+
+push-standalone-cinder-provisioner:
+	cd openstack/standalone-cinder; \
+	make push
+.PHONY: push-standalone-cinder-provisioner
+
 push-openebs-provisioner:
 	cd openebs; \
 	make push
 .PHONY: push-openebs-provisioner
-
-push-openstack-sharedfilesystems:
-	cd openstack-sharedfilesystems; \
-	make push
-.PHONY: push-openstack-sharedfilesystems
 
 deploy-openebs-provisioner:
 	cd openebs; \
