@@ -72,6 +72,8 @@ spec:
             - mountPath: /etc/provisioner/config
               name: provisioner-config
               readOnly: true
+            - mountPath: /dev
+              name: provisioner-dev
             {{- range $classConfig := .Values.classes }}
             - mountPath: {{ if $classConfig.mountDir }} {{- $classConfig.mountDir -}} {{ else }} {{- $classConfig.hostDir -}} {{ end }}
               name: {{ $classConfig.name }}
@@ -81,6 +83,9 @@ spec:
         - name: provisioner-config
           configMap:
             name: {{ .Values.common.configMapName }}
+        - name: provisioner-dev
+          hostPath:
+            path: /dev
         {{- range $classConfig := .Values.classes }}
         - name: {{ $classConfig.name }}
           hostPath:
