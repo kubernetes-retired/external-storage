@@ -22,8 +22,11 @@ ROOT=$(unset CDPATH && cd $(dirname "${BASH_SOURCE[0]}")/.. && pwd)
 cd $ROOT
 
 function install_helm() {
-    local HELM_URL=http://storage.googleapis.com/kubernetes-helm/helm-v2.7.2-linux-amd64.tar.gz
-    curl "$HELM_URL" | sudo tar --strip-components 1 -C /usr/bin linux-amd64/helm -zxf -
+    local OS=$(uname | tr A-Z a-z)
+    local VERSION=v2.7.2
+    local ARCH=amd64
+    local HELM_URL=http://storage.googleapis.com/kubernetes-helm/helm-${VERSION}-${OS}-${ARCH}.tar.gz
+    curl -s "$HELM_URL" | sudo tar --strip-components 1 -C /usr/local/bin -zxf - ${OS}-${ARCH}/helm
 }
 
 if ! which helm &>/dev/null; then

@@ -6,11 +6,11 @@ In order to be able to use **helm** to render templates, it has to be installed 
 to generate templates.
 
 ## Helm Installation
-On Linux, run these two commands to download and copy helm binary into /usr/bin directory.
+On Linux or Mac OS, run these two commands to download and copy helm binary into /usr/local/bin directory.
 
 ``` console
-export HELM_URL=http://storage.googleapis.com/kubernetes-helm/helm-v2.7.2-linux-amd64.tar.gz
-curl "$HELM_URL" | sudo tar --strip-components 1 -C /usr/bin linux-amd64/helm -zxf -
+export HELM_URL=http://storage.googleapis.com/kubernetes-helm/helm-v2.7.2-$(uname | tr A-Z a-z)-amd64.tar.gz
+curl "$HELM_URL" | sudo tar --strip-components 1 -C /usr/local/bin -zxf - $(uname | tr A-Z a-z)-amd64/helm
 ```
 Provisioner's spec generation process has been tested with helm version 2.7.2.
 
