@@ -34,6 +34,11 @@ container: build
 	docker build -t $(MUTABLE_IMAGE) .
 	docker tag $(MUTABLE_IMAGE) $(IMAGE)
 
+push: container
+	docker push $(IMAGE)
+	docker push $(MUTABLE_IMAGE)
+.PHONY: push
+
 test:
 	go test -cover ./pkg/provisioner ./pkg/volumeservice
 

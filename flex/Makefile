@@ -21,7 +21,7 @@ ifeq ($(VERSION),)
 endif
 
 IMAGE = $(REGISTRY)flex-provisioner:$(VERSION)
-MUTABLE_IMAGE = $(REGISTRY)deploy/docker/flex-provisioner:latest
+MUTABLE_IMAGE = $(REGISTRY)flex-provisioner:latest
 
 all build:
 	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o flex-provisioner ./cmd/flex-provisioner
