@@ -14,6 +14,9 @@
 
 FROM alpine:latest
 
+# support for HTTPS endpoints
+RUN apk add --no-cache ca-certificates && update-ca-certificates
+
 COPY cinder-provisioner /
 
 ENTRYPOINT ["/cinder-provisioner"]
