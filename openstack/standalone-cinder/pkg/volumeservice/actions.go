@@ -27,10 +27,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
+// InitiatorName Initiator name
+const InitiatorName = "iqn.1994-05.com.redhat:a13fc3d1cc22"
+
 const attachMountPoint = "/k8s.io/standalone-cinder"
 const attachHostName = "standalone-cinder.k8s.io"
 
-const initiatorName = "iqn.1994-05.com.redhat:a13fc3d1cc22"
 const interval = 3 * time.Second
 const timeout = 60 * time.Second
 
@@ -102,7 +104,7 @@ func ConnectCinderVolume(vs *gophercloud.ServiceClient, volumeID string) (Volume
 	opt := volumeactions.InitializeConnectionOpts{
 		Host:      "localhost",
 		IP:        "127.0.0.1",
-		Initiator: initiatorName,
+		Initiator: InitiatorName,
 	}
 	var rcv rcvVolumeConnection
 	err := volumeactions.InitializeConnection(vs, volumeID, &opt).ExtractInto(&rcv)
@@ -137,7 +139,7 @@ func DisconnectCinderVolume(vs *gophercloud.ServiceClient, volumeID string) erro
 	opt := volumeactions.TerminateConnectionOpts{
 		Host:      "localhost",
 		IP:        "127.0.0.1",
-		Initiator: initiatorName,
+		Initiator: InitiatorName,
 	}
 
 	err := volumeactions.TerminateConnection(vs, volumeID, &opt).Result.Err
