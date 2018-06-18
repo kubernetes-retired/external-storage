@@ -128,6 +128,20 @@ func TestUpdateUser(t *testing.T) {
 	th.CheckDeepEquals(t, SecondUserUpdated, *actual)
 }
 
+func TestChangeUserPassword(t *testing.T) {
+	th.SetupHTTP()
+	defer th.TeardownHTTP()
+	HandleChangeUserPasswordSuccessfully(t)
+
+	changePasswordOpts := users.ChangePasswordOpts{
+		OriginalPassword: "secretsecret",
+		Password:         "new_secretsecret",
+	}
+
+	res := users.ChangePassword(client.ServiceClient(), "9fe1d3", changePasswordOpts)
+	th.AssertNoErr(t, res.Err)
+}
+
 func TestDeleteUser(t *testing.T) {
 	th.SetupHTTP()
 	defer th.TeardownHTTP()
@@ -146,6 +160,22 @@ func TestListUserGroups(t *testing.T) {
 	actual, err := groups.ExtractGroups(allPages)
 	th.AssertNoErr(t, err)
 	th.CheckDeepEquals(t, ExpectedGroupsSlice, actual)
+}
+
+func TestAddToGroup(t *testing.T) {
+	th.SetupHTTP()
+	defer th.TeardownHTTP()
+	HandleAddToGroupSuccessfully(t)
+	res := users.AddToGroup(client.ServiceClient(), "ea167b", "9fe1d3")
+	th.AssertNoErr(t, res.Err)
+}
+
+func TestRemoveFromGroup(t *testing.T) {
+	th.SetupHTTP()
+	defer th.TeardownHTTP()
+	HandleRemoveFromGroupSuccessfully(t)
+	res := users.RemoveFromGroup(client.ServiceClient(), "ea167b", "9fe1d3")
+	th.AssertNoErr(t, res.Err)
 }
 
 func TestListUserProjects(t *testing.T) {

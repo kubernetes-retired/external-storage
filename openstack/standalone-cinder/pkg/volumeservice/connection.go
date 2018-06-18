@@ -179,7 +179,7 @@ func getNoAuthVolumeService(cfg cinderConfig) (*gophercloud.ServiceClient, error
 		return nil, err
 	}
 
-	client, err := noauth.NewBlockStorageV2(provider, noauth.EndpointOpts{
+	client, err := noauth.NewBlockStorageNoAuth(provider, noauth.EndpointOpts{
 		CinderEndpoint: cfg.Global.CinderEndpoint,
 	})
 	if err != nil {

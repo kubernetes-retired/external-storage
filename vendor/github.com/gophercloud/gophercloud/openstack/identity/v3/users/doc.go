@@ -54,6 +54,22 @@ Example to Update a User
 		panic(err)
 	}
 
+Example to Change Password of a User
+
+	userID := "0fe36e73809d46aeae6705c39077b1b3"
+	originalPassword := "secretsecret"
+	password := "new_secretsecret"
+
+	changePasswordOpts := users.ChangePasswordOpts{
+		OriginalPassword: originalPassword,
+		Password:         password,
+	}
+
+	err := users.ChangePassword(identityClient, userID, changePasswordOpts).ExtractErr()
+	if err != nil {
+		panic(err)
+	}
+
 Example to Delete a User
 
 	userID := "0fe36e73809d46aeae6705c39077b1b3"
@@ -78,6 +94,26 @@ Example to List Groups a User Belongs To
 
 	for _, group := range allGroups {
 		fmt.Printf("%+v\n", group)
+	}
+
+Example to Add a User to a Group
+
+	groupID := "bede500ee1124ae9b0006ff859758b3a"
+	userID := "0fe36e73809d46aeae6705c39077b1b3"
+	err := users.AddToGroup(identityClient, groupID, userID).ExtractErr()
+
+	if err != nil {
+		panic(err)
+	}
+
+Example to Remove a User from a Group
+
+	groupID := "bede500ee1124ae9b0006ff859758b3a"
+	userID := "0fe36e73809d46aeae6705c39077b1b3"
+	err := users.RemoveFromGroup(identityClient, groupID, userID).ExtractErr()
+
+	if err != nil {
+		panic(err)
 	}
 
 Example to List Projects a User Belongs To

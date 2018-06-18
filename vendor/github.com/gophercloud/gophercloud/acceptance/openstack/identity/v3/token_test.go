@@ -14,7 +14,7 @@ import (
 func TestGetToken(t *testing.T) {
 	client, err := clients.NewIdentityV3Client()
 	if err != nil {
-		t.Fatalf("Unable to obtain an identity client: %v")
+		t.Fatalf("Unable to obtain an identity client: %v", err)
 	}
 
 	ao, err := openstack.AuthOptionsFromEnv()
