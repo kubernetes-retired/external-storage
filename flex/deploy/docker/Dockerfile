@@ -12,12 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM gcr.io/google-containers/debian-base-amd64:0.3
+FROM launcher.gcr.io/google/debian9
 
 # install the go kube piece of provisioner
 COPY flex-provisioner /opt/storage_drivers/flex-provisioner
 
-
 ENTRYPOINT ["/opt/storage_drivers/flex-provisioner"]
-
-# "github.com/kubernetes-incubator/external-storage/lib/controller"
