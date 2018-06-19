@@ -55,6 +55,7 @@ provisioner chart and their default values.
 | common.namespace                       | Namespace where provisioner runs.                                                                     | str      | `default`                                                  |
 | common.useAlphaAPI                     | If running against pre-1.10 k8s version, the `useAlphaAPI` flag must be enabled.                      | bool     | `false`                                                    |
 | common.useJobForCleaning               | Is set to true, provisioner will use jobs-based block cleaning.                                       | bool     | `false`                                                    |
+| common.minResyncPeriod                 | Resync period in reflectors will be random between `minResyncPeriod` and `2*minResyncPeriod`.         | str      | `5m0s`
 | common.configMapName                   | Provisioner ConfigMap name.                                                                           | str      | `local-provisioner-config`                                 |
 | classes.[n].name                       | StorageClass name.                                                                                    | str      | `-`                                                        |
 | classes.[n].hostDir                    | Path on the host where local volumes of this storage class are mounted under.                         | str      | `-`                                                        |
@@ -82,6 +83,7 @@ $ helm template ./helm/provisioner -f helm/examples/gce.yaml > ./provisioner/dep
 Currently you can try the following examples:
 
 * [examples/baremetal-cleanbyjobs.yaml](examples/baremetal-cleanbyjobs.yaml)
+* [examples/baremetal-resyncperiod.yaml](examples/baremetal-resyncperiod.yaml)
 * [examples/baremetal-without-rbac.yaml](examples/baremetal-without-rbac.yaml)
 * [examples/baremetal.yaml](examples/baremetal.yaml)
 * [examples/gce-pre1.9.yaml](examples/gce-pre1.9.yaml)

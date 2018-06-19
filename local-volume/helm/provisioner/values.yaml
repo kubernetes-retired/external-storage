@@ -21,6 +21,11 @@ common:
   #
   useJobForCleaning: false
   #
+  # Resync period in reflectors will be random between minResyncPeriod and
+  # 2*minResyncPeriod. Default: 5m0s.
+  #
+  #minResyncPeriod: 5m0s
+  #
   # Defines the name of configmap used by Provisioner
   #
   configMapName: "local-provisioner-config"
