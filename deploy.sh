@@ -36,7 +36,6 @@ nfs-client-provisioner
 nfs-provisioner
 openebs-provisioner
 rbd-provisioner
-standalone-cinder-provisioner
 )
 
 regex="^($(IFS=\|; echo "${provisioners[*]}"))-(v[0-9]+\.[0-9]+\.[0-9]+-k8s1.10)$"
