@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-all: aws/efs ceph/cephfs ceph/rbd flex gluster/block gluster/glusterfs gluster/file iscsi/targetd local-volume/provisioner nfs-client nfs snapshot openstack/standalone-cinder
+all: aws/efs ceph/cephfs ceph/rbd flex gluster/block gluster/glusterfs gluster/file iscsi/targetd local-volume/provisioner nfs-client nfs snapshot
 .PHONY: all
 
-clean: clean-aws/efs clean-ceph/cephfs clean-ceph/rbd clean-flex clean-gluster/block clean-gluster/glusterfs clean-iscsi/targetd clean-local-volume/provisioner clean-nfs-client clean-nfs clean-openebs clean-snapshot clean-openstack/standalone-cinder
+clean: clean-aws/efs clean-ceph/cephfs clean-ceph/rbd clean-flex clean-gluster/block clean-gluster/glusterfs clean-iscsi/targetd clean-local-volume/provisioner clean-nfs-client clean-nfs clean-openebs clean-snapshot
 .PHONY: clean
 
-test: test-aws/efs test-local-volume/provisioner test-local-volume/helm test-nfs test-snapshot test-openstack/standalone-cinder
+test: test-aws/efs test-local-volume/provisioner test-local-volume/helm test-nfs test-snapshot
 .PHONY: test
 
 verify:
@@ -186,21 +186,6 @@ clean-snapshot:
 	make clean
 .PHONY: clean-snapshot
 
-openstack/standalone-cinder:
-	cd openstack/standalone-cinder; \
-	make
-.PHONY: openstack/standalone-cinder
-
-test-openstack/standalone-cinder:
-	cd openstack/standalone-cinder; \
-	make test
-.PHONY: test-openstack/standalone-cinder
-
-clean-openstack/standalone-cinder:
-	cd openstack/standalone-cinder; \
-	make clean
-.PHONY: clean-openstack/standalone-cinder
-
 test-snapshot:
 	cd snapshot; \
 	make test
@@ -260,11 +245,6 @@ push-flex-provisioner:
 	cd flex; \
 	make push
 .PHONY: push-flex-provisioner
-
-push-standalone-cinder-provisioner:
-	cd openstack/standalone-cinder; \
-	make push
-.PHONY: push-standalone-cinder-provisioner
 
 push-openebs-provisioner:
 	cd openebs; \
