@@ -92,6 +92,9 @@ type UserConfig struct {
 	Namespace string
 	// Image of container to use for jobs (optional)
 	JobContainerImage string
+	// MinResyncPeriod is minimum resync period. Resync period in reflectors
+	// will be random between MinResyncPeriod and 2*MinResyncPeriod.
+	MinResyncPeriod metav1.Duration
 }
 
 // MountConfig stores a configuration for discoverying a specific storageclass
@@ -164,6 +167,9 @@ type ProvisionerConfiguration struct {
 	// default is false.
 	// +optional
 	UseJobForCleaning bool `json:"useJobForCleaning" yaml:"useJobForCleaning"`
+	// MinResyncPeriod is minimum resync period. Resync period in reflectors
+	// will be random between MinResyncPeriod and 2*MinResyncPeriod.
+	MinResyncPeriod metav1.Duration `json:"minResyncPeriod" yaml:"minResyncPeriod"`
 }
 
 // CreateLocalPVSpec returns a PV spec that can be used for PV creation

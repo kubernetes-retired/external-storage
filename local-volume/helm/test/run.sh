@@ -49,7 +49,7 @@ function test_values_file() {
     trap "test -f $tmpfile && rm $tmpfile || true" EXIT
     helm template ./provisioner -f examples/$f > $tmpfile
     echo -n "Checking $input "
-    local diff=$(diff -u $expected $tmpfile) || true
+    local diff=$(diff -u $expected $tmpfile 2>&1) || true
     if [[ -n "${diff}" ]]; then
         echo "failed, diff: "
         echo "$diff"
