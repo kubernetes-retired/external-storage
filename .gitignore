@@ -66,9 +66,6 @@ flycheck_*.el
 /snapshot/deploy/docker/controller/snapshot-controller
 /snapshot/deploy/docker/provisioner/snapshot-provisioner
 
-# cinder binary
-/openstack/standalone-cinder/cinder-provisioner
-
 # digitalocean binaries
 /digitalocean/digitalocean-flexplugin
 /digitalocean/deploy/docker/digitalocean-flexplugin
