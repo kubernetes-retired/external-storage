@@ -84,7 +84,7 @@ class CephFSNativeDriver(object):
             cluster_name = os.environ["CEPH_CLUSTER_NAME"]
         except KeyError:
             cluster_name = "ceph"
-        try:     
+        try:
             mons = os.environ["CEPH_MON"]
         except KeyError:
             raise ValueError("Missing CEPH_MON env")
@@ -92,7 +92,7 @@ class CephFSNativeDriver(object):
             auth_id = os.environ["CEPH_AUTH_ID"]
         except KeyError:
             raise ValueError("Missing CEPH_AUTH_ID")
-        try: 
+        try:
             auth_key = os.environ["CEPH_AUTH_KEY"]
         except:
             raise ValueError("Missing CEPH_AUTH_KEY")
@@ -297,15 +297,19 @@ class CephFSNativeDriver(object):
             self._volume_client.disconnect()
             self._volume_client = None
 
+def usage():
+    print "Usage: " + sys.argv[0] + " --remove -n share_name -u ceph_user_id -s size"
+
 def main():
     create = True
     share = ""
     user = ""
+    size = None
     cephfs = CephFSNativeDriver()
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "rn:u:", ["remove"])
+        opts, args = getopt.getopt(sys.argv[1:], "rn:u:s:", ["remove"])
     except getopt.GetoptError:
-        print "Usage: " + sys.argv[0] + " --remove -n share_name -u ceph_user_id"
+        usage()
         sys.exit(1)
 
     for opt, arg in opts:
@@ -313,18 +317,20 @@ def main():
             share = arg
         elif opt == '-u':
             user = arg
+        elif opt == '-s':
+            size = arg
         elif opt in ("-r", "--remove"):
             create = False
 
     if share == "" or user == "":
-        print "Usage: " + sys.argv[0] + " --remove -n share_name -u ceph_user_id"
+        usage()
         sys.exit(1)
 
-    if create == True:
-        print cephfs.create_share(share, user)    
+    if create:
+        print cephfs.create_share(share, user, size=size)
     else:
-        cephfs.delete_share(share, user)    
-        
-        
+        cephfs.delete_share(share, user)
+
+
 if __name__ == "__main__":
     main()

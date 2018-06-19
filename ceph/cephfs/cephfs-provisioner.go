@@ -61,13 +61,16 @@ type cephFSProvisioner struct {
 	identity string
 	// Namespace secrets will be created in. If empty, secrets will be created in each PVC's namespace.
 	secretNamespace string
+	// enable PVC quota
+	enableQuota bool
 }
 
-func newCephFSProvisioner(client kubernetes.Interface, id string, secretNamespace string) controller.Provisioner {
+func newCephFSProvisioner(client kubernetes.Interface, id string, secretNamespace string, enableQuota bool) controller.Provisioner {
 	return &cephFSProvisioner{
 		client:          client,
 		identity:        id,
 		secretNamespace: secretNamespace,
+		enableQuota:     enableQuota,
 	}
 }
 
@@ -129,7 +132,13 @@ func (p *cephFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 	}
 	// provision share
 	// create cmd
-	cmd := exec.Command(provisionCmd, "-n", share, "-u", user)
+	args := []string{"-n", share, "-u", user}
+	if p.enableQuota {
+		capacity := options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
+		requestBytes := strconv.FormatInt(capacity.Value(), 10)
+		args = append(args, "-s", requestBytes)
+	}
+	cmd := exec.Command(provisionCmd, args...)
 	// set env
 	cmd.Env = []string{
 		"CEPH_CLUSTER_NAME=" + cluster,
@@ -186,7 +195,10 @@ func (p *cephFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: options.PersistentVolumeReclaimPolicy,
 			AccessModes:                   options.PVC.Spec.AccessModes,
-			Capacity: v1.ResourceList{ //FIXME: kernel cephfs doesn't enforce quota, capacity is not meaningless here.
+			Capacity: v1.ResourceList{
+				// Quotas are supported by the userspace client(ceph-fuse, libcephfs), or kernel client >= 4.17 but only on mimic clusters.
+				// In other cases capacity is meaningless here.
+				// If quota is enabled, provisioner will set ceph.quota.max_bytes on volume path.
 				v1.ResourceName(v1.ResourceStorage): options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)],
 			},
 			PersistentVolumeSource: v1.PersistentVolumeSource{
@@ -337,6 +349,7 @@ var (
 	kubeconfig      = flag.String("kubeconfig", "", "Absolute path to the kubeconfig")
 	id              = flag.String("id", "", "Unique provisioner identity")
 	secretNamespace = flag.String("secret-namespace", "", "Namespace secrets will be created in (default: '', created in each PVC's namespace)")
+	enableQuota     = flag.Bool("enable-quota", false, "Enable PVC quota")
 )
 
 func main() {
@@ -387,7 +400,7 @@ func main() {
 	// Create the provisioner: it implements the Provisioner interface expected by
 	// the controller
 	glog.Infof("Creating CephFS provisioner %s with identity: %s, secret namespace: %s", prName, prID, *secretNamespace)
-	cephFSProvisioner := newCephFSProvisioner(clientset, prID, *secretNamespace)
+	cephFSProvisioner := newCephFSProvisioner(clientset, prID, *secretNamespace, *enableQuota)
 
 	// Start the provision controller which will dynamically provision cephFS
 	// PVs
