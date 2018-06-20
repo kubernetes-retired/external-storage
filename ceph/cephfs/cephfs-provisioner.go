@@ -350,6 +350,7 @@ var (
 	id              = flag.String("id", "", "Unique provisioner identity")
 	secretNamespace = flag.String("secret-namespace", "", "Namespace secrets will be created in (default: '', created in each PVC's namespace)")
 	enableQuota     = flag.Bool("enable-quota", false, "Enable PVC quota")
+	metricsPort     = flag.Int("metrics-port", 0, "The port of the metrics server (set to non-zero to enable)")
 )
 
 func main() {
@@ -409,6 +410,7 @@ func main() {
 		prName,
 		cephFSProvisioner,
 		serverVersion.GitVersion,
+		controller.MetricsPort(int32(*metricsPort)),
 	)
 
 	pc.Run(wait.NeverStop)
