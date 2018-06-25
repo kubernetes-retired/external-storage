@@ -475,3 +475,7 @@ func (p *iscsiProvisioner) getConnection() (*jsonrpc2.Client, error) {
 	log.Debugln("targetd client created")
 	return client, nil
 }
+
+func (p *iscsiProvisioner) SupportsBlock() bool {
+	return true
+}
