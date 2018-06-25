@@ -30,6 +30,7 @@ import (
 	"github.com/kubernetes-incubator/external-storage/lib/controller/metrics"
 	"github.com/kubernetes-incubator/external-storage/lib/leaderelection"
 	rl "github.com/kubernetes-incubator/external-storage/lib/leaderelection/resourcelock"
+	"github.com/kubernetes-incubator/external-storage/lib/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"golang.org/x/time/rate"
@@ -840,6 +841,16 @@ func (ctrl *ProvisionController) shouldProvision(claim *v1.PersistentVolumeClaim
 		}
 	}
 
+	// Check if this provisioner supports Block volume
+	if util.CheckPersistentVolumeClaimModeBlock(claim) && !ctrl.supportsBlock() {
+		claimClass := helper.GetPersistentVolumeClaimClass(claim)
+		strerr := fmt.Sprintf("%s does not support block volume provisioning", ctrl.provisionerName)
+		ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, "ProvisioningFailed", strerr)
+		glog.Errorf("Failed to provision volume for claim %q with StorageClass %q: %v",
+			claimToClaimKey(claim), claimClass, strerr)
+		return false
+	}
+
 	// Kubernetes 1.5 provisioning with annStorageProvisioner
 	if ctrl.kubeVersion.AtLeast(utilversion.MustParseSemantic("v1.5.0")) {
 		if provisioner, found := claim.Annotations[annStorageProvisioner]; found {
@@ -1360,4 +1371,14 @@ func (ctrl *ProvisionController) fetchReclaimPolicy(storageClassName string) (v1
 	}
 
 	return v1.PersistentVolumeReclaimDelete, fmt.Errorf("Cannot convert object to StorageClass: %+v", classObj)
+}
+
+// supportsBlock returns whether a provisioner supports block volume.
+// Provisioners that implement BlockProvisioner interface and return true to SupportsBlock
+// will be regarded as supported for block volume.
+func (ctrl *ProvisionController) supportsBlock() bool {
+	if blockProvisioner, ok := ctrl.provisioner.(BlockProvisioner); ok {
+		return blockProvisioner.SupportsBlock()
+	}
+	return false
 }
