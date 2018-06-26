@@ -85,3 +85,9 @@ daemonset:
   #  nodeLabels:
   #    - failure-domain.beta.kubernetes.io/zone
   #    - failure-domain.beta.kubernetes.io/region
+  #
+  # If configured, tolerations will add a toleration field to the DaemonSet PodSpec.
+  #
+  # Node tolerations for local-volume-provisioner scheduling to nodes with taints.
+  # Ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+  tolerations: []
