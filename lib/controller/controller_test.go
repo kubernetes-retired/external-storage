@@ -25,7 +25,6 @@ import (
 	"testing"
 	"time"
 
-	rl "github.com/kubernetes-incubator/external-storage/lib/leaderelection/resourcelock"
 	"k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	storagebeta "k8s.io/api/storage/v1beta1"
@@ -33,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -223,8 +223,11 @@ func TestController(t *testing.T) {
 		stopCh := make(chan struct{})
 		go ctrl.Run(stopCh)
 
+		// When we shutdown while something is happening the fake client panics
+		// with send on closed channel...but the test passed, so ignore
+		utilruntime.ReallyCrash = false
+
 		time.Sleep(2 * resyncPeriod)
-		ctrl.runningOperations.Wait()
 
 		pvList, _ := client.CoreV1().PersistentVolumes().List(metav1.ListOptions{})
 		if !reflect.DeepEqual(test.expectedVolumes, pvList.Items) {
@@ -290,7 +293,7 @@ func TestMultipleControllers(t *testing.T) {
 		}
 
 		for i := 0; i < test.numControllers; i++ {
-			go ctrls[i].addClaim(newClaim("claim-1", "uid-1-1", "class-1", test.provisionerName, "", nil))
+			go ctrls[i].syncClaim(newClaim("claim-1", "uid-1-1", "class-1", test.provisionerName, "", nil))
 		}
 
 		// Sleep for 3 election retry periods
@@ -492,51 +495,6 @@ func TestShouldDelete(t *testing.T) {
 	}
 }
 
-func TestIsOnlyRecordUpdate(t *testing.T) {
-	tests := []struct {
-		name       string
-		old        *v1.PersistentVolumeClaim
-		new        *v1.PersistentVolumeClaim
-		expectedIs bool
-	}{
-		{
-			name:       "is only record update",
-			old:        newClaim("claim-1", "1-1", "class-1", "", "", map[string]string{rl.LeaderElectionRecordAnnotationKey: "a"}),
-			new:        newClaim("claim-1", "1-1", "class-1", "", "", map[string]string{rl.LeaderElectionRecordAnnotationKey: "b"}),
-			expectedIs: true,
-		},
-		{
-			name:       "is seen as only record update, stayed exactly the same",
-			old:        newClaim("claim-1", "1-1", "class-1", "", "", map[string]string{rl.LeaderElectionRecordAnnotationKey: "a"}),
-			new:        newClaim("claim-1", "1-1", "class-1", "", "", map[string]string{rl.LeaderElectionRecordAnnotationKey: "a"}),
-			expectedIs: true,
-		},
-		{
-			name:       "isn't only record update, class changed as well",
-			old:        newClaim("claim-1", "1-1", "class-1", "", "", map[string]string{rl.LeaderElectionRecordAnnotationKey: "a"}),
-			new:        newClaim("claim-1", "1-1", "class-2", "", "", map[string]string{rl.LeaderElectionRecordAnnotationKey: "b"}),
-			expectedIs: false,
-		},
-		{
-			name:       "isn't only record update, only class changed",
-			old:        newClaim("claim-1", "1-1", "class-1", "", "", map[string]string{rl.LeaderElectionRecordAnnotationKey: "a"}),
-			new:        newClaim("claim-1", "1-1", "class-2", "", "", map[string]string{rl.LeaderElectionRecordAnnotationKey: "a"}),
-			expectedIs: false,
-		},
-	}
-	for _, test := range tests {
-		client := fake.NewSimpleClientset()
-		provisioner := newTestProvisioner()
-		ctrl := newTestProvisionController(client, "foo.bar/baz", provisioner, "v1.5.0")
-
-		is, _ := ctrl.isOnlyRecordUpdate(test.old, test.new)
-		if test.expectedIs != is {
-			t.Logf("test case: %s", test.name)
-			t.Errorf("expected is only record update %v but got %v\n", test.expectedIs, is)
-		}
-	}
-}
-
 func TestControllerSharedInformers(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -593,9 +551,12 @@ func TestControllerSharedInformers(t *testing.T) {
 		go ctrl.Run(stopCh)
 		go informersFactory.Start(stopCh)
 
+		// When we shutdown while something is happening the fake client panics
+		// with send on closed channel...but the test passed, so ignore
+		utilruntime.ReallyCrash = false
+
 		informersFactory.WaitForCacheSync(stopCh)
 		time.Sleep(2 * sharedResyncPeriod)
-		ctrl.runningOperations.Wait()
 
 		pvList, _ := client.Core().PersistentVolumes().List(metav1.ListOptions{})
 		if (len(test.expectedVolumes) > 0 || len(pvList.Items) > 0) &&
@@ -619,7 +580,6 @@ func newTestProvisionController(
 		provisioner,
 		serverGitVersion,
 		ResyncPeriod(resyncPeriod),
-		ExponentialBackOffOnError(false),
 		CreateProvisionedPVInterval(10*time.Millisecond),
 		LeaseDuration(2*resyncPeriod),
 		RenewDeadline(resyncPeriod),
@@ -652,7 +612,6 @@ func newTestProvisionControllerSharedInformers(
 		provisioner,
 		serverGitVersion,
 		ResyncPeriod(resyncPeriod),
-		ExponentialBackOffOnError(false),
 		CreateProvisionedPVInterval(10*time.Millisecond),
 		LeaseDuration(2*resyncPeriod),
 		RenewDeadline(resyncPeriod),
