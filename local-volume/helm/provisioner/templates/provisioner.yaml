@@ -48,6 +48,10 @@ spec:
         app: local-volume-provisioner
     spec:
       serviceAccountName: {{.Values.daemonset.serviceAccount}}
+{{- if .Values.daemonset.tolerations }}
+      tolerations:
+{{ .Values.daemonset.tolerations | toYaml | trim | indent 8 }}
+{{- end }}
       containers:
         - image: "{{ .Values.daemonset.image }}"
           {{- if .Values.daemonset.imagePullPolicy }}
