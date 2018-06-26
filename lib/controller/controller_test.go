@@ -408,6 +408,81 @@ func TestShouldProvision(t *testing.T) {
 			claim:           newClaim("claim-1", "1-1", "class-1", "foo.bar/baz", "", nil),
 			expectedShould:  true,
 		},
+		// volumeMode tests for provisioner w/o BlockProvisoner I/F
+		{
+			name:            "Undefined volumeMode PV request to provisioner w/o BlockProvisoner I/F",
+			provisionerName: "foo.bar/baz",
+			provisioner:     newTestProvisioner(),
+			class:           newStorageClass("class-1", "foo.bar/baz"),
+			claim:           newClaim("claim-1", "volmode-1-1", "class-1", "foo.bar/baz", "", nil),
+			expectedShould:  true,
+		},
+		{
+			name:            "FileSystem volumeMode PV request to provisioner w/o BlockProvisoner I/F",
+			provisionerName: "foo.bar/baz",
+			provisioner:     newTestProvisioner(),
+			class:           newStorageClass("class-1", "foo.bar/baz"),
+			claim:           newClaimWithVolumeMode("claim-1", "volmode-1-2", "class-1", "foo.bar/baz", "", nil, v1.PersistentVolumeFilesystem),
+			expectedShould:  true,
+		},
+		{
+			name:            "Block volumeMode PV request to provisioner w/o BlockProvisoner I/F",
+			provisionerName: "foo.bar/baz",
+			provisioner:     newTestProvisioner(),
+			class:           newStorageClass("class-1", "foo.bar/baz"),
+			claim:           newClaimWithVolumeMode("claim-1", "volmode-1-3", "class-1", "foo.bar/baz", "", nil, v1.PersistentVolumeBlock),
+			expectedShould:  false,
+		},
+		// volumeMode tests for BlockProvisioner that returns false
+		{
+			name:            "Undefined volumeMode PV request to BlockProvisoner that returns false",
+			provisionerName: "foo.bar/baz",
+			provisioner:     newTestBlockProvisioner(false),
+			class:           newStorageClass("class-1", "foo.bar/baz"),
+			claim:           newClaim("claim-1", "volmode-2-1", "class-1", "foo.bar/baz", "", nil),
+			expectedShould:  true,
+		},
+		{
+			name:            "FileSystem volumeMode PV request to BlockProvisoner that returns false",
+			provisionerName: "foo.bar/baz",
+			provisioner:     newTestBlockProvisioner(false),
+			class:           newStorageClass("class-1", "foo.bar/baz"),
+			claim:           newClaimWithVolumeMode("claim-1", "volmode-2-2", "class-1", "foo.bar/baz", "", nil, v1.PersistentVolumeFilesystem),
+			expectedShould:  true,
+		},
+		{
+			name:            "Block volumeMode PV request to BlockProvisoner that returns false",
+			provisionerName: "foo.bar/baz",
+			provisioner:     newTestBlockProvisioner(false),
+			class:           newStorageClass("class-1", "foo.bar/baz"),
+			claim:           newClaimWithVolumeMode("claim-1", "volmode-2-3", "class-1", "foo.bar/baz", "", nil, v1.PersistentVolumeBlock),
+			expectedShould:  false,
+		},
+		// volumeMode tests for BlockProvisioner that returns true
+		{
+			name:            "Undefined volumeMode PV request to BlockProvisoner that returns true",
+			provisionerName: "foo.bar/baz",
+			provisioner:     newTestBlockProvisioner(true),
+			class:           newStorageClass("class-1", "foo.bar/baz"),
+			claim:           newClaim("claim-1", "volmode-3-1", "class-1", "foo.bar/baz", "", nil),
+			expectedShould:  true,
+		},
+		{
+			name:            "FileSystem volumeMode PV request to BlockProvisoner that returns true",
+			provisionerName: "foo.bar/baz",
+			provisioner:     newTestBlockProvisioner(true),
+			class:           newStorageClass("class-1", "foo.bar/baz"),
+			claim:           newClaimWithVolumeMode("claim-1", "volmode-3-2", "class-1", "foo.bar/baz", "", nil, v1.PersistentVolumeFilesystem),
+			expectedShould:  true,
+		},
+		{
+			name:            "Block volumeMode PV request to BlockProvisioner that returns true",
+			provisionerName: "foo.bar/baz",
+			provisioner:     newTestBlockProvisioner(true),
+			class:           newStorageClass("class-1", "foo.bar/baz"),
+			claim:           newClaimWithVolumeMode("claim-1", "volmode-3-3", "class-1", "foo.bar/baz", "", nil, v1.PersistentVolumeBlock),
+			expectedShould:  true,
+		},
 	}
 	for _, test := range tests {
 		client := fake.NewSimpleClientset(test.claim)
@@ -684,6 +759,12 @@ func newClaim(name, claimUID, class, provisioner, volumeName string, annotations
 	return claim
 }
 
+func newClaimWithVolumeMode(name, claimUID, class, provisioner, volumeName string, annotations map[string]string, volumeMode v1.PersistentVolumeMode) *v1.PersistentVolumeClaim {
+	claim := newClaim(name, claimUID, class, provisioner, volumeName, annotations)
+	claim.Spec.VolumeMode = &volumeMode
+	return claim
+}
+
 func newVolume(name string, phase v1.PersistentVolumePhase, policy v1.PersistentVolumeReclaimPolicy, annotations map[string]string) *v1.PersistentVolume {
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
@@ -783,6 +864,22 @@ var _ Provisioner = &testQualifiedProvisioner{}
 var _ Qualifier = &testQualifiedProvisioner{}
 
 func (p *testQualifiedProvisioner) ShouldProvision(claim *v1.PersistentVolumeClaim) bool {
+	return p.answer
+}
+
+func newTestBlockProvisioner(answer bool) *testBlockProvisioner {
+	return &testBlockProvisioner{newTestProvisioner(), answer}
+}
+
+type testBlockProvisioner struct {
+	*testProvisioner
+	answer bool
+}
+
+var _ Provisioner = &testBlockProvisioner{}
+var _ BlockProvisioner = &testBlockProvisioner{}
+
+func (p *testBlockProvisioner) SupportsBlock() bool {
 	return p.answer
 }
 
