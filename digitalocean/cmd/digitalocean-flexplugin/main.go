@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/digitalocean/godo"
-	"github.com/digitalocean/godo/context"
+	"context"
 	"golang.org/x/oauth2"
 	"io/ioutil"
 	"net/http"

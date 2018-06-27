@@ -22,7 +22,7 @@ import (
 	"os"
 
 	"github.com/golang/glog"
-	"github.com/kubernetes-incubator/external-storage/local-volume/utils/update-helm-values/pkg/chartutil"
+	"github.com/kubernetes-incubator/external-storage/local-volume/utils/update-helm-values-pre-v2.2.0/pkg/chartutil"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
