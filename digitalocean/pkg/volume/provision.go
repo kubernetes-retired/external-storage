@@ -17,9 +17,10 @@ limitations under the License.
 package volume
 
 import (
+	"context"
 	"fmt"
+
 	"github.com/digitalocean/godo"
-	"github.com/digitalocean/godo/context"
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	"github.com/kubernetes-incubator/external-storage/lib/util"
