@@ -1029,11 +1029,17 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 		}
 	}
 
+	mountOptions, err := ctrl.fetchMountOptions(claimClass)
+	if err != nil {
+		return err
+	}
+
 	options := VolumeOptions{
 		PersistentVolumeReclaimPolicy: reclaimPolicy,
-		PVName:     pvName,
-		PVC:        claim,
-		Parameters: parameters,
+		PVName:         pvName,
+		PVC:            claim,
+		MountOptions:   mountOptions,
+		Parameters:     parameters,
 	}
 
 	ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, "Provisioning", fmt.Sprintf("External provisioner is provisioning volume for claim %q", claimToClaimKey(claim)))
@@ -1360,4 +1366,23 @@ func (ctrl *ProvisionController) fetchReclaimPolicy(storageClassName string) (v1
 	}
 
 	return v1.PersistentVolumeReclaimDelete, fmt.Errorf("Cannot convert object to StorageClass: %+v", classObj)
+}
+
+func (ctrl *ProvisionController) fetchMountOptions(storageClassName string) ([]string, error) {
+	classObj, found, err := ctrl.classes.GetByKey(storageClassName)
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, fmt.Errorf("StorageClass %q not found", storageClassName)
+	}
+
+	switch class := classObj.(type) {
+	case *storage.StorageClass:
+		return class.MountOptions, nil
+	case *storagebeta.StorageClass:
+		return class.MountOptions, nil
+	}
+
+	return nil, fmt.Errorf("Cannot convert object to StorageClass: %+v", classObj)
 }
