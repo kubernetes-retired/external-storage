@@ -121,15 +121,15 @@ func TestLoadProvisionerConfigs(t *testing.T) {
 				},
 				UseAlphaAPI: true,
 				MinResyncPeriod: metav1.Duration{
-					time.Hour + time.Minute*30,
+					Duration: time.Hour + time.Minute*30,
 				},
 			},
 		},
 	}
 	for _, v := range testcases {
 		for name, value := range v.data {
-			err := ioutil.WriteFile(filepath.Join(tmpConfigPath, name), []byte(value), 0644)
-			if err != nil {
+			err1 := ioutil.WriteFile(filepath.Join(tmpConfigPath, name), []byte(value), 0644)
+			if err1 != nil {
 				t.Fatalf("Failed to write data into directory %s", tmpConfigPath)
 			}
 		}
