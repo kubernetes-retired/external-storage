@@ -62,11 +62,11 @@ func upgrade(val chartutil.Values, engine string) (chartutil.Values, error) {
 		return out, err
 	}
 	if err == nil {
-		outCommon, err := out.Table("common")
-		if err != nil && !isNoTableError(err) {
-			return out, err
+		outCommon, err1 := out.Table("common")
+		if err1 != nil && !isNoTableError(err1) {
+			return out, err1
 		}
-		if isNoTableError(err) {
+		if isNoTableError(err1) {
 			outCommon = chartutil.Values{}
 			out["common"] = outCommon
 		}

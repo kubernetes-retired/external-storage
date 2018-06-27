@@ -137,7 +137,7 @@ func TestCreateVsm(t *testing.T) {
 		vs := mayav1.VolumeSpec{}
 		vs.Metadata.Name = c.vname
 		vs.Metadata.Labels.Storage = c.size
-		message, err := EvaluateCreateVolume(c.ovt, c.vname, c.size)
+		message, err := EvaluateCreateVolume(c.ovt, vs)
 
 		if !reflect.DeepEqual(err, c.expectedErr) {
 			t.Fatalf("Expected error %v got %v", c.expectedErr, err)

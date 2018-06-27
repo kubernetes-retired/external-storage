@@ -21,8 +21,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/digitalocean/godo"
 	"context"
+
+	"github.com/digitalocean/godo"
 	"github.com/golang/glog"
 	vol "github.com/kubernetes-incubator/external-storage/digitalocean/pkg/volume"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
