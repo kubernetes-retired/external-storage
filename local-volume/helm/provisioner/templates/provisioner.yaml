@@ -60,6 +60,10 @@ spec:
           name: provisioner
           securityContext:
             privileged: true
+{{- if .Values.daemonset.resources }}
+          resources:
+{{ .Values.daemonset.resources | toYaml | trim | indent 12 }}
+{{- end }}
           env:
           - name: MY_NODE_NAME
             valueFrom:

@@ -91,3 +91,7 @@ daemonset:
   # Node tolerations for local-volume-provisioner scheduling to nodes with taints.
   # Ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
   tolerations: []
+  #
+  # If configured, resources will set the requests/limits field to the Daemonset PodSpec.
+  # Ref: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/
+  resources: {}
