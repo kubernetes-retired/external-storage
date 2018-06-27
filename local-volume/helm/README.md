@@ -70,7 +70,7 @@ provisioner chart and their default values.
 | daemonset.kubeConfigEnv                | Specify the location of kubernetes config file.                                                       | str      | `-`                                                        |
 | daemonset.nodeLabels                   | List of node labels to be copied to the PVs created by the provisioner.                               | list     | `-`                                                        |
 | daemonset.tolerations                  | List of tolerations to be applied to the Provisioner DaemonSet.                                       | list     | `-`                                                        |
-
+| daemonset.resources                    | Map of resource request and limits to be applied to the Provisioner Daemonset.                        | map     | `-`                                                        |
 Note: `classes` is a list of objects, you can specify one or more classes.
 
 ## Examples
@@ -85,6 +85,8 @@ Currently you can try the following examples:
 
 * [examples/baremetal-cleanbyjobs.yaml](examples/baremetal-cleanbyjobs.yaml)
 * [examples/baremetal-resyncperiod.yaml](examples/baremetal-resyncperiod.yaml)
+* [examples/baremetal-tolerations.yaml](examples/baremetal-tolerations.yaml)
+* [examples/baremetal-with-resource-limits.yaml](examples/baremetal-with-resource-limits.yaml)
 * [examples/baremetal-without-rbac.yaml](examples/baremetal-without-rbac.yaml)
 * [examples/baremetal.yaml](examples/baremetal.yaml)
 * [examples/gce-pre1.9.yaml](examples/gce-pre1.9.yaml)
