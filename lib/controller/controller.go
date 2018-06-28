@@ -841,16 +841,6 @@ func (ctrl *ProvisionController) shouldProvision(claim *v1.PersistentVolumeClaim
 		}
 	}
 
-	// Check if this provisioner supports Block volume
-	if util.CheckPersistentVolumeClaimModeBlock(claim) && !ctrl.supportsBlock() {
-		claimClass := helper.GetPersistentVolumeClaimClass(claim)
-		strerr := fmt.Sprintf("%s does not support block volume provisioning", ctrl.provisionerName)
-		ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, "ProvisioningFailed", strerr)
-		glog.Errorf("Failed to provision volume for claim %q with StorageClass %q: %v",
-			claimToClaimKey(claim), claimClass, strerr)
-		return false
-	}
-
 	// Kubernetes 1.5 provisioning with annStorageProvisioner
 	if ctrl.kubeVersion.AtLeast(utilversion.MustParseSemantic("v1.5.0")) {
 		if provisioner, found := claim.Annotations[annStorageProvisioner]; found {
@@ -905,6 +895,16 @@ func (ctrl *ProvisionController) shouldDelete(volume *v1.PersistentVolume) bool 
 	}
 
 	return true
+}
+
+// canProvision returns error if provisioner can't provision claim.
+func (ctrl *ProvisionController) canProvision(claim *v1.PersistentVolumeClaim) error {
+	// Check if this provisioner supports Block volume
+	if util.CheckPersistentVolumeClaimModeBlock(claim) && !ctrl.supportsBlock() {
+		return fmt.Errorf("%s does not support block volume provisioning", ctrl.provisionerName)
+	}
+
+	return nil
 }
 
 // lockProvisionClaimOperation wraps provisionClaimOperation. In case other
@@ -1029,6 +1029,14 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 		// annDynamicallyProvisioned contains different provisioner than
 		// class.Provisioner.
 		glog.Errorf("Unknown provisioner %q requested in claim %q's StorageClass %q", provisioner, claimToClaimKey(claim), claimClass)
+		return nil
+	}
+
+	// Check if this provisioner can provision this claim.
+	if err := ctrl.canProvision(claim); err != nil {
+		ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, "ProvisioningFailed", err.Error())
+		glog.Errorf("Failed to provision volume for claim %q with StorageClass %q: %v",
+			claimToClaimKey(claim), claimClass, err)
 		return nil
 	}
 
