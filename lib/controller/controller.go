@@ -30,6 +30,7 @@ import (
 	"github.com/kubernetes-incubator/external-storage/lib/controller/metrics"
 	"github.com/kubernetes-incubator/external-storage/lib/leaderelection"
 	rl "github.com/kubernetes-incubator/external-storage/lib/leaderelection/resourcelock"
+	"github.com/kubernetes-incubator/external-storage/lib/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"golang.org/x/time/rate"
@@ -896,6 +897,16 @@ func (ctrl *ProvisionController) shouldDelete(volume *v1.PersistentVolume) bool 
 	return true
 }
 
+// canProvision returns error if provisioner can't provision claim.
+func (ctrl *ProvisionController) canProvision(claim *v1.PersistentVolumeClaim) error {
+	// Check if this provisioner supports Block volume
+	if util.CheckPersistentVolumeClaimModeBlock(claim) && !ctrl.supportsBlock() {
+		return fmt.Errorf("%s does not support block volume provisioning", ctrl.provisionerName)
+	}
+
+	return nil
+}
+
 // lockProvisionClaimOperation wraps provisionClaimOperation. In case other
 // controllers are serving the same claims, to prevent them all from creating
 // volumes for a claim & racing to submit their PV, each controller creates a
@@ -1018,6 +1029,14 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 		// annDynamicallyProvisioned contains different provisioner than
 		// class.Provisioner.
 		glog.Errorf("Unknown provisioner %q requested in claim %q's StorageClass %q", provisioner, claimToClaimKey(claim), claimClass)
+		return nil
+	}
+
+	// Check if this provisioner can provision this claim.
+	if err := ctrl.canProvision(claim); err != nil {
+		ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, "ProvisioningFailed", err.Error())
+		glog.Errorf("Failed to provision volume for claim %q with StorageClass %q: %v",
+			claimToClaimKey(claim), claimClass, err)
 		return nil
 	}
 
@@ -1360,4 +1379,14 @@ func (ctrl *ProvisionController) fetchReclaimPolicy(storageClassName string) (v1
 	}
 
 	return v1.PersistentVolumeReclaimDelete, fmt.Errorf("Cannot convert object to StorageClass: %+v", classObj)
+}
+
+// supportsBlock returns whether a provisioner supports block volume.
+// Provisioners that implement BlockProvisioner interface and return true to SupportsBlock
+// will be regarded as supported for block volume.
+func (ctrl *ProvisionController) supportsBlock() bool {
+	if blockProvisioner, ok := ctrl.provisioner.(BlockProvisioner); ok {
+		return blockProvisioner.SupportsBlock()
+	}
+	return false
 }
