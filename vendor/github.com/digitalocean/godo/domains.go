@@ -1,10 +1,9 @@
 package godo
 
 import (
+	"context"
 	"fmt"
 	"net/http"
-
-	"github.com/digitalocean/godo/context"
 )
 
 const domainsBasePath = "v2/domains"
@@ -77,6 +76,8 @@ type DomainRecord struct {
 	Port     int    `json:"port,omitempty"`
 	TTL      int    `json:"ttl,omitempty"`
 	Weight   int    `json:"weight,omitempty"`
+	Flags    int    `json:"flags"`
+	Tag      string `json:"tag,omitempty"`
 }
 
 // DomainRecordEditRequest represents a request to update a domain record.
@@ -88,6 +89,8 @@ type DomainRecordEditRequest struct {
 	Port     int    `json:"port,omitempty"`
 	TTL      int    `json:"ttl,omitempty"`
 	Weight   int    `json:"weight,omitempty"`
+	Flags    int    `json:"flags"`
+	Tag      string `json:"tag,omitempty"`
 }
 
 func (d Domain) String() string {

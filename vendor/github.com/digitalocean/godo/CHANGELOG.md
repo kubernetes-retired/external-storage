@@ -1,5 +1,25 @@
 # Change Log
 
+## [v1.3.0] - 2018-05-24
+
+- #170 Add support for volume formatting - @adamwg
+
+## [v1.2.0] - 2018-05-08
+
+- #166 Remove support for Go 1.6 - @iheanyi
+- #165 Add support for Let's Encrypt Certificates - @viola
+
+## [v1.1.3] - 2018-03-07
+
+- #156 Handle non-json errors from the API - @aknuds1
+- #158 Update droplet example to use latest instance type - @dan-v
+
+## [v1.1.2] - 2018-03-06
+
+- #157 storage: list volumes should handle only name or only region params - @andrewsykim
+- #154 docs: replace first example with fully-runnable example - @xmudrii
+- #152 Handle flags & tag properties of domain record - @jaymecd
+
 ## [v1.1.1] - 2017-09-29
 
 - #151 Following user agent field recommendations - @joonas

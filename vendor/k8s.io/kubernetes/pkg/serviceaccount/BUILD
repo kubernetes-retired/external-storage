@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "claims.go",
         "jwt.go",
         "legacy.go",
         "util.go",
@@ -35,7 +36,6 @@ go_test(
         "//pkg/controller/serviceaccount:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/authentication/serviceaccount:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//vendor/k8s.io/client-go/util/cert:go_default_library",
@@ -57,9 +57,14 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = ["util_test.go"],
+    srcs = [
+        "claims_test.go",
+        "util_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
+        "//pkg/apis/core:go_default_library",
+        "//vendor/gopkg.in/square/go-jose.v2/jwt:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
     ],

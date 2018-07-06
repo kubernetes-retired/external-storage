@@ -330,17 +330,6 @@ func (volExpandReq VolumeExpandRequest) Validate() error {
 	)
 }
 
-type VolumeCloneRequest struct {
-       Name string `json:"name,omitempty"`
-}
-
-func (vcr VolumeCloneRequest) Validate() error {
-     return validation.ValidateStruct(&vcr,
-             validation.Field(&vcr.Name, validation.Match(volumeNameRe)),
-     )
-}
-
-
 // BlockVolume
 
 type BlockVolumeCreateRequest struct {
