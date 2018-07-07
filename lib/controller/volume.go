@@ -47,6 +47,14 @@ type Qualifier interface {
 	ShouldProvision(*v1.PersistentVolumeClaim) bool
 }
 
+// BlockProvisioner is an optional interface implemented by provisioners to determine
+// whether it supports block volume.
+type BlockProvisioner interface {
+	Provisioner
+	// SupportsBlock returns whether provisioner supports block volume.
+	SupportsBlock() bool
+}
+
 // IgnoredError is the value for Delete to return to indicate that the call has
 // been ignored and no action taken. In case multiple provisioners are serving
 // the same storage class, provisioners may ignore PVs they are not responsible

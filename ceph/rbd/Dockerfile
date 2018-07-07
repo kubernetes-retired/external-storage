@@ -14,7 +14,7 @@
 
 FROM centos:7
 
-ENV CEPH_VERSION "luminous"
+ENV CEPH_VERSION "mimic"
 RUN rpm -Uvh https://download.ceph.com/rpm-$CEPH_VERSION/el7/noarch/ceph-release-1-1.el7.noarch.rpm && \
   yum install -y epel-release && \
   yum install -y --nogpgcheck ceph-common && \
