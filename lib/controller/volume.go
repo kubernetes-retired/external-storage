@@ -76,6 +76,10 @@ type VolumeOptions struct {
 	// PV.Name of the appropriate PersistentVolume. Used to generate cloud
 	// volume name.
 	PVName string
+
+	// PV mount options. Not validated - mount of the PVs will simply fail if one is invalid.
+	MountOptions []string
+
 	// PVC is reference to the claim that lead to provisioning of a new PV.
 	// Provisioners *must* create a PV that would be matched by this PVC,
 	// i.e. with required capacity, accessMode, labels matching PVC.Selector and
