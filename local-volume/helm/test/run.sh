@@ -21,16 +21,9 @@ set -o pipefail
 ROOT=$(unset CDPATH && cd $(dirname "${BASH_SOURCE[0]}")/.. && pwd)
 cd $ROOT
 
-function install_helm() {
-    local OS=$(uname | tr A-Z a-z)
-    local VERSION=v2.7.2
-    local ARCH=amd64
-    local HELM_URL=http://storage.googleapis.com/kubernetes-helm/helm-${VERSION}-${OS}-${ARCH}.tar.gz
-    curl -s "$HELM_URL" | sudo tar --strip-components 1 -C /usr/local/bin -zxf - ${OS}-${ARCH}/helm
-}
-
 if ! which helm &>/dev/null; then
-    install_helm
+    echo "helm not installed, see README.md for instructions on installing it"
+    exit 2
 fi
 
 # lint first

@@ -19,6 +19,18 @@ set -o nounset
 set -o pipefail
 set -o xtrace
 
+# This file is used by travisci to test PRs.
+# It installs several dependencies on the test machine that are
+# required to run the tests.
+
+function install_helm() {
+    local OS=$(uname | tr A-Z a-z)
+    local VERSION=v2.7.2
+    local ARCH=amd64
+    local HELM_URL=http://storage.googleapis.com/kubernetes-helm/helm-${VERSION}-${OS}-${ARCH}.tar.gz
+    curl -s "$HELM_URL" | sudo tar --strip-components 1 -C /usr/local/bin -zxf - ${OS}-${ARCH}/helm
+}
+
 # Skip duplicate build and test runs through the CI, that occur because we are now running on osx and linux.
 # Skipping these steps saves time and travis-ci resources.
 if [ "$TRAVIS_OS_NAME" = "osx" ]; then
@@ -49,6 +61,8 @@ if [ "$TRAVIS_OS_NAME" = "osx" ]; then
                 export PATH=$(pwd):${PATH}
                 make
                 make test
+                install_helm
+                make test-local-volume/helm
         fi
 elif [ "$TEST_SUITE" = "linux-nfs" ]; then
 	# Install nfs, cfssl
@@ -120,5 +134,6 @@ elif [ "$TEST_SUITE" = "linux-everything-else" ]; then
 elif [ "$TEST_SUITE" = "linux-local-volume" ]; then
 	make local-volume/provisioner
 	make test-local-volume/provisioner
+	install_helm
 	make test-local-volume/helm
 fi
