@@ -18,7 +18,7 @@ all: aws/efs ceph/cephfs ceph/rbd flex gluster/block gluster/glusterfs gluster/f
 clean: clean-aws/efs clean-ceph/cephfs clean-ceph/rbd clean-flex clean-gluster/block clean-gluster/glusterfs clean-iscsi/targetd clean-local-volume/provisioner clean-nfs-client clean-nfs clean-openebs clean-snapshot
 .PHONY: clean
 
-test: test-aws/efs test-local-volume/provisioner test-local-volume/helm test-nfs test-snapshot
+test: test-aws/efs test-local-volume/provisioner test-nfs test-snapshot
 .PHONY: test
 
 verify:
