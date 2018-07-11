@@ -117,3 +117,17 @@ func TestGetErrorFromResponseErrStringSpace(t *testing.T) {
 	tests.Assert(t, err.Error() == "whoa nellie",
 		`expected err.Error() == "whoa nellie", got:`, err.Error())
 }
+
+func TestGetErrorFromResponseEmptyString(t *testing.T) {
+	bodytext := "\n"
+	resp := &http.Response{
+		Status:        "200 OK",
+		StatusCode:    200,
+		Body:          dummyCloser{bytes.NewBufferString(bodytext)},
+		ContentLength: int64(len(bodytext)),
+	}
+	err := GetErrorFromResponse(resp)
+	tests.Assert(t, err != nil, "expected err != nil, got:", err)
+	tests.Assert(t, err.Error() == "server did not provide a message (status 200: OK)",
+		`expected err.Error() == "server did not provide a message (status 200: OK)", got:`, err.Error())
+}

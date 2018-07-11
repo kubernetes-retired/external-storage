@@ -19,7 +19,7 @@ run_test() {
 	sts=$?
 	if [[ ${sts} -ne 0 ]]; then
 		vecho "failed ${cmd} [${sts}]"
-		FAILURES+=(${cmd})
+		FAILURES+=("${cmd}")
 		if [[ "${exitfirst}" = "yes" ]]; then
 			exit 1
 		fi
