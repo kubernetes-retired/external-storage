@@ -4,7 +4,7 @@ os:
 
 language: go
 go:
-  - 1.8.3
+  - 1.10.3
 services: docker
 
 go_import_path: github.com/kubernetes-incubator/external-storage

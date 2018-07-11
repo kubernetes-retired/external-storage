@@ -50,6 +50,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 // ProviderName is the name of this cloud provider.
@@ -1684,7 +1685,7 @@ func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (KubernetesVolumeID, er
 
 	createAZ := volumeOptions.AvailabilityZone
 	if createAZ == "" {
-		createAZ = volume.ChooseZoneForVolume(allZones, volumeOptions.PVCName)
+		createAZ = util.ChooseZoneForVolume(allZones, volumeOptions.PVCName)
 	}
 
 	var createType string

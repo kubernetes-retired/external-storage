@@ -185,3 +185,35 @@ func (c *Client) NodeState(id string, request *api.StateRequest) error {
 
 	return nil
 }
+
+func (c *Client) NodeSetTags(id string, request *api.TagsChangeRequest) error {
+	buffer, err := json.Marshal(request)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest("POST",
+		c.host+"/nodes/"+id+"/tags",
+		bytes.NewBuffer(buffer))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	// Set token
+	err = c.setToken(req)
+	if err != nil {
+		return err
+	}
+
+	// Get info
+	r, err := c.do(req)
+	if err != nil {
+		return err
+	}
+	defer r.Body.Close()
+	if r.StatusCode != http.StatusOK {
+		return utils.GetErrorFromResponse(r)
+	}
+	return nil
+}

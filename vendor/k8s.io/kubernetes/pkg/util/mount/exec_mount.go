@@ -20,6 +20,7 @@ package mount
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/golang/glog"
 )
@@ -135,6 +136,34 @@ func (m *execMounter) MakeDir(pathname string) error {
 	return m.wrappedMounter.MakeDir(pathname)
 }
 
-func (m *execMounter) ExistsPath(pathname string) bool {
+func (m *execMounter) ExistsPath(pathname string) (bool, error) {
 	return m.wrappedMounter.ExistsPath(pathname)
+}
+
+func (m *execMounter) PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error) {
+	return m.wrappedMounter.PrepareSafeSubpath(subPath)
+}
+
+func (m *execMounter) CleanSubPaths(podDir string, volumeName string) error {
+	return m.wrappedMounter.CleanSubPaths(podDir, volumeName)
+}
+
+func (m *execMounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
+	return m.wrappedMounter.SafeMakeDir(pathname, base, perm)
+}
+
+func (m *execMounter) GetMountRefs(pathname string) ([]string, error) {
+	return m.wrappedMounter.GetMountRefs(pathname)
+}
+
+func (m *execMounter) GetFSGroup(pathname string) (int64, error) {
+	return m.wrappedMounter.GetFSGroup(pathname)
+}
+
+func (m *execMounter) GetSELinuxSupport(pathname string) (bool, error) {
+	return m.wrappedMounter.GetSELinuxSupport(pathname)
+}
+
+func (m *execMounter) GetMode(pathname string) (os.FileMode, error) {
+	return m.wrappedMounter.GetMode(pathname)
 }

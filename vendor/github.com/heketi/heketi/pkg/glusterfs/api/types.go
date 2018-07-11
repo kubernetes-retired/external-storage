@@ -35,6 +35,8 @@ var (
 	volumeNameRe = regexp.MustCompile("^[a-zA-Z0-9_-]+$")
 
 	blockVolNameRe = regexp.MustCompile("^[a-zA-Z0-9_-]+$")
+
+	tagNameRe = regexp.MustCompile("^[a-zA-Z0-9_.-]+$")
 )
 
 // ValidateUUID is written this way because heketi UUID does not
@@ -150,24 +152,28 @@ type BrickInfo struct {
 
 // Device
 type Device struct {
-	Name string `json:"name"`
+	Name string            `json:"name"`
+	Tags map[string]string `json:"tags,omitempty"`
 }
 
 func (dev Device) Validate() error {
 	return validation.ValidateStruct(&dev,
 		validation.Field(&dev.Name, validation.Required, validation.Match(deviceNameRe)),
+		validation.Field(&dev.Tags, validation.By(ValidateTags)),
 	)
 }
 
 type DeviceAddRequest struct {
 	Device
-	NodeId string `json:"node"`
+	NodeId      string `json:"node"`
+	DestroyData bool   `json:"destroydata,omitempty"`
 }
 
 func (devAddReq DeviceAddRequest) Validate() error {
 	return validation.ValidateStruct(&devAddReq,
 		validation.Field(&devAddReq.Device, validation.Required),
 		validation.Field(&devAddReq.NodeId, validation.Required, validation.By(ValidateUUID)),
+		validation.Field(&devAddReq.DestroyData, validation.In(true, false)),
 	)
 }
 
@@ -185,9 +191,10 @@ type DeviceInfoResponse struct {
 
 // Node
 type NodeAddRequest struct {
-	Zone      int           `json:"zone"`
-	Hostnames HostAddresses `json:"hostnames"`
-	ClusterId string        `json:"cluster"`
+	Zone      int               `json:"zone"`
+	Hostnames HostAddresses     `json:"hostnames"`
+	ClusterId string            `json:"cluster"`
+	Tags      map[string]string `json:"tags,omitempty"`
 }
 
 func (req NodeAddRequest) Validate() error {
@@ -195,6 +202,7 @@ func (req NodeAddRequest) Validate() error {
 		validation.Field(&req.Zone, validation.Required, validation.Min(1)),
 		validation.Field(&req.Hostnames, validation.Required),
 		validation.Field(&req.ClusterId, validation.Required, validation.By(ValidateUUID)),
+		validation.Field(&req.Tags, validation.By(ValidateTags)),
 	)
 }
 
@@ -331,15 +339,14 @@ func (volExpandReq VolumeExpandRequest) Validate() error {
 }
 
 type VolumeCloneRequest struct {
-       Name string `json:"name,omitempty"`
+	Name string `json:"name,omitempty"`
 }
 
 func (vcr VolumeCloneRequest) Validate() error {
-     return validation.ValidateStruct(&vcr,
-             validation.Field(&vcr.Name, validation.Match(volumeNameRe)),
-     )
+	return validation.ValidateStruct(&vcr,
+		validation.Field(&vcr.Name, validation.Match(volumeNameRe)),
+	)
 }
-
 
 // BlockVolume
 
@@ -390,6 +397,55 @@ type BlockVolumeListResponse struct {
 type LogLevelInfo struct {
 	// should contain one or more logger to log-level-name mapping
 	LogLevel map[string]string `json:"loglevel"`
+}
+
+type TagsChangeType string
+
+const (
+	UnknownTagsChangeType TagsChangeType = ""
+	SetTags               TagsChangeType = "set"
+	UpdateTags            TagsChangeType = "update"
+	DeleteTags            TagsChangeType = "delete"
+)
+
+// Common tag post body
+type TagsChangeRequest struct {
+	Tags   map[string]string `json:"tags"`
+	Change TagsChangeType    `json:"change_type"`
+}
+
+func (tcr TagsChangeRequest) Validate() error {
+	return validation.ValidateStruct(&tcr,
+		validation.Field(&tcr.Tags, validation.By(ValidateTags)),
+		validation.Field(&tcr.Change,
+			validation.Required,
+			validation.In(SetTags, UpdateTags, DeleteTags)))
+}
+
+func ValidateTags(v interface{}) error {
+	t, ok := v.(map[string]string)
+	if !ok {
+		return fmt.Errorf("tags must be a map of strings to strings")
+	}
+	if len(t) > 32 {
+		return fmt.Errorf("too many tags specified (%v), up to %v supported",
+			len(t), 32)
+	}
+	for k, v := range t {
+		if len(k) == 0 {
+			return fmt.Errorf("tag names may not be empty")
+		}
+		if err := validation.Validate(k, validation.RuneLength(1, 32)); err != nil {
+			return fmt.Errorf("tag name %v: %v", k, err)
+		}
+		if err := validation.Validate(v, validation.RuneLength(0, 64)); err != nil {
+			return fmt.Errorf("value of tag %v: %v", k, err)
+		}
+		if !tagNameRe.MatchString(k) {
+			return fmt.Errorf("invalid characters in tag name %+v", k)
+		}
+	}
+	return nil
 }
 
 // Constructors

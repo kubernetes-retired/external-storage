@@ -749,3 +749,293 @@ func TestLogLevel(t *testing.T) {
 		`expected llinfo.LogLevel["glusterfs"] == "info", get:`, llinfo.LogLevel)
 	return
 }
+
+func TestDeviceTags(t *testing.T) {
+	db := tests.Tempfile()
+	defer os.Remove(db)
+
+	// Create the app
+	app := glusterfs.NewTestApp(db)
+	defer app.Close()
+
+	// Setup the server
+	ts := setupHeketiServer(app)
+	defer ts.Close()
+
+	// Create cluster
+	c := NewClient(ts.URL, "admin", TEST_ADMIN_KEY)
+	tests.Assert(t, c != nil)
+	cluster_req := &api.ClusterCreateRequest{
+		ClusterFlags: api.ClusterFlags{
+			Block: true,
+			File:  true,
+		},
+	}
+	cluster, err := c.ClusterCreate(cluster_req)
+	tests.Assert(t, err == nil)
+
+	// Create node request packet
+	nodeReq := &api.NodeAddRequest{}
+	nodeReq.ClusterId = cluster.Id
+	nodeReq.Hostnames.Manage = []string{"manage"}
+	nodeReq.Hostnames.Storage = []string{"storage"}
+	nodeReq.Zone = 10
+
+	// Create node
+	node, err := c.NodeAdd(nodeReq)
+	tests.Assert(t, err == nil)
+
+	// Create a device request
+	deviceReq := &api.DeviceAddRequest{}
+	deviceReq.Name = "/sda"
+	deviceReq.NodeId = node.Id
+	deviceReq.Tags = map[string]string{
+		"weight": "light",
+		"fish":   "cod",
+	}
+
+	// Create device
+	err = c.DeviceAdd(deviceReq)
+	tests.Assert(t, err == nil)
+
+	// Get node information
+	nodeInfo, err := c.NodeInfo(node.Id)
+	tests.Assert(t, err == nil)
+	tests.Assert(t, nodeInfo.DevicesInfo[0].Id != "")
+
+	devId := nodeInfo.DevicesInfo[0].Id
+	tests.Assert(t, len(devId) > 1)
+
+	deviceInfo, err := c.DeviceInfo(devId)
+	tests.Assert(t, err == nil, "expected err == nil, got:", err)
+	tests.Assert(t, len(deviceInfo.Tags) == 2,
+		"expected len(deviceInfo.Tags) == 2, got:", len(deviceInfo.Tags))
+	tests.Assert(t, deviceInfo.Tags["fish"] == "cod",
+		`expected deviceInfo.Tags["fish"] == "cod", got:`,
+		deviceInfo.Tags["fish"])
+
+	err = c.DeviceSetTags(devId, &api.TagsChangeRequest{
+		Change: api.UpdateTags,
+		Tags: map[string]string{
+			"metal": "iron",
+		},
+	})
+	tests.Assert(t, err == nil, "expected err == nil, got:", err)
+
+	deviceInfo, err = c.DeviceInfo(devId)
+	tests.Assert(t, err == nil, "expected err == nil, got:", err)
+	tests.Assert(t, len(deviceInfo.Tags) == 3,
+		"expected len(deviceInfo.Tags) == 3, got:", len(deviceInfo.Tags))
+	tests.Assert(t, deviceInfo.Tags["fish"] == "cod",
+		`expected deviceInfo.Tags["fish"] == "cod", got:`,
+		deviceInfo.Tags["fish"])
+	tests.Assert(t, deviceInfo.Tags["metal"] == "iron",
+		`expected deviceInfo.Tags["metal"] == "iron", got:`,
+		deviceInfo.Tags["metal"])
+
+	err = c.DeviceSetTags(devId, &api.TagsChangeRequest{
+		Change: api.UpdateTags,
+		Tags: map[string]string{
+			"metal": "nickel",
+		},
+	})
+	tests.Assert(t, err == nil, "expected err == nil, got:", err)
+
+	deviceInfo, err = c.DeviceInfo(devId)
+	tests.Assert(t, err == nil, "expected err == nil, got:", err)
+	tests.Assert(t, len(deviceInfo.Tags) == 3,
+		"expected len(deviceInfo.Tags) == 3, got:", len(deviceInfo.Tags))
+	tests.Assert(t, deviceInfo.Tags["fish"] == "cod",
+		`expected deviceInfo.Tags["fish"] == "cod", got:`,
+		deviceInfo.Tags["fish"])
+	tests.Assert(t, deviceInfo.Tags["metal"] == "nickel",
+		`expected deviceInfo.Tags["metal"] == "nickel", got:`,
+		deviceInfo.Tags["metal"])
+
+	err = c.DeviceSetTags(devId, &api.TagsChangeRequest{
+		Change: api.DeleteTags,
+		Tags: map[string]string{
+			"weight": "",
+		},
+	})
+	tests.Assert(t, err == nil, "expected err == nil, got:", err)
+
+	deviceInfo, err = c.DeviceInfo(devId)
+	tests.Assert(t, err == nil, "expected err == nil, got:", err)
+	tests.Assert(t, len(deviceInfo.Tags) == 2,
+		"expected len(deviceInfo.Tags) == 2, got:", len(deviceInfo.Tags))
+	tests.Assert(t, deviceInfo.Tags["fish"] == "cod",
+		`expected deviceInfo.Tags["fish"] == "cod", got:`,
+		deviceInfo.Tags["fish"])
+	tests.Assert(t, deviceInfo.Tags["metal"] == "nickel",
+		`expected deviceInfo.Tags["metal"] == "nickel", got:`,
+		deviceInfo.Tags["metal"])
+
+	err = c.DeviceSetTags(devId, &api.TagsChangeRequest{
+		Change: api.SetTags,
+		Tags: map[string]string{
+			"metal": "heavy",
+		},
+	})
+	tests.Assert(t, err == nil, "expected err == nil, got:", err)
+
+	deviceInfo, err = c.DeviceInfo(devId)
+	tests.Assert(t, err == nil, "expected err == nil, got:", err)
+	tests.Assert(t, len(deviceInfo.Tags) == 1,
+		"expected len(deviceInfo.Tags) == 1, got:", len(deviceInfo.Tags))
+	tests.Assert(t, deviceInfo.Tags["metal"] == "heavy",
+		`expected deviceInfo.Tags["metal"] == "heavy", got:`,
+		deviceInfo.Tags["metal"])
+
+	// Offline Device
+	err = c.DeviceState(devId, &api.StateRequest{State: api.EntryStateOffline})
+	tests.Assert(t, err == nil)
+	// Fail Device
+	err = c.DeviceState(devId, &api.StateRequest{State: api.EntryStateFailed})
+	tests.Assert(t, err == nil)
+
+	// Delete device
+	err = c.DeviceDelete(devId)
+	tests.Assert(t, err == nil)
+
+	// Delete node
+	err = c.NodeDelete(node.Id)
+	tests.Assert(t, err == nil)
+
+	// Delete cluster
+	err = c.ClusterDelete(cluster.Id)
+	tests.Assert(t, err == nil)
+}
+
+func TestNodeTags(t *testing.T) {
+	db := tests.Tempfile()
+	defer os.Remove(db)
+
+	// Create the app
+	app := glusterfs.NewTestApp(db)
+	defer app.Close()
+
+	// Setup the server
+	ts := setupHeketiServer(app)
+	defer ts.Close()
+
+	// Create cluster
+	c := NewClient(ts.URL, "admin", TEST_ADMIN_KEY)
+	tests.Assert(t, c != nil)
+	cluster_req := &api.ClusterCreateRequest{
+		ClusterFlags: api.ClusterFlags{
+			Block: true,
+			File:  true,
+		},
+	}
+	cluster, err := c.ClusterCreate(cluster_req)
+	tests.Assert(t, err == nil)
+
+	// Create node request packet
+	nodeReq := &api.NodeAddRequest{}
+	nodeReq.ClusterId = cluster.Id
+	nodeReq.Hostnames.Manage = []string{"manage"}
+	nodeReq.Hostnames.Storage = []string{"storage"}
+	nodeReq.Zone = 10
+	nodeReq.Tags = map[string]string{
+		"weight": "100tons",
+		"fish":   "cod",
+	}
+
+	// Create node
+	node, err := c.NodeAdd(nodeReq)
+	tests.Assert(t, err == nil)
+	nodeId := node.Id
+
+	// Get node information
+	nodeInfo, err := c.NodeInfo(nodeId)
+	tests.Assert(t, err == nil, "expected err == nil, got:", err)
+	tests.Assert(t, err == nil, "expected err == nil, got:", err)
+	tests.Assert(t, len(nodeInfo.Tags) == 2,
+		"expected len(nodeInfo.Tags) == 2, got:", len(nodeInfo.Tags))
+	tests.Assert(t, nodeInfo.Tags["fish"] == "cod",
+		`expected nodeInfo.Tags["fish"] == "cod", got:`,
+		nodeInfo.Tags["fish"])
+
+	err = c.NodeSetTags(nodeId, &api.TagsChangeRequest{
+		Change: api.UpdateTags,
+		Tags: map[string]string{
+			"metal": "iron",
+		},
+	})
+	tests.Assert(t, err == nil, "expected err == nil, got:", err)
+
+	nodeInfo, err = c.NodeInfo(nodeId)
+	tests.Assert(t, err == nil, "expected err == nil, got:", err)
+	tests.Assert(t, len(nodeInfo.Tags) == 3,
+		"expected len(nodeInfo.Tags) == 3, got:", len(nodeInfo.Tags))
+	tests.Assert(t, nodeInfo.Tags["fish"] == "cod",
+		`expected nodeInfo.Tags["fish"] == "cod", got:`,
+		nodeInfo.Tags["fish"])
+	tests.Assert(t, nodeInfo.Tags["metal"] == "iron",
+		`expected nodeInfo.Tags["metal"] == "iron", got:`,
+		nodeInfo.Tags["metal"])
+
+	err = c.NodeSetTags(nodeId, &api.TagsChangeRequest{
+		Change: api.UpdateTags,
+		Tags: map[string]string{
+			"metal": "nickel",
+		},
+	})
+	tests.Assert(t, err == nil, "expected err == nil, got:", err)
+
+	nodeInfo, err = c.NodeInfo(nodeId)
+	tests.Assert(t, err == nil, "expected err == nil, got:", err)
+	tests.Assert(t, len(nodeInfo.Tags) == 3,
+		"expected len(nodeInfo.Tags) == 3, got:", len(nodeInfo.Tags))
+	tests.Assert(t, nodeInfo.Tags["fish"] == "cod",
+		`expected nodeInfo.Tags["fish"] == "cod", got:`,
+		nodeInfo.Tags["fish"])
+	tests.Assert(t, nodeInfo.Tags["metal"] == "nickel",
+		`expected nodeInfo.Tags["metal"] == "nickel", got:`,
+		nodeInfo.Tags["metal"])
+
+	err = c.NodeSetTags(nodeId, &api.TagsChangeRequest{
+		Change: api.DeleteTags,
+		Tags: map[string]string{
+			"weight": "",
+		},
+	})
+	tests.Assert(t, err == nil, "expected err == nil, got:", err)
+
+	nodeInfo, err = c.NodeInfo(nodeId)
+	tests.Assert(t, err == nil, "expected err == nil, got:", err)
+	tests.Assert(t, len(nodeInfo.Tags) == 2,
+		"expected len(nodeInfo.Tags) == 2, got:", len(nodeInfo.Tags))
+	tests.Assert(t, nodeInfo.Tags["fish"] == "cod",
+		`expected nodeInfo.Tags["fish"] == "cod", got:`,
+		nodeInfo.Tags["fish"])
+	tests.Assert(t, nodeInfo.Tags["metal"] == "nickel",
+		`expected nodeInfo.Tags["metal"] == "nickel", got:`,
+		nodeInfo.Tags["metal"])
+
+	err = c.NodeSetTags(nodeId, &api.TagsChangeRequest{
+		Change: api.SetTags,
+		Tags: map[string]string{
+			"metal": "heavy",
+		},
+	})
+	tests.Assert(t, err == nil, "expected err == nil, got:", err)
+
+	nodeInfo, err = c.NodeInfo(nodeId)
+	tests.Assert(t, err == nil, "expected err == nil, got:", err)
+	tests.Assert(t, len(nodeInfo.Tags) == 1,
+		"expected len(nodeInfo.Tags) == 1, got:", len(nodeInfo.Tags))
+	tests.Assert(t, nodeInfo.Tags["metal"] == "heavy",
+		`expected nodeInfo.Tags["metal"] == "heavy", got:`,
+		nodeInfo.Tags["metal"])
+
+	// Delete node
+	err = c.NodeDelete(node.Id)
+	tests.Assert(t, err == nil)
+
+	// Delete cluster
+	err = c.ClusterDelete(cluster.Id)
+	tests.Assert(t, err == nil)
+
+}

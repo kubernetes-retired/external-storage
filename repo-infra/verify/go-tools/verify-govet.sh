@@ -17,4 +17,4 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-go vet -v $(go list ./... | grep -v /vendor/)
+go vet -v $(go list ./... | grep -v nfs/test/e2e)

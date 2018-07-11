@@ -135,6 +135,10 @@ type Webhook struct {
 
 	// Rules describes what operations on what resources/subresources the webhook cares about.
 	// The webhook cares about an operation if it matches _any_ Rule.
+	// However, in order to prevent ValidatingAdmissionWebhooks and MutatingAdmissionWebhooks
+	// from putting the cluster in a state which cannot be recovered from without completely
+	// disabling the plugin, ValidatingAdmissionWebhooks and MutatingAdmissionWebhooks are never called
+	// on admission requests for ValidatingWebhookConfiguration and MutatingWebhookConfiguration objects.
 	Rules []RuleWithOperations `json:"rules,omitempty" protobuf:"bytes,3,rep,name=rules"`
 
 	// FailurePolicy defines how unrecognized errors from the admission endpoint are handled -
@@ -250,9 +254,7 @@ type WebhookClientConfig struct {
 	//
 	// If the webhook is running within the cluster, then you should use `service`.
 	//
-	// If there is only one port open for the service, that port will be
-	// used. If there are multiple ports open, port 443 will be used if it
-	// is open, otherwise it is an error.
+	// Port 443 will be used if it is open, otherwise it is an error.
 	//
 	// +optional
 	Service *ServiceReference `json:"service" protobuf:"bytes,1,opt,name=service"`

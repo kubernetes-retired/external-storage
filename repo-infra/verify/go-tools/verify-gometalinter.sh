@@ -17,16 +17,16 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-cmd='gometalinter --deadline=50s --vendor
+cmd='gometalinter --deadline=180s --vendor
   --cyclo-over=50 --dupl-threshold=100
   --disable-all
-  --enable=vet
   --enable=deadcode
   --enable=vetshadow
   --enable=gocyclo
   --skip=.git
   --skip=.tool
   --skip=vendor
+  --exclude=^vendor\/
   --tests '
 
 skip_file=".golintignore"

@@ -32,12 +32,12 @@ import (
 
 func cloneAndUpdatePV(pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
 	var affinity v1.NodeAffinity
-	err := json.Unmarshal([]byte(pv.Annotations[v1.AlphaStorageNodeAffinityAnnotation]), &affinity)
+	err := json.Unmarshal([]byte(pv.Annotations[common.AlphaStorageNodeAffinityAnnotation]), &affinity)
 	if err != nil {
 		return nil, err
 	}
 	pvClone := pv.DeepCopy()
-	delete(pvClone.Annotations, v1.AlphaStorageNodeAffinityAnnotation)
+	delete(pvClone.Annotations, common.AlphaStorageNodeAffinityAnnotation)
 	pvClone.Spec.NodeAffinity = &v1.VolumeNodeAffinity{
 		Required: affinity.RequiredDuringSchedulingIgnoredDuringExecution,
 	}
@@ -49,13 +49,13 @@ func updateLocalPVAlphaAnn(client *kubernetes.Clientset, pv *v1.PersistentVolume
 		return nil
 	}
 	// check alpha node affinity annotation
-	if len(pv.Annotations) > 0 && pv.Annotations[v1.AlphaStorageNodeAffinityAnnotation] != "" {
+	if len(pv.Annotations) > 0 && pv.Annotations[common.AlphaStorageNodeAffinityAnnotation] != "" {
 		pvClone, err := cloneAndUpdatePV(pv)
 		if err != nil {
 			return err
 		}
 
-		glog.Infof("Updating local PV(%s), node affinity is: %v", pv.Name, pv.Annotations[v1.AlphaStorageNodeAffinityAnnotation])
+		glog.Infof("Updating local PV(%s), node affinity is: %v", pv.Name, pv.Annotations[common.AlphaStorageNodeAffinityAnnotation])
 		_, err = client.CoreV1().PersistentVolumes().Update(pvClone)
 		if err != nil {
 			if errors.IsNotFound(err) {

@@ -11,6 +11,7 @@ package utils
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -33,5 +34,10 @@ func GetErrorFromResponse(r *http.Response) error {
 	if err != nil {
 		return err
 	}
-	return errors.New(strings.TrimSpace(s))
+
+	s = strings.TrimSpace(s)
+	if len(s) == 0 {
+		return fmt.Errorf("server did not provide a message (status %v: %v)", r.StatusCode, http.StatusText(r.StatusCode))
+	}
+	return errors.New(s)
 }
