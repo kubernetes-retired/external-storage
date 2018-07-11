@@ -27,6 +27,7 @@ cmd='gometalinter --deadline=50s --vendor
   --skip=.git
   --skip=.tool
   --skip=vendor
+  --exclude=^vendor\/
   --tests '
 
 skip_file=".golintignore"
