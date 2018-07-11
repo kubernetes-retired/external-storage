@@ -1,5 +1,5 @@
-hash: d4ed6462e0f768c525478e90882e48ae5cd7bf40bad15c1107c5896002b09878
-updated: 2018-07-11T08:58:30.257839278-04:00
+hash: ea8739d892f40a0fef6991b2cf9b2de78f3fd70eaaa97c54a23e8816486871f6
+updated: 2018-07-11T10:39:15.996793649-04:00
 imports:
 - name: cloud.google.com/go
   version: 3b1ae45394a234c385be014e9a488f2bb6eef821
@@ -94,7 +94,7 @@ imports:
 - name: github.com/ghodss/yaml
   version: 73d445a93680fa1a78ae23a5839bad48f32ba1ee
 - name: github.com/go-ini/ini
-  version: cec2bdc49009247305a260b082a18e802d0fe292
+  version: af26abd521cd7697481572fdbc4a53cbea3dde1b
 - name: github.com/go-ozzo/ozzo-validation
   version: 2c68ddd4ffc17941d8e940cb1264f68e1d8f0394
   subpackages:
@@ -185,7 +185,7 @@ imports:
   - json/scanner
   - json/token
 - name: github.com/heketi/heketi
-  version: af26821e74991e7b7236f503e6310ec6b1d91f73
+  version: da761a7d57de0c1bebd0922402f340ecbcd517a2
   subpackages:
   - client/api/go-client
   - pkg/glusterfs/api
@@ -197,7 +197,7 @@ imports:
 - name: github.com/jmespath/go-jmespath
   version: 0b12d6b521d83fc7f755e7cfc1b1fbdd35a01a74
 - name: github.com/json-iterator/go
-  version: 2ddf6d758266fcb080a4f9e054b9f292c85e6798
+  version: ab8a2e0c74be9d3be70b3184d9acc634935ded82
 - name: github.com/kr/fs
   version: 2788f0dbd16903de03cb8186e5c7d97b69ad387b
 - name: github.com/lpabon/godbc
@@ -216,10 +216,6 @@ imports:
   version: bacd9c7ef1dd9b15be4a9909b8ac7a4e313eec94
 - name: github.com/modern-go/reflect2
   version: 05fbef0ca5da472bbf96c9322b84a53edc03c9fd
-- name: github.com/onsi/ginkgo
-  version: 39febac9157b63aeba74d843d6b1c30990f3d7ed
-- name: github.com/onsi/gomega
-  version: 9be84105672ba4433a3b61f1b4d7f9ff8b022293
 - name: github.com/opencontainers/go-digest
   version: a6d0ee40d4207ea02364bd3b9e8e77b9159ba1eb
 - name: github.com/pborman/uuid
@@ -275,12 +271,13 @@ imports:
 - name: github.com/tent/http-link-go
   version: ac974c61c2f990f4115b119354b5e0b47550e888
 - name: golang.org/x/crypto
-  version: 49796115aa4b964c318aad4f3084fdb41e9aa067
+  version: a49355c7e3f8fe157a85be2f77e6e269a0f89602
   subpackages:
   - curve25519
   - ed25519
   - ed25519/internal/edwards25519
   - internal/chacha20
+  - internal/subtle
   - poly1305
   - ssh
   - ssh/terminal
@@ -306,7 +303,7 @@ imports:
   - jws
   - jwt
 - name: golang.org/x/sys
-  version: a2e06a18b0d52d8cb2010e04b372a1965d8e3439
+  version: 1b2967e3c290b7c545b3db0deeda16e9be4f98a2
   subpackages:
   - unix
   - windows
