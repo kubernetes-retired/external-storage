@@ -64,6 +64,9 @@ const (
 	ProvisionerNodeLabelsForPV = "nodeLabelsForPV"
 	// ProvisionerUseAlphaAPI shows if we need to use alpha API, default to false
 	ProvisionerUseAlphaAPI = "useAlphaAPI"
+	// AlphaStorageNodeAffinityAnnotation defines node affinity policies for a PersistentVolume.
+	// Value is a string of the json representation of type NodeAffinity
+	AlphaStorageNodeAffinityAnnotation = "volume.alpha.kubernetes.io/node-affinity"
 	// VolumeDelete copied from k8s.io/kubernetes/pkg/controller/volume/events
 	VolumeDelete = "VolumeDelete"
 
@@ -200,7 +203,7 @@ func CreateLocalPVSpec(config *LocalPVConfig) *v1.PersistentVolume {
 		},
 	}
 	if config.UseAlphaAPI {
-		pv.ObjectMeta.Annotations[v1.AlphaStorageNodeAffinityAnnotation] = config.AffinityAnn
+		pv.ObjectMeta.Annotations[AlphaStorageNodeAffinityAnnotation] = config.AffinityAnn
 	} else {
 		pv.Spec.NodeAffinity = config.NodeAffinity
 	}

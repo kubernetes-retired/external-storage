@@ -11,25 +11,31 @@ import:
   subpackages:
   - pkg/mount
 - package: github.com/golang/glog
+- package: golang.org/x/crypto
+  version: a49355c
+- package: golang.org/x/sys
+  version: 1b2967e 
 - package: github.com/guelfey/go.dbus
 - package: github.com/mitchellh/mapstructure
   version: db1efb5
 - package: gopkg.in/gcfg.v1
   version: v1.2.1
 - package: k8s.io/apiserver
-  version: kubernetes-1.10.0-beta.1
+  version: kubernetes-1.11.0
 - package: k8s.io/apiextensions-apiserver
-  version: kubernetes-1.10.0-beta.1
+  version: kubernetes-1.11.0
 - package: k8s.io/apimachinery
-  version: kubernetes-1.10.0-beta.1
+  version: kubernetes-1.11.0
 - package: k8s.io/client-go
-  version: kubernetes-1.10.0-beta.1
+  version: kubernetes-1.11.0
 - package: k8s.io/api
-  version: kubernetes-1.10.0-beta.1
+  version: kubernetes-1.11.0
 - package: k8s.io/kubernetes
-  version: v1.10.0-beta.0
+  version: v1.11.0
+- package: github.com/json-iterator/go
+  version: 1.1.4
 - package: github.com/heketi/heketi
-  version: af26821e74991e7b7236f503e6310ec6b1d91f73
+  version: v7.0.0
   subpackages:
   - client/api/go-client
   - pkg/glusterfs/api
@@ -48,12 +54,6 @@ import:
   version: 6e5b7d64ea59ae3b8fdf0456e73e6c7638200e31
 - package: github.com/davecgh/go-spew
   version: 04cdfd42973bb9c8589fd6a731800cf222fde1a9
-- package: golang.org/x/sys
-  version: a2e06a18
-  subpackages:
-  - unix
-- package: github.com/onsi/ginkgo
-- package: github.com/onsi/gomega
 - package: github.com/go-ozzo/ozzo-validation
   version: 2c68ddd4ffc17941d8e940cb1264f68e1d8f0394
 - package: github.com/asaskevich/govalidator

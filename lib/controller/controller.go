@@ -1033,7 +1033,7 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 	}
 
 	// Check if this provisioner can provision this claim.
-	if err := ctrl.canProvision(claim); err != nil {
+	if err = ctrl.canProvision(claim); err != nil {
 		ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, "ProvisioningFailed", err.Error())
 		glog.Errorf("Failed to provision volume for claim %q with StorageClass %q: %v",
 			claimToClaimKey(claim), claimClass, err)

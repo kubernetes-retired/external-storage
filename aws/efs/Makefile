@@ -36,7 +36,7 @@ all build:
 		-v $$(pwd):/go/bin \
 		-v $$(pwd)/.go/stdlib:/usr/local/go/pkg/linux_amd64_asdf \
 		-w /go/src/github.com/kubernetes-incubator/external-storage/aws/efs \
-		golang:1.8.3-alpine \
+		golang:1.10.3-alpine \
 		go install -installsuffix "asdf" ./cmd/efs-provisioner
 .PHONY: all build
 
