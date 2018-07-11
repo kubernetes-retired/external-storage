@@ -17,6 +17,7 @@ limitations under the License.
 package discovery
 
 import (
+	"encoding/json"
 	"fmt"
 	"hash/fnv"
 	"path/filepath"
@@ -31,7 +32,6 @@ import (
 	"k8s.io/api/core/v1"
 	storagev1listers "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 )
 
 // Discoverer finds available volumes and creates PVs for them
@@ -73,7 +73,7 @@ func NewDiscoverer(config *common.RuntimeConfig, cleanupTracker *deleter.Cleanup
 			return nil, fmt.Errorf("Failed to generate node affinity: %v", err)
 		}
 		tmpAnnotations := map[string]string{}
-		err = helper.StorageNodeAffinityToAlphaAnnotation(tmpAnnotations, nodeAffinity)
+		err = StorageNodeAffinityToAlphaAnnotation(tmpAnnotations, nodeAffinity)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to convert node affinity to alpha annotation: %v", err)
 		}
@@ -82,7 +82,7 @@ func NewDiscoverer(config *common.RuntimeConfig, cleanupTracker *deleter.Cleanup
 			Labels:          labelMap,
 			CleanupTracker:  cleanupTracker,
 			classLister:     sharedInformer.Lister(),
-			nodeAffinityAnn: tmpAnnotations[v1.AlphaStorageNodeAffinityAnnotation]}, nil
+			nodeAffinityAnn: tmpAnnotations[common.AlphaStorageNodeAffinityAnnotation]}, nil
 	}
 
 	volumeNodeAffinity, err := generateVolumeNodeAffinity(config.Node)
@@ -344,4 +344,32 @@ func roundDownCapacityPretty(capacityBytes int64) int64 {
 		}
 	}
 	return capacityBytes
+}
+
+// GetStorageNodeAffinityFromAnnotation gets the json serialized data from PersistentVolume.Annotations
+// and converts it to the NodeAffinity type in core.
+func GetStorageNodeAffinityFromAnnotation(annotations map[string]string) (*v1.NodeAffinity, error) {
+	if len(annotations) > 0 && annotations[common.AlphaStorageNodeAffinityAnnotation] != "" {
+		var affinity v1.NodeAffinity
+		err := json.Unmarshal([]byte(annotations[common.AlphaStorageNodeAffinityAnnotation]), &affinity)
+		if err != nil {
+			return nil, err
+		}
+		return &affinity, nil
+	}
+	return nil, nil
+}
+
+// StorageNodeAffinityToAlphaAnnotation converts NodeAffinity type to Alpha annotation for use in PersistentVolumes
+func StorageNodeAffinityToAlphaAnnotation(annotations map[string]string, affinity *v1.NodeAffinity) error {
+	if affinity == nil {
+		return nil
+	}
+
+	json, err := json.Marshal(*affinity)
+	if err != nil {
+		return err
+	}
+	annotations[common.AlphaStorageNodeAffinityAnnotation] = string(json)
+	return nil
 }

@@ -36,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/util/mount"
 )
 
@@ -378,7 +377,7 @@ func verifyNodeAffinity(t *testing.T, pv *v1.PersistentVolume) {
 
 	volumeNodeAffinity = pv.Spec.NodeAffinity
 	if volumeNodeAffinity == nil {
-		nodeAffinity, err = helper.GetStorageNodeAffinityFromAnnotation(pv.Annotations)
+		nodeAffinity, err = GetStorageNodeAffinityFromAnnotation(pv.Annotations)
 		if err != nil {
 			t.Errorf("Could not get node affinity from annotation: %v", err)
 			return

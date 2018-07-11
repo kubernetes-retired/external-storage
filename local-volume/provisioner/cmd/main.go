@@ -52,7 +52,7 @@ func main() {
 
 	provisionerConfig := common.ProvisionerConfiguration{
 		StorageClassConfig: make(map[string]common.MountConfig),
-		MinResyncPeriod:    metav1.Duration{5 * time.Minute},
+		MinResyncPeriod:    metav1.Duration{Duration: 5 * time.Minute},
 	}
 	if err := common.LoadProvisionerConfigs(common.ProvisionerConfigPath, &provisionerConfig); err != nil {
 		glog.Fatalf("Error parsing Provisioner's configuration: %#v. Exiting...\n", err)

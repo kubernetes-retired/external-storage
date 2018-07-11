@@ -24,7 +24,7 @@ import (
 	"github.com/golang/glog"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/util/fs"
 )
 
 // VolumeUtil is an interface for local filesystem operations
@@ -115,7 +115,7 @@ func (u *volumeUtil) DeleteContents(fullPath string) error {
 // fullPath is the pathname of any file within the mounted filesystem. Capacity
 // returned here is total capacity.
 func (u *volumeUtil) GetFsCapacityByte(fullPath string) (int64, error) {
-	_, capacity, _, _, _, _, err := util.FsInfo(fullPath)
+	_, capacity, _, _, _, _, err := fs.FsInfo(fullPath)
 	return capacity, err
 }
 
