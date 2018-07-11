@@ -556,10 +556,10 @@ func getClusterNodes(cli *gcli.Client, cluster string) (dynamicHostIps []string,
 	// of the cluster on which provisioned volume belongs to, as there can be multiple
 	// clusters.
 	for _, node := range clusterinfo.Nodes {
-		nodei, err := cli.NodeInfo(string(node))
-		if err != nil {
-			glog.Errorf("failed to get host ipaddress: %v", err)
-			return nil, fmt.Errorf("failed to get host ipaddress: %v", err)
+		nodei, err2 := cli.NodeInfo(string(node))
+		if err2 != nil {
+			glog.Errorf("failed to get host ipaddress: %v", err2)
+			return nil, fmt.Errorf("failed to get host ipaddress: %v", err2)
 		}
 		ipaddr := dstrings.Join(nodei.NodeAddRequest.Hostnames.Storage, "")
 		dynamicHostIps = append(dynamicHostIps, ipaddr)

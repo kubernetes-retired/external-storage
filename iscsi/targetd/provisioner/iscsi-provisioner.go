@@ -236,15 +236,15 @@ func (p *iscsiProvisioner) createVolume(options controller.VolumeOptions) (vol s
 	chapCredentials := &chapSessionCredentials{}
 	//read chap session authentication credentials
 	if getBool(options.Parameters["chapAuthSession"]) {
-		prop, err := properties.LoadFile(viper.GetString("session-chap-credential-file-path"), properties.UTF8)
-		if err != nil {
-			log.Warnln(err)
-			return "", 0, "", err
+		prop, err2 := properties.LoadFile(viper.GetString("session-chap-credential-file-path"), properties.UTF8)
+		if err2 != nil {
+			log.Warnln(err2)
+			return "", 0, "", err2
 		}
-		err = prop.Decode(chapCredentials)
-		if err != nil {
-			log.Warnln(err)
-			return "", 0, "", err
+		err2 = prop.Decode(chapCredentials)
+		if err2 != nil {
+			log.Warnln(err2)
+			return "", 0, "", err2
 		}
 	}
 
