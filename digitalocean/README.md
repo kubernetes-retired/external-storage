@@ -1,5 +1,15 @@
 # Kubernetes DigitalOcean provisioner
 
+> :warning:
+>
+> You should **NOT** use this provisioner for new clusters!
+>
+> It is recommended to switch to the official [DigitalOcean CSI driver](https://github.com/digitalocean/csi-digitalocean).
+>
+> The provisioner will be updated on a best-effort basis, but eventually it will be removed (k8s ~1.13-1.15).
+>
+> :warning:
+
 This is an simple provisioner for DigitalOcean [Block Storage](https://www.digitalocean.com/products/storage/).
 
 **Deploy**
