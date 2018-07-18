@@ -189,7 +189,7 @@ func (p *rbdProvisioner) Delete(volume *v1.PersistentVolume) error {
 	return p.rbdUtil.DeleteImage(image, opts)
 }
 
-// Look up the cluster dns service by label "kube-dns"
+// Look up the cluster dns service by label "coredns", falling back to "kube-dns" if not found
 func findDNSIP(p *rbdProvisioner) (dnsip string) {
 	// find DNS server address through client API
 	// cache result in rbdProvisioner
