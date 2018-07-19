@@ -91,8 +91,8 @@ type UserConfig struct {
 	UseAlphaAPI bool
 	// UseJobForCleaning indicates if Jobs should be spawned for cleaning block devices (as opposed to process),.
 	UseJobForCleaning bool
-	// Namespace of this Pod (optional)
-	Namespace string
+	// Namespace to create jobs (optional)
+	JobNamespace string
 	// Image of container to use for jobs (optional)
 	JobContainerImage string
 	// MinResyncPeriod is minimum resync period. Resync period in reflectors

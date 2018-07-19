@@ -65,10 +65,10 @@ func main() {
 		glog.Fatalf("MY_NODE_NAME environment variable not set\n")
 	}
 
-	namespace := os.Getenv("MY_NAMESPACE")
-	if namespace == "" {
-		glog.Warningf("MY_NAMESPACE environment variable not set, will be set to default.\n")
-		namespace = "default"
+	jobNamespace := os.Getenv("JOB_NAMESPACE")
+	if jobNamespace == "" {
+		glog.Warningf("JOB_NAMESPACE environment variable not set, will be set to default.\n")
+		jobNamespace = "default"
 	}
 
 	jobImage := os.Getenv("JOB_CONTAINER_IMAGE")
@@ -88,7 +88,7 @@ func main() {
 		UseAlphaAPI:       provisionerConfig.UseAlphaAPI,
 		UseJobForCleaning: provisionerConfig.UseJobForCleaning,
 		MinResyncPeriod:   provisionerConfig.MinResyncPeriod,
-		Namespace:         namespace,
+		JobNamespace:      jobNamespace,
 		JobContainerImage: jobImage,
 	})
 

@@ -74,7 +74,7 @@ type jobController struct {
 
 // NewJobController instantiates  a new job controller.
 func NewJobController(labelmap map[string]string, config *common.RuntimeConfig) (JobController, error) {
-	namespace := config.Namespace
+	namespace := config.JobNamespace
 	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 	labelset := labels.Set(labelmap)
 	optionsModifier := func(options *meta_v1.ListOptions) {
