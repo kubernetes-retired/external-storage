@@ -340,7 +340,7 @@ func (d *Deleter) runJob(pv *v1.PersistentVolume, blkdevPath string, config comm
 	if d.JobContainerImage == "" {
 		return fmt.Errorf("cannot run cleanup job without specifying job image name in the environment variable")
 	}
-	job := NewCleanupJob(pv, d.JobContainerImage, d.Node.Name, d.Namespace, blkdevPath, config)
+	job := NewCleanupJob(pv, d.JobContainerImage, d.Node.Name, d.JobNamespace, blkdevPath, config)
 	return d.RuntimeConfig.APIUtil.CreateJob(job)
 }
 

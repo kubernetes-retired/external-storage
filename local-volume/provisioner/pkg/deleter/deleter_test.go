@@ -571,7 +571,7 @@ func testSetup(t *testing.T, config *testConfig, cleanupCmd []string, useJobForC
 		Node:              &v1.Node{ObjectMeta: meta_v1.ObjectMeta{Name: "somehost.acme.com"}},
 		UseJobForCleaning: useJobForCleaning,
 		JobContainerImage: containerImage,
-		Namespace:         ns,
+		JobNamespace:      ns,
 	}
 
 	// set buffer size big enough, not all cases care about recorder.

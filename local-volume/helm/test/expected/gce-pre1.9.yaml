@@ -39,7 +39,7 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: spec.nodeName
-          - name: MY_NAMESPACE
+          - name: JOB_NAMESPACE
             valueFrom:
               fieldRef:
                 fieldPath: metadata.namespace
