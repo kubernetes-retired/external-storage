@@ -29,3 +29,15 @@ function validateBlockDevice {
     fi
 }
 
+function validateFilesystem {
+    if [ -z ${LOCAL_PV_FILESYSTEM+x} ]
+    then
+        errorExit "Environment variable LOCAL_PV_FILESYSTEM has not been set"
+    fi
+
+    if [ ! -d "$LOCAL_PV_FILESYSTEM" ]
+    then
+        errorExit "$LOCAL_PV_FILESYSTEM is not a filesystem directory."
+    fi
+}
+
