@@ -105,12 +105,10 @@ func (d *Deleter) DeletePVs() {
 func (d *Deleter) getVolModeAndRunJob(pv *v1.PersistentVolume) (v1.PersistentVolumeMode, bool) {
 	// Default is filesystem mode, so even if volume mode is not specified, mode should be filesystem.
 	volMode := v1.PersistentVolumeFilesystem
-	runjob := false
 	if pv.Spec.VolumeMode != nil && *pv.Spec.VolumeMode == v1.PersistentVolumeBlock {
 		volMode = v1.PersistentVolumeBlock
-		runjob = d.RuntimeConfig.UseJobForCleaning
 	}
-	return volMode, runjob
+	return volMode, d.RuntimeConfig.UseJobForCleaning
 }
 
 func (d *Deleter) deletePV(pv *v1.PersistentVolume) error {
@@ -179,9 +177,16 @@ func (d *Deleter) deletePV(pv *v1.PersistentVolume) error {
 		return fmt.Errorf("Unexpected state %d for pv %s", state, pv.Name)
 	}
 
+	if volMode == v1.PersistentVolumeBlock {
+		if len(config.BlockCleanerCommand) < 1 {
+			return fmt.Errorf("Blockcleaner command was empty for pv %q mountPath %s but mount dir is %s", pv.Name,
+				mountPath, config.MountDir)
+		}
+	}
+
 	if runjob {
 		// If we are dealing with block volumes and using jobs based cleaning for it.
-		return d.runJob(pv, mountPath, config)
+		return d.runJob(pv, volMode, mountPath, config)
 	}
 
 	return d.runProcess(pv, volMode, mountPath, config)
@@ -245,13 +250,6 @@ func (d *Deleter) cleanFilePV(pv *v1.PersistentVolume, mountPath string, config 
 }
 
 func (d *Deleter) cleanBlockPV(pv *v1.PersistentVolume, blkdevPath string, config common.MountConfig) error {
-	if len(config.BlockCleanerCommand) < 1 {
-		err := fmt.Errorf("Blockcleaner command was empty for pv %q ountPath %s but mount dir is %s", pv.Name,
-			blkdevPath, config.MountDir)
-		glog.Error(err)
-		return err
-	}
-
 	cleaningInfo := fmt.Errorf("Starting cleanup of Block PV %q, this may take a while", pv.Name)
 	d.RuntimeConfig.Recorder.Eventf(pv, v1.EventTypeNormal, common.VolumeDelete, cleaningInfo.Error())
 	glog.Infof("Deleting PV block volume %q device hostpath %q, mountpath %q", pv.Name, pv.Spec.Local.Path,
@@ -336,11 +334,14 @@ func (d *Deleter) execScript(pvName string, blkdevPath string, exe string, exeAr
 // of successful run are not as interesting. Long term, we might want to fetch the logs of the successful Jobs too,
 // before deleting them, but for the initial implementation we will keep things simple and perhaps decide the
 // enhancement based on user feedback.
-func (d *Deleter) runJob(pv *v1.PersistentVolume, blkdevPath string, config common.MountConfig) error {
+func (d *Deleter) runJob(pv *v1.PersistentVolume, volMode v1.PersistentVolumeMode, mountPath string, config common.MountConfig) error {
 	if d.JobContainerImage == "" {
 		return fmt.Errorf("cannot run cleanup job without specifying job image name in the environment variable")
 	}
-	job := NewCleanupJob(pv, d.JobContainerImage, d.Node.Name, d.Namespace, blkdevPath, config)
+	job, err := NewCleanupJob(pv, volMode, d.JobContainerImage, d.Node.Name, d.Namespace, mountPath, config)
+	if err != nil {
+		return err
+	}
 	return d.RuntimeConfig.APIUtil.CreateJob(job)
 }
 
