@@ -72,6 +72,8 @@ const (
 
 	// LocalPVEnv will contain the device path when script is invoked
 	LocalPVEnv = "LOCAL_PV_BLKDEVICE"
+	// LocalFilesystemEnv will contain the filesystm path when script is invoked
+	LocalFilesystemEnv = "LOCAL_PV_FILESYSTEM"
 	// KubeConfigEnv will (optionally) specify the location of kubeconfig file on the node.
 	KubeConfigEnv = "KUBECONFIG"
 
