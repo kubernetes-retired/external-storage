@@ -4,8 +4,8 @@ metadata:
   name: glusterfile-provisioner
 spec: 
   containers: 
-    env:
-      name: PROVISIONER_NAME
+  - env:
+    - name: PROVISIONER_NAME
       value: gluster.org/glusterfile
     image: "quay.io/external_storage/glusterfile-provisioner:latest"
     name: glusterfile-provisioner
