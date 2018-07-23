@@ -189,22 +189,35 @@ func (p *rbdProvisioner) Delete(volume *v1.PersistentVolume) error {
 	return p.rbdUtil.DeleteImage(image, opts)
 }
 
-// Look up the cluster dns service by label "kube-dns"
+// Look up the cluster dns service by label "coredns", falling back to "kube-dns" if not found
 func findDNSIP(p *rbdProvisioner) (dnsip string) {
 	// find DNS server address through client API
 	// cache result in rbdProvisioner
+	var dnssvc *v1.Service
+
 	if p.dnsip == "" {
-		dnssvc, err := p.client.CoreV1().Services(metav1.NamespaceSystem).Get("kube-dns", metav1.GetOptions{})
+		coredns, err := p.client.CoreV1().Services(metav1.NamespaceSystem).Get("coredns", metav1.GetOptions{})
+
 		if err != nil {
-			glog.Errorf("error getting kube-dns service: %v\n", err)
-			return ""
+			glog.Warningf("error getting coredns service: %v. Falling back to kube-dns\n", err)
+			kubedns, err := p.client.CoreV1().Services(metav1.NamespaceSystem).Get("kube-dns", metav1.GetOptions{})
+			if err != nil {
+				glog.Errorf("error getting kube-dns service: %v\n", err)
+				return ""
+			}
+			dnssvc = kubedns
+		} else {
+			dnssvc = coredns
 		}
+
 		if len(dnssvc.Spec.ClusterIP) == 0 {
-			glog.Errorf("kube-dns service ClusterIP bad\n")
+			glog.Errorf("DNS service ClusterIP bad\n")
 			return ""
 		}
+
 		p.dnsip = dnssvc.Spec.ClusterIP
 	}
+
 	return p.dnsip
 }
 
