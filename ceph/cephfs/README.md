@@ -25,9 +25,9 @@ See https://kubernetes.io/.
 * Create a Ceph admin secret
 
 ```bash
-ceph auth get client.admin 2>&1 |grep "key = " |awk '{print  $3'} |xargs echo -n > /tmp/secret
+ceph auth get-key client.admin > /tmp/secret
 kubectl create ns cephfs
-kubectl create secret generic ceph-secret-admin --from-file=/tmp/secret --namespace=cephfs
+kubectl create secret generic ceph-secret-admin --from-file=/tmp/secret --namespace=kube-system
 ```
 
 * Start CephFS provisioner
@@ -35,7 +35,7 @@ kubectl create secret generic ceph-secret-admin --from-file=/tmp/secret --namesp
 The following example uses `cephfs-provisioner-1` as the identity for the instance and assumes kubeconfig is at `/root/.kube`. The identity should remain the same if the provisioner restarts. If there are multiple provisioners, each should have a different identity.
 
 ```bash
-docker run -ti -v /root/.kube:/kube -v /var/run/kubernetes:/var/run/kubernetes --privileged --net=host  cephfs-provisioner /usr/local/bin/cephfs-provisioner -master=http://127.0.0.1:8080 -kubeconfig=/kube/config -id=cephfs-provisioner-1
+docker run -ti -v /root/.kube:/kube -v /var/run/kubernetes:/var/run/kubernetes --privileged --net=host quay.io/external_storage/cephfs-provisioner /usr/local/bin/cephfs-provisioner -master=http://127.0.0.1:8080 -kubeconfig=/kube/config -id=cephfs-provisioner-1
 ```
 
 Alternatively, deploy it in kubernetes, see [deployment](deploy/README.md).
