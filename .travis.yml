@@ -30,4 +30,4 @@ deploy:
     script: ./deploy.sh
     on:
       tags: true
-      condition: $TEST_SUITE = linux-local-volume
+      condition: $TEST_SUITE = linux-local-volume && $TRAVIS_OS_NAME = linux
