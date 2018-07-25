@@ -23,7 +23,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/utils/exec"
+	"strconv"
 )
 
 const (
@@ -108,6 +110,14 @@ func (p *flexProvisioner) Provision(options controller.VolumeOptions) (*v1.Persi
 func (p *flexProvisioner) createVolume(volumeOptions controller.VolumeOptions) error {
 	extraOptions := map[string]string{}
 	extraOptions[optionPVorVolumeName] = volumeOptions.PVName
+
+	capacity := volumeOptions.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
+	requestBytes := capacity.Value()
+	requestMiB := int(util.RoundUpSize(requestBytes, 1024*1024))
+	requestGiB := int(util.RoundUpSize(requestBytes, 1024*1024*1024))
+	extraOptions["requestBytes"] = strconv.FormatInt(requestBytes, 10)
+	extraOptions["requestMiB"] = strconv.Itoa(requestMiB)
+	extraOptions["requestGiB"] = strconv.Itoa(requestGiB)
 
 	call := p.NewDriverCall(p.execCommand, provisionCmd)
 	call.AppendSpec(volumeOptions.Parameters, extraOptions)
