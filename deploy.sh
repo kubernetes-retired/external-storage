@@ -38,7 +38,7 @@ openebs-provisioner
 rbd-provisioner
 )
 
-regex="^($(IFS=\|; echo "${provisioners[*]}"))-(v[0-9]+\.[0-9]+\.[0-9]+-k8s1.10)$"
+regex="^($(IFS=\|; echo "${provisioners[*]}"))-(v[0-9]+\.[0-9]+\.[0-9]+-k8s1.[0-9]+)$"
 if [[ "${TRAVIS_TAG}" =~ $regex ]]; then
 	PROVISIONER="${BASH_REMATCH[1]}"
 	export VERSION="${BASH_REMATCH[2]}"
