@@ -18,6 +18,12 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+# Skip duplicate build and test runs through the CI, that occur because we are now running on osx and linux.
+# Skipping these steps saves time and travis-ci resources.
+if [ "$TRAVIS_OS_NAME" = "osx" ]; then
+  exit 0
+fi
+
 export REGISTRY=quay.io/external_storage/
 
 docker login -u "${QUAY_USERNAME}" -p "${QUAY_PASSWORD}" quay.io
