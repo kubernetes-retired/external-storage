@@ -18,6 +18,12 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+# Skip duplicate build and test runs through the CI, that occur because we are now running on osx and linux.
+# Skipping these steps saves time and travis-ci resources.
+if [ "$TRAVIS_OS_NAME" = "osx" ]; then
+  exit 0
+fi
+
 export REGISTRY=quay.io/external_storage/
 
 docker login -u "${QUAY_USERNAME}" -p "${QUAY_PASSWORD}" quay.io
@@ -38,7 +44,7 @@ openebs-provisioner
 rbd-provisioner
 )
 
-regex="^($(IFS=\|; echo "${provisioners[*]}"))-(v[0-9]+\.[0-9]+\.[0-9]+-k8s1.10)$"
+regex="^($(IFS=\|; echo "${provisioners[*]}"))-(v[0-9]+\.[0-9]+\.[0-9]+-k8s1.[0-9]+)$"
 if [[ "${TRAVIS_TAG}" =~ $regex ]]; then
 	PROVISIONER="${BASH_REMATCH[1]}"
 	export VERSION="${BASH_REMATCH[2]}"
