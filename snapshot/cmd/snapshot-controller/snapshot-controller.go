@@ -125,13 +125,13 @@ func buildVolumePlugins() {
 				gcePlugin := gcepd.RegisterPlugin()
 				gcePlugin.Init(cloud)
 				volumePlugins[gcepd.GetPluginName()] = gcePlugin
-				glog.Info("Register cloudprovider %s", gcepd.GetPluginName())
+				glog.Infof("Register cloudprovider %s", gcepd.GetPluginName())
 			}
 			if *cloudProvider == openstack.ProviderName {
 				cinderPlugin := cinder.RegisterPlugin()
 				cinderPlugin.Init(cloud)
 				volumePlugins[cinder.GetPluginName()] = cinderPlugin
-				glog.Info("Register cloudprovider %s", cinder.GetPluginName())
+				glog.Infof("Register cloudprovider %s", cinder.GetPluginName())
 			}
 		} else {
 			glog.Warningf("failed to initialize cloudprovider: %v, supported cloudproviders are %#v", err, cloudprovider.CloudProviders())
