@@ -937,6 +937,8 @@ func main() {
 		provName,
 		glusterBlockProvisioner,
 		serverVersion.GitVersion,
+		controller.Threadiness(2),
+		controller.FailedProvisionThreshold(30),
 	)
 
 	pc.Run(wait.NeverStop)
