@@ -182,7 +182,7 @@ func (c *snapshotController) onSnapshotAdd(obj interface{}) {
 	// the actual snapshot
 	snapshotObj, ok := obj.(*crdv1.VolumeSnapshot)
 	if !ok {
-		glog.Warning("expecting type VolumeSnapshot but received type %T", obj)
+		glog.Warningf("expecting type VolumeSnapshot but received type %T", obj)
 		return
 	}
 	snapshot := snapshotObj.DeepCopy()
