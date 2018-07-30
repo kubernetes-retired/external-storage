@@ -428,6 +428,7 @@ func NewProvisionController(
 		identity:                      identity,
 		eventRecorder:                 eventRecorder,
 		resyncPeriod:                  DefaultResyncPeriod,
+		exponentialBackOffOnError:     DefaultExponentialBackOffOnError,
 		threadiness:                   DefaultThreadiness,
 		createProvisionedPVRetryCount: DefaultCreateProvisionedPVRetryCount,
 		createProvisionedPVInterval:   DefaultCreateProvisionedPVInterval,
