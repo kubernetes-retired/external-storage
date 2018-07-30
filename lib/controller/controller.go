@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -47,6 +48,8 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/leaderelection"
+	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/client-go/util/workqueue"
@@ -611,46 +614,82 @@ func (ctrl *ProvisionController) forgetWork(queue workqueue.RateLimitingInterfac
 
 // Run starts all of this controller's control loops
 func (ctrl *ProvisionController) Run(stopCh <-chan struct{}) {
-	glog.Infof("Starting provisioner controller %s!", string(ctrl.identity))
-	defer utilruntime.HandleCrash()
-	defer ctrl.claimQueue.ShutDown()
-	defer ctrl.volumeQueue.ShutDown()
 
-	ctrl.hasRunLock.Lock()
-	ctrl.hasRun = true
-	ctrl.hasRunLock.Unlock()
-	if ctrl.metricsPort > 0 {
-		prometheus.MustRegister([]prometheus.Collector{
-			metrics.PersistentVolumeClaimProvisionTotal,
-			metrics.PersistentVolumeClaimProvisionFailedTotal,
-			metrics.PersistentVolumeClaimProvisionDurationSeconds,
-			metrics.PersistentVolumeDeleteTotal,
-			metrics.PersistentVolumeDeleteFailedTotal,
-			metrics.PersistentVolumeDeleteDurationSeconds,
-		}...)
-		http.Handle(ctrl.metricsPath, promhttp.Handler())
-		address := net.JoinHostPort(ctrl.metricsAddress, strconv.FormatInt(int64(ctrl.metricsPort), 10))
-		glog.Infof("Starting metrics server at %s\n", address)
-		go wait.Forever(func() {
-			err := http.ListenAndServe(address, nil)
-			if err != nil {
-				glog.Errorf("Failed to listen on %s: %v", address, err)
-			}
-		}, 5*time.Second)
+	run := func(stopCh <-chan struct{}) {
+		glog.Infof("Starting provisioner controller %s!", string(ctrl.identity))
+		defer utilruntime.HandleCrash()
+		defer ctrl.claimQueue.ShutDown()
+		defer ctrl.volumeQueue.ShutDown()
+
+		ctrl.hasRunLock.Lock()
+		ctrl.hasRun = true
+		ctrl.hasRunLock.Unlock()
+		if ctrl.metricsPort > 0 {
+			prometheus.MustRegister([]prometheus.Collector{
+				metrics.PersistentVolumeClaimProvisionTotal,
+				metrics.PersistentVolumeClaimProvisionFailedTotal,
+				metrics.PersistentVolumeClaimProvisionDurationSeconds,
+				metrics.PersistentVolumeDeleteTotal,
+				metrics.PersistentVolumeDeleteFailedTotal,
+				metrics.PersistentVolumeDeleteDurationSeconds,
+			}...)
+			http.Handle(ctrl.metricsPath, promhttp.Handler())
+			address := net.JoinHostPort(ctrl.metricsAddress, strconv.FormatInt(int64(ctrl.metricsPort), 10))
+			glog.Infof("Starting metrics server at %s\n", address)
+			go wait.Forever(func() {
+				err := http.ListenAndServe(address, nil)
+				if err != nil {
+					glog.Errorf("Failed to listen on %s: %v", address, err)
+				}
+			}, 5*time.Second)
+		}
+
+		go ctrl.claimController.Run(stopCh)
+		go ctrl.volumeController.Run(stopCh)
+		go ctrl.classController.Run(stopCh)
+
+		for i := 0; i < ctrl.threadiness; i++ {
+			go wait.Until(ctrl.runClaimWorker, time.Second, stopCh)
+			go wait.Until(ctrl.runVolumeWorker, time.Second, stopCh)
+		}
+
+		glog.Infof("Started provisioner controller %s!", string(ctrl.identity))
+
+		<-stopCh
 	}
 
-	go ctrl.claimController.Run(stopCh)
-	go ctrl.volumeController.Run(stopCh)
-	go ctrl.classController.Run(stopCh)
-
-	for i := 0; i < ctrl.threadiness; i++ {
-		go wait.Until(ctrl.runClaimWorker, time.Second, stopCh)
-		go wait.Until(ctrl.runVolumeWorker, time.Second, stopCh)
+	id, err := os.Hostname()
+	if err != nil {
+		glog.Fatalf("error getting hostname: %v", err)
 	}
 
-	glog.Infof("Started provisioner controller %s!", string(ctrl.identity))
+	// add a uniquifier so that two processes on the same host don't accidentally both become active
+	id = id + "_" + string(uuid.NewUUID())
+	rl, err := resourcelock.New("endpoints",
+		"kube-system",
+		strings.Replace(ctrl.provisionerName, "/", "-", -1),
+		ctrl.client.CoreV1(),
+		resourcelock.ResourceLockConfig{
+			Identity:      id,
+			EventRecorder: ctrl.eventRecorder,
+		})
+	if err != nil {
+		glog.Fatalf("error creating lock: %v", err)
+	}
 
-	<-stopCh
+	leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{
+		Lock:          rl,
+		LeaseDuration: ctrl.leaseDuration,
+		RenewDeadline: ctrl.renewDeadline,
+		RetryPeriod:   ctrl.retryPeriod,
+		Callbacks: leaderelection.LeaderCallbacks{
+			OnStartedLeading: run,
+			OnStoppedLeading: func() {
+				glog.Fatalf("leaderelection lost")
+			},
+		},
+	})
+	panic("unreachable")
 }
 
 func (ctrl *ProvisionController) runClaimWorker() {
