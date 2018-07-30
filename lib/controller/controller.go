@@ -28,7 +28,6 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller/metrics"
-	"github.com/kubernetes-incubator/external-storage/lib/leaderelection"
 	rl "github.com/kubernetes-incubator/external-storage/lib/leaderelection/resourcelock"
 	"github.com/kubernetes-incubator/external-storage/lib/util"
 	"github.com/prometheus/client_golang/prometheus"
@@ -145,10 +144,6 @@ type ProvisionController struct {
 	// when multiple controllers are running: they race to lock (lead) every PVC
 	// so that only one calls Provision for it (saving API calls, CPU cycles...)
 	leaseDuration, renewDeadline, retryPeriod, termLimit time.Duration
-	// Map of claim UID to LeaderElector: for checking if this controller
-	// is the leader of a given claim
-	leaderElectors      map[types.UID]*leaderelection.LeaderElector
-	leaderElectorsMutex *sync.Mutex
 
 	hasRun     bool
 	hasRunLock *sync.Mutex
@@ -445,8 +440,6 @@ func NewProvisionController(
 		metricsPort:                   DefaultMetricsPort,
 		metricsAddress:                DefaultMetricsAddress,
 		metricsPath:                   DefaultMetricsPath,
-		leaderElectors:                make(map[types.UID]*leaderelection.LeaderElector),
-		leaderElectorsMutex:           &sync.Mutex{},
 		hasRun:                        false,
 		hasRunLock:                    &sync.Mutex{},
 	}
@@ -789,16 +782,9 @@ func (ctrl *ProvisionController) syncClaim(obj interface{}) error {
 	}
 
 	if ctrl.shouldProvision(claim) {
-		ctrl.leaderElectorsMutex.Lock()
-		le, ok := ctrl.leaderElectors[claim.UID]
-		ctrl.leaderElectorsMutex.Unlock()
-		if ok && le.IsLeader() {
-			startTime := time.Now()
-			err := ctrl.provisionClaimOperation(claim)
-			ctrl.updateProvisionStats(claim, err, startTime)
-			return err
-		}
-		err := ctrl.lockProvisionClaimOperation(claim)
+		startTime := time.Now()
+		err := ctrl.provisionClaimOperation(claim)
+		ctrl.updateProvisionStats(claim, err, startTime)
 		return err
 	}
 	return nil
@@ -913,68 +899,6 @@ func (ctrl *ProvisionController) canProvision(claim *v1.PersistentVolumeClaim) e
 	return nil
 }
 
-// lockProvisionClaimOperation wraps provisionClaimOperation. In case other
-// controllers are serving the same claims, to prevent them all from creating
-// volumes for a claim & racing to submit their PV, each controller creates a
-// LeaderElector to instead race for the leadership (lock), where only the
-// leader is tasked with provisioning & may try to do so. Returns error, which
-// indicates whether provisioning should be retried (requeue the claim) or not
-func (ctrl *ProvisionController) lockProvisionClaimOperation(claim *v1.PersistentVolumeClaim) error {
-	rl := rl.ProvisionPVCLock{
-		PVCMeta: claim.ObjectMeta,
-		Client:  ctrl.client,
-		LockConfig: rl.Config{
-			Identity:      string(ctrl.identity),
-			EventRecorder: ctrl.eventRecorder,
-		},
-	}
-	var provisionErr error
-	le, err := leaderelection.NewLeaderElector(leaderelection.Config{
-		Lock:          &rl,
-		LeaseDuration: ctrl.leaseDuration,
-		RenewDeadline: ctrl.renewDeadline,
-		RetryPeriod:   ctrl.retryPeriod,
-		TermLimit:     ctrl.termLimit,
-		Callbacks: leaderelection.LeaderCallbacks{
-			OnStartedLeading: func(_ <-chan struct{}) {
-				startTime := time.Now()
-				provisionErr = ctrl.provisionClaimOperation(claim)
-				ctrl.updateProvisionStats(claim, provisionErr, startTime)
-			},
-			OnStoppedLeading: func() {
-			},
-		},
-	})
-	if err != nil {
-		glog.Errorf("Error creating LeaderElector, can't provision for claim %q: %v", claimToClaimKey(claim), err)
-		return err
-	}
-
-	ctrl.leaderElectorsMutex.Lock()
-	ctrl.leaderElectors[claim.UID] = le
-	ctrl.leaderElectorsMutex.Unlock()
-
-	// To determine when to stop trying to acquire/renew the lock, watch for
-	// provisioning success/failure. (The leader could get the result of its
-	// operation but it has to watch anyway)
-	stopCh := make(chan struct{})
-	successCh, err := ctrl.watchProvisioning(claim, stopCh)
-	if err != nil {
-		glog.Errorf("Error watching for provisioning success, can't provision for claim %q: %v", claimToClaimKey(claim), err)
-		return err
-	}
-
-	le.Run(successCh)
-
-	close(stopCh)
-
-	ctrl.leaderElectorsMutex.Lock()
-	delete(ctrl.leaderElectors, claim.UID)
-	ctrl.leaderElectorsMutex.Unlock()
-
-	return provisionErr
-}
-
 func (ctrl *ProvisionController) updateProvisionStats(claim *v1.PersistentVolumeClaim, err error, startTime time.Time) {
 	class := ""
 	if claim.Spec.StorageClassName != nil {
@@ -1009,9 +933,13 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 	//  A previous doProvisionClaim may just have finished while we were waiting for
 	//  the locks. Check that PV (with deterministic name) hasn't been provisioned
 	//  yet.
+	namespace := claim.GetNamespace()
 	pvName := ctrl.getProvisionedVolumeNameForClaim(claim)
-	volume, err := ctrl.client.CoreV1().PersistentVolumes().Get(pvName, metav1.GetOptions{})
-	if err == nil && volume != nil {
+	_, exists, err := ctrl.volumes.GetByKey(fmt.Sprintf("%s/%s", namespace, pvName))
+	if err != nil {
+		glog.Errorf("Error getting claim %q's volume: %v", claimToClaimKey(claim), err)
+		return nil
+	} else if exists {
 		// Volume has been already provisioned, nothing to do.
 		glog.V(4).Infof("provisionClaimOperation [%s]: volume already exists, skipping", claimToClaimKey(claim))
 		return nil
@@ -1093,7 +1021,7 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 
 	ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, "Provisioning", fmt.Sprintf("External provisioner is provisioning volume for claim %q", claimToClaimKey(claim)))
 
-	volume, err = ctrl.provisioner.Provision(options)
+	volume, err := ctrl.provisioner.Provision(options)
 	if err != nil {
 		if ierr, ok := err.(*IgnoredError); ok {
 			// Provision ignored, do nothing and hope another provisioner will provision it.
@@ -1166,159 +1094,6 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 	return nil
 }
 
-// watchProvisioning returns a channel to which it sends the results of all
-// provisioning attempts for the given claim. The PVC being modified to no
-// longer need provisioning is considered a success.
-func (ctrl *ProvisionController) watchProvisioning(claim *v1.PersistentVolumeClaim, stopChannel chan struct{}) (<-chan bool, error) {
-	stopWatchPVC := make(chan struct{})
-	pvcCh, err := ctrl.watchPVC(claim, stopWatchPVC)
-	if err != nil {
-		glog.Infof("cannot start watcher for PVC %s/%s: %v", claim.Namespace, claim.Name, err)
-		return nil, err
-	}
-
-	successCh := make(chan bool, 0)
-
-	go func() {
-		defer close(stopWatchPVC)
-		defer close(successCh)
-
-		for {
-			select {
-			case _ = <-stopChannel:
-				return
-
-			case event := <-pvcCh:
-				switch event.Object.(type) {
-				case *v1.PersistentVolumeClaim:
-					// PVC changed
-					claim := event.Object.(*v1.PersistentVolumeClaim)
-					glog.V(4).Infof("claim update received: %s %s/%s %s", event.Type, claim.Namespace, claim.Name, claim.Status.Phase)
-					switch event.Type {
-					case watch.Added, watch.Modified:
-						if claim.Spec.VolumeName != "" {
-							successCh <- true
-						} else if !ctrl.shouldProvision(claim) {
-							glog.Infof("claim %s/%s was modified to not ask for this provisioner", claim.Namespace, claim.Name)
-							successCh <- true
-						}
-
-					case watch.Deleted:
-						glog.Infof("claim %s/%s was deleted", claim.Namespace, claim.Name)
-						successCh <- true
-
-					case watch.Error:
-						glog.Infof("claim %s/%s watcher failed", claim.Namespace, claim.Name)
-						successCh <- true
-					default:
-					}
-				case *v1.Event:
-					// Event received
-					claimEvent := event.Object.(*v1.Event)
-					glog.V(4).Infof("claim event received: %s %s/%s %s/%s %s", event.Type, claimEvent.Namespace, claimEvent.Name, claimEvent.InvolvedObject.Namespace, claimEvent.InvolvedObject.Name, claimEvent.Reason)
-					if claimEvent.Reason == "ProvisioningSucceeded" {
-						successCh <- true
-					} else if claimEvent.Reason == "ProvisioningFailed" {
-						successCh <- false
-					}
-				}
-			}
-		}
-	}()
-
-	return successCh, nil
-}
-
-// watchPVC returns a watch on the given PVC and ProvisioningFailed &
-// ProvisioningSucceeded events involving it
-func (ctrl *ProvisionController) watchPVC(claim *v1.PersistentVolumeClaim, stopChannel chan struct{}) (<-chan watch.Event, error) {
-	options := metav1.ListOptions{
-		FieldSelector:   "metadata.name=" + claim.Name,
-		Watch:           true,
-		ResourceVersion: claim.ResourceVersion,
-	}
-
-	pvcWatch, err := ctrl.claimSource.Watch(options)
-	if err != nil {
-		return nil, err
-	}
-
-	failWatch, err := ctrl.getPVCEventWatch(claim, v1.EventTypeWarning, "ProvisioningFailed")
-	if err != nil {
-		pvcWatch.Stop()
-		return nil, err
-	}
-
-	successWatch, err := ctrl.getPVCEventWatch(claim, v1.EventTypeNormal, "ProvisioningSucceeded")
-	if err != nil {
-		failWatch.Stop()
-		pvcWatch.Stop()
-		return nil, err
-	}
-
-	eventCh := make(chan watch.Event, 0)
-
-	go func() {
-		defer successWatch.Stop()
-		defer failWatch.Stop()
-		defer pvcWatch.Stop()
-		defer close(eventCh)
-
-		for {
-			select {
-			case _ = <-stopChannel:
-				return
-
-			case pvcEvent, ok := <-pvcWatch.ResultChan():
-				if !ok {
-					return
-				}
-				eventCh <- pvcEvent
-
-			case failEvent, ok := <-failWatch.ResultChan():
-				if !ok {
-					return
-				}
-				eventCh <- failEvent
-
-			case successEvent, ok := <-successWatch.ResultChan():
-				if !ok {
-					return
-				}
-				eventCh <- successEvent
-			}
-		}
-	}()
-
-	return eventCh, nil
-}
-
-// getPVCEventWatch returns a watch on the given PVC for the given event from
-// this point forward.
-func (ctrl *ProvisionController) getPVCEventWatch(claim *v1.PersistentVolumeClaim, eventType, reason string) (watch.Interface, error) {
-	claimKind := "PersistentVolumeClaim"
-	claimUID := string(claim.UID)
-	fieldSelector := ctrl.client.CoreV1().Events(claim.Namespace).GetFieldSelector(&claim.Name, &claim.Namespace, &claimKind, &claimUID).String() + ",type=" + eventType + ",reason=" + reason
-
-	list, err := ctrl.client.CoreV1().Events(claim.Namespace).List(metav1.ListOptions{
-		FieldSelector: fieldSelector,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	resourceVersion := ""
-	if len(list.Items) >= 1 {
-		resourceVersion = list.Items[len(list.Items)-1].ResourceVersion
-	}
-
-	return ctrl.client.CoreV1().Events(claim.Namespace).Watch(metav1.ListOptions{
-		FieldSelector:   fieldSelector,
-		Watch:           true,
-		ResourceVersion: resourceVersion,
-	})
-}
-
 // deleteVolumeOperation attempts to delete the volume backing the given
 // volume. Returns error, which indicates whether deletion should be retried
 // (requeue the volume) or not
@@ -1329,10 +1104,21 @@ func (ctrl *ProvisionController) deleteVolumeOperation(volume *v1.PersistentVolu
 	// Our check does not have to be as sophisticated as PV controller's, we can
 	// trust that the PV controller has set the PV to Released/Failed and it's
 	// ours to delete
-	newVolume, err := ctrl.client.CoreV1().PersistentVolumes().Get(volume.Name, metav1.GetOptions{})
+	newVolumeObject, exists, err := ctrl.volumes.GetByKey(volume.Name)
 	if err != nil {
+		glog.Errorf("error getting persistentvolume by name %s: %v, skipping", volume.Name, err)
+		return nil
+	} else if !exists {
+		glog.Infof("persistentvolume %s does not exist, skipping", volume.Name)
 		return nil
 	}
+
+	newVolume, ok := newVolumeObject.(*v1.PersistentVolume)
+	if !ok {
+		glog.Errorf("error getting persistentvolume %s/%s, skipping", volume.Namespace, volume.Name)
+		return nil
+	}
+
 	if !ctrl.shouldDelete(newVolume) {
 		glog.Infof("volume %q no longer needs deletion, skipping", volume.Name)
 		return nil
