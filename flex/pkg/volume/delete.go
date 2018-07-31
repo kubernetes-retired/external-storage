@@ -36,8 +36,11 @@ func (p *flexProvisioner) Delete(volume *v1.PersistentVolume) error {
 		return &controller.IgnoredError{Reason: strerr}
 	}
 
+	extraOptions := map[string]string{}
+	extraOptions[optionPVorVolumeName] = volume.Name
+
 	call := p.NewDriverCall(p.execCommand, deleteCmd)
-	call.AppendSpec(volume.Spec.FlexVolume.Options, nil)
+	call.AppendSpec(volume.Spec.FlexVolume.Options, extraOptions)
 	output, err := call.Run()
 
 	if err != nil {
