@@ -457,6 +457,7 @@ func NewProvisionController(
 	)
 	if !controller.exponentialBackOffOnError {
 		ratelimiter = workqueue.NewMaxOfRateLimiter(
+			workqueue.NewItemExponentialFailureRateLimiter(15*time.Second, 15*time.Second),
 			&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
 		)
 	}
