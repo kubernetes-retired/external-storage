@@ -693,8 +693,7 @@ func newTestProvisionController(
 		CreateProvisionedPVInterval(10*time.Millisecond),
 		LeaseDuration(2*resyncPeriod),
 		RenewDeadline(resyncPeriod),
-		RetryPeriod(resyncPeriod/2),
-		TermLimit(2*resyncPeriod))
+		RetryPeriod(resyncPeriod/2))
 	return ctrl
 }
 
@@ -726,7 +725,6 @@ func newTestProvisionControllerSharedInformers(
 		LeaseDuration(2*resyncPeriod),
 		RenewDeadline(resyncPeriod),
 		RetryPeriod(resyncPeriod/2),
-		TermLimit(2*resyncPeriod),
 		ClaimsInformer(claimInformer),
 		VolumesInformer(volumeInformer),
 		ClassesInformer(classInformer))
