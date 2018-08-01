@@ -29,7 +29,6 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller/metrics"
-	rl "github.com/kubernetes-incubator/external-storage/lib/leaderelection/resourcelock"
 	"github.com/kubernetes-incubator/external-storage/lib/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -843,20 +842,6 @@ func (ctrl *ProvisionController) syncVolume(obj interface{}) error {
 		return err
 	}
 	return nil
-}
-
-// removeRecord returns a claim with its leader election record annotation and
-// ResourceVersion set blank
-func (ctrl *ProvisionController) removeRecord(claim *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
-	claimClone := claim.DeepCopy()
-	if claimClone.Annotations == nil {
-		claimClone.Annotations = make(map[string]string)
-	}
-	claimClone.Annotations[rl.LeaderElectionRecordAnnotationKey] = ""
-
-	claimClone.ResourceVersion = ""
-
-	return claimClone, nil
 }
 
 // shouldProvision returns whether a claim should have a volume provisioned for
