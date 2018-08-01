@@ -22,7 +22,7 @@ $ make container
 If you are running in Kubernetes, it will pull the image from Quay for you. Or you can do it yourself.
 
 ```
-$ docker pull quay.io/kubernetes_incubator/nfs-provisioner:v1.0.9
+$ docker pull quay.io/kubernetes_incubator/nfs-provisioner:latest
 ```
 
 ## Deploying the provisioner
@@ -34,13 +34,10 @@ $ ALLOW_SECURITY_CONTEXT=true API_HOST_IP=0.0.0.0 $GOPATH/src/k8s.io/kubernetes/
 
 Decide on a unique name to give the provisioner that follows the naming scheme `<vendor name>/<provisioner name>` where `<vendor name>` cannot be "kubernetes.io." The provisioner will only provision volumes for claims that request a `StorageClass` with a `provisioner` field set equal to this name. For example, the names of the in-tree GCE and AWS provisioners are `kubernetes.io/gce-pd` and `kubernetes.io/aws-ebs`.
 
-Decide how to run nfs-provisioner and follow one of the below sections. The recommended way is running it as a [single-instance stateful app](http://kubernetes.io/docs/tutorials/stateful-application/run-stateful-application/), where you create a `Deployment`/`StatefulSet` and back it with some persistent storage like a `hostPath` volume. Running as a `DaemonSet` is for exposing & "pooling" multiple nodes' `hostPath` volumes. Running outside of Kubernetes as a standalone container or binary is for when you want greater control over the app's lifecycle and/or the ability to set per-PV quotas.
-
-**Note**: if you went through the [Authorization](authorization.md) guide, you should use the yaml specs in `deploy/kubernetes/auth` which have the spec.template.spec.serviceAccount set to "nfs-provisioner" for your convenience, instead of using the ones referred to here: e.g. `deploy/kubernetes/auth/deployment-sa.yaml` instead of `deploy/kubernetes/deployment.yaml`.
+Decide how to run nfs-provisioner and follow one of the below sections. The recommended way is running it as a [single-instance stateful app](http://kubernetes.io/docs/tutorials/stateful-application/run-stateful-application/), where you create a `Deployment`/`StatefulSet` and back it with some persistent storage like a `hostPath` volume. Running outside of Kubernetes as a standalone container or binary is for when you want greater control over the app's lifecycle and/or the ability to set per-PV quotas.
 
 * [In Kubernetes - Deployment](#in-kubernetes---deployment-of-1-replica)
 * [In Kubernetes - StatefulSet](#in-kubernetes---statefulset-of-1-replica)
-* [In Kubernetes - DaemonSet](#in-kubernetes---daemonset)
 * [Outside of Kubernetes - container](#outside-of-kubernetes---container)
 * [Outside of Kubernetes - binary](#outside-of-kubernetes---binary)
 
@@ -57,6 +54,8 @@ Note that if you continue with the `hostPath` volume, its path must exist on the
 Create the deployment and its service.
 
 ```
+$ kubectl create -f deploy/kubernetes/psp.yaml
+$ kubectl create -f deploy/kubernetes/rbac.yaml
 $ kubectl create -f deploy/kubernetes/deployment.yaml
 service "nfs-provisioner" created
 deployment "nfs-provisioner" created
@@ -65,31 +64,6 @@ deployment "nfs-provisioner" created
 ### In Kubernetes - StatefulSet of 1 replica
 
 The procedure for running a stateful set is identical to [that for a deployment, above,](#in-kubernetes---deployment-of-1-replica) so wherever you see `deployment` there, replace it with `statefulset`. The benefit is that you get a stable hostname. But note that stateful sets are in beta. Note that the service cannot be headless, unlike in most examples of stateful sets.
-
-
-### In Kubernetes - DaemonSet
-
-Edit the `provisioner` argument in the `args` field in `deploy/kubernetes/daemonset.yaml` to be the provisioner's name you decided on.
-
-`deploy/kubernetes/daemonset.yaml` specifies a `hostPath` volume `/srv` mounted at `/export`. The `/export` directory is where the provisioner stores its state and provisioned `PersistentVolumes'` data, so by mounting a volume there, you specify it as the backing storage for provisioned PVs. Each pod in the daemon set does this, effectively creating a "pool" of their nodes' local storage.
-
-`deploy/kubernetes/daemonset.yaml` also specifies a `nodeSelector` to target nodes/hosts. Choose nodes to deploy nfs-provisioner on and be sure that the `hostPath` directory exists on each node: `mkdir -p /srv`. If SELinux is enforcing on the nodes, you may need to make the container [privileged](http://kubernetes.io/docs/user-guide/security-context/) or change the security context of the `hostPath` directory on the node: `sudo chcon -Rt svirt_sandbox_file_t /srv`.
-
-`deploy/kubernetes/daemonset.yaml` specifies a `hostPort` for NFS, TCP 2049, to expose on the node, so be sure that this port is available on each node. The daemon set's pods will use their node's name as the NFS server IP to put on their `PersistentVolumes`.
-
-Label the chosen nodes to match the `nodeSelector`.
-
-```
-$ kubectl label node 127.0.0.1 app=nfs-provisioner
-node "127.0.0.1" labeled
-```
-
-Create the daemon set.
-
-```
-$ kubectl create -f deploy/kubernetes/daemonset.yaml
-daemonset "nfs-provisioner" created
-```
 
 ### Outside of Kubernetes - container
 
@@ -103,7 +77,7 @@ You may want to specify the hostname the NFS server exports from, i.e. the serve
 $ docker run --cap-add DAC_READ_SEARCH --cap-add SYS_RESOURCE \
 --security-opt seccomp:deploy/docker/nfs-provisioner-seccomp.json \
 -v $HOME/.kube:/.kube:Z \
-quay.io/kubernetes_incubator/nfs-provisioner:v1.0.9 \
+quay.io/kubernetes_incubator/nfs-provisioner:latest \
 -provisioner=example.com/nfs \
 -kubeconfig=/.kube/config
 ```
@@ -111,7 +85,7 @@ or
 ```
 $ docker run --cap-add DAC_READ_SEARCH --cap-add SYS_RESOURCE \
 --security-opt seccomp:deploy/docker/nfs-provisioner-seccomp.json \
-quay.io/kubernetes_incubator/nfs-provisioner:v1.0.9 \
+quay.io/kubernetes_incubator/nfs-provisioner:latest \
 -provisioner=example.com/nfs \
 -master=http://172.17.0.1:8080
 ```
@@ -126,7 +100,7 @@ With the two above options, the run command will look something like this.
 $ docker run --privileged \
 -v $HOME/.kube:/.kube:Z \
 -v /xfs:/export:Z \
-quay.io/kubernetes_incubator/nfs-provisioner:v1.0.9 \
+quay.io/kubernetes_incubator/nfs-provisioner:latest \
 -provisioner=example.com/nfs \
 -kubeconfig=/.kube/config \
 -enable-xfs-quota=true

@@ -1,3 +1,8 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: nfs-provisioner
+---
 kind: Service
 apiVersion: v1
 metadata:
@@ -31,9 +36,10 @@ spec:
       labels:
         app: nfs-provisioner
     spec:
+      serviceAccount: nfs-provisioner
       containers:
         - name: nfs-provisioner
-          image: quay.io/kubernetes_incubator/nfs-provisioner:v1.0.9
+          image: quay.io/kubernetes_incubator/nfs-provisioner:latest
           ports:
             - name: nfs
               containerPort: 2049
