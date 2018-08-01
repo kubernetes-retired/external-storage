@@ -40,7 +40,7 @@ kubectl create secret generic ceph-admin-secret --from-file=/tmp/secret --namesp
 ```bash
 ceph osd pool create kube 8 8
 ceph auth add client.kube mon 'allow r' osd 'allow rwx pool=kube'
-ceph auth get-key client.admin > /tmp/secret
+ceph auth get-key client.kube > /tmp/secret
 kubectl create secret generic ceph-secret --from-file=/tmp/secret --namespace=kube-system
 ```
 
