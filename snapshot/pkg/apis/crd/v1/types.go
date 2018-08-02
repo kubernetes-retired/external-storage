@@ -214,6 +214,10 @@ type GlusterVolumeSnapshotSource struct {
 type AWSElasticBlockStoreVolumeSnapshotSource struct {
 	// Unique id of the persistent disk snapshot resource. Used to identify the disk snapshot in AWS
 	SnapshotID string `json:"snapshotId"`
+	// Original volume file system type. The volume created from the snapshot would be pre-formatted
+	// using the same file system, so it has to be saved along with the AWS snapshot ID
+	// +optional
+	FSType string `json:"fsType"`
 }
 
 // CinderVolumeSnapshotSource is Cinder volume snapshot source
