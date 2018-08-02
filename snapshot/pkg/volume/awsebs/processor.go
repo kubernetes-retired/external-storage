@@ -78,6 +78,7 @@ func (a *awsEBSPlugin) SnapshotCreate(
 	return &crdv1.VolumeSnapshotDataSource{
 		AWSElasticBlockStore: &crdv1.AWSElasticBlockStoreVolumeSnapshotSource{
 			SnapshotID: snapshotID,
+			FSType:     spec.AWSElasticBlockStore.FSType,
 		},
 	}, convertAWSStatus(status), nil
 }
@@ -184,11 +185,11 @@ func (a *awsEBSPlugin) SnapshotRestore(snapshotData *crdv1.VolumeSnapshotData, p
 	pv := &v1.PersistentVolumeSource{
 		AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
 			VolumeID:  string(volumeID),
-			FSType:    "ext4",
 			Partition: 0,
 			ReadOnly:  false,
 		},
 	}
+	pv.AWSElasticBlockStore.FSType = snapshotData.Spec.AWSElasticBlockStore.FSType
 
 	return pv, labels, nil
 
