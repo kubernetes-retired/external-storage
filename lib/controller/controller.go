@@ -21,7 +21,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
@@ -38,7 +37,6 @@ import (
 	storagebeta "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -119,7 +117,8 @@ type ProvisionController struct {
 	// across restarts. Useful only for debugging, for seeing the source of
 	// events. controller.provisioner may have its own, different notion of
 	// identity which may/may not persist across restarts
-	identity      types.UID
+	id            string
+	component     string
 	eventRecorder record.EventRecorder
 
 	resyncPeriod time.Duration
@@ -387,26 +386,27 @@ func NewProvisionController(
 	kubeVersion string,
 	options ...func(*ProvisionController) error,
 ) *ProvisionController {
-	identity := uuid.NewUUID()
+	id, err := os.Hostname()
+	if err != nil {
+		glog.Fatalf("error getting hostname: %v", err)
+	}
+	// add a uniquifier so that two processes on the same host don't accidentally both become active
+	id = id + "_" + string(uuid.NewUUID())
+	component := provisionerName + "_" + id
 
 	v1.AddToScheme(scheme.Scheme)
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartLogging(glog.Infof)
 	broadcaster.StartRecordingToSink(&corev1.EventSinkImpl{Interface: client.CoreV1().Events(v1.NamespaceAll)})
-	var eventRecorder record.EventRecorder
-	out, err := exec.Command("hostname").Output()
-	if err != nil {
-		eventRecorder = broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: fmt.Sprintf("%s %s", provisionerName, string(identity))})
-	} else {
-		eventRecorder = broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: fmt.Sprintf("%s %s %s", provisionerName, strings.TrimSpace(string(out)), string(identity))})
-	}
+	eventRecorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: component})
 
 	controller := &ProvisionController{
 		client:                        client,
 		provisionerName:               provisionerName,
 		provisioner:                   provisioner,
 		kubeVersion:                   utilversion.MustParseSemantic(kubeVersion),
-		identity:                      identity,
+		id:                            id,
+		component:                     component,
 		eventRecorder:                 eventRecorder,
 		resyncPeriod:                  DefaultResyncPeriod,
 		exponentialBackOffOnError:     DefaultExponentialBackOffOnError,
@@ -593,7 +593,7 @@ func (ctrl *ProvisionController) forgetWork(queue workqueue.RateLimitingInterfac
 func (ctrl *ProvisionController) Run(stopCh <-chan struct{}) {
 
 	run := func(stopCh <-chan struct{}) {
-		glog.Infof("Starting provisioner controller %s!", string(ctrl.identity))
+		glog.Infof("Starting provisioner controller %s!", ctrl.component)
 		defer utilruntime.HandleCrash()
 		defer ctrl.claimQueue.ShutDown()
 		defer ctrl.volumeQueue.ShutDown()
@@ -642,24 +642,17 @@ func (ctrl *ProvisionController) Run(stopCh <-chan struct{}) {
 			go wait.Until(ctrl.runVolumeWorker, time.Second, stopCh)
 		}
 
-		glog.Infof("Started provisioner controller %s!", string(ctrl.identity))
+		glog.Infof("Started provisioner controller %s!", ctrl.component)
 
 		<-stopCh
 	}
 
-	id, err := os.Hostname()
-	if err != nil {
-		glog.Fatalf("error getting hostname: %v", err)
-	}
-
-	// add a uniquifier so that two processes on the same host don't accidentally both become active
-	id = id + "_" + string(uuid.NewUUID())
 	rl, err := resourcelock.New("endpoints",
 		"kube-system",
 		strings.Replace(ctrl.provisionerName, "/", "-", -1),
 		ctrl.client.CoreV1(),
 		resourcelock.ResourceLockConfig{
-			Identity:      id,
+			Identity:      ctrl.id,
 			EventRecorder: ctrl.eventRecorder,
 		})
 	if err != nil {
