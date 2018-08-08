@@ -134,7 +134,7 @@ func buildVolumePlugins() {
 				glog.Infof("Register cloudprovider %s", cinder.GetPluginName())
 			}
 		} else {
-			glog.Warningf("failed to initialize cloudprovider: %v, supported cloudproviders are %#v", err, cloudprovider.CloudProviders())
+			glog.Fatalf("failed to initialize cloudprovider: %v, supported cloudproviders are %#v", err, cloudprovider.CloudProviders())
 		}
 	}
 	volumePlugins[gluster.GetPluginName()] = gluster.RegisterPlugin()

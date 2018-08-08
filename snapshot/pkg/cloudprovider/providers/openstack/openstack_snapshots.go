@@ -69,7 +69,7 @@ func (snapshots *SnapshotsV2) createSnapshot(opts SnapshotCreateOpts) (string, s
 
 	createOpts := snapshotsV2.CreateOpts{
 		VolumeID:    opts.VolumeID,
-		Force:       false,
+		Force:       opts.Force,
 		Name:        opts.Name,
 		Description: opts.Description,
 		Metadata:    opts.Metadata,
@@ -141,30 +141,21 @@ func (snapshots *SnapshotsV2) listSnapshots(opts SnapshotListOpts) ([]Snapshot, 
 }
 
 // CreateSnapshot from the specified volume
-func (os *OpenStack) CreateSnapshot(sourceVolumeID, name, description string, tags map[string]string) (string, string, error) {
+func (os *OpenStack) CreateSnapshot(opts SnapshotCreateOpts, tags map[string]string) (string, string, error) {
 	snapshots, err := os.snapshotService()
 	if err != nil || snapshots == nil {
 		glog.Errorf("Unable to initialize cinder client for region: %s", os.region)
-		return "", "", fmt.Errorf("Failed to create snapshot for volume %s: %v", sourceVolumeID, err)
-	}
-
-	opts := SnapshotCreateOpts{
-		VolumeID:    sourceVolumeID,
-		Name:        name,
-		Description: description,
-	}
-	if tags != nil {
-		opts.Metadata = tags
+		return "", "", fmt.Errorf("Failed to create snapshot for volume %s: %v", opts.VolumeID, err)
 	}
 
 	snapshotID, status, err := snapshots.createSnapshot(opts)
 
 	if err != nil {
-		glog.Errorf("Failed to snapshot volume %s : %v", sourceVolumeID, err)
+		glog.Errorf("Failed to snapshot volume %s : %v", opts.VolumeID, err)
 		return "", "", err
 	}
 
-	glog.Infof("Created snapshot %v from volume: %v", snapshotID, sourceVolumeID)
+	glog.Infof("Created snapshot %v from volume: %v", snapshotID, opts.VolumeID)
 	return snapshotID, status, nil
 }
 
