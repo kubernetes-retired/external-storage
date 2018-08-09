@@ -44,8 +44,7 @@ if [ "$TRAVIS_OS_NAME" != "osx" ]; then
         fi
 fi
 
-# Install glide, golint, cfssl
-curl https://glide.sh/get | sh
+# Install golint, cfssl
 go get -u github.com/golang/lint/golint
 export PATH=$PATH:$GOPATH/bin
 go get -u github.com/alecthomas/gometalinter
@@ -85,7 +84,11 @@ elif [ "$TEST_SUITE" = "linux-nfs" ]; then
 	# Start kubernetes
 	mkdir -p $HOME/.kube
 	sudo chmod -R 777 $HOME/.kube
-	sudo "PATH=$PATH" KUBECTL=$HOME/kubernetes/server/bin/kubectl ALLOW_SECURITY_CONTEXT=true API_HOST_IP=0.0.0.0 $HOME/kubernetes-${KUBE_VERSION}/hack/local-up-cluster.sh -o $HOME/kubernetes/server/bin >/tmp/local-up-cluster.log 2>&1 &
+	if [ "$KUBE_VERSION" = "1.5.8" ]; then
+	    sudo "PATH=$PATH" KUBECTL=$HOME/kubernetes/server/bin/kubectl ENABLE_RBAC=true  ALLOW_SECURITY_CONTEXT=true API_HOST_IP=0.0.0.0 $HOME/kubernetes-${KUBE_VERSION}/hack/local-up-cluster.sh -o $HOME/kubernetes/server/bin >/tmp/local-up-cluster.log 2>&1 &
+	else
+	    sudo "PATH=$PATH" KUBECTL=$HOME/kubernetes/server/bin/kubectl ALLOW_SECURITY_CONTEXT=true $HOME/kubernetes-${KUBE_VERSION}/hack/local-up-cluster.sh -o $HOME/kubernetes/server/bin >/tmp/local-up-cluster.log 2>&1 &
+	fi
 	touch /tmp/local-up-cluster.log
 	timeout 30 grep -q "Local Kubernetes cluster is running." <(tail -f /tmp/local-up-cluster.log)
 	if [ $? == 124 ]; then
@@ -93,7 +96,7 @@ elif [ "$TEST_SUITE" = "linux-nfs" ]; then
 		exit 1
 	fi
 	KUBECTL=$HOME/kubernetes/server/bin/kubectl
-	if [ "$KUBE_VERSION" = "1.5.4" ]; then
+	if [ "$KUBE_VERSION" = "1.5.8" ]; then
 		$KUBECTL config set-cluster local --server=https://localhost:6443 --certificate-authority=/var/run/kubernetes/apiserver.crt;
 		$KUBECTL config set-credentials myself --username=admin --password=admin;
 	else
@@ -102,7 +105,7 @@ elif [ "$TEST_SUITE" = "linux-nfs" ]; then
 	fi
 	$KUBECTL config set-context local --cluster=local --user=myself
 	$KUBECTL config use-context local
-	if [ "$KUBE_VERSION" != "1.5.4" ]; then
+	if [ "$KUBE_VERSION" != "1.5.8" ]; then
 		sudo chown -R $(logname) /var/run/kubernetes;
 	fi
 

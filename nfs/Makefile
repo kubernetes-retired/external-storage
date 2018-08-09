@@ -46,8 +46,7 @@ test:
 .PHONY: test
 
 test-e2e:
-	cd ./test/e2e; glide install -v
-	go test ./test/e2e -v --kubeconfig=$(HOME)/.kube/config
+	cd ./test/e2e; ./test.sh
 .PHONY: test-e2e
 
 clean:
