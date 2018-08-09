@@ -66,6 +66,10 @@ func main() {
 		glog.Fatalf("Invalid flags specified: if run-server is true, use-ganesha must also be true.")
 	}
 
+	if *useGanesha && *exportSubnet != "*" {
+		glog.Warningf("If use-ganesha is true, there is no effect on export-subnet.")
+	}
+
 	if *gracePeriod != 90 && (!*runServer || !*useGanesha) {
 		glog.Fatalf("Invalid flags specified: custom grace period can only be set if both run-server and use-ganesha are true.")
 	} else if *gracePeriod > 180 && *runServer && *useGanesha {
