@@ -1,3 +1,8 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: efs-provisioner
+---
 kind: Deployment
 apiVersion: extensions/v1beta1
 metadata:
@@ -11,6 +16,7 @@ spec:
       labels:
         app: efs-provisioner
     spec:
+      serviceAccount: efs-provisioner
       containers:
         - name: efs-provisioner
           image: quay.io/external_storage/efs-provisioner:latest
