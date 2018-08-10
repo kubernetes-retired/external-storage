@@ -31,14 +31,14 @@ import (
 
 type exporter interface {
 	CanExport(int) bool
-	AddExportBlock(string, bool) (string, uint16, error)
+	AddExportBlock(string, bool, string) (string, uint16, error)
 	RemoveExportBlock(string, uint16) error
 	Export(string) error
 	Unexport(*v1.PersistentVolume) error
 }
 
 type exportBlockCreator interface {
-	CreateExportBlock(string, string, bool) string
+	CreateExportBlock(string, string, bool, string) string
 }
 
 type exportMap struct {
@@ -87,11 +87,11 @@ func newGenericExporter(ebc exportBlockCreator, config string, re *regexp.Regexp
 	}
 }
 
-func (e *genericExporter) AddExportBlock(path string, rootSquash bool) (string, uint16, error) {
+func (e *genericExporter) AddExportBlock(path string, rootSquash bool, exportSubnet string) (string, uint16, error) {
 	exportID := generateID(e.mapMutex, e.exportIDs)
 	exportIDStr := strconv.FormatUint(uint64(exportID), 10)
 
-	block := e.ebc.CreateExportBlock(exportIDStr, path, rootSquash)
+	block := e.ebc.CreateExportBlock(exportIDStr, path, rootSquash, exportSubnet)
 
 	// Add the export block to the config file
 	if err := addToFile(e.fileMutex, e.config, block); err != nil {
@@ -161,7 +161,7 @@ type ganeshaExportBlockCreator struct{}
 var _ exportBlockCreator = &ganeshaExportBlockCreator{}
 
 // CreateBlock creates the text block to add to the ganesha config file.
-func (e *ganeshaExportBlockCreator) CreateExportBlock(exportID, path string, rootSquash bool) string {
+func (e *ganeshaExportBlockCreator) CreateExportBlock(exportID, path string, rootSquash bool, exportSubnet string) string {
 	squash := "no_root_squash"
 	if rootSquash {
 		squash = "root_id_squash"
@@ -217,10 +217,10 @@ type kernelExportBlockCreator struct{}
 var _ exportBlockCreator = &kernelExportBlockCreator{}
 
 // CreateBlock creates the text block to add to the /etc/exports file.
-func (e *kernelExportBlockCreator) CreateExportBlock(exportID, path string, rootSquash bool) string {
+func (e *kernelExportBlockCreator) CreateExportBlock(exportID, path string, rootSquash bool, exportSubnet string) string {
 	squash := "no_root_squash"
 	if rootSquash {
 		squash = "root_squash"
 	}
-	return "\n" + path + " *(rw,insecure," + squash + ",fsid=" + exportID + ")\n"
+	return "\n" + path + " " + exportSubnet + "(rw,insecure," + squash + ",fsid=" + exportID + ")\n"
 }
