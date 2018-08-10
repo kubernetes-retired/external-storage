@@ -20,8 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"strconv"
-	"sync"
 	"testing"
 	"time"
 
@@ -33,15 +31,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
-	fakev1core "k8s.io/client-go/kubernetes/typed/core/v1/fake"
 	testclient "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
-	fcache "k8s.io/client-go/tools/cache/testing"
 	ref "k8s.io/client-go/tools/reference"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
 )
@@ -335,78 +330,6 @@ func TestTopologyParams(t *testing.T) {
 		}
 
 		close(stopCh)
-	}
-}
-
-func TestMultipleControllers(t *testing.T) {
-	tests := []struct {
-		name            string
-		provisionerName string
-		numControllers  int
-		numClaims       int
-		expectedCalls   int
-	}{
-		{
-			name:            "call provision exactly once",
-			provisionerName: "foo.bar/baz",
-			numControllers:  5,
-			numClaims:       1,
-			expectedCalls:   1,
-		},
-	}
-	for _, test := range tests {
-		client := fake.NewSimpleClientset()
-
-		// Create a reactor to reject Updates if object has already been modified,
-		// like etcd.
-		claimSource := fcache.NewFakePVCControllerSource()
-		reactor := claimReactor{
-			fake:        &fakev1core.FakeCoreV1{Fake: &client.Fake},
-			claims:      make(map[string]*v1.PersistentVolumeClaim),
-			lock:        sync.Mutex{},
-			claimSource: claimSource,
-		}
-		reactor.claims["claim-1"] = newClaim("claim-1", "uid-1-1", "class-1", test.provisionerName, "", nil)
-		client.PrependReactor("update", "persistentvolumeclaims", reactor.React)
-		client.PrependReactor("get", "persistentvolumeclaims", reactor.React)
-
-		// Create a fake watch so each controller can get ProvisioningSucceeded
-		fakeWatch := watch.NewFakeWithChanSize(test.numControllers, false)
-		client.PrependWatchReactor("events", testclient.DefaultWatchReactor(fakeWatch, nil))
-		client.PrependReactor("create", "events", func(action testclient.Action) (bool, runtime.Object, error) {
-			obj := action.(testclient.CreateAction).GetObject()
-			for i := 0; i < test.numControllers; i++ {
-				fakeWatch.Add(obj)
-			}
-			return true, obj, nil
-		})
-
-		provisioner := newTestProvisioner()
-		ctrls := make([]*ProvisionController, test.numControllers)
-		stopChs := make([]chan struct{}, test.numControllers)
-		for i := 0; i < test.numControllers; i++ {
-			ctrls[i] = NewProvisionController(client, test.provisionerName, provisioner, defaultServerVersion, CreateProvisionedPVInterval(10*time.Millisecond))
-			ctrls[i].claimSource = claimSource
-			ctrls[i].claims.Add(newClaim("claim-1", "uid-1-1", "class-1", test.provisionerName, "", nil))
-			ctrls[i].classes.Add(newBetaStorageClass("class-1", test.provisionerName))
-			stopChs[i] = make(chan struct{})
-		}
-
-		for i := 0; i < test.numControllers; i++ {
-			go ctrls[i].syncClaim(newClaim("claim-1", "uid-1-1", "class-1", test.provisionerName, "", nil))
-		}
-
-		// Sleep for 3 election retry periods
-		time.Sleep(3 * ctrls[0].retryPeriod)
-
-		if test.expectedCalls != len(provisioner.provisionCalls) {
-			t.Logf("test case: %s", test.name)
-			t.Errorf("expected provision calls:\n %v\n but got:\n %v\n", test.expectedCalls, len(provisioner.provisionCalls))
-		}
-
-		for _, stopCh := range stopChs {
-			close(stopCh)
-		}
 	}
 }
 
@@ -770,8 +693,7 @@ func newTestProvisionController(
 		CreateProvisionedPVInterval(10*time.Millisecond),
 		LeaseDuration(2*resyncPeriod),
 		RenewDeadline(resyncPeriod),
-		RetryPeriod(resyncPeriod/2),
-		TermLimit(2*resyncPeriod))
+		RetryPeriod(resyncPeriod/2))
 	return ctrl
 }
 
@@ -803,7 +725,6 @@ func newTestProvisionControllerSharedInformers(
 		LeaseDuration(2*resyncPeriod),
 		RenewDeadline(resyncPeriod),
 		RetryPeriod(resyncPeriod/2),
-		TermLimit(2*resyncPeriod),
 		ClaimsInformer(claimInformer),
 		VolumesInformer(volumeInformer),
 		ClassesInformer(classInformer))
@@ -1109,49 +1030,4 @@ func (i *ignoredProvisioner) Provision(options VolumeOptions) (*v1.PersistentVol
 
 func (i *ignoredProvisioner) Delete(volume *v1.PersistentVolume) error {
 	return nil
-}
-
-type claimReactor struct {
-	fake        *fakev1core.FakeCoreV1
-	claims      map[string]*v1.PersistentVolumeClaim
-	lock        sync.Mutex
-	claimSource *fcache.FakePVCControllerSource
-}
-
-func (r *claimReactor) React(action testclient.Action) (handled bool, ret runtime.Object, err error) {
-	r.lock.Lock()
-	defer r.lock.Unlock()
-	switch {
-	case action.Matches("update", "persistentvolumeclaims"):
-		obj := action.(testclient.UpdateAction).GetObject()
-
-		claim := obj.(*v1.PersistentVolumeClaim)
-
-		// Check and bump object version
-		storedClaim, found := r.claims[claim.Name]
-		if found {
-			storedVer, _ := strconv.Atoi(storedClaim.ResourceVersion)
-			requestedVer, _ := strconv.Atoi(claim.ResourceVersion)
-			if storedVer != requestedVer {
-				return true, obj, errors.New("VersionError")
-			}
-			claim.ResourceVersion = strconv.Itoa(storedVer + 1)
-		} else {
-			return true, nil, fmt.Errorf("Cannot update claim %s: claim not found", claim.Name)
-		}
-
-		r.claims[claim.Name] = claim
-		r.claimSource.Modify(claim)
-		return true, claim, nil
-	case action.Matches("get", "persistentvolumeclaims"):
-		name := action.(testclient.GetAction).GetName()
-		claim, found := r.claims[name]
-		if found {
-			claimClone := claim.DeepCopy()
-			return true, claimClone, nil
-		}
-		return true, nil, fmt.Errorf("Cannot find claim %s", name)
-	}
-
-	return false, nil, nil
 }

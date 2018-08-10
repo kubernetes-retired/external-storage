@@ -141,24 +141,15 @@ If your cluster has RBAC enabled or you are running OpenShift you must authorize
 
 #### RBAC
 ```console
-$ kubectl create -f deploy/auth/serviceaccount.yaml
-serviceaccount "efs-provisioner" created
-$ kubectl create -f deploy/auth/clusterrole.yaml
-clusterrole "efs-provisioner-runner" created
-$ kubectl create -f deploy/auth/clusterrolebinding.yaml
-clusterrolebinding "run-efs-provisioner" created
-$ kubectl patch deployment efs-provisioner -p '{"spec":{"template":{"spec":{"serviceAccount":"efs-provisioner"}}}}'
+$ kubectl create -f deploy/rbac.yaml
 ```
 
 #### OpenShift
 ```console
-$ oc create -f deploy/auth/serviceaccount.yaml
-serviceaccount "efs-provisioner" created
-$ oc create -f deploy/auth/openshift-clusterrole.yaml
+$ oc create -f deploy/openshift-clusterrole.yaml
 clusterrole "efs-provisioner-runner" created
 $ oadm policy add-scc-to-user hostmount-anyuid system:serviceaccount:default:efs-provisioner
 $ oadm policy add-cluster-role-to-user efs-provisioner-runner system:serviceaccount:default:efs-provisioner
-$ oc patch deployment efs-provisioner -p '{"spec":{"template":{"spec":{"serviceAccount":"efs-provisioner"}}}}'
 ```
 ### SELinux
 If SELinux is enforcing on the node where the provisioner runs, you must enable writing from a pod to a remote NFS server (EFS in this case) on the node by running:
