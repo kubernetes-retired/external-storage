@@ -90,8 +90,9 @@ elif [ "$TEST_SUITE" = "linux-nfs" ]; then
 	    sudo "PATH=$PATH" KUBECTL=$HOME/kubernetes/server/bin/kubectl ALLOW_SECURITY_CONTEXT=true $HOME/kubernetes-${KUBE_VERSION}/hack/local-up-cluster.sh -o $HOME/kubernetes/server/bin >/tmp/local-up-cluster.log 2>&1 &
 	fi
 	touch /tmp/local-up-cluster.log
-	timeout 30 grep -q "Local Kubernetes cluster is running." <(tail -f /tmp/local-up-cluster.log)
-	if [ $? == 124 ]; then
+	ret=0
+	timeout 60 grep -q "Local Kubernetes cluster is running." <(tail -f /tmp/local-up-cluster.log) || ret=$?
+	if [ $ret == 124 ]; then
 		cat /tmp/local-up-cluster.log
 		exit 1
 	fi
