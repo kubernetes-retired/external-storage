@@ -11,6 +11,7 @@ spec:
       labels:
         app: glusterfs-simple-provisioner
     spec:
+      serviceAccount: glfs-provisioner
       containers:
         - image: "quay.io/external_storage/glusterfs-simple-provisioner:latest"
           name: glusterfs-simple-provisioner
