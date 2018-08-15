@@ -64,19 +64,18 @@ func (h *glusterfsPlugin) SnapshotCreate(
 
 	volumePath := spec.Glusterfs.Path
 	snapshotName := volumePath + "_" + uuid.New()
-
 	cmd := exec.Command(glusterfsBinary, "snapshot", "create", snapshotName, volumePath, "no-timestamp")
 	out, err := cmd.CombinedOutput()
 
 	if err != nil {
-		glog.Errorf("failed to create snapshot for volume :%v, out:%v, err: %v", volumePath, out, err)
+		glog.Errorf("failed to create snapshot for volume :%v, out:%v, err: %v, command args: %s", volumePath, out, err, cmd.Args)
 	}
-	glog.V(1).Info("snapshot %v created successfully", snapshotName)
+	glog.V(1).Infof("snapshot %v created successfully", snapshotName)
 	cmd = exec.Command(glusterfsBinary, "snapshot", "activate", snapshotName)
 	_, err = cmd.CombinedOutput()
 
 	if err != nil {
-		glog.Errorf("failed to activate snapshot:%v , err: %v", snapshotName, err)
+		glog.Errorf("failed to activate snapshot:%v , err: %s, snapshot command is %s", snapshotName, err, cmd.Args)
 	}
 
 	cond := []crdv1.VolumeSnapshotCondition{}
