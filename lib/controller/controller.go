@@ -76,6 +76,9 @@ const annStorageProvisioner = "volume.beta.kubernetes.io/storage-provisioner"
 // be dynamically provisioned. Its value is the name of the selected node.
 const annSelectedNode = "volume.alpha.kubernetes.io/selected-node"
 
+// Length in characters for the generated uuid of a created volume
+const volumeNameUUIDLength = 16
+
 // ProvisionController is a controller that provisions PersistentVolumes for
 // PersistentVolumeClaims.
 type ProvisionController struct {
@@ -149,7 +152,7 @@ const (
 	// DefaultResyncPeriod is used when option function ResyncPeriod is omitted
 	DefaultResyncPeriod = 15 * time.Minute
 	// DefaultThreadiness is used when option function Threadiness is omitted
-	DefaultThreadiness = 4
+	DefaultThreadiness = 1
 	// DefaultExponentialBackOffOnError is used when option function ExponentialBackOffOnError is omitted
 	DefaultExponentialBackOffOnError = true
 	// DefaultCreateProvisionedPVRetryCount is used when option function CreateProvisionedPVRetryCount is omitted
@@ -940,13 +943,9 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 	//  A previous doProvisionClaim may just have finished while we were waiting for
 	//  the locks. Check that PV (with deterministic name) hasn't been provisioned
 	//  yet.
-	namespace := claim.GetNamespace()
 	pvName := ctrl.getProvisionedVolumeNameForClaim(claim)
-	_, exists, err := ctrl.volumes.GetByKey(fmt.Sprintf("%s/%s", namespace, pvName))
-	if err != nil {
-		glog.Errorf("Error getting claim %q's volume: %v", claimToClaimKey(claim), err)
-		return nil
-	} else if exists {
+	volume, err := ctrl.client.CoreV1().PersistentVolumes().Get(pvName, metav1.GetOptions{})
+	if err == nil && volume != nil {
 		// Volume has been already provisioned, nothing to do.
 		glog.V(4).Infof("provisionClaimOperation [%s]: volume already exists, skipping", claimToClaimKey(claim))
 		return nil
@@ -1028,7 +1027,7 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 
 	ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, "Provisioning", fmt.Sprintf("External provisioner is provisioning volume for claim %q", claimToClaimKey(claim)))
 
-	volume, err := ctrl.provisioner.Provision(options)
+	volume, err = ctrl.provisioner.Provision(options)
 	if err != nil {
 		if ierr, ok := err.(*IgnoredError); ok {
 			// Provision ignored, do nothing and hope another provisioner will provision it.
@@ -1162,7 +1161,7 @@ func (ctrl *ProvisionController) deleteVolumeOperation(volume *v1.PersistentVolu
 // getProvisionedVolumeNameForClaim returns PV.Name for the provisioned volume.
 // The name must be unique.
 func (ctrl *ProvisionController) getProvisionedVolumeNameForClaim(claim *v1.PersistentVolumeClaim) string {
-	return "pvc-" + string(claim.UID)
+	return fmt.Sprintf("%s-%s", "pvc", strings.Replace(string(claim.UID), "-", "", -1)[0:volumeNameUUIDLength])
 }
 
 func (ctrl *ProvisionController) getStorageClassFields(name string) (string, map[string]string, error) {
