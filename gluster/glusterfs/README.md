@@ -49,6 +49,17 @@ And add nodes to trusted pool
 [root@localhost]# kubectl exec -ti glusterfs-mgmnd gluster peer probe 172.16.2.132
 ```
 
+## Configure RBAC (Kubernetes 1.8+)
+
+If you are running Kubernetes 1.8+, you will need to bind a set of permissions to a new ServiceAccount for the provisioner to access the Kubernetes API.
+
+Run the following to configure RBAC for a new `glfs-provisioner` ServiceAccount:
+```bash
+kubectl create -f deploy/rbac.yaml
+```
+
+NOTE: Make sure that your deployment contains a reference to `serviceAccount: glfs-provisioner`.
+
 ## Start glusterfs simple provisioner
 
 The following example assumes kubeconfig is at `/root/.kube`.
