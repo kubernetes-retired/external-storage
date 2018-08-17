@@ -942,13 +942,9 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 	//  A previous doProvisionClaim may just have finished while we were waiting for
 	//  the locks. Check that PV (with deterministic name) hasn't been provisioned
 	//  yet.
-	namespace := claim.GetNamespace()
 	pvName := ctrl.getProvisionedVolumeNameForClaim(claim)
-	_, exists, err := ctrl.volumes.GetByKey(fmt.Sprintf("%s/%s", namespace, pvName))
-	if err != nil {
-		glog.Errorf(logOperation(operation, "error getting claim's persistentvolume %q: %v", pvName, err))
-		return nil
-	} else if exists {
+	volume, err := ctrl.client.CoreV1().PersistentVolumes().Get(pvName, metav1.GetOptions{})
+	if err == nil && volume != nil {
 		// Volume has been already provisioned, nothing to do.
 		glog.Infof(logOperation(operation, "persistentvolume %q already exists, skipping", pvName))
 		return nil
@@ -1029,7 +1025,7 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 
 	ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, "Provisioning", fmt.Sprintf("External provisioner is provisioning volume for claim %q", claimToClaimKey(claim)))
 
-	volume, err := ctrl.provisioner.Provision(options)
+	volume, err = ctrl.provisioner.Provision(options)
 	if err != nil {
 		if ierr, ok := err.(*IgnoredError); ok {
 			// Provision ignored, do nothing and hope another provisioner will provision it.
@@ -1118,21 +1114,10 @@ func (ctrl *ProvisionController) deleteVolumeOperation(volume *v1.PersistentVolu
 	// Our check does not have to be as sophisticated as PV controller's, we can
 	// trust that the PV controller has set the PV to Released/Failed and it's
 	// ours to delete
-	newVolumeObject, exists, err := ctrl.volumes.GetByKey(volume.Name)
+	newVolume, err := ctrl.client.CoreV1().PersistentVolumes().Get(volume.Name, metav1.GetOptions{})
 	if err != nil {
-		glog.Errorf(logOperation(operation, "error getting persistentvolume: %v, skipping", err))
-		return nil
-	} else if !exists {
-		glog.Infof(logOperation(operation, "persistentvolume does not exist, skipping"))
 		return nil
 	}
-
-	newVolume, ok := newVolumeObject.(*v1.PersistentVolume)
-	if !ok {
-		glog.Errorf(logOperation(operation, "error getting persistentvolume, skipping"))
-		return nil
-	}
-
 	if !ctrl.shouldDelete(newVolume) {
 		glog.Infof(logOperation(operation, "persistentvolume no longer needs deletion, skipping"))
 		return nil
