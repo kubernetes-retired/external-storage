@@ -54,7 +54,7 @@ Note that if you continue with the `hostPath` volume, its path must exist on the
 Create the deployment and its service.
 
 ```
-$ kubectl create -f deploy/kubernetes/psp.yaml
+$ kubectl create -f deploy/kubernetes/psp.yaml # or if openshift: oc create -f deploy/kubernetes/scc.yaml
 $ kubectl create -f deploy/kubernetes/rbac.yaml
 $ kubectl create -f deploy/kubernetes/deployment.yaml
 service "nfs-provisioner" created
