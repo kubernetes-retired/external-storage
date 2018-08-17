@@ -455,12 +455,14 @@ func TestShouldProvision(t *testing.T) {
 }
 
 func TestShouldDelete(t *testing.T) {
+	timestamp := metav1.NewTime(time.Now())
 	tests := []struct {
-		name             string
-		provisionerName  string
-		volume           *v1.PersistentVolume
-		serverGitVersion string
-		expectedShould   bool
+		name              string
+		provisionerName   string
+		volume            *v1.PersistentVolume
+		deletionTimestamp *metav1.Time
+		serverGitVersion  string
+		expectedShould    bool
 	}{
 		{
 			name:             "should delete",
@@ -504,11 +506,27 @@ func TestShouldDelete(t *testing.T) {
 			serverGitVersion: "v1.5.0",
 			expectedShould:   false,
 		},
+		{
+			name:              "1.9 non-nil deletion timestamp",
+			provisionerName:   "foo.bar/baz",
+			volume:            newVolume("volume-1", v1.VolumeReleased, v1.PersistentVolumeReclaimDelete, map[string]string{annDynamicallyProvisioned: "foo.bar/baz"}),
+			deletionTimestamp: &timestamp,
+			serverGitVersion:  "v1.9.0",
+			expectedShould:    false,
+		},
+		{
+			name:             "1.9 nil deletion timestamp",
+			provisionerName:  "foo.bar/baz",
+			volume:           newVolume("volume-1", v1.VolumeReleased, v1.PersistentVolumeReclaimDelete, map[string]string{annDynamicallyProvisioned: "foo.bar/baz"}),
+			serverGitVersion: "v1.9.0",
+			expectedShould:   true,
+		},
 	}
 	for _, test := range tests {
 		client := fake.NewSimpleClientset()
 		provisioner := newTestProvisioner()
 		ctrl := newTestProvisionController(client, test.provisionerName, provisioner, test.serverGitVersion)
+		test.volume.ObjectMeta.DeletionTimestamp = test.deletionTimestamp
 
 		should := ctrl.shouldDelete(test.volume)
 		if test.expectedShould != should {
