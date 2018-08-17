@@ -35,6 +35,7 @@ import (
 	"k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	storagebeta "k8s.io/api/storage/v1beta1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -1055,9 +1056,14 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 	// Try to create the PV object several times
 	for i := 0; i < ctrl.createProvisionedPVRetryCount; i++ {
 		glog.V(4).Infof("provisionClaimOperation [%s]: trying to save volume %s", claimToClaimKey(claim), volume.Name)
-		if _, err = ctrl.client.CoreV1().PersistentVolumes().Create(volume); err == nil {
+		if _, err = ctrl.client.CoreV1().PersistentVolumes().Create(volume); err == nil || apierrs.IsAlreadyExists(err) {
 			// Save succeeded.
-			glog.Infof("volume %q for claim %q saved", volume.Name, claimToClaimKey(claim))
+			if err != nil {
+				glog.Infof("volume %q for claim %q already exists, reusing", volume.Name, claimToClaimKey(claim))
+				err = nil
+			} else {
+				glog.Infof("volume %q for claim %q saved", volume.Name, claimToClaimKey(claim))
+			}
 			break
 		}
 		// Save failed, try again after a while.
