@@ -1,3 +1,25 @@
+# [v2.2.0](https://github.com/kubernetes-incubator/external-storage/releases/tag/local-volume-provisioner-v2.2.0)
+Image updates:
+* Add Prometheus metrics
+  ([#721](https://github.com/kubernetes-incubator/external-storage/pull/721))
+* Support Retain reclaim policy
+  ([#776](https://github.com/kubernetes-incubator/external-storage/pull/776))
+* Add option for resync period and add a default of 5 minutes
+  ([#800](https://github.com/kubernetes-incubator/external-storage/pull/800))
+* Add option for cleaning filesystem PVs in a Job
+  ([#863](https://github.com/kubernetes-incubator/external-storage/pull/863))
+* Add option for using only Node.Name as the provisioner name, instead of Node.UID ([#947](https://github.com/kubernetes-incubator/external-storage/pull/947))
+
+Deployment updates:
+* Refactor helm generation
+  ([#789](https://github.com/kubernetes-incubator/external-storage/pull/789))
+* Add option for tolerations
+  ([#792](https://github.com/kubernetes-incubator/external-storage/pull/792))
+* Add /dev volume mount for raw block support
+  ([#799)](https://github.com/kubernetes-incubator/external-storage/pull/799)
+* Add option for resource requests and limits
+  ([#831](https://github.com/kubernetes-incubator/external-storage/pull/831))
+
 # [v2.1.0](https://github.com/kubernetes-incubator/external-storage/releases/tag/local-volume-provisioner-v2.1.0)
 The following changes require Kubernetes 1.10 or higher.
 * Add block volumeMode discovery and cleanup.
