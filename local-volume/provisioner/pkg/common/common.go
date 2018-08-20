@@ -100,6 +100,9 @@ type UserConfig struct {
 	// MinResyncPeriod is minimum resync period. Resync period in reflectors
 	// will be random between MinResyncPeriod and 2*MinResyncPeriod.
 	MinResyncPeriod metav1.Duration
+	// UseNodeNameOnly indicates if Node.Name should be used in the provisioner name
+	// instead of Node.UID.
+	UseNodeNameOnly bool
 }
 
 // MountConfig stores a configuration for discoverying a specific storageclass
@@ -175,6 +178,10 @@ type ProvisionerConfiguration struct {
 	// MinResyncPeriod is minimum resync period. Resync period in reflectors
 	// will be random between MinResyncPeriod and 2*MinResyncPeriod.
 	MinResyncPeriod metav1.Duration `json:"minResyncPeriod" yaml:"minResyncPeriod"`
+	// UseNodeNameOnly indicates if Node.Name should be used in the provisioner name
+	// instead of Node.UID. Default is false.
+	// +optional
+	UseNodeNameOnly bool `json:"useNodeNameOnly" yaml:"useNodeNameOnly"`
 }
 
 // CreateLocalPVSpec returns a PV spec that can be used for PV creation
