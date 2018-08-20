@@ -1,3 +1,5 @@
+common:
+  useNodeNameOnly: true
 classes:
 - name: local-scsi
   hostDir: "/mnt/disks/by-uuid/google-local-ssds-scsi-fs"
