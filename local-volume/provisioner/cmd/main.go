@@ -88,6 +88,7 @@ func main() {
 		UseAlphaAPI:       provisionerConfig.UseAlphaAPI,
 		UseJobForCleaning: provisionerConfig.UseJobForCleaning,
 		MinResyncPeriod:   provisionerConfig.MinResyncPeriod,
+		UseNodeNameOnly:   provisionerConfig.UseNodeNameOnly,
 		Namespace:         namespace,
 		JobContainerImage: jobImage,
 	})
