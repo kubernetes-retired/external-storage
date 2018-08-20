@@ -44,7 +44,12 @@ import (
 func StartLocalController(client *kubernetes.Clientset, ptable deleter.ProcTable, config *common.UserConfig) {
 	glog.Info("Initializing volume cache\n")
 
-	provisionerName := fmt.Sprintf("local-volume-provisioner-%v-%v", config.Node.Name, config.Node.UID)
+	var provisionerName string
+	if config.UseNodeNameOnly {
+		provisionerName = fmt.Sprintf("local-volume-provisioner-%v", config.Node.Name)
+	} else {
+		provisionerName = fmt.Sprintf("local-volume-provisioner-%v-%v", config.Node.Name, config.Node.UID)
+	}
 
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(client.CoreV1().RESTClient()).Events("")})
