@@ -7,6 +7,7 @@ metadata:
   name: local-provisioner-config 
   namespace: default 
 data:
+  useNodeNameOnly: "true"
   storageClassMap: |     
     local-scsi:
        hostDir: /mnt/disks
@@ -30,7 +31,7 @@ spec:
     spec:
       serviceAccountName: local-storage-admin
       containers:
-        - image: "quay.io/external_storage/local-volume-provisioner:v2.1.0"
+        - image: "quay.io/external_storage/local-volume-provisioner:v2.2.0"
           imagePullPolicy: "Always"
           name: provisioner 
           securityContext:
