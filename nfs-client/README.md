@@ -44,7 +44,23 @@ parameters:
   archiveOnDelete: "false" # When set to "false" your PVs will not be archived by the provisioner upon deletion of the PVC.
 ```
 
-2. Authorization
+2. Deployment
+
+To deploy from the files you just editted, run the following commands.
+
+Kubernetes:
+```bash
+kubectl apply -f deploy/deployment.yaml
+kubectl apply -f deploy/class.yaml
+```
+
+Openshift:
+```bash
+oc create -f deploy/deployment.yaml
+oc create -f deploy/class.yaml
+```
+
+3. Authorization
 
 If your cluster has RBAC enabled or you are running OpenShift you must authorize the provisioner. If you are in a namespace/project other than "default" either edit `deploy/auth/clusterrolebinding.yaml` or edit the `oadm policy` command accordingly.
 
@@ -67,7 +83,7 @@ $ oadm policy add-scc-to-user hostmount-anyuid system:serviceaccount:default:nfs
 $ oadm policy add-cluster-role-to-user nfs-client-provisioner-runner system:serviceaccount:default:nfs-client-provisioner
 ```
 
-3. Finally, test your environment!
+4. Finally, test your environment!
 
 Now we'll test your NFS provisioner.
 
