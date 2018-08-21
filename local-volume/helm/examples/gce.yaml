@@ -2,6 +2,7 @@ common:
   # Beta PV.NodeAffinity field is used by default. If running against pre-1.10
   # k8s version, the `useAlphaAPI` flag must be enabled in the configMap.
   useAlphaAPI: false
+  useNodeNameOnly: true
 classes:
 - name: local-scsi
   hostDir: "/mnt/disks/by-uuid/google-local-ssds-scsi-fs"

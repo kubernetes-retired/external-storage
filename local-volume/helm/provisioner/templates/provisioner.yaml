@@ -16,6 +16,9 @@ data:
 {{- if .Values.common.useJobForCleaning }}
   useJobForCleaning: "yes"
 {{- end}}
+{{- if .Values.common.useNodeNameOnly }}
+  useNodeNameOnly: "true"
+{{- end }}
 {{- if .Values.common.minResyncPeriod }}
   minResyncPeriod: {{ .Values.common.minResyncPeriod | quote }}
 {{- end}}

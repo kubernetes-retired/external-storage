@@ -21,6 +21,11 @@ common:
   #
   useJobForCleaning: false
   #
+  # Provisioner name contains Node.UID by default. If set to true, the provisioner
+  # name will only use Node.Name.
+  #
+  useNodeNameOnly: false
+  #
   # Resync period in reflectors will be random between minResyncPeriod and
   # 2*minResyncPeriod. Default: 5m0s.
   #
@@ -67,7 +72,7 @@ daemonset:
   #
   # Defines Provisioner's image name including container registry.
   #
-  image: quay.io/external_storage/local-volume-provisioner:v2.1.0
+  image: quay.io/external_storage/local-volume-provisioner:v2.2.0
   #
   # Defines Image download policy, see kubernetes documentation for available values.
   #

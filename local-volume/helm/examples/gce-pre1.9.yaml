@@ -1,5 +1,6 @@
 common:
   useAlphaAPI: true
+  useNodeNameOnly: true
 classes:
 - name: local-scsi
   hostDir: "/mnt/disks"
