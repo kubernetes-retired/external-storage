@@ -78,9 +78,9 @@ var _ = Describe("external-storage", func() {
 
 			By("creating nfs-provisioner RBAC")
 			framework.RunKubectlOrDie("create", "-f", mkpath("rbac.yaml"))
+
 			crb, err := c.RbacV1().ClusterRoleBindings().Get(nfsRBACCRBName, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
-
 			crb.Subjects[0].Namespace = ns
 			crb, err = c.RbacV1().ClusterRoleBindings().Update(crb)
 			Expect(err).NotTo(HaveOccurred())
@@ -92,12 +92,17 @@ var _ = Describe("external-storage", func() {
 
 			ss, err := c.AppsV1().StatefulSets(ns).Get(nfsStatefulSetName, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
+
+			sst := framework.NewStatefulSetTester(c)
+			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
+
+			ss, err = c.AppsV1().StatefulSets(ns).Get(nfsStatefulSetName, metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred())
 			ss.Spec.Template.Spec.Volumes[0].HostPath.Path = tmpDir
 			ss.Spec.Template.Spec.Containers[0].Args = []string{"-grace-period=10"}
 			ss, err = c.AppsV1().StatefulSets(ns).Update(ss)
 			Expect(err).NotTo(HaveOccurred())
 
-			sst := framework.NewStatefulSetTester(c)
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 
 			By("creating a class")
