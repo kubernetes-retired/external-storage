@@ -18,13 +18,14 @@ package storage
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os/exec"
 	"path/filepath"
 	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"io/ioutil"
 	"k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -77,32 +78,23 @@ var _ = Describe("external-storage", func() {
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			By("creating nfs-provisioner RBAC")
-			framework.RunKubectlOrDie("create", "-f", mkpath("rbac.yaml"))
-
-			crb, err := c.RbacV1().ClusterRoleBindings().Get(nfsRBACCRBName, metav1.GetOptions{})
-			Expect(err).NotTo(HaveOccurred())
-			crb.Subjects[0].Namespace = ns
-			crb, err = c.RbacV1().ClusterRoleBindings().Update(crb)
-			Expect(err).NotTo(HaveOccurred())
+			cmd := exec.Command("bash", "-c", fmt.Sprintf("sed -i'' 's/namespace:.*/namespace: %s/g' %s", ns, mkpath("rbac.yaml")))
+			framework.ExpectNoError(cmd.Run())
+			framework.RunKubectlOrDie("create", "-f", mkpath("rbac.yaml"), nsFlag)
 
 			By("creating an nfs-provisioner statefulset")
-			framework.RunKubectlOrDie("create", "-f", mkpath("statefulset.yaml"), nsFlag)
 			tmpDir, err := ioutil.TempDir("", "nfs-provisioner-statefulset")
 			Expect(err).NotTo(HaveOccurred())
+			cmd = exec.Command("bash", "-c", fmt.Sprintf("sed -i'' 's|path:.*|path: %s|g' %s", tmpDir, mkpath("statefulset.yaml")))
+			framework.ExpectNoError(cmd.Run())
+			cmd = exec.Command("bash", "-c", fmt.Sprintf("sed -i'' '/-provisioner=/a \\            - \"-grace-period=10\"' %s", mkpath("statefulset.yaml")))
+			framework.ExpectNoError(cmd.Run())
+			framework.RunKubectlOrDie("create", "-f", mkpath("statefulset.yaml"), nsFlag)
 
 			ss, err := c.AppsV1().StatefulSets(ns).Get(nfsStatefulSetName, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			sst := framework.NewStatefulSetTester(c)
-			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
-
-			ss, err = c.AppsV1().StatefulSets(ns).Get(nfsStatefulSetName, metav1.GetOptions{})
-			Expect(err).NotTo(HaveOccurred())
-			ss.Spec.Template.Spec.Volumes[0].HostPath.Path = tmpDir
-			ss.Spec.Template.Spec.Containers[0].Args = []string{"-grace-period=10"}
-			ss, err = c.AppsV1().StatefulSets(ns).Update(ss)
-			Expect(err).NotTo(HaveOccurred())
-
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 
 			By("creating a class")
@@ -143,6 +135,7 @@ var _ = Describe("external-storage", func() {
 			By("creating a pod to write to the volume")
 			framework.RunKubectlOrDie("create", "-f", mkpath("write-pod.yaml"), nsFlag)
 			framework.ExpectNoError(framework.WaitForPodSuccessInNamespace(c, nfsWritePodName, ns))
+			framework.DeletePodOrFail(c, ns, nfsWritePodName)
 
 			By("creating a pod to read from the volume")
 			framework.RunKubectlOrDie("create", "-f", mkpath("read-pod.yaml"), nsFlag)
@@ -155,6 +148,7 @@ var _ = Describe("external-storage", func() {
 			By("creating a pod to read from the volume again")
 			framework.RunKubectlOrDie("create", "-f", mkpath("read-pod.yaml"), nsFlag)
 			framework.ExpectNoError(framework.WaitForPodSuccessInNamespace(c, nfsReadPodName, ns))
+			framework.DeletePodOrFail(c, ns, nfsReadPodName)
 
 			By("deleting the claim")
 			err = c.CoreV1().PersistentVolumeClaims(ns).Delete(nfsClaimName, nil)
