@@ -77,6 +77,9 @@ const annStorageProvisioner = "volume.beta.kubernetes.io/storage-provisioner"
 // be dynamically provisioned. Its value is the name of the selected node.
 const annSelectedNode = "volume.alpha.kubernetes.io/selected-node"
 
+// Length in characters for the generated uuid of a created volume
+const volumeNameUUIDLength = 16
+
 // ProvisionController is a controller that provisions PersistentVolumes for
 // PersistentVolumeClaims.
 type ProvisionController struct {
@@ -150,7 +153,7 @@ const (
 	// DefaultResyncPeriod is used when option function ResyncPeriod is omitted
 	DefaultResyncPeriod = 15 * time.Minute
 	// DefaultThreadiness is used when option function Threadiness is omitted
-	DefaultThreadiness = 4
+	DefaultThreadiness = 1
 	// DefaultExponentialBackOffOnError is used when option function ExponentialBackOffOnError is omitted
 	DefaultExponentialBackOffOnError = true
 	// DefaultCreateProvisionedPVRetryCount is used when option function CreateProvisionedPVRetryCount is omitted
@@ -1167,7 +1170,7 @@ func logOperation(operation, format string, a ...interface{}) string {
 // getProvisionedVolumeNameForClaim returns PV.Name for the provisioned volume.
 // The name must be unique.
 func (ctrl *ProvisionController) getProvisionedVolumeNameForClaim(claim *v1.PersistentVolumeClaim) string {
-	return "pvc-" + string(claim.UID)
+	return fmt.Sprintf("%s-%s", "pvc", strings.Replace(string(claim.UID), "-", "", -1)[0:volumeNameUUIDLength])
 }
 
 func (ctrl *ProvisionController) getStorageClassFields(name string) (string, map[string]string, error) {
