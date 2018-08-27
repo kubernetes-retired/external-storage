@@ -20,5 +20,5 @@ rules:
     verbs: ["get", "list", "watch", "create", "update", "patch"]
   - apiGroups: [""]
     resources: ["services"]
-    resourceNames: ["kube-dns"]
+    resourceNames: ["kube-dns","coredns"]
     verbs: ["list", "get"]
