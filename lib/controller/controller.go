@@ -18,6 +18,7 @@ package controller
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -139,6 +140,10 @@ type ProvisionController struct {
 	// The path of metrics endpoint path.
 	metricsPath string
 
+	// Whether to do kubernetes leader election at all. It should basically
+	// always be done when possible to avoid duplicate Provision attempts.
+	leaderElection          bool
+	leaderElectionNamespace string
 	// Parameters of leaderelection.LeaderElectionConfig.
 	leaseDuration, renewDeadline, retryPeriod time.Duration
 
@@ -161,6 +166,8 @@ const (
 	DefaultFailedProvisionThreshold = 15
 	// DefaultFailedDeleteThreshold is used when option function FailedDeleteThreshold is omitted
 	DefaultFailedDeleteThreshold = 15
+	// DefaultLeaderElection is used when option function LeaderElection is omitted
+	DefaultLeaderElection = true
 	// DefaultLeaseDuration is used when option function LeaseDuration is omitted
 	DefaultLeaseDuration = 15 * time.Second
 	// DefaultRenewDeadline is used when option function RenewDeadline is omitted
@@ -259,6 +266,31 @@ func FailedDeleteThreshold(failedDeleteThreshold int) func(*ProvisionController)
 			return errRuntime
 		}
 		c.failedDeleteThreshold = failedDeleteThreshold
+		return nil
+	}
+}
+
+// LeaderElection determines whether to enable leader election or not. Defaults
+// to true.
+func LeaderElection(leaderElection bool) func(*ProvisionController) error {
+	return func(c *ProvisionController) error {
+		if c.HasRun() {
+			return errRuntime
+		}
+		c.leaderElection = leaderElection
+		return nil
+	}
+}
+
+// LeaderElectionNamespace is the kubernetes namespace in which to create the
+// leader election object. Defaults to the same namespace in which the
+// the controller runs.
+func LeaderElectionNamespace(leaderElectionNamespace string) func(*ProvisionController) error {
+	return func(c *ProvisionController) error {
+		if c.HasRun() {
+			return errRuntime
+		}
+		c.leaderElectionNamespace = leaderElectionNamespace
 		return nil
 	}
 }
@@ -416,6 +448,8 @@ func NewProvisionController(
 		createProvisionedPVInterval:   DefaultCreateProvisionedPVInterval,
 		failedProvisionThreshold:      DefaultFailedProvisionThreshold,
 		failedDeleteThreshold:         DefaultFailedDeleteThreshold,
+		leaderElection:                DefaultLeaderElection,
+		leaderElectionNamespace:       getInClusterNamespace(),
 		leaseDuration:                 DefaultLeaseDuration,
 		renewDeadline:                 DefaultRenewDeadline,
 		retryPeriod:                   DefaultRetryPeriod,
@@ -648,31 +682,36 @@ func (ctrl *ProvisionController) Run(stopCh <-chan struct{}) {
 		<-stopCh
 	}
 
-	rl, err := resourcelock.New("endpoints",
-		"kube-system",
-		strings.Replace(ctrl.provisionerName, "/", "-", -1),
-		ctrl.client.CoreV1(),
-		resourcelock.ResourceLockConfig{
-			Identity:      ctrl.id,
-			EventRecorder: ctrl.eventRecorder,
-		})
-	if err != nil {
-		glog.Fatalf("Error creating lock: %v", err)
-	}
+	if ctrl.leaderElection {
+		// TODO: passed in stopCh is ignored.
+		rl, err := resourcelock.New("endpoints",
+			ctrl.leaderElectionNamespace,
+			strings.Replace(ctrl.provisionerName, "/", "-", -1),
+			ctrl.client.CoreV1(),
+			resourcelock.ResourceLockConfig{
+				Identity:      ctrl.id,
+				EventRecorder: ctrl.eventRecorder,
+			})
+		if err != nil {
+			glog.Fatalf("Error creating lock: %v", err)
+		}
 
-	leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{
-		Lock:          rl,
-		LeaseDuration: ctrl.leaseDuration,
-		RenewDeadline: ctrl.renewDeadline,
-		RetryPeriod:   ctrl.retryPeriod,
-		Callbacks: leaderelection.LeaderCallbacks{
-			OnStartedLeading: run,
-			OnStoppedLeading: func() {
-				glog.Fatalf("leaderelection lost")
+		leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{
+			Lock:          rl,
+			LeaseDuration: ctrl.leaseDuration,
+			RenewDeadline: ctrl.renewDeadline,
+			RetryPeriod:   ctrl.retryPeriod,
+			Callbacks: leaderelection.LeaderCallbacks{
+				OnStartedLeading: run,
+				OnStoppedLeading: func() {
+					glog.Fatalf("leaderelection lost")
+				},
 			},
-		},
-	})
-	panic("unreachable")
+		})
+		panic("unreachable")
+	} else {
+		run(stopCh)
+	}
 }
 
 func (ctrl *ProvisionController) runClaimWorker() {
@@ -1162,6 +1201,22 @@ func (ctrl *ProvisionController) deleteVolumeOperation(volume *v1.PersistentVolu
 
 func logOperation(operation, format string, a ...interface{}) string {
 	return fmt.Sprintf(fmt.Sprintf("%s: %s", operation, format), a...)
+}
+
+// getInClusterNamespace returns the namespace in which the controller runs.
+func getInClusterNamespace() string {
+	if ns := os.Getenv("POD_NAMESPACE"); ns != "" {
+		return ns
+	}
+
+	// Fall back to the namespace associated with the service account token, if available
+	if data, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace"); err == nil {
+		if ns := strings.TrimSpace(string(data)); len(ns) > 0 {
+			return ns
+		}
+	}
+
+	return "default"
 }
 
 // getProvisionedVolumeNameForClaim returns PV.Name for the provisioned volume.
