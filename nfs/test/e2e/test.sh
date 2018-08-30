@@ -24,10 +24,10 @@ GOPATH=$TEST_DIR
 
 # Download kubernetes source
 if [ ! -e "$GOPATH/src/k8s.io/kubernetes" ]; then
-    mkdir -p $GOPATH/src/k8s.io
-    curl -L https://github.com/kubernetes/kubernetes/archive/v${KUBE_VERSION}.tar.gz | tar xz -C $TEST_DIR/src/k8s.io/
-    rm -rf $GOPATH/src/k8s.io/kubernetes
-    mv $GOPATH/src/k8s.io/kubernetes-$KUBE_VERSION $GOPATH/src/k8s.io/kubernetes
+  mkdir -p $GOPATH/src/k8s.io
+  curl -L https://github.com/kubernetes/kubernetes/archive/v${KUBE_VERSION}.tar.gz | tar xz -C $TEST_DIR/src/k8s.io/
+  rm -rf $GOPATH/src/k8s.io/kubernetes
+  mv $GOPATH/src/k8s.io/kubernetes-$KUBE_VERSION $GOPATH/src/k8s.io/kubernetes
 fi
 
 cd $GOPATH/src/k8s.io/kubernetes
@@ -46,7 +46,6 @@ cp -r $TEST_DIR/testing-manifests/* ./test/e2e/testing-manifests
 
 # Build ginkgo and e2e.test
 hack/update-bazel.sh
-make clean
 make ginkgo
 if ! type bazel; then
   wget https://github.com/bazelbuild/bazel/releases/download/0.16.0/bazel-0.16.0-installer-linux-x86_64.sh
@@ -58,8 +57,10 @@ rm -f ./_output/bin/e2e.test
 cp ./bazel-bin/test/e2e/e2e.test ./_output/bin
 
 # Download kubectl to _output directory
-curl -o ./_output/bin/kubectl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
-chmod +x ./_output/bin/kubectl
+if [ ! -e "./_output/bin/kubectl" ]; then
+  curl -o ./_output/bin/kubectl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+  chmod +x ./_output/bin/kubectl
+fi
 
 # Run tests assuming local cluster i.e. one started with hack/local-up-cluster.sh
 go run hack/e2e.go -- --provider=local --check-version-skew=false --test --test_args="--ginkgo.focus=external-storage"

@@ -16,10 +16,7 @@ rules:
     resources: ["events"]
     verbs: ["create", "update", "patch"]
   - apiGroups: [""]
-    resources: ["endpoints"]
-    verbs: ["get", "list", "watch", "create", "update", "patch"]
-  - apiGroups: [""]
-    resources: ["services"]
+    resources: ["services", "endpoints"]
     verbs: ["get"]
   - apiGroups: ["extensions"]
     resources: ["podsecuritypolicies"]
@@ -33,9 +30,32 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: nfs-provisioner
-    namespace: default
-# update namespace above to your namespace in order to make this work
+     # replace with namespace where provisioner is deployed
+    namespace: aosiefjase
 roleRef:
   kind: ClusterRole
   name: nfs-provisioner-runner
+  apiGroup: rbac.authorization.k8s.io
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: leader-locking-nfs-provisioner
+rules:
+  - apiGroups: [""]
+    resources: ["endpoints"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: leader-locking-nfs-provisioner
+subjects:
+  - kind: ServiceAccount
+    name: nfs-provisioner
+    # replace with namespace where provisioner is deployed
+    namespace: aosiefjase
+roleRef:
+  kind: Role
+  name: leader-locking-nfs-provisioner
   apiGroup: rbac.authorization.k8s.io

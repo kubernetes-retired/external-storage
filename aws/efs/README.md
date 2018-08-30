@@ -137,20 +137,16 @@ If you are not using RBAC or OpenShift you can continue to the usage section.
 
 ### Authorization
 
-If your cluster has RBAC enabled or you are running OpenShift you must authorize the provisioner. If you are in a namespace/project other than "default" either edit `deploy/auth/clusterrolebinding.yaml` or edit the `oadm policy` command accordingly.
+If your cluster has RBAC enabled or you are running OpenShift you must authorize the provisioner. If you are in a namespace/project other than "default" edit `deploy/rbac.yaml`.
 
 #### RBAC
 ```console
+# Set the subject of the RBAC objects to the current namespace where the provisioner is being deployed
+$ NAMESPACE=`kc config get-contexts | grep '^*' | tr -s ' ' | cut -d' ' -f5`
+$ sed -i'' "s/namespace:.*/namespace: $NAMESPACE/g" ./deploy/rbac.yaml
 $ kubectl create -f deploy/rbac.yaml
 ```
 
-#### OpenShift
-```console
-$ oc create -f deploy/openshift-clusterrole.yaml
-clusterrole "efs-provisioner-runner" created
-$ oadm policy add-scc-to-user hostmount-anyuid system:serviceaccount:default:efs-provisioner
-$ oadm policy add-cluster-role-to-user efs-provisioner-runner system:serviceaccount:default:efs-provisioner
-```
 ### SELinux
 If SELinux is enforcing on the node where the provisioner runs, you must enable writing from a pod to a remote NFS server (EFS in this case) on the node by running:
 ```console
