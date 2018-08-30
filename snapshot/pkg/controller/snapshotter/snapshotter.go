@@ -25,7 +25,7 @@ import (
 	crdv1 "github.com/kubernetes-incubator/external-storage/snapshot/pkg/apis/crd/v1"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/controller/cache"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume"
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -129,11 +129,16 @@ func (vs *volumeSnapshotter) getPVFromVolumeSnapshot(uniqueSnapshotName string, 
 	}
 
 	pvName := pvc.Spec.VolumeName
-	pv, err := vs.coreClient.CoreV1().PersistentVolumes().Get(pvName, metav1.GetOptions{})
+	pv, err := vs.getPVFromName(pvName)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to retrieve PV %s from the API server: %q", pvName, err)
 	}
 	return pv, nil
+}
+
+// Helper function to get PV from PV name
+func (vs *volumeSnapshotter) getPVFromName(pvName string) (*v1.PersistentVolume, error) {
+	return vs.coreClient.CoreV1().PersistentVolumes().Get(pvName, metav1.GetOptions{})
 }
 
 // TODO: cache the VolumeSnapshotData list since this is only needed when controller restarts, checks
@@ -286,7 +291,11 @@ func (vs *volumeSnapshotter) deleteSnapshot(spec *crdv1.VolumeSnapshotDataSpec) 
 		return fmt.Errorf("%s is not supported volume for %#v", volumeType, spec)
 	}
 	source := spec.VolumeSnapshotDataSource
-	err := plugin.SnapshotDelete(&source, nil /* *v1.PersistentVolume */)
+	pv, err := vs.getPVFromName(spec.PersistentVolumeRef.Name)
+	if err != nil {
+		glog.Warningf("failed to retrieve PV %s from the API server: %q", spec.PersistentVolumeRef.Name, err)
+	}
+	err = plugin.SnapshotDelete(&source, pv)
 	if err != nil {
 		return fmt.Errorf("failed to delete snapshot %#v, err: %v", source, err)
 	}
