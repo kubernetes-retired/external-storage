@@ -25,7 +25,7 @@ import (
 	"net/http"
 	"testing"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -376,6 +376,10 @@ func Test_deleteSnapshot(t *testing.T) {
 	vs := vsObj.(*volumeSnapshotter)
 
 	snapDataList := fakeVolumeSnapshotDataList()
+	// create fake PV
+	pv := fakePV()
+	pv.Name = snapDataList.Items[0].Spec.PersistentVolumeRef.Name
+	vs.coreClient.CoreV1().PersistentVolumes().Create(pv)
 	err = vs.deleteSnapshot(&snapDataList.Items[0].Spec)
 	if err != nil {
 		t.Errorf("Test failed, unexpected error: %v", err)
