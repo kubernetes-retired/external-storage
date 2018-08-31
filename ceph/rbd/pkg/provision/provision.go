@@ -281,7 +281,7 @@ func (p *rbdProvisioner) parseParameters(parameters map[string]string) (*rbdProv
 			arr := strings.Split(v, ",")
 			for _, m := range arr {
 				mhost, mport := splitHostPort(m)
-				if dnsip != "" {
+				if dnsip != "" && net.ParseIP(mhost) == nil {
 					var lookup []string
 					if lookup, err = lookuphost(mhost, dnsip); err == nil {
 						for _, a := range lookup {
