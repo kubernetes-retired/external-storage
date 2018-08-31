@@ -224,6 +224,10 @@ func findDNSIP(p *rbdProvisioner) (dnsip string) {
 
 // Look up hostname in dns server serverip.
 func lookuphost(hostname string, serverip string) (iplist []string, err error) {
+	if net.ParseIP(hostname) != nil {
+		glog.V(4).Infof("%q detected as IP address\n", hostname)
+		return append(iplist, hostname), nil
+	}
 	glog.V(4).Infof("lookuphost %q on %q\n", hostname, serverip)
 	m := new(dns.Msg)
 	m.SetQuestion(dns.Fqdn(hostname), dns.TypeA)
