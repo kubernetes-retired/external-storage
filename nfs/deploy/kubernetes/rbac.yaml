@@ -31,7 +31,7 @@ subjects:
   - kind: ServiceAccount
     name: nfs-provisioner
      # replace with namespace where provisioner is deployed
-    namespace: aosiefjase
+    namespace: default
 roleRef:
   kind: ClusterRole
   name: nfs-provisioner-runner
@@ -54,7 +54,7 @@ subjects:
   - kind: ServiceAccount
     name: nfs-provisioner
     # replace with namespace where provisioner is deployed
-    namespace: aosiefjase
+    namespace: default
 roleRef:
   kind: Role
   name: leader-locking-nfs-provisioner
