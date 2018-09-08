@@ -113,6 +113,10 @@ type MountConfig struct {
 	MountDir string `json:"mountDir" yaml:"mountDir"`
 	// The type of block cleaner to use
 	BlockCleanerCommand []string `json:"blockCleanerCommand" yaml:"blockCleanerCommand"`
+	// The uid of a mount directory
+	UID string `json:"uid" yaml:"uid"`
+	// The gid of a mount directory
+	GID string `json:"gid" yaml:"gid"`
 }
 
 // RuntimeConfig stores all the objects that the provisioner needs to run
