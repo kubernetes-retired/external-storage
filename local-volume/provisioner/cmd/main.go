@@ -152,9 +152,11 @@ func startChownProcessor(signal <-chan int, storageClassConfig map[string]common
 		if !running {
 			break
 		}
+		completed := 0
 		for _, config := range storageClassConfig {
 			rc, ok := state[config.MountDir]
 			if ok && rc {
+				completed++
 				continue
 			}
 			state[config.MountDir] = false
@@ -181,12 +183,17 @@ func startChownProcessor(signal <-chan int, storageClassConfig map[string]common
 			}
 			glog.Infof("Mount dir chowned: %s %s:%s", config.MountDir, config.UID, config.GID)
 			state[config.MountDir] = true
+			completed++
 		}
 		select {
 		case <-signal:
 			running = false
 		default:
 			running = true
+		}
+		if completed == len(storageClassConfig) {
+			glog.Infof("Finishing chown-processor: %d dirs processed", completed)
+			running = false
 		}
 	}
 }
