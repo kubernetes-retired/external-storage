@@ -161,6 +161,7 @@ func startChownProcessor(signal <-chan int, storageClassConfig map[string]common
 			}
 			state[config.MountDir] = false
 			if config.UID == "" || config.GID == "" {
+				completed++
 				continue
 			}
 			uid, err := strconv.Atoi(config.UID)
