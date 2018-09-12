@@ -142,7 +142,7 @@ If your cluster has RBAC enabled or you are running OpenShift you must authorize
 #### RBAC
 ```console
 # Set the subject of the RBAC objects to the current namespace where the provisioner is being deployed
-$ NAMESPACE=`kc config get-contexts | grep '^*' | tr -s ' ' | cut -d' ' -f5`
+$ NAMESPACE=`kubectl config get-contexts | grep '^*' | tr -s ' ' | cut -d' ' -f5`
 $ sed -i'' "s/namespace:.*/namespace: $NAMESPACE/g" ./deploy/rbac.yaml
 $ kubectl create -f deploy/rbac.yaml
 ```
