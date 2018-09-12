@@ -32,4 +32,4 @@ volumes:
 - downwardAPI
 - emptyDir
 - persistentVolumeClaim
-- secret<Paste>
+- secret
