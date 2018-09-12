@@ -123,7 +123,7 @@ func (p *rbdProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 		return nil, err
 	}
 	// create random image name
-	image := fmt.Sprintf("kubernetes-dynamic-pvc-%s", uuid.NewUUID())
+	image := fmt.Sprintf("%s-%s-%s", options.PVC.Namespace, options.PVC.Name, uuid.NewUUID())
 	rbd, sizeMB, err := p.rbdUtil.CreateImage(image, opts, options)
 	if err != nil {
 		glog.Errorf("rbd: create volume failed, err: %v", err)
@@ -140,7 +140,7 @@ func (p *rbdProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: options.PVName,
+			Name: image,
 			Annotations: map[string]string{
 				provisionerIDAnn: p.identity,
 			},
