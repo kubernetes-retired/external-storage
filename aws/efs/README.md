@@ -153,7 +153,7 @@ If SELinux is enforcing on the node where the provisioner runs, you must enable 
 $ setsebool -P virt_use_nfs 1
 $ setsebool -P virt_sandbox_use_nfs 1
 ```
-https://docs.openshift.org/latest/install_config/persistent_storage/persistent_storage_nfs.html#nfs-selinux
+https://docs.okd.io/latest/install_config/persistent_storage/persistent_storage_nfs.html#nfs-selinux
 
 ## Usage
 
