@@ -21,6 +21,7 @@ type ListOpts struct {
 	RemoteIPPrefix string `q:"remote_ip_prefix"`
 	SecGroupID     string `q:"security_group_id"`
 	TenantID       string `q:"tenant_id"`
+	ProjectID      string `q:"project_id"`
 	Limit          int    `q:"limit"`
 	Marker         string `q:"marker"`
 	SortKey        string `q:"sort_key"`
@@ -87,6 +88,9 @@ type CreateOpts struct {
 	// group rule is applied.
 	Direction RuleDirection `json:"direction" required:"true"`
 
+	// String description of each rule, optional
+	Description string `json:"description" required:"false"`
+
 	// Must be "IPv4" or "IPv6", and addresses represented in CIDR must match the
 	// ingress or egress rules.
 	EtherType RuleEtherType `json:"ethertype" required:"true"`
@@ -118,9 +122,9 @@ type CreateOpts struct {
 	// specified IP prefix as the source IP address of the IP packet.
 	RemoteIPPrefix string `json:"remote_ip_prefix,omitempty"`
 
-	// The UUID of the tenant who owns the Rule. Only administrative users
-	// can specify a tenant UUID other than their own.
-	TenantID string `json:"tenant_id,omitempty"`
+	// TenantID is the UUID of the project who owns the Rule.
+	// Only administrative users can specify a project UUID other than their own.
+	ProjectID string `json:"project_id,omitempty"`
 }
 
 // ToSecGroupRuleCreateMap builds a request body from CreateOpts.

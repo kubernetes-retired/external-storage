@@ -52,14 +52,7 @@ func SetFieldsRequiredByDefault(value bool) {
 }
 
 // IsEmail check if the string is an email.
-func IsEmail(str string) bool {
-	// TODO uppercase letters are not supported
-	return rxEmail.MatchString(str)
-}
-
-// IsExistingEmail check if the string is an email of existing domain
-func IsExistingEmail(email string) bool {
-
+func IsEmail(email string) bool {
 	if len(email) < 6 || len(email) > 254 {
 		return false
 	}
