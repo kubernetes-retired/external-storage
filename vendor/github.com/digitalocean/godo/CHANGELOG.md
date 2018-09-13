@@ -1,5 +1,18 @@
 # Change Log
 
+## [v1.4.2] - 2018-08-30
+
+- #178 Allowing creating domain records with weight of 0 - @TFaga
+- #177 Adding `VolumeLimit` to account - @lxfontes
+
+## [v1.4.1] - 2018-08-23
+
+- #176 Fix cdn flush cache API endpoint - @sunny-b
+
+## [v1.4.0] - 2018-08-22
+
+- #175 Add support for Spaces CDN - @sunny-b
+
 ## [v1.3.0] - 2018-05-24
 
 - #170 Add support for volume formatting - @adamwg
