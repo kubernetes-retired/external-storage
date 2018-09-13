@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/deleter"
-	"k8s.io/kube-state-metrics/collectors/testutils"
+	"k8s.io/kube-state-metrics/pkg/collectors/testutils"
 )
 
 func newUint64Pointer(i uint64) *uint64 {
