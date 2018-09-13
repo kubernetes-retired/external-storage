@@ -17,6 +17,7 @@ type ListOpts struct {
 	Distributed  *bool  `q:"distributed"`
 	Status       string `q:"status"`
 	TenantID     string `q:"tenant_id"`
+	ProjectID    string `q:"project_id"`
 	Limit        int    `q:"limit"`
 	Marker       string `q:"marker"`
 	SortKey      string `q:"sort_key"`
@@ -49,11 +50,13 @@ type CreateOptsBuilder interface {
 // CreateOpts contains all the values needed to create a new router. There are
 // no required values.
 type CreateOpts struct {
-	Name         string       `json:"name,omitempty"`
-	AdminStateUp *bool        `json:"admin_state_up,omitempty"`
-	Distributed  *bool        `json:"distributed,omitempty"`
-	TenantID     string       `json:"tenant_id,omitempty"`
-	GatewayInfo  *GatewayInfo `json:"external_gateway_info,omitempty"`
+	Name                  string       `json:"name,omitempty"`
+	AdminStateUp          *bool        `json:"admin_state_up,omitempty"`
+	Distributed           *bool        `json:"distributed,omitempty"`
+	TenantID              string       `json:"tenant_id,omitempty"`
+	ProjectID             string       `json:"project_id,omitempty"`
+	GatewayInfo           *GatewayInfo `json:"external_gateway_info,omitempty"`
+	AvailabilityZoneHints []string     `json:"availability_zone_hints,omitempty"`
 }
 
 // ToRouterCreateMap builds a create request body from CreateOpts.
