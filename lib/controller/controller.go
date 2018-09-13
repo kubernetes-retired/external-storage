@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -625,9 +626,13 @@ func (ctrl *ProvisionController) forgetWork(queue workqueue.RateLimitingInterfac
 }
 
 // Run starts all of this controller's control loops
-func (ctrl *ProvisionController) Run(stopCh <-chan struct{}) {
+func (ctrl *ProvisionController) Run(_ <-chan struct{}) {
+	// TODO: arg is as of 1.12 unused. Nothing can ever be cancelled. Should
+	// accept a context instead and use it instead of context.TODO(), but would
+	// break API. Not urgent: realistically, users are simply passing in
+	// wait.NeverStop() anyway.
 
-	run := func(stopCh <-chan struct{}) {
+	run := func(ctx context.Context) {
 		glog.Infof("Starting provisioner controller %s!", ctrl.component)
 		defer utilruntime.HandleCrash()
 		defer ctrl.claimQueue.ShutDown()
@@ -659,31 +664,30 @@ func (ctrl *ProvisionController) Run(stopCh <-chan struct{}) {
 		// If a SharedInformer has been passed in, this controller should not
 		// call Run again
 		if ctrl.claimInformer == nil {
-			go ctrl.claimController.Run(stopCh)
+			go ctrl.claimController.Run(ctx.Done())
 		}
 		if ctrl.volumeInformer == nil {
-			go ctrl.volumeController.Run(stopCh)
+			go ctrl.volumeController.Run(ctx.Done())
 		}
 		if ctrl.classInformer == nil {
-			go ctrl.classController.Run(stopCh)
+			go ctrl.classController.Run(ctx.Done())
 		}
 
-		if !cache.WaitForCacheSync(stopCh, ctrl.claimController.HasSynced, ctrl.volumeController.HasSynced, ctrl.classController.HasSynced) {
+		if !cache.WaitForCacheSync(ctx.Done(), ctrl.claimController.HasSynced, ctrl.volumeController.HasSynced, ctrl.classController.HasSynced) {
 			return
 		}
 
 		for i := 0; i < ctrl.threadiness; i++ {
-			go wait.Until(ctrl.runClaimWorker, time.Second, stopCh)
-			go wait.Until(ctrl.runVolumeWorker, time.Second, stopCh)
+			go wait.Until(ctrl.runClaimWorker, time.Second, context.TODO().Done())
+			go wait.Until(ctrl.runVolumeWorker, time.Second, context.TODO().Done())
 		}
 
 		glog.Infof("Started provisioner controller %s!", ctrl.component)
 
-		<-stopCh
+		select {}
 	}
 
 	if ctrl.leaderElection {
-		// TODO: passed in stopCh is ignored.
 		rl, err := resourcelock.New("endpoints",
 			ctrl.leaderElectionNamespace,
 			strings.Replace(ctrl.provisionerName, "/", "-", -1),
@@ -696,7 +700,7 @@ func (ctrl *ProvisionController) Run(stopCh <-chan struct{}) {
 			glog.Fatalf("Error creating lock: %v", err)
 		}
 
-		leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{
+		leaderelection.RunOrDie(context.TODO(), leaderelection.LeaderElectionConfig{
 			Lock:          rl,
 			LeaseDuration: ctrl.leaseDuration,
 			RenewDeadline: ctrl.renewDeadline,
@@ -710,7 +714,7 @@ func (ctrl *ProvisionController) Run(stopCh <-chan struct{}) {
 		})
 		panic("unreachable")
 	} else {
-		run(stopCh)
+		run(context.TODO())
 	}
 }
 

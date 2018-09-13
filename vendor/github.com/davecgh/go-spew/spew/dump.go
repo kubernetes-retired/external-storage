@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Dave Collins <dave@davec.name>
+ * Copyright (c) 2013-2016 Dave Collins <dave@davec.name>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -35,16 +35,16 @@ var (
 
 	// cCharRE is a regular expression that matches a cgo char.
 	// It is used to detect character arrays to hexdump them.
-	cCharRE = regexp.MustCompile("^.*\\._Ctype_char$")
+	cCharRE = regexp.MustCompile(`^.*\._Ctype_char$`)
 
 	// cUnsignedCharRE is a regular expression that matches a cgo unsigned
 	// char.  It is used to detect unsigned character arrays to hexdump
 	// them.
-	cUnsignedCharRE = regexp.MustCompile("^.*\\._Ctype_unsignedchar$")
+	cUnsignedCharRE = regexp.MustCompile(`^.*\._Ctype_unsignedchar$`)
 
 	// cUint8tCharRE is a regular expression that matches a cgo uint8_t.
 	// It is used to detect uint8_t arrays to hexdump them.
-	cUint8tCharRE = regexp.MustCompile("^.*\\._Ctype_uint8_t$")
+	cUint8tCharRE = regexp.MustCompile(`^.*\._Ctype_uint8_t$`)
 )
 
 // dumpState contains information about the state of a dump operation.
@@ -143,10 +143,10 @@ func (d *dumpState) dumpPtr(v reflect.Value) {
 	// Display dereferenced value.
 	d.w.Write(openParenBytes)
 	switch {
-	case nilFound == true:
+	case nilFound:
 		d.w.Write(nilAngleBytes)
 
-	case cycleFound == true:
+	case cycleFound:
 		d.w.Write(circularBytes)
 
 	default:

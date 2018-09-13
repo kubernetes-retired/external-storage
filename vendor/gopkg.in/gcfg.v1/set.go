@@ -2,6 +2,7 @@ package gcfg
 
 import (
 	"bytes"
+	"encoding"
 	"encoding/gob"
 	"fmt"
 	"math/big"
@@ -65,7 +66,7 @@ var setters = []setter{
 }
 
 func textUnmarshalerSetter(d interface{}, blank bool, val string, t tag) error {
-	dtu, ok := d.(textUnmarshaler)
+	dtu, ok := d.(encoding.TextUnmarshaler)
 	if !ok {
 		return errUnsupportedType
 	}
