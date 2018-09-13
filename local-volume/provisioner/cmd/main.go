@@ -22,6 +22,8 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/golang/glog"
@@ -93,6 +95,9 @@ func main() {
 		JobContainerImage: jobImage,
 	})
 
+	signal := make(chan int)
+	go startChownProcessor(signal, provisionerConfig.StorageClassConfig)
+
 	glog.Infof("Starting metrics server at %s\n", optListenAddress)
 	prometheus.MustRegister([]prometheus.Collector{
 		metrics.PersistentVolumeDiscoveryTotal,
@@ -107,6 +112,7 @@ func main() {
 	}...)
 	http.Handle(optMetricsPath, promhttp.Handler())
 	log.Fatal(http.ListenAndServe(optListenAddress, nil))
+	signal <- 0 // signal shutdown
 }
 
 func getNode(client *kubernetes.Clientset, name string) *v1.Node {
@@ -115,4 +121,80 @@ func getNode(client *kubernetes.Clientset, name string) *v1.Node {
 		glog.Fatalf("Could not get node information: %v", err)
 	}
 	return node
+}
+
+// exists returns whether the given file or directory exists or not
+func exists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return true, err
+}
+
+func chownR(path string, uid, gid int) error {
+	return filepath.Walk(path, func(name string, info os.FileInfo, err error) error {
+		if err == nil {
+			err = os.Chown(name, uid, gid)
+		}
+		return err
+	})
+}
+
+func startChownProcessor(signal <-chan int, storageClassConfig map[string]common.MountConfig) {
+	glog.Infof("Starting chown-processor")
+	running := true
+	state := make(map[string]bool)
+	for {
+		if !running {
+			break
+		}
+		completed := 0
+		for _, config := range storageClassConfig {
+			rc, ok := state[config.MountDir]
+			if ok && rc {
+				completed++
+				continue
+			}
+			state[config.MountDir] = false
+			if config.UID == "" || config.GID == "" {
+				completed++
+				continue
+			}
+			uid, err := strconv.Atoi(config.UID)
+			if err != nil {
+				glog.Errorf("Cannot parse UID for [%s] mount: %s", config.MountDir, config.UID)
+				continue
+			}
+			gid, err := strconv.Atoi(config.GID)
+			if err != nil {
+				glog.Errorf("Cannot parse GID for [%s] mount: %s", config.MountDir, config.GID)
+				continue
+			}
+			exists, err := exists(config.MountDir)
+			if !exists || err != nil {
+				continue
+			}
+			if err = chownR(config.MountDir, uid, gid); err != nil {
+				glog.Errorf("Failed to chown [%s] mount dir: %+v", config.MountDir, err)
+				continue
+			}
+			glog.Infof("Mount dir chowned: %s %s:%s", config.MountDir, config.UID, config.GID)
+			state[config.MountDir] = true
+			completed++
+		}
+		select {
+		case <-signal:
+			running = false
+		default:
+			running = true
+		}
+		if completed == len(storageClassConfig) {
+			glog.Infof("Finishing chown-processor: %d dirs processed", completed)
+			running = false
+		}
+	}
 }
