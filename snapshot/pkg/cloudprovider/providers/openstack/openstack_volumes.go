@@ -156,7 +156,7 @@ func (os *OpenStack) AttachDisk(instanceID, volumeID string) (string, error) {
 	}
 	if volume.Status != VolumeAvailableStatus {
 		errmsg := fmt.Sprintf("volume %s status is %s, not %s, can not be attached to instance %s.", volume.Name, volume.Status, VolumeAvailableStatus, instanceID)
-		glog.Errorf(errmsg)
+		glog.Error(errmsg)
 		return "", errors.New(errmsg)
 	}
 	cClient, err := os.NewComputeV2()
@@ -196,7 +196,7 @@ func (os *OpenStack) DetachDisk(instanceID, volumeID string) error {
 	}
 	if volume.Status != VolumeInUseStatus {
 		errmsg := fmt.Sprintf("can not detach volume %s, its status is %s.", volume.Name, volume.Status)
-		glog.Errorf(errmsg)
+		glog.Error(errmsg)
 		return errors.New(errmsg)
 	}
 	cClient, err := os.NewComputeV2()
@@ -205,7 +205,7 @@ func (os *OpenStack) DetachDisk(instanceID, volumeID string) error {
 	}
 	if volume.AttachedServerID != instanceID {
 		errMsg := fmt.Sprintf("Disk: %s has no attachments or is not attached to compute: %s", volume.Name, instanceID)
-		glog.Errorf(errMsg)
+		glog.Error(errMsg)
 		return errors.New(errMsg)
 	}
 
@@ -322,7 +322,7 @@ func (os *OpenStack) GetAttachmentDiskPath(instanceID, volumeID string) (string,
 	}
 	if volume.Status != VolumeInUseStatus {
 		errmsg := fmt.Sprintf("can not get device path of volume %s, its status is %s.", volume.Name, volume.Status)
-		glog.Errorf(errmsg)
+		glog.Error(errmsg)
 		return "", errors.New(errmsg)
 	}
 	if volume.AttachedServerID != "" {
@@ -332,7 +332,7 @@ func (os *OpenStack) GetAttachmentDiskPath(instanceID, volumeID string) (string,
 			return volume.AttachedDevice, nil
 		}
 		errMsg := fmt.Sprintf("Disk %q is attached to a different compute: %q, should be detached before proceeding", volumeID, volume.AttachedServerID)
-		glog.Errorf(errMsg)
+		glog.Error(errMsg)
 		return "", errors.New(errMsg)
 	}
 	return "", fmt.Errorf("volume %s has no ServerId", volumeID)
