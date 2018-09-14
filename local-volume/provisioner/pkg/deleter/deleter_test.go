@@ -628,7 +628,7 @@ func waitForAsyncToComplete(t *testing.T, d *Deleter, pvNames ...string) {
 	d.DeletePVs()
 	for _, pvName := range pvNames {
 		if d.CleanupStatus.ProcTable.IsRunning(pvName) {
-			t.Errorf("Command failed to complete for pv " + pvName)
+			t.Errorf("Command failed to complete for pv %s", pvName)
 		}
 	}
 }

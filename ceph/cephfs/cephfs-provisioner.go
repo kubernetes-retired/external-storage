@@ -122,7 +122,7 @@ func (p *cephFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 	}
 	var share, user string
 	if deterministicNames {
-		share = fmt.Sprintf(options.PVC.Name)
+		share = options.PVC.Name
 		user = fmt.Sprintf("k8s.%s.%s", options.PVC.Namespace, options.PVC.Name)
 	} else {
 		// create random share name
