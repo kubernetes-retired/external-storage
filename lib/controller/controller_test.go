@@ -623,7 +623,7 @@ func TestCanProvision(t *testing.T) {
 	}
 }
 
-func TestControllerSharedInformers(t *testing.T) {
+func TestControllerExternalSharedInformers(t *testing.T) {
 	tests := []struct {
 		name            string
 		objs            []runtime.Object
@@ -672,8 +672,9 @@ func TestControllerSharedInformers(t *testing.T) {
 		if test.serverVersion != "" {
 			serverVersion = test.serverVersion
 		}
-		ctrl, informersFactory := newTestProvisionControllerSharedInformers(client, test.provisionerName,
-			newTestProvisioner(), serverVersion, sharedResyncPeriod)
+		ctrl, informersFactory := newTestProvisionControllerExternalSharedInformers(
+			client, test.provisionerName, newTestProvisioner(), serverVersion, sharedResyncPeriod,
+		)
 		stopCh := make(chan struct{})
 
 		go ctrl.Run(stopCh)
@@ -715,7 +716,7 @@ func newTestProvisionController(
 	return ctrl
 }
 
-func newTestProvisionControllerSharedInformers(
+func newTestProvisionControllerExternalSharedInformers(
 	client kubernetes.Interface,
 	provisionerName string,
 	provisioner Provisioner,
@@ -745,7 +746,8 @@ func newTestProvisionControllerSharedInformers(
 		RetryPeriod(resyncPeriod/2),
 		ClaimsInformer(claimInformer),
 		VolumesInformer(volumeInformer),
-		ClassesInformer(classInformer))
+		ClassesInformer(classInformer),
+	)
 
 	return ctrl, informerFactory
 }
