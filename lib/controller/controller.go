@@ -77,7 +77,7 @@ const annStorageProvisioner = "volume.beta.kubernetes.io/storage-provisioner"
 
 // This annotation is added to a PVC that has been triggered by scheduler to
 // be dynamically provisioned. Its value is the name of the selected node.
-const annSelectedNode = "volume.alpha.kubernetes.io/selected-node"
+const annSelectedNode = "volume.kubernetes.io/selected-node"
 
 // ProvisionController is a controller that provisions PersistentVolumes for
 // PersistentVolumeClaims.
