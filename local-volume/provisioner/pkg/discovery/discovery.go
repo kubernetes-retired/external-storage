@@ -217,7 +217,7 @@ func (d *Discoverer) discoverVolumesAtPath(class string, config common.MountConf
 				*pv.Spec.VolumeMode != v1.PersistentVolumeBlock) {
 				errStr := fmt.Sprintf("Incorrect Volume Mode: PV %q (path %q) was not created in block mode. "+
 					"Please check if BlockVolume features gate has been enabled for the cluster.", pvName, filePath)
-				glog.Errorf(errStr)
+				glog.Error(errStr)
 				d.Recorder.Eventf(pv, v1.EventTypeWarning, common.EventVolumeFailedDelete, errStr)
 			}
 			continue
