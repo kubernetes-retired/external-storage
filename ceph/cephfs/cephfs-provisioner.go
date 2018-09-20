@@ -21,6 +21,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"strconv"
@@ -28,6 +29,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
+	"github.com/kubernetes-incubator/external-storage/lib/util"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -63,6 +65,8 @@ type cephFSProvisioner struct {
 	secretNamespace string
 	// enable PVC quota
 	enableQuota bool
+	// cached IP address of cluster DNS service
+	dnsip string
 }
 
 func newCephFSProvisioner(client kubernetes.Interface, id string, secretNamespace string, enableQuota bool) controller.Provisioner {
@@ -303,10 +307,30 @@ func (p *cephFSProvisioner) parseParameters(parameters map[string]string) (strin
 		case "cluster":
 			cluster = v
 		case "monitors":
+			// Try to find DNS info in local cluster DNS so that the kubernetes
+			// host DNS config doesn't have to know about cluster DNS
+			if p.dnsip == "" {
+				p.dnsip = util.FindDNSIP(p.client)
+			}
+			glog.V(4).Infof("dnsip: %q\n", p.dnsip)
 			arr := strings.Split(v, ",")
 			for _, m := range arr {
-				mon = append(mon, m)
+				mhost, mport := util.SplitHostPort(m)
+				if p.dnsip != "" && net.ParseIP(mhost) == nil {
+					var lookup []string
+					if lookup, err = util.LookupHost(mhost, p.dnsip); err == nil {
+						for _, a := range lookup {
+							glog.V(1).Infof("adding %+v from mon lookup\n", a)
+							mon = append(mon, util.JoinHostPort(a, mport))
+						}
+					} else {
+						mon = append(mon, util.JoinHostPort(mhost, mport))
+					}
+				} else {
+					mon = append(mon, util.JoinHostPort(mhost, mport))
+				}
 			}
+			glog.V(4).Infof("final monitors list: %v\n", mon)
 		case "adminid":
 			adminID = v
 		case "adminsecretname":
