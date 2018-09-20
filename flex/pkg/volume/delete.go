@@ -25,7 +25,7 @@ import (
 )
 
 func (p *flexProvisioner) Delete(volume *v1.PersistentVolume) error {
-	glog.Infof("Delete called for volume:", volume.Name)
+	glog.Infof("Delete called for volume: %s", volume.Name)
 
 	provisioned, err := p.provisioned(volume)
 	if err != nil {

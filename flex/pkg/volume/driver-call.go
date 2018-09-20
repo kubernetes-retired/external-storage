@@ -191,7 +191,7 @@ func handleCmdResponse(cmd string, output []byte) (*DriverStatus, error) {
 		return nil, errors.New(status.Status)
 	} else if status.Status != StatusSuccess {
 		errMsg := fmt.Sprintf("%s command failed, status: %s, reason: %s", cmd, status.Status, status.Message)
-		glog.Errorf(errMsg)
+		glog.Error(errMsg)
 		return nil, fmt.Errorf("%s", errMsg)
 	}
 
