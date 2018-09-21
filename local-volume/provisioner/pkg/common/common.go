@@ -79,6 +79,9 @@ const (
 
 	// NodeNameLabel is the name of the label that holds the nodename
 	NodeNameLabel = "kubernetes.io/hostname"
+
+	// DefaultVolumeMode is the default volume mode of created PV object.
+	DefaultVolumeMode = "Filesystem"
 )
 
 // UserConfig stores all the user-defined parameters to the provisioner
@@ -113,6 +116,14 @@ type MountConfig struct {
 	MountDir string `json:"mountDir" yaml:"mountDir"`
 	// The type of block cleaner to use
 	BlockCleanerCommand []string `json:"blockCleanerCommand" yaml:"blockCleanerCommand"`
+	// The volume mode of created PersistentVolume object,
+	// default to Filesystem if not specified.
+	VolumeMode string `json:"volumeMode" yaml:"volumeMode"`
+	// Filesystem type to mount.
+	// It applies only when the source path is a block device,
+	// and desire volume mode is Filesystem.
+	// Must be a filesystem type supported by the host operating system.
+	FsType string `json:"fsType" yaml:"fsType"`
 }
 
 // RuntimeConfig stores all the objects that the provisioner needs to run
@@ -150,6 +161,7 @@ type LocalPVConfig struct {
 	AffinityAnn     string
 	NodeAffinity    *v1.VolumeNodeAffinity
 	VolumeMode      v1.PersistentVolumeMode
+	FsType          *string
 	Labels          map[string]string
 }
 
@@ -201,7 +213,8 @@ func CreateLocalPVSpec(config *LocalPVConfig) *v1.PersistentVolume {
 			},
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				Local: &v1.LocalVolumeSource{
-					Path: config.HostPath,
+					Path:   config.HostPath,
+					FSType: config.FsType,
 				},
 			},
 			AccessModes: []v1.PersistentVolumeAccessMode{
@@ -288,11 +301,22 @@ func ConfigMapDataToVolumeConfig(data map[string]string, provisionerConfig *Prov
 		if config.MountDir == "" || config.HostDir == "" {
 			return fmt.Errorf("Storage Class %v is misconfigured, missing HostDir or MountDir parameter", class)
 		}
+
+		if config.VolumeMode == "" {
+			config.VolumeMode = DefaultVolumeMode
+		}
+		volumeMode := v1.PersistentVolumeMode(config.VolumeMode)
+		if volumeMode != v1.PersistentVolumeBlock && volumeMode != v1.PersistentVolumeFilesystem {
+			return fmt.Errorf("unsupported volume mode %s", config.VolumeMode)
+		}
+
 		provisionerConfig.StorageClassConfig[class] = config
-		glog.Infof("StorageClass %q configured with MountDir %q, HostDir %q, BlockCleanerCommand %q",
+		glog.Infof("StorageClass %q configured with MountDir %q, HostDir %q, VolumeMode %q, FsType %q, BlockCleanerCommand %q",
 			class,
 			config.MountDir,
 			config.HostDir,
+			config.VolumeMode,
+			config.FsType,
 			config.BlockCleanerCommand)
 	}
 	return nil
@@ -365,4 +389,27 @@ func GenerateMountName(mount *MountConfig) string {
 	h.Write([]byte(mount.HostDir))
 	h.Write([]byte(mount.MountDir))
 	return fmt.Sprintf("mount-%x", h.Sum32())
+}
+
+// GetVolumeMode check volume mode of given path.
+func GetVolumeMode(volUtil util.VolumeUtil, fullPath string) (v1.PersistentVolumeMode, error) {
+	isdir, errdir := volUtil.IsDir(fullPath)
+	if isdir {
+		return v1.PersistentVolumeFilesystem, nil
+	}
+	// check for Block before returning errdir
+	isblk, errblk := volUtil.IsBlock(fullPath)
+	if isblk {
+		return v1.PersistentVolumeBlock, nil
+	}
+
+	if errdir == nil && errblk == nil {
+		return "", fmt.Errorf("Skipping file %q: not a directory nor block device", fullPath)
+	}
+
+	// report the first error found
+	if errdir != nil {
+		return "", fmt.Errorf("Directory check for %q failed: %s", fullPath, errdir)
+	}
+	return "", fmt.Errorf("Block device check for %q failed: %s", fullPath, errblk)
 }

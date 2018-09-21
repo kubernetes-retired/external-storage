@@ -107,6 +107,8 @@ func TestLoadProvisionerConfigs(t *testing.T) {
    blockCleanerCommand:
      - "/scripts/shred.sh"
      - "2"
+   volumeMode: Filesystem
+   fsType: ext4
 `,
 				"useAlphaAPI":     "true",
 				"minResyncPeriod": "1h30m",
@@ -117,6 +119,8 @@ func TestLoadProvisionerConfigs(t *testing.T) {
 						HostDir:             "/mnt/disks",
 						MountDir:            "/mnt/disks",
 						BlockCleanerCommand: []string{"/scripts/shred.sh", "2"},
+						VolumeMode:          "Filesystem",
+						FsType:              "ext4",
 					},
 				},
 				UseAlphaAPI: true,
