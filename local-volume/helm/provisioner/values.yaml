@@ -45,6 +45,14 @@ classes:
   # Optionally specify mount path of local volumes. By default, we use same
   # path as hostDir in container.
   # mountDir: /mnt/fast-disks
+  # The volume mode of created PersistentVolume object. Default to Filesystem
+  # if not specified.
+  volumeMode: Filesystem
+  # Filesystem type to mount.
+  # It applies only when the source path is a block device,
+  # and desire volume mode is Filesystem.
+  # Must be a filesystem type supported by the host operating system.
+  fsType: ext4
   blockCleanerCommand:
   #  Do a quick reset of the block device during its cleanup.
   #  - "/scripts/quick_reset.sh"
