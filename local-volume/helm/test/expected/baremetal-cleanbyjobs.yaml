@@ -13,6 +13,7 @@ data:
        mountDir: /mnt/disks
        blockCleanerCommand:
          - "/scripts/quick_reset.sh"
+       volumeMode: Block
 ---
 apiVersion: extensions/v1beta1
 kind: DaemonSet
