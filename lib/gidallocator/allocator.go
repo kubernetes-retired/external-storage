@@ -203,7 +203,7 @@ func (a *Allocator) collectGids(className string, gidTable *allocator.MinMaxAllo
 
 		_, err = gidTable.Allocate(gid)
 		if err == allocator.ErrConflict {
-			glog.Warningf("gid %v found in pv %v was already allocated", gid)
+			glog.Warningf("gid %v found in pv %v was already allocated", gid, pvName)
 		} else if err != nil {
 			glog.Errorf("failed to store gid %v found in pv '%v': %v", gid, pvName, err)
 			return err
