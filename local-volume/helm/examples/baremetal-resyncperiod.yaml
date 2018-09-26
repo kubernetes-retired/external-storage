@@ -5,4 +5,5 @@ classes:
   hostDir: /mnt/disks
   blockCleanerCommand:
   - "/scripts/quick_reset.sh"
+  volumeMode: Block
   storageClass: true

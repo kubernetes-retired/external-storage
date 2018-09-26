@@ -204,7 +204,7 @@ func (d *Discoverer) discoverVolumesAtPath(class string, config common.MountConf
 	for _, file := range files {
 		startTime := time.Now()
 		filePath := filepath.Join(config.MountDir, file)
-		volMode, err := d.getVolumeMode(filePath)
+		volMode, err := common.GetVolumeMode(d.VolUtil, filePath)
 		if err != nil {
 			glog.Error(err)
 			continue
@@ -213,11 +213,10 @@ func (d *Discoverer) discoverVolumesAtPath(class string, config common.MountConf
 		pvName := generatePVName(file, d.Node.Name, class)
 		pv, exists := d.Cache.GetPV(pvName)
 		if exists {
-			if volMode == v1.PersistentVolumeBlock && (pv.Spec.VolumeMode == nil ||
-				*pv.Spec.VolumeMode != v1.PersistentVolumeBlock) {
-				errStr := fmt.Sprintf("Incorrect Volume Mode: PV %q (path %q) was not created in block mode. "+
-					"Please check if BlockVolume features gate has been enabled for the cluster.", pvName, filePath)
-				glog.Error(errStr)
+			if pv.Spec.VolumeMode != nil && *pv.Spec.VolumeMode == v1.PersistentVolumeBlock &&
+				volMode == v1.PersistentVolumeFilesystem {
+				errStr := fmt.Sprintf("Incorrect Volume Mode: PV %q requires block mode but path %q was in fs mode.", pvName, filePath)
+				glog.Errorf(errStr)
 				d.Recorder.Eventf(pv, v1.EventTypeWarning, common.EventVolumeFailedDelete, errStr)
 			}
 			continue
@@ -233,6 +232,7 @@ func (d *Discoverer) discoverVolumesAtPath(class string, config common.MountConf
 		}
 
 		var capacityByte int64
+		desireVolumeMode := v1.PersistentVolumeMode(config.VolumeMode)
 		switch volMode {
 		case v1.PersistentVolumeBlock:
 			capacityByte, err = d.VolUtil.GetBlockCapacityByte(filePath)
@@ -241,6 +241,10 @@ func (d *Discoverer) discoverVolumesAtPath(class string, config common.MountConf
 				continue
 			}
 		case v1.PersistentVolumeFilesystem:
+			if desireVolumeMode == v1.PersistentVolumeBlock {
+				glog.Errorf("Path %q of filesystem mode cannot be used to create block volume", filePath)
+				continue
+			}
 			// Validate that this path is an actual mountpoint
 			if _, isMntPnt := mountPointMap[filePath]; isMntPnt == false {
 				glog.Errorf("Path %q is not an actual mountpoint", filePath)
@@ -256,30 +260,8 @@ func (d *Discoverer) discoverVolumesAtPath(class string, config common.MountConf
 			continue
 		}
 
-		d.createPV(file, class, reclaimPolicy, config, capacityByte, volMode, startTime)
+		d.createPV(file, class, reclaimPolicy, config, capacityByte, desireVolumeMode, startTime)
 	}
-}
-
-func (d *Discoverer) getVolumeMode(fullPath string) (v1.PersistentVolumeMode, error) {
-	isdir, errdir := d.VolUtil.IsDir(fullPath)
-	if isdir {
-		return v1.PersistentVolumeFilesystem, nil
-	}
-	// check for Block before returning errdir
-	isblk, errblk := d.VolUtil.IsBlock(fullPath)
-	if isblk {
-		return v1.PersistentVolumeBlock, nil
-	}
-
-	if errdir == nil && errblk == nil {
-		return "", fmt.Errorf("Skipping file %q: not a directory nor block device", fullPath)
-	}
-
-	// report the first error found
-	if errdir != nil {
-		return "", fmt.Errorf("Directory check for %q failed: %s", fullPath, errdir)
-	}
-	return "", fmt.Errorf("Block device check for %q failed: %s", fullPath, errblk)
 }
 
 func generatePVName(file, node, class string) string {
@@ -295,8 +277,8 @@ func (d *Discoverer) createPV(file, class string, reclaimPolicy v1.PersistentVol
 	pvName := generatePVName(file, d.Node.Name, class)
 	outsidePath := filepath.Join(config.HostDir, file)
 
-	glog.Infof("Found new volume of volumeMode %q at host path %q with capacity %d, creating Local PV %q",
-		volMode, outsidePath, capacityByte, pvName)
+	glog.Infof("Found new volume at host path %q with capacity %d, creating Local PV %q, required volumeMode %q",
+		outsidePath, capacityByte, pvName, volMode)
 
 	localPVConfig := &common.LocalPVConfig{
 		Name:            pvName,
@@ -314,6 +296,10 @@ func (d *Discoverer) createPV(file, class string, reclaimPolicy v1.PersistentVol
 		localPVConfig.AffinityAnn = d.nodeAffinityAnn
 	} else {
 		localPVConfig.NodeAffinity = d.nodeAffinity
+	}
+
+	if config.FsType != "" {
+		localPVConfig.FsType = &config.FsType
 	}
 
 	pvSpec := common.CreateLocalPVSpec(localPVConfig)
