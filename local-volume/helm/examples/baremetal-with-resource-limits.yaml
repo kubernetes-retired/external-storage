@@ -12,6 +12,7 @@ classes:
   - "2"
   # or blkdiscard utility by uncommenting the line below.
   # - "/scripts/blkdiscard.sh"
+  volumeMode: Block
   storageClass: true
 
 daemonset:

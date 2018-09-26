@@ -13,6 +13,7 @@ data:
        blockCleanerCommand:
          - "/scripts/shred.sh"
          - "2"
+       volumeMode: Block
 ---
 apiVersion: extensions/v1beta1
 kind: DaemonSet

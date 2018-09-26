@@ -6,7 +6,11 @@ common:
 classes:
 - name: local-scsi
   hostDir: "/mnt/disks/by-uuid/google-local-ssds-scsi-fs"
+  volumeMode: Filesystem
+  fsType: ext4
   storageClass: true
 - name: local-nvme
-  hostDir: "/mnt/disks/by-uuid/google-local-ssds-nvme-fs" 
+  hostDir: "/mnt/disks/by-uuid/google-local-ssds-nvme-fs"
+  volumeMode: Filesystem
+  fsType: ext4
   storageClass: true

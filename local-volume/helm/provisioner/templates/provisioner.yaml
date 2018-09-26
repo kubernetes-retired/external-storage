@@ -32,6 +32,12 @@ data:
        {{- range $val := $classConfig.blockCleanerCommand }}
          - "{{ $val -}}"{{- end}}
        {{- end }}
+       {{- if $classConfig.volumeMode }}
+       volumeMode: {{ $classConfig.volumeMode }}
+       {{- end }}
+       {{- if $classConfig.fsType }}
+       fsType: {{ $classConfig.fsType }}
+       {{- end }}
     {{- end }}
 ---
 apiVersion: extensions/v1beta1

@@ -84,9 +84,12 @@ func (d *Deleter) DeletePVs() {
 			// Cleanup volume
 			err := d.deletePV(pv)
 			if err != nil {
-				mode, runjob := d.getVolModeAndRunJob(pv)
+				mode, modeErr := d.getVolMode(pv)
+				if modeErr != nil {
+					mode = "unknown"
+				}
 				deleteType := metrics.DeleteTypeProcess
-				if runjob {
+				if d.shouldRunJob(mode) {
 					deleteType = metrics.DeleteTypeJob
 				}
 				metrics.PersistentVolumeDeleteFailedTotal.WithLabelValues(string(mode), deleteType).Inc()
@@ -102,13 +105,27 @@ func (d *Deleter) DeletePVs() {
 	}
 }
 
-func (d *Deleter) getVolModeAndRunJob(pv *v1.PersistentVolume) (v1.PersistentVolumeMode, bool) {
-	// Default is filesystem mode, so even if volume mode is not specified, mode should be filesystem.
-	volMode := v1.PersistentVolumeFilesystem
-	if pv.Spec.VolumeMode != nil && *pv.Spec.VolumeMode == v1.PersistentVolumeBlock {
-		volMode = v1.PersistentVolumeBlock
+func (d *Deleter) getVolMode(pv *v1.PersistentVolume) (v1.PersistentVolumeMode, error) {
+	config, ok := d.DiscoveryMap[pv.Spec.StorageClassName]
+	if !ok {
+		return "", fmt.Errorf("Unknown storage class name %s", pv.Spec.StorageClassName)
 	}
-	return volMode, d.RuntimeConfig.UseJobForCleaning
+
+	mountPath, err := common.GetContainerPath(pv, config)
+	if err != nil {
+		return "", err
+	}
+
+	volMode, err := common.GetVolumeMode(d.VolUtil, mountPath)
+	if err != nil {
+		return "", err
+	}
+
+	return volMode, nil
+}
+
+func (d *Deleter) shouldRunJob(mode v1.PersistentVolumeMode) bool {
+	return mode == v1.PersistentVolumeBlock && d.RuntimeConfig.UseJobForCleaning
 }
 
 func (d *Deleter) deletePV(pv *v1.PersistentVolume) error {
@@ -125,8 +142,11 @@ func (d *Deleter) deletePV(pv *v1.PersistentVolume) error {
 	if err != nil {
 		return err
 	}
-
-	volMode, runjob := d.getVolModeAndRunJob(pv)
+	volMode, err := d.getVolMode(pv)
+	if err != nil {
+		return fmt.Errorf("failed to get volume mode of path %q: %v", mountPath, err)
+	}
+	runjob := d.shouldRunJob(volMode)
 
 	// Exit if cleaning is still in progress.
 	if d.CleanupStatus.InProgress(pv.Name, runjob) {

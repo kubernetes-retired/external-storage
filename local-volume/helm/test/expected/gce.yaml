@@ -11,9 +11,13 @@ data:
     local-scsi:
        hostDir: /mnt/disks/by-uuid/google-local-ssds-scsi-fs
        mountDir: /mnt/disks/by-uuid/google-local-ssds-scsi-fs
+       volumeMode: Filesystem
+       fsType: ext4
     local-nvme:
        hostDir: /mnt/disks/by-uuid/google-local-ssds-nvme-fs
        mountDir: /mnt/disks/by-uuid/google-local-ssds-nvme-fs
+       volumeMode: Filesystem
+       fsType: ext4
 ---
 apiVersion: extensions/v1beta1
 kind: DaemonSet

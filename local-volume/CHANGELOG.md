@@ -1,3 +1,10 @@
+# HEAD
+
+Deployment updates:
+* support fs volumes on block
+  ([#980](https://github.com/kubernetes-incubator/external-storage/pull/980)).
+  The change breaks backwards compatibility for block volumes: Users must explicitly set volumeMode to "Block" in config if a StorageClass is expected to be used for block volumes.
+
 # [v2.2.0](https://github.com/kubernetes-incubator/external-storage/releases/tag/local-volume-provisioner-v2.2.0)
 Image updates:
 * Add Prometheus metrics
