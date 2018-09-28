@@ -161,6 +161,7 @@ type LocalPVConfig struct {
 	AffinityAnn     string
 	NodeAffinity    *v1.VolumeNodeAffinity
 	VolumeMode      v1.PersistentVolumeMode
+	MountOptions    []string
 	FsType          *string
 	Labels          map[string]string
 }
@@ -222,6 +223,7 @@ func CreateLocalPVSpec(config *LocalPVConfig) *v1.PersistentVolume {
 			},
 			StorageClassName: config.StorageClass,
 			VolumeMode:       &config.VolumeMode,
+			MountOptions:     config.MountOptions,
 		},
 	}
 	if config.UseAlphaAPI {
