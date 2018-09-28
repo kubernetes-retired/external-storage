@@ -78,6 +78,7 @@ var testStorageClasses = []*storagev1.StorageClass{
 			Name: "sc1",
 		},
 		ReclaimPolicy: &reclaimPolicyDelete,
+		MountOptions:  []string{"ro"},
 	},
 	{
 		ObjectMeta: metav1.ObjectMeta{
@@ -505,6 +506,19 @@ func verifyVolumeMode(t *testing.T, createdPV *v1.PersistentVolume, expectedPV *
 	}
 }
 
+func verifyMountOptions(t *testing.T, createdPV *v1.PersistentVolume) {
+	var expectedMountOptions []string
+	for _, class := range testStorageClasses {
+		if class.Name == createdPV.Spec.StorageClassName {
+			expectedMountOptions = class.MountOptions
+		}
+	}
+	eq := reflect.DeepEqual(expectedMountOptions, createdPV.Spec.MountOptions)
+	if !eq {
+		t.Errorf("MountOptions not as expected %v != %v", createdPV.Spec.MountOptions, expectedMountOptions)
+	}
+}
+
 // testPVInfo contains all the fields we are intested in validating.
 type testPVInfo struct {
 	pvName       string
@@ -564,6 +578,7 @@ func verifyCreatedPVs(t *testing.T, test *testConfig) {
 		verifyPVLabels(t, createdPV)
 		verifyCapacity(t, createdPV, expectedPV)
 		verifyVolumeMode(t, createdPV, expectedPV)
+		verifyMountOptions(t, createdPV)
 		// TODO: Verify volume type once that is supported in the API.
 	}
 }
