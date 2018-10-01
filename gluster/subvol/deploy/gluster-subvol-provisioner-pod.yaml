@@ -1,0 +1,93 @@
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: gluster-subvol-provisioner
+rules:
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "update"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["list", "watch", "create", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get","create","delete"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["routes"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["endpoints"]
+    # all provisioners require some access to Endpoints, but we also need to
+    # create/delete Endpoints to allow the mounts to happen in the namespace of
+    # the PVC (create, get, delete)
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  namespace: storage-gluster
+  name: gluster-subvol-provisioner
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: gluster-subvol-provisioner
+roleRef:
+  kind: ClusterRole
+  name: gluster-subvol-provisioner
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+- kind: ServiceAccount
+  namespace: storage-gluster
+  name: gluster-subvol-provisioner
+---
+kind: Deployment
+apiVersion: extensions/v1beta1
+metadata:
+  namespace: storage-gluster
+  name: gluster-subvol-provisioner
+  annotations:
+    description: Defines how to deploy the glusterfile provisioner pod.
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: storage-provisioner-gluster
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      namespace: storage-gluster
+      name: gluster-subvol-provisioner
+      labels:
+        k8s-app: storage-provisioner-gluster
+    spec:
+      serviceAccountName: gluster-subvol-provisioner
+      containers:
+      - name: gluster-subvol-provisioner
+        # TODO: use official images after provisioner has been merged
+        image: quay.io/nixpanic/k8s-external-storage:testing_gluster_subvol
+        imagePullPolicy: Always
+        volumeMounts:
+        - name: gluster-subvol-dev-fuse
+          mountPath: /dev/fuse
+        securityContext:
+          # capabilities do not seem to be sufficient, privileged needed :-/
+          privileged: true
+          #capabilities:
+          #  # need to mount the supervol to create subdirs
+          #  add: ["SYS_ADMIN"]
+      volumes:
+      - name: gluster-subvol-dev-fuse
+        hostPath:
+          path: /dev/fuse

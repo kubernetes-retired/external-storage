@@ -1,0 +1,43 @@
+---
+#
+# Once the website from website-centos.yaml has been created, the contents can
+# be cloned. A new PVC will be provisioned, and the contents from website-dev
+# should get cloned.
+#
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: website-prod
+  annotations:
+    k8s.io/CloneRequest: website-dev
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Mi
+  storageClassName: gluster-subvol
+---
+#
+# Start a NGINX webserver with the cloned website.
+# We'll skip creating a service, to keep things minimal.
+#
+apiVersion: v1
+kind: Pod
+metadata:
+  name: website-nginx
+spec:
+  containers:
+  - image: gcr.io/google_containers/nginx-slim:0.8
+    name: nginx
+    ports:
+    - containerPort: 80
+      name: web
+    volumeMounts:
+    - mountPath: /usr/share/nginx/html
+      name: website
+  volumes:
+  - name: website
+    persistentVolumeClaim:
+      claimName: website-prod
+

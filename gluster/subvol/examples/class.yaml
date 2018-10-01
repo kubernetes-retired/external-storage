@@ -1,0 +1,22 @@
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: supervol
+  namespace: storage-gluster
+spec:
+  storageClassName: "glusterfile"
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 4Gi
+---
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: gluster-subvol
+provisioner: gluster.org/gluster-subvol
+parameters:
+  namespace: storage-gluster
+  pvc: supervol

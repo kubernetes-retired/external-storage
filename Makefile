@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-all: aws/efs ceph/cephfs ceph/rbd flex gluster/block gluster/glusterfs gluster/file iscsi/targetd local-volume/provisioner nfs-client nfs snapshot
+all: aws/efs ceph/cephfs ceph/rbd flex gluster/block gluster/glusterfs gluster/file gluster/subvol iscsi/targetd local-volume/provisioner nfs-client nfs snapshot
 .PHONY: all
 
-clean: clean-aws/efs clean-ceph/cephfs clean-ceph/rbd clean-flex clean-gluster/block clean-gluster/glusterfs clean-iscsi/targetd clean-local-volume/provisioner clean-nfs-client clean-nfs clean-openebs clean-snapshot
+clean: clean-aws/efs clean-ceph/cephfs clean-ceph/rbd clean-flex clean-gluster/block clean-gluster/glusterfs clean-gluster/subvol clean-iscsi/targetd clean-local-volume/provisioner clean-nfs-client clean-nfs clean-openebs clean-snapshot
 .PHONY: clean
 
 test: test-aws/efs test-local-volume/provisioner test-nfs test-snapshot
@@ -100,6 +100,16 @@ clean-gluster/file:
 	cd gluster/file; \
 	make clean
 .PHONY: clean-gluster/file
+
+gluster/subvol:
+	cd gluster/subvol; \
+	make container
+.PHONY: gluster/subvol
+
+clean-gluster/subvol:
+	cd gluster/subvol; \
+	make clean
+.PHONY: clean-gluster/subvol
 
 iscsi/targetd:
 	cd iscsi/targetd; \

@@ -1,0 +1,44 @@
+---
+#
+# Minimal PVC where a developer can build a website.
+#
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: website-dev
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Mi
+  storageClassName: gluster-subvol
+---
+#
+# This pod will just download a fortune phrase and store it (as plain text) in
+# index.html on the PVC. This is how we create websites?
+#
+# The root of the website stored on the above PVC is mounted on /mnt.
+#
+apiVersion: v1
+kind: Pod
+metadata:
+  name: centos-webdev
+spec:
+  containers:
+  - image: centos:latest
+    name: centos
+    args:
+    - curl
+    - -o/mnt/index.html
+    - https://api.ef.gy/fortune
+    volumeMounts:
+    - mountPath: /mnt
+      name: website
+  # once the website is created, the pod will exit
+  restartPolicy: Never
+  volumes:
+  - name: website
+    persistentVolumeClaim:
+      claimName: website-dev
+
