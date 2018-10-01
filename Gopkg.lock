@@ -815,7 +815,7 @@
   version = "v2.2.1"
 
 [[projects]]
-  digest = "1:2ef69eae8d7f06d95c8567b146d08aa374455f871efa6c4e805905dfa7aa9b06"
+  digest = "1:910ec974550174f4ca48b9f4a3caec16b693e584c3762dc726dc0dcf28f8e318"
   name = "k8s.io/api"
   packages = [
     "admissionregistration/v1alpha1",
@@ -851,8 +851,8 @@
     "storage/v1beta1",
   ]
   pruneopts = "UT"
-  revision = "0527d9f2238346a310e6cf1e6afe2422f329cc3d"
-  version = "kubernetes-1.12.0-beta.1"
+  revision = "fd83cbc87e7632ccd8bbab63d2b673d4e0c631cc"
+  version = "kubernetes-1.12.0"
 
 [[projects]]
   digest = "1:68802413f6b2d016bc2a49fb2a66be5507bbfbae627f8b81badd30bac6c4aa26"
@@ -866,8 +866,8 @@
     "pkg/features",
   ]
   pruneopts = "UT"
-  revision = "e138199d57ae5108ebe5e18447f6b21c0efe9677"
-  version = "kubernetes-1.12.0-beta.1"
+  revision = "1748dfb29e8a4432b78514bc88a1b07937a9805a"
+  version = "kubernetes-1.12.0"
 
 [[projects]]
   digest = "1:ee6332b77951ce63a684169b4f1727c833c8a976cc726a93d87f1c04574b5208"
@@ -926,8 +926,8 @@
     "third_party/forked/golang/reflect",
   ]
   pruneopts = "UT"
-  revision = "63dd81ab0848cd58da3257a806f599808708029c"
-  version = "kubernetes-1.12.0-beta.1"
+  revision = "6dd46049f39503a1fc8d65de4bd566829e95faff"
+  version = "kubernetes-1.12.0"
 
 [[projects]]
   branch = "master"
@@ -944,7 +944,7 @@
   revision = "3bfd32753e74188b22f853117029bfc4360272c7"
 
 [[projects]]
-  digest = "1:cb538542d8894ebbadafd13d6ceac72fc2f97fcca82084532b4969a88563a158"
+  digest = "1:3bfa8144a5f4722df6b6de720e54f0bedc2509df51bfa735fe3d585fc115731b"
   name = "k8s.io/client-go"
   packages = [
     "discovery",
@@ -1124,8 +1124,8 @@
     "util/workqueue",
   ]
   pruneopts = "UT"
-  revision = "173ad5fde8e4ee8f92763f78c6ba37322f2125ab"
-  version = "kubernetes-1.12.0-beta.1"
+  revision = "1638f8970cefaa404ff3a62950f88b08292b2696"
+  version = "kubernetes-1.12.0"
 
 [[projects]]
   branch = "master"
@@ -1157,7 +1157,7 @@
   version = "v1.4.0"
 
 [[projects]]
-  digest = "1:5f21ea1faa436097ce7048a9c03e4dbac0193ef44580747e4abd730b2889e234"
+  digest = "1:6ad4d2445cf8e1d4a5aebd91f45c82169e796c6c1cdb18ddd75b7a63b934880f"
   name = "k8s.io/kubernetes"
   packages = [
     "pkg/api/legacyscheme",
@@ -1214,8 +1214,8 @@
     "pkg/volume/util/volumepathhandler",
   ]
   pruneopts = "UT"
-  revision = "0cafd04160ff4e5c16bb38d0e4ecae805c84d41c"
-  version = "v1.12.0-beta.2"
+  revision = "0ed33881dc4355495f623c6f22e7dd0b7632b7c0"
+  version = "v1.12.0"
 
 [[projects]]
   branch = "master"
@@ -1317,7 +1317,6 @@
     "k8s.io/apimachinery/pkg/util/validation",
     "k8s.io/apimachinery/pkg/util/validation/field",
     "k8s.io/apimachinery/pkg/util/wait",
-    "k8s.io/apimachinery/pkg/watch",
     "k8s.io/client-go/informers",
     "k8s.io/client-go/kubernetes",
     "k8s.io/client-go/kubernetes/fake",
