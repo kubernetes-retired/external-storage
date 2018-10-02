@@ -102,11 +102,11 @@ type ProvisionController struct {
 	// * 1.6: storage classes enter GA
 	kubeVersion *utilversion.Version
 
-	claimInformer  cache.SharedIndexInformer
+	claimInformer  cache.SharedInformer
 	claims         cache.Store
-	volumeInformer cache.SharedIndexInformer
+	volumeInformer cache.SharedInformer
 	volumes        cache.Store
-	classInformer  cache.SharedIndexInformer
+	classInformer  cache.SharedInformer
 	classes        cache.Store
 
 	// To determine if the informer is internal or external
@@ -334,7 +334,7 @@ func RetryPeriod(retryPeriod time.Duration) func(*ProvisionController) error {
 
 // ClaimsInformer sets the informer to use for accessing PersistentVolumeClaims.
 // Defaults to using a internal informer.
-func ClaimsInformer(informer cache.SharedIndexInformer) func(*ProvisionController) error {
+func ClaimsInformer(informer cache.SharedInformer) func(*ProvisionController) error {
 	return func(c *ProvisionController) error {
 		if c.HasRun() {
 			return errRuntime
@@ -347,7 +347,7 @@ func ClaimsInformer(informer cache.SharedIndexInformer) func(*ProvisionControlle
 
 // VolumesInformer sets the informer to use for accessing PersistentVolumes.
 // Defaults to using a internal informer.
-func VolumesInformer(informer cache.SharedIndexInformer) func(*ProvisionController) error {
+func VolumesInformer(informer cache.SharedInformer) func(*ProvisionController) error {
 	return func(c *ProvisionController) error {
 		if c.HasRun() {
 			return errRuntime
@@ -362,7 +362,7 @@ func VolumesInformer(informer cache.SharedIndexInformer) func(*ProvisionControll
 // The informer must use the versioned resource appropriate for the Kubernetes cluster version
 // (that is, v1.StorageClass for >= 1.6, and v1beta1.StorageClass for < 1.6).
 // Defaults to using a internal informer.
-func ClassesInformer(informer cache.SharedIndexInformer) func(*ProvisionController) error {
+func ClassesInformer(informer cache.SharedInformer) func(*ProvisionController) error {
 	return func(c *ProvisionController) error {
 		if c.HasRun() {
 			return errRuntime
