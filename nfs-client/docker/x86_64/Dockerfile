@@ -13,6 +13,6 @@
 # limitations under the License.
 
 FROM alpine:3.6
-RUN apk update --no-cache && apk add ca-certificates
+RUN apk update --no-cache && apk add ca-certificates nfs-utils
 COPY nfs-client-provisioner /nfs-client-provisioner
 ENTRYPOINT ["/nfs-client-provisioner"]
