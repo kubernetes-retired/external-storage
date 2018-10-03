@@ -39,11 +39,10 @@ import (
 	storagebeta "k8s.io/api/storage/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -103,15 +102,15 @@ type ProvisionController struct {
 	// * 1.6: storage classes enter GA
 	kubeVersion *utilversion.Version
 
-	claimInformer    cache.SharedInformer
-	claims           cache.Store
-	claimController  cache.Controller
-	volumeInformer   cache.SharedInformer
-	volumes          cache.Store
-	volumeController cache.Controller
-	classInformer    cache.SharedInformer
-	classes          cache.Store
-	classController  cache.Controller
+	claimInformer  cache.SharedInformer
+	claims         cache.Store
+	volumeInformer cache.SharedInformer
+	volumes        cache.Store
+	classInformer  cache.SharedInformer
+	classes        cache.Store
+
+	// To determine if the informer is internal or external
+	customClaimInformer, customVolumeInformer, customClassInformer bool
 
 	claimQueue  workqueue.RateLimitingInterface
 	volumeQueue workqueue.RateLimitingInterface
@@ -334,25 +333,27 @@ func RetryPeriod(retryPeriod time.Duration) func(*ProvisionController) error {
 }
 
 // ClaimsInformer sets the informer to use for accessing PersistentVolumeClaims.
-// Defaults to using a private (non-shared) informer.
+// Defaults to using a internal informer.
 func ClaimsInformer(informer cache.SharedInformer) func(*ProvisionController) error {
 	return func(c *ProvisionController) error {
 		if c.HasRun() {
 			return errRuntime
 		}
 		c.claimInformer = informer
+		c.customClaimInformer = true
 		return nil
 	}
 }
 
 // VolumesInformer sets the informer to use for accessing PersistentVolumes.
-// Defaults to using a private (non-shared) informer.
+// Defaults to using a internal informer.
 func VolumesInformer(informer cache.SharedInformer) func(*ProvisionController) error {
 	return func(c *ProvisionController) error {
 		if c.HasRun() {
 			return errRuntime
 		}
 		c.volumeInformer = informer
+		c.customVolumeInformer = true
 		return nil
 	}
 }
@@ -360,13 +361,14 @@ func VolumesInformer(informer cache.SharedInformer) func(*ProvisionController) e
 // ClassesInformer sets the informer to use for accessing StorageClasses.
 // The informer must use the versioned resource appropriate for the Kubernetes cluster version
 // (that is, v1.StorageClass for >= 1.6, and v1beta1.StorageClass for < 1.6).
-// Defaults to using a private (non-shared) informer.
+// Defaults to using a internal informer.
 func ClassesInformer(informer cache.SharedInformer) func(*ProvisionController) error {
 	return func(c *ProvisionController) error {
 		if c.HasRun() {
 			return errRuntime
 		}
 		c.classInformer = informer
+		c.customClassInformer = true
 		return nil
 	}
 }
@@ -478,17 +480,10 @@ func NewProvisionController(
 	controller.claimQueue = workqueue.NewNamedRateLimitingQueue(ratelimiter, "claims")
 	controller.volumeQueue = workqueue.NewNamedRateLimitingQueue(ratelimiter, "volumes")
 
+	informer := informers.NewSharedInformerFactory(client, controller.resyncPeriod)
+
 	// ----------------------
 	// PersistentVolumeClaims
-
-	claimSource := &cache.ListWatch{
-		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			return client.CoreV1().PersistentVolumeClaims(v1.NamespaceAll).List(options)
-		},
-		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			return client.CoreV1().PersistentVolumeClaims(v1.NamespaceAll).Watch(options)
-		},
-	}
 
 	claimHandler := cache.ResourceEventHandlerFuncs{
 		AddFunc:    func(obj interface{}) { controller.enqueueWork(controller.claimQueue, obj) },
@@ -498,30 +493,14 @@ func NewProvisionController(
 
 	if controller.claimInformer != nil {
 		controller.claimInformer.AddEventHandlerWithResyncPeriod(claimHandler, controller.resyncPeriod)
-		controller.claims, controller.claimController =
-			controller.claimInformer.GetStore(),
-			controller.claimInformer.GetController()
 	} else {
-		controller.claims, controller.claimController =
-			cache.NewInformer(
-				claimSource,
-				&v1.PersistentVolumeClaim{},
-				controller.resyncPeriod,
-				claimHandler,
-			)
+		controller.claimInformer = informer.Core().V1().PersistentVolumeClaims().Informer()
+		controller.claimInformer.AddEventHandler(claimHandler)
 	}
+	controller.claims = controller.claimInformer.GetStore()
 
 	// -----------------
 	// PersistentVolumes
-
-	volumeSource := &cache.ListWatch{
-		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			return client.CoreV1().PersistentVolumes().List(options)
-		},
-		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			return client.CoreV1().PersistentVolumes().Watch(options)
-		},
-	}
 
 	volumeHandler := cache.ResourceEventHandlerFuncs{
 		AddFunc:    func(obj interface{}) { controller.enqueueWork(controller.volumeQueue, obj) },
@@ -531,67 +510,24 @@ func NewProvisionController(
 
 	if controller.volumeInformer != nil {
 		controller.volumeInformer.AddEventHandlerWithResyncPeriod(volumeHandler, controller.resyncPeriod)
-		controller.volumes, controller.volumeController =
-			controller.volumeInformer.GetStore(),
-			controller.volumeInformer.GetController()
 	} else {
-		controller.volumes, controller.volumeController =
-			cache.NewInformer(
-				volumeSource,
-				&v1.PersistentVolume{},
-				controller.resyncPeriod,
-				volumeHandler,
-			)
+		controller.volumeInformer = informer.Core().V1().PersistentVolumes().Informer()
+		controller.volumeInformer.AddEventHandler(volumeHandler)
 	}
+	controller.volumes = controller.volumeInformer.GetStore()
 
 	// --------------
 	// StorageClasses
 
-	var versionedClassType runtime.Object
-	var classSource cache.ListerWatcher
-	if controller.kubeVersion.AtLeast(utilversion.MustParseSemantic("v1.6.0")) {
-		versionedClassType = &storage.StorageClass{}
-		classSource = &cache.ListWatch{
-			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				return client.StorageV1().StorageClasses().List(options)
-			},
-			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				return client.StorageV1().StorageClasses().Watch(options)
-			},
-		}
-	} else {
-		versionedClassType = &storagebeta.StorageClass{}
-		classSource = &cache.ListWatch{
-			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				return client.StorageV1beta1().StorageClasses().List(options)
-			},
-			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				return client.StorageV1beta1().StorageClasses().Watch(options)
-			},
+	// no resource event handler needed for StorageClasses
+	if controller.classInformer == nil {
+		if controller.kubeVersion.AtLeast(utilversion.MustParseSemantic("v1.6.0")) {
+			controller.classInformer = informer.Storage().V1().StorageClasses().Informer()
+		} else {
+			controller.classInformer = informer.Storage().V1beta1().StorageClasses().Informer()
 		}
 	}
-
-	classHandler := cache.ResourceEventHandlerFuncs{
-		// We don't need an actual event handler for StorageClasses,
-		// but we must pass a non-nil one to cache.NewInformer()
-		AddFunc:    nil,
-		UpdateFunc: nil,
-		DeleteFunc: nil,
-	}
-
-	if controller.classInformer != nil {
-		// no resource event handler needed for StorageClasses
-		controller.classes, controller.classController =
-			controller.classInformer.GetStore(),
-			controller.classInformer.GetController()
-	} else {
-		controller.classes, controller.classController = cache.NewInformer(
-			classSource,
-			versionedClassType,
-			controller.resyncPeriod,
-			classHandler,
-		)
-	}
+	controller.classes = controller.classInformer.GetStore()
 
 	return controller
 }
@@ -661,19 +597,19 @@ func (ctrl *ProvisionController) Run(_ <-chan struct{}) {
 			}, 5*time.Second)
 		}
 
-		// If a SharedInformer has been passed in, this controller should not
-		// call Run again
-		if ctrl.claimInformer == nil {
-			go ctrl.claimController.Run(ctx.Done())
+		// If a external SharedInformer has been passed in, this controller
+		// should not call Run again
+		if !ctrl.customClaimInformer {
+			go ctrl.claimInformer.Run(ctx.Done())
 		}
-		if ctrl.volumeInformer == nil {
-			go ctrl.volumeController.Run(ctx.Done())
+		if !ctrl.customVolumeInformer {
+			go ctrl.volumeInformer.Run(ctx.Done())
 		}
-		if ctrl.classInformer == nil {
-			go ctrl.classController.Run(ctx.Done())
+		if !ctrl.customClassInformer {
+			go ctrl.classInformer.Run(ctx.Done())
 		}
 
-		if !cache.WaitForCacheSync(ctx.Done(), ctrl.claimController.HasSynced, ctrl.volumeController.HasSynced, ctrl.classController.HasSynced) {
+		if !cache.WaitForCacheSync(ctx.Done(), ctrl.claimInformer.HasSynced, ctrl.volumeInformer.HasSynced, ctrl.classInformer.HasSynced) {
 			return
 		}
 
