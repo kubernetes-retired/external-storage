@@ -179,13 +179,6 @@ const (
 	// Enable nodes to exclude themselves from service load balancers
 	ServiceNodeExclusion utilfeature.Feature = "ServiceNodeExclusion"
 
-	// owner @brendandburns
-	// deprecated: v1.10
-	//
-	// Enable the service proxy to contact external IP addresses. Note this feature is present
-	// only for backward compatibility, it will be removed in the 1.11 release.
-	ServiceProxyAllowExternalIPs utilfeature.Feature = "ServiceProxyAllowExternalIPs"
-
 	// owner: @jsafrane
 	// alpha: v1.9
 	//
@@ -257,15 +250,8 @@ const (
 	// Enable Hyper-V containers on Windows
 	HyperVContainer utilfeature.Feature = "HyperVContainer"
 
-	// owner: @joelsmith
-	// deprecated: v1.10
-	//
-	// Mount secret, configMap, downwardAPI and projected volumes ReadOnly. Note: this feature
-	// gate is present only for backward compatibility, it will be removed in the 1.11 release.
-	ReadOnlyAPIDataVolumes utilfeature.Feature = "ReadOnlyAPIDataVolumes"
-
 	// owner: @k82cn
-	// alpha: v1.10
+	// beta: v1.12
 	//
 	// Schedule DaemonSet Pods by default scheduler instead of DaemonSet controller
 	ScheduleDaemonSetPods utilfeature.Feature = "ScheduleDaemonSetPods"
@@ -438,7 +424,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	SupportIPVSProxyMode:                        {Default: true, PreRelease: utilfeature.GA},
 	SupportPodPidsLimit:                         {Default: false, PreRelease: utilfeature.Alpha},
 	HyperVContainer:                             {Default: false, PreRelease: utilfeature.Alpha},
-	ScheduleDaemonSetPods:                       {Default: false, PreRelease: utilfeature.Alpha},
+	ScheduleDaemonSetPods:                       {Default: true, PreRelease: utilfeature.Beta},
 	TokenRequest:                                {Default: true, PreRelease: utilfeature.Beta},
 	TokenRequestProjection:                      {Default: true, PreRelease: utilfeature.Beta},
 	CRIContainerLogRotation:                     {Default: true, PreRelease: utilfeature.Beta},
@@ -473,6 +459,5 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	apiextensionsfeatures.CustomResourceSubresources: {Default: true, PreRelease: utilfeature.Beta},
 
 	// features that enable backwards compatibility but are scheduled to be removed
-	ServiceProxyAllowExternalIPs: {Default: false, PreRelease: utilfeature.Deprecated},
-	ReadOnlyAPIDataVolumes:       {Default: true, PreRelease: utilfeature.Deprecated},
+	// ...
 }
