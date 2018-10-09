@@ -4,6 +4,10 @@ kind: ClusterRoleBinding
 metadata:
   name: local-storage-provisioner-pv-binding
   namespace: {{ .Values.common.namespace }}
+  labels:
+    heritage: {{ .Release.Service | quote }}
+    release: {{ .Release.Name | quote }}
+    chart: {{ replace "+" "_" .Chart.Version | printf "%s-%s" .Chart.Name }}
 subjects:
 - kind: ServiceAccount
   name: {{ .Values.daemonset.serviceAccount }}
@@ -18,6 +22,10 @@ kind: ClusterRole
 metadata:
   name: local-storage-provisioner-node-clusterrole
   namespace: {{ .Values.common.namespace }}
+  labels:
+    heritage: {{ .Release.Service | quote }}
+    release: {{ .Release.Name | quote }}
+    chart: {{ replace "+" "_" .Chart.Version | printf "%s-%s" .Chart.Name }}
 rules:
 - apiGroups: [""]
   resources: ["nodes"]
@@ -28,6 +36,10 @@ kind: ClusterRoleBinding
 metadata:
   name: local-storage-provisioner-node-binding
   namespace: {{ .Values.common.namespace }}
+  labels:
+    heritage: {{ .Release.Service | quote }}
+    release: {{ .Release.Name | quote }}
+    chart: {{ replace "+" "_" .Chart.Version | printf "%s-%s" .Chart.Name }}
 subjects:
 - kind: ServiceAccount
   name: {{ .Values.daemonset.serviceAccount }}
@@ -43,6 +55,10 @@ kind: Role
 metadata:
   name: local-storage-provisioner-jobs-role
   namespace: {{ .Values.common.namespace }}
+  labels:
+    heritage: {{ .Release.Service | quote }}
+    release: {{ .Release.Name | quote }}
+    chart: {{ replace "+" "_" .Chart.Version | printf "%s-%s" .Chart.Name }}
 rules:
 - apiGroups:
     - 'batch'
@@ -56,6 +72,10 @@ kind: RoleBinding
 metadata:
   name: local-storage-provisioner-jobs-rolebinding
   namespace: {{ .Values.common.namespace }}
+  labels:
+    heritage: {{ .Release.Service | quote }}
+    release: {{ .Release.Name | quote }}
+    chart: {{ replace "+" "_" .Chart.Version | printf "%s-%s" .Chart.Name }}
 subjects:
 - kind: ServiceAccount
   name: {{ .Values.daemonset.serviceAccount }}
