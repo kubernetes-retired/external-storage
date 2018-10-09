@@ -3,6 +3,10 @@ kind: ConfigMap
 metadata:
   name: {{ .Values.common.configMapName }}
   namespace: {{ .Values.common.namespace }}
+  labels:
+    heritage: {{ .Release.Service | quote }}
+    release: {{ .Release.Name | quote }}
+    chart: {{ replace "+" "_" .Chart.Version | printf "%s-%s" .Chart.Name }}
 data:
 {{- if .Values.daemonset.nodeLabels }}
   nodeLabelsForPV: |
