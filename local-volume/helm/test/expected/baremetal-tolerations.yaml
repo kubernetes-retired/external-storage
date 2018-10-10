@@ -5,6 +5,10 @@ kind: ConfigMap
 metadata:
   name: local-provisioner-config
   namespace: default
+  labels:
+    heritage: "Tiller"
+    release: "RELEASE-NAME"
+    chart: provisioner-2.0.0
 data:
   storageClassMap: |
     local-storage:
@@ -87,6 +91,10 @@ kind: ServiceAccount
 metadata:
   name: local-storage-admin
   namespace: default
+  labels:
+    heritage: "Tiller"
+    release: "RELEASE-NAME"
+    chart: provisioner-2.0.0
 
 ---
 # Source: provisioner/templates/provisioner-cluster-role-binding.yaml
@@ -96,6 +104,10 @@ kind: ClusterRoleBinding
 metadata:
   name: local-storage-provisioner-pv-binding
   namespace: default
+  labels:
+    heritage: "Tiller"
+    release: "RELEASE-NAME"
+    chart: provisioner-2.0.0
 subjects:
 - kind: ServiceAccount
   name: local-storage-admin
@@ -110,6 +122,10 @@ kind: ClusterRole
 metadata:
   name: local-storage-provisioner-node-clusterrole
   namespace: default
+  labels:
+    heritage: "Tiller"
+    release: "RELEASE-NAME"
+    chart: provisioner-2.0.0
 rules:
 - apiGroups: [""]
   resources: ["nodes"]
@@ -120,6 +136,10 @@ kind: ClusterRoleBinding
 metadata:
   name: local-storage-provisioner-node-binding
   namespace: default
+  labels:
+    heritage: "Tiller"
+    release: "RELEASE-NAME"
+    chart: provisioner-2.0.0
 subjects:
 - kind: ServiceAccount
   name: local-storage-admin
