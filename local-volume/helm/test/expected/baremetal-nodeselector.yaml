@@ -8,7 +8,7 @@ metadata:
   labels:
     heritage: "Tiller"
     release: "RELEASE-NAME"
-    chart: provisioner-2.0.0
+    chart: provisioner-2.3.0
 data:
   storageClassMap: |
     local-storage:
@@ -93,7 +93,7 @@ metadata:
   labels:
     heritage: "Tiller"
     release: "RELEASE-NAME"
-    chart: provisioner-2.0.0
+    chart: provisioner-2.3.0
 
 ---
 # Source: provisioner/templates/provisioner-cluster-role-binding.yaml
@@ -106,7 +106,7 @@ metadata:
   labels:
     heritage: "Tiller"
     release: "RELEASE-NAME"
-    chart: provisioner-2.0.0
+    chart: provisioner-2.3.0
 subjects:
 - kind: ServiceAccount
   name: local-storage-admin
@@ -124,7 +124,7 @@ metadata:
   labels:
     heritage: "Tiller"
     release: "RELEASE-NAME"
-    chart: provisioner-2.0.0
+    chart: provisioner-2.3.0
 rules:
 - apiGroups: [""]
   resources: ["nodes"]
@@ -138,7 +138,7 @@ metadata:
   labels:
     heritage: "Tiller"
     release: "RELEASE-NAME"
-    chart: provisioner-2.0.0
+    chart: provisioner-2.3.0
 subjects:
 - kind: ServiceAccount
   name: local-storage-admin

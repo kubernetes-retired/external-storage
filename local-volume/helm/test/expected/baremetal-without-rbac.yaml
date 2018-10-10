@@ -8,7 +8,7 @@ metadata:
   labels:
     heritage: "Tiller"
     release: "RELEASE-NAME"
-    chart: provisioner-2.0.0
+    chart: provisioner-2.3.0
 data:
   storageClassMap: |
     local-storage:
