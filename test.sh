@@ -45,7 +45,7 @@ if [ "$TRAVIS_OS_NAME" != "osx" ]; then
 fi
 
 # Install golint, cfssl
-go get -u github.com/golang/lint/golint
+go get -u golang.org/x/lint/golint
 export PATH=$PATH:$GOPATH/bin
 go get -u github.com/alecthomas/gometalinter
 gometalinter --install
