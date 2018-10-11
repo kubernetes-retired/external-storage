@@ -72,8 +72,9 @@ provisioner chart and their default values.
 | daemonset.serviceAccount               | Provisioner DaemonSet service account.                                                                | str      | `local-storage-admin`                                      |
 | daemonset.kubeConfigEnv                | Specify the location of kubernetes config file.                                                       | str      | `-`                                                        |
 | daemonset.nodeLabels                   | List of node labels to be copied to the PVs created by the provisioner.                               | list     | `-`                                                        |
+| daemonset.nodeSelector                 | NodeSelector constraint on nodes eligible to run the provisioner.                                     | map      | `-`                                                        |
 | daemonset.tolerations                  | List of tolerations to be applied to the Provisioner DaemonSet.                                       | list     | `-`                                                        |
-| daemonset.resources                    | Map of resource request and limits to be applied to the Provisioner Daemonset.                        | map     | `-`                                                        |
+| daemonset.resources                    | Map of resource request and limits to be applied to the Provisioner Daemonset.                        | map      | `-`                                                        |
 Note: `classes` is a list of objects, you can specify one or more classes.
 
 ## Examples

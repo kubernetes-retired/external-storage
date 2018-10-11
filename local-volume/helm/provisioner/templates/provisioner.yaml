@@ -61,6 +61,10 @@ spec:
         app: local-volume-provisioner
     spec:
       serviceAccountName: {{.Values.daemonset.serviceAccount}}
+{{- if .Values.daemonset.nodeSelector }}
+      nodeSelector:
+{{ .Values.daemonset.nodeSelector | toYaml | trim | indent 8 }}
+{{- end }}
 {{- if .Values.daemonset.tolerations }}
       tolerations:
 {{ .Values.daemonset.tolerations | toYaml | trim | indent 8 }}

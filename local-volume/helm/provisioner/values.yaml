@@ -89,6 +89,11 @@ daemonset:
   # Defines a name of the service account which Provisioner will use to communicate with API server.
   #
   serviceAccount: local-storage-admin
+  # If configured, nodeSelector will add a nodeSelector field to the DaemonSet PodSpec.
+  #
+  # NodeSelector constraint for local-volume-provisioner scheduling to nodes.
+  # Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector
+  nodeSelector: {}
   #
   # If configured KubeConfigEnv will (optionally) specify the location of kubeconfig file on the node.
   #  kubeConfigEnv: KUBECONFIG
