@@ -1002,12 +1002,12 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 
 	options := VolumeOptions{
 		PersistentVolumeReclaimPolicy: reclaimPolicy,
-		PVName:            pvName,
-		PVC:               claim,
-		MountOptions:      mountOptions,
-		Parameters:        parameters,
-		SelectedNode:      selectedNode,
-		AllowedTopologies: allowedTopologies,
+		PVName:                        pvName,
+		PVC:                           claim,
+		MountOptions:                  mountOptions,
+		Parameters:                    parameters,
+		SelectedNode:                  selectedNode,
+		AllowedTopologies:             allowedTopologies,
 	}
 
 	ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, "Provisioning", fmt.Sprintf("External provisioner is provisioning volume for claim %q", claimToClaimKey(claim)))
