@@ -59,9 +59,9 @@ func TestCreateVolume(t *testing.T) {
 			name: "succeed creating volume",
 			options: controller.VolumeOptions{
 				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
-				PVName:     "pvc-1",
-				PVC:        newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
-				Parameters: map[string]string{},
+				PVName:                        "pvc-1",
+				PVC:                           newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
+				Parameters:                    map[string]string{},
 			},
 			envKey:           podIPEnv,
 			expectedServer:   "1.1.1.1",
@@ -75,9 +75,9 @@ func TestCreateVolume(t *testing.T) {
 			name: "succeed creating volume again",
 			options: controller.VolumeOptions{
 				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
-				PVName:     "pvc-2",
-				PVC:        newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
-				Parameters: map[string]string{},
+				PVName:                        "pvc-2",
+				PVC:                           newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
+				Parameters:                    map[string]string{},
 			},
 			envKey:           podIPEnv,
 			expectedServer:   "1.1.1.1",
@@ -91,9 +91,9 @@ func TestCreateVolume(t *testing.T) {
 			name: "bad parameter",
 			options: controller.VolumeOptions{
 				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
-				PVName:     "pvc-3",
-				PVC:        newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
-				Parameters: map[string]string{"foo": "bar"},
+				PVName:                        "pvc-3",
+				PVC:                           newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
+				Parameters:                    map[string]string{"foo": "bar"},
 			},
 			envKey:           podIPEnv,
 			expectedServer:   "",
@@ -108,9 +108,9 @@ func TestCreateVolume(t *testing.T) {
 			name: "bad server",
 			options: controller.VolumeOptions{
 				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
-				PVName:     "pvc-4",
-				PVC:        newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
-				Parameters: map[string]string{},
+				PVName:                        "pvc-4",
+				PVC:                           newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
+				Parameters:                    map[string]string{},
 			},
 			envKey:           serviceEnv,
 			expectedServer:   "",
@@ -125,9 +125,9 @@ func TestCreateVolume(t *testing.T) {
 			name: "dir already exists",
 			options: controller.VolumeOptions{
 				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
-				PVName:     "pvc-1",
-				PVC:        newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
-				Parameters: map[string]string{},
+				PVName:                        "pvc-1",
+				PVC:                           newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
+				Parameters:                    map[string]string{},
 			},
 			envKey:           podIPEnv,
 			expectedServer:   "",
@@ -142,9 +142,9 @@ func TestCreateVolume(t *testing.T) {
 			name: "error exporting",
 			options: controller.VolumeOptions{
 				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
-				PVName:     "FAIL_TO_EXPORT_ME",
-				PVC:        newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
-				Parameters: map[string]string{},
+				PVName:                        "FAIL_TO_EXPORT_ME",
+				PVC:                           newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
+				Parameters:                    map[string]string{},
 			},
 			envKey:           podIPEnv,
 			expectedServer:   "",
@@ -158,9 +158,9 @@ func TestCreateVolume(t *testing.T) {
 			name: "succeed creating volume last slot",
 			options: controller.VolumeOptions{
 				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
-				PVName:     "pvc-3",
-				PVC:        newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
-				Parameters: map[string]string{},
+				PVName:                        "pvc-3",
+				PVC:                           newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
+				Parameters:                    map[string]string{},
 			},
 			envKey:           podIPEnv,
 			expectedServer:   "1.1.1.1",
@@ -174,9 +174,9 @@ func TestCreateVolume(t *testing.T) {
 			name: "max export limit exceeded",
 			options: controller.VolumeOptions{
 				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
-				PVName:     "pvc-3",
-				PVC:        newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
-				Parameters: map[string]string{},
+				PVName:                        "pvc-3",
+				PVC:                           newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
+				Parameters:                    map[string]string{},
 			},
 			envKey:           podIPEnv,
 			expectedServer:   "",
@@ -589,7 +589,6 @@ func TestGetServer(t *testing.T) {
 		expectedServer string
 		expectError    bool
 	}{
-
 		{
 			name:           "valid node only",
 			objs:           []runtime.Object{},
