@@ -1552,7 +1552,7 @@ type CSIPersistentVolumeSource struct {
 	// ControllerPublishSecretRef is a reference to the secret object containing
 	// sensitive information to pass to the CSI driver to complete the CSI
 	// ControllerPublishVolume and ControllerUnpublishVolume calls.
-	// This field is optional, and  may be empty if no secret is required. If the
+	// This field is optional, and may be empty if no secret is required. If the
 	// secret object contains more than one secret, all secrets are passed.
 	// +optional
 	ControllerPublishSecretRef *SecretReference
@@ -1560,7 +1560,7 @@ type CSIPersistentVolumeSource struct {
 	// NodeStageSecretRef is a reference to the secret object containing sensitive
 	// information to pass to the CSI driver to complete the CSI NodeStageVolume
 	// and NodeStageVolume and NodeUnstageVolume calls.
-	// This field is optional, and  may be empty if no secret is required. If the
+	// This field is optional, and may be empty if no secret is required. If the
 	// secret object contains more than one secret, all secrets are passed.
 	// +optional
 	NodeStageSecretRef *SecretReference
@@ -1568,7 +1568,7 @@ type CSIPersistentVolumeSource struct {
 	// NodePublishSecretRef is a reference to the secret object containing
 	// sensitive information to pass to the CSI driver to complete the CSI
 	// NodePublishVolume and NodeUnpublishVolume calls.
-	// This field is optional, and  may be empty if no secret is required. If the
+	// This field is optional, and may be empty if no secret is required. If the
 	// secret object contains more than one secret, all secrets are passed.
 	// +optional
 	NodePublishSecretRef *SecretReference
@@ -2597,6 +2597,11 @@ type PodSpec struct {
 	// This is an alpha feature and may change in the future.
 	// +optional
 	RuntimeClassName *string
+	// EnableServiceLinks indicates whether information about services should be injected into pod's
+	// environment variables, matching the syntax of Docker links.
+	// If not specified, the default is true.
+	// +optional
+	EnableServiceLinks *bool
 }
 
 // HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the
