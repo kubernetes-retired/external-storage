@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
@@ -38,7 +39,6 @@ import (
 	testclient "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	ref "k8s.io/client-go/tools/reference"
-	utilversion "k8s.io/kubernetes/pkg/util/version"
 )
 
 const (
