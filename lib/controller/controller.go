@@ -41,6 +41,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -53,7 +54,6 @@ import (
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	utilversion "k8s.io/kubernetes/pkg/util/version"
 )
 
 // annClass annotation represents the storage class associated with a resource:
