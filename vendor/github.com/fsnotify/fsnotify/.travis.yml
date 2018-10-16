@@ -12,7 +12,7 @@ matrix:
   fast_finish: true
 
 before_script:
-  - go get -u golang.org/x/lint/golint
+  - go get -u github.com/golang/lint/golint
 
 script:
   - go test -v --race ./...

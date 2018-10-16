@@ -1640,7 +1640,7 @@ type CSIPersistentVolumeSource struct {
 	// ControllerPublishSecretRef is a reference to the secret object containing
 	// sensitive information to pass to the CSI driver to complete the CSI
 	// ControllerPublishVolume and ControllerUnpublishVolume calls.
-	// This field is optional, and  may be empty if no secret is required. If the
+	// This field is optional, and may be empty if no secret is required. If the
 	// secret object contains more than one secret, all secrets are passed.
 	// +optional
 	ControllerPublishSecretRef *SecretReference `json:"controllerPublishSecretRef,omitempty" protobuf:"bytes,6,opt,name=controllerPublishSecretRef"`
@@ -1648,7 +1648,7 @@ type CSIPersistentVolumeSource struct {
 	// NodeStageSecretRef is a reference to the secret object containing sensitive
 	// information to pass to the CSI driver to complete the CSI NodeStageVolume
 	// and NodeStageVolume and NodeUnstageVolume calls.
-	// This field is optional, and  may be empty if no secret is required. If the
+	// This field is optional, and may be empty if no secret is required. If the
 	// secret object contains more than one secret, all secrets are passed.
 	// +optional
 	NodeStageSecretRef *SecretReference `json:"nodeStageSecretRef,omitempty" protobuf:"bytes,7,opt,name=nodeStageSecretRef"`
@@ -1656,7 +1656,7 @@ type CSIPersistentVolumeSource struct {
 	// NodePublishSecretRef is a reference to the secret object containing
 	// sensitive information to pass to the CSI driver to complete the CSI
 	// NodePublishVolume and NodeUnpublishVolume calls.
-	// This field is optional, and  may be empty if no secret is required. If the
+	// This field is optional, and may be empty if no secret is required. If the
 	// secret object contains more than one secret, all secrets are passed.
 	// +optional
 	NodePublishSecretRef *SecretReference `json:"nodePublishSecretRef,omitempty" protobuf:"bytes,8,opt,name=nodePublishSecretRef"`
@@ -2891,7 +2891,16 @@ type PodSpec struct {
 	// This is an alpha feature and may change in the future.
 	// +optional
 	RuntimeClassName *string `json:"runtimeClassName,omitempty" protobuf:"bytes,29,opt,name=runtimeClassName"`
+	// EnableServiceLinks indicates whether information about services should be injected into pod's
+	// environment variables, matching the syntax of Docker links.
+	// +optional
+	EnableServiceLinks *bool `json:"enableServiceLinks,omitempty" protobuf:"varint,30,opt,name=enableServiceLinks"`
 }
+
+const (
+	// The default value for enableServiceLinks attribute.
+	DefaultEnableServiceLinks = true
+)
 
 // HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the
 // pod's hosts file.
@@ -5210,7 +5219,7 @@ type SecurityContext struct {
 	// readonly paths and masked paths.
 	// This requires the ProcMountType feature flag to be enabled.
 	// +optional
-	ProcMount *ProcMountType `json:"procMount,omitEmpty" protobuf:"bytes,9,opt,name=procMount"`
+	ProcMount *ProcMountType `json:"procMount,omitempty" protobuf:"bytes,9,opt,name=procMount"`
 }
 
 type ProcMountType string
