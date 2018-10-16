@@ -99,6 +99,11 @@ spec:
             - name: KUBECONFIG
               value: {{.Values.daemonset.kubeConfigEnv}}
           {{- end }}
+          {{- if .Values.prometheus.operator.enabled }}
+          ports:
+          - containerPort: 8080
+            name: http
+          {{- end }}
           volumeMounts:
             - mountPath: /etc/provisioner/config
               name: provisioner-config
@@ -140,4 +145,52 @@ provisioner: kubernetes.io/no-provisioner
 volumeBindingMode: WaitForFirstConsumer
 reclaimPolicy: {{ $reclaimPolicy }}
 {{- end }}
+{{- end }}
+{{- if .Values.prometheus.operator.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.daemonset.name }}
+  namespace: {{ .Values.common.namespace }}
+  labels:
+    app: local-volume-provisioner
+    heritage: {{ .Release.Service | quote }}
+    release: {{ .Release.Name | quote }}
+    chart: {{ replace "+" "_" .Chart.Version | printf "%s-%s" .Chart.Name }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: 8080
+      name: http
+  selector:
+    app: local-volume-provisioner
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ .Values.daemonset.name }}
+  namespace: {{ .Values.prometheus.operator.serviceMonitor.namespace }}
+  labels:
+    app: local-volume-provisioner
+    heritage: {{ .Release.Service | quote }}
+    release: {{ .Release.Name | quote }}
+    chart: {{ replace "+" "_" .Chart.Version | printf "%s-%s" .Chart.Name }}
+    {{- if .Values.prometheus.operator.serviceMonitor.selector }}
+    {{ toYaml .Values.prometheus.operator.serviceMonitor.selector | indent 4 }}
+    {{- end }}
+spec:
+  jobLabel: app
+  selector:
+    matchLabels:
+      app: local-volume-provisioner
+      release: {{ .Release.Name | quote }}
+  namespaceSelector:
+    matchNames:
+      - {{ .Values.common.namespace }}
+  endpoints:
+    - port: http
+      interval: {{ .Values.prometheus.operator.serviceMonitor.interval }}
+      scheme: http
 {{- end }}
