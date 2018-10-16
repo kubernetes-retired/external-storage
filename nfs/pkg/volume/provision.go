@@ -210,7 +210,8 @@ func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 	if volume.supGroup != 0 {
 		annotations[VolumeGidAnnotationKey] = strconv.FormatUint(volume.supGroup, 10)
 	}
-	if volume.mountOptions != "" {
+	// Only use legacy mount options annotation if StorageClass.MountOptions is empty
+	if volume.mountOptions != "" && options.MountOptions == nil {
 		annotations[MountOptionAnnotation] = volume.mountOptions
 	}
 	annotations[annProvisionerID] = string(p.identity)
@@ -234,6 +235,7 @@ func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 					ReadOnly: false,
 				},
 			},
+			MountOptions: options.MountOptions,
 		},
 	}
 
