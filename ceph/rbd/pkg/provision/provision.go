@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -177,7 +176,7 @@ func (p *rbdProvisioner) Delete(volume *v1.PersistentVolume) error {
 		return &controller.IgnoredError{Reason: "identity annotation on PV does not match ours"}
 	}
 
-	class, err := p.client.StorageV1beta1().StorageClasses().Get(helper.GetPersistentVolumeClass(volume), metav1.GetOptions{})
+	class, err := p.client.StorageV1beta1().StorageClasses().Get(util.GetPersistentVolumeClass(volume), metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
