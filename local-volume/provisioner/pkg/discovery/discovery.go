@@ -27,7 +27,7 @@ import (
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/metrics"
 
-	esUtil "github.com/kubernetes-incubator/external-storage/lib/util"
+	esUtil "github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/util"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/deleter"
 	"k8s.io/api/core/v1"
 	storagev1listers "k8s.io/client-go/listers/storage/v1"
