@@ -22,7 +22,7 @@ import (
 	"fmt"
 
 	"github.com/golang/glog"
-	"github.com/kubernetes-incubator/external-storage/lib/controller"
+	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/controller"
 	crdv1 "github.com/kubernetes-incubator/external-storage/snapshot/pkg/apis/crd/v1"
 	crdclient "github.com/kubernetes-incubator/external-storage/snapshot/pkg/client"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/cloudprovider"

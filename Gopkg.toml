@@ -51,10 +51,6 @@ ignored = [
   version = "7.0.0"
 
 [[constraint]]
-  branch = "master"
-  name = "github.com/miekg/dns"
-
-[[constraint]]
   name = "github.com/powerman/rpc-codec"
   version = "1.0.0"
 
@@ -81,6 +77,10 @@ ignored = [
 [[constraint]]
   name = "k8s.io/kubernetes"
   version = "v1.13.0-alpha.1"
+
+[[constraint]]
+  name = "github.com/kubernetes-sigs/sig-storage-lib-external-provisioner"
+  revision = "712c5819bca548e64c5fb29d2946c5d69126c3fa"
 
 # https://github.com/kubernetes/kubernetes/blob/v1.12.0-beta.1/Godeps/Godeps.json#L3213
 [[override]]

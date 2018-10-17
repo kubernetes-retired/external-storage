@@ -366,6 +366,20 @@
   version = "v1.1.5"
 
 [[projects]]
+  digest = "1:259c981611ec8c76e54c7289fbe3475137dcc1741fda3e22b9ac4f9814790944"
+  name = "github.com/kubernetes-sigs/sig-storage-lib-external-provisioner"
+  packages = [
+    "allocator",
+    "controller",
+    "controller/metrics",
+    "gidallocator",
+    "mount",
+    "util",
+  ]
+  pruneopts = "UT"
+  revision = "712c5819bca548e64c5fb29d2946c5d69126c3fa"
+
+[[projects]]
   digest = "1:933c3a3ae62b901b7dc4430113b5303eb69a496a98b1b70771942b272dd94bdf"
   name = "github.com/lpabon/godbc"
   packages = ["."]
@@ -390,12 +404,12 @@
   version = "v1.0.1"
 
 [[projects]]
-  branch = "master"
-  digest = "1:7e54d070a99dc461a6e62a495a9e67c103960b343ba8e6d37535859cfd32ee65"
+  digest = "1:57689550840d285f2da9e85356a66e626592a8b6f1170d7f2482438e64fe82e3"
   name = "github.com/miekg/dns"
   packages = ["."]
   pruneopts = "UT"
-  revision = "b0dc93d2760ef438612a252a9e448d054d28b625"
+  revision = "d74956db7b5b20451796774572d0f5a0222e377a"
+  version = "v1.0.13"
 
 [[projects]]
   digest = "1:645110e089152bd0f4a011a2648fbb0e4df5977be73ca605781157ac297f50c4"
@@ -1240,6 +1254,10 @@
     "github.com/guelfey/go.dbus",
     "github.com/heketi/heketi/client/api/go-client",
     "github.com/heketi/heketi/pkg/glusterfs/api",
+    "github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/controller",
+    "github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/gidallocator",
+    "github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/mount",
+    "github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/util",
     "github.com/magiconair/properties",
     "github.com/miekg/dns",
     "github.com/mitchellh/mapstructure",

@@ -32,7 +32,6 @@ all build:
 		-v $$(pwd)/.go:/go \
 		-v $$(pwd):/go/src/github.com/kubernetes-incubator/external-storage/gluster/file \
 		-v "$${PWD%/*/*}/vendor":/go/src/github.com/kubernetes-incubator/external-storage/vendor \
-		-v "$${PWD%/*/*}/lib":/go/src/github.com/kubernetes-incubator/external-storage/lib \
 		-v $$(pwd):/go/bin \
 		-v $$(pwd)/.go/stdlib:/usr/local/go/pkg/linux_amd64_asdf \
 		-w /go/src/github.com/kubernetes-incubator/external-storage/gluster/file \

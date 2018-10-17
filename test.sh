@@ -114,15 +114,6 @@ elif [ "$TEST_SUITE" = "linux-nfs" ]; then
 	make nfs
 	make test-nfs-all
 elif [ "$TEST_SUITE" = "linux-everything-else" ]; then
-	pushd ./lib
-	go test ./controller
-	go test ./allocator
-	popd
-	# Test building hostpath-provisioner demo
-	pushd ./docs/demo/hostpath-provisioner
-	make image
-	make clean
-	popd
 	make aws/efs
 	make test-aws/efs
 	make ceph/cephfs
