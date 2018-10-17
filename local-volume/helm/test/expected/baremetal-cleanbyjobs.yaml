@@ -26,6 +26,9 @@ metadata:
   namespace: default
   labels:
     app: local-volume-provisioner
+    heritage: "Tiller"
+    release: "RELEASE-NAME"
+    chart: provisioner-2.3.0
 spec:
   selector:
     matchLabels:
@@ -76,6 +79,10 @@ apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
   name: local-storage
+  labels:
+    heritage: "Tiller"
+    release: "RELEASE-NAME"
+    chart: provisioner-2.3.0
 provisioner: kubernetes.io/no-provisioner
 volumeBindingMode: WaitForFirstConsumer
 reclaimPolicy: Delete

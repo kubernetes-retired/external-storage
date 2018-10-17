@@ -113,3 +113,23 @@ daemonset:
   # If configured, resources will set the requests/limits field to the Daemonset PodSpec.
   # Ref: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/
   resources: {}
+#
+# Configure Prometheus monitoring
+#
+prometheus:
+  operator:
+    ## Are you using Prometheus Operator?
+    enabled: false
+
+    serviceMonitor:
+      ## Interval at which Prometheus scrapes the provisioner
+      interval: 10s
+
+      # Namespace Prometheus is installed in
+      namespace: monitoring
+
+      ## Defaults to whats used if you follow CoreOS [Prometheus Install Instructions](https://github.com/coreos/prometheus-operator/tree/master/helm#tldr)
+      ## [Prometheus Selector Label](https://github.com/coreos/prometheus-operator/blob/master/helm/prometheus/templates/prometheus.yaml#L65)
+      ## [Kube Prometheus Selector Label](https://github.com/coreos/prometheus-operator/blob/master/helm/kube-prometheus/values.yaml#L298)
+      selector:
+        prometheus: kube-prometheus
