@@ -207,12 +207,12 @@ func (c *snapshotController) onSnapshotDelete(obj interface{}) {
 		// DeletedFinalStateUnkown is an expected data type here
 		deletedState, isState := obj.(kcache.DeletedFinalStateUnknown)
 		if !isState {
-			glog.Errorf("Error: unkown type passed as snapshot for deletion: %T", obj)
+			glog.Errorf("Error: unknown type passed as snapshot for deletion: %T", obj)
 			return
 		}
 		deletedSnapshot, ok = deletedState.Obj.(*crdv1.VolumeSnapshot)
 		if !ok {
-			glog.Errorf("Error: unkown data type in DeletedState: %T", deletedState.Obj)
+			glog.Errorf("Error: unknown data type in DeletedState: %T", deletedState.Obj)
 			return
 		}
 	}

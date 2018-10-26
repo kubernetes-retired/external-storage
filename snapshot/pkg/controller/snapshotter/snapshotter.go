@@ -416,7 +416,7 @@ func (vs *volumeSnapshotter) syncSnapshot(uniqueSnapshotName string, snapshot *c
 		status := vs.getSimplifiedSnapshotStatus(snapshot.Status.Conditions)
 		var err error
 		// When the condition is new, it is still possible that snapshot is already triggered but has not yet updated the condition.
-		// Check the metadata and avaiable VolumeSnapshotData objects and update the snapshot accordingly
+		// Check the metadata and available VolumeSnapshotData objects and update the snapshot accordingly
 		if status == statusNew {
 			status, snapshotObj, err = vs.updateSnapshotIfExists(uniqueSnapshotName, snapshot)
 			if err != nil {
