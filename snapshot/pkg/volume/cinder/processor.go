@@ -54,7 +54,7 @@ func GetPluginName() string {
 	return "cinder"
 }
 
-// VolumeDelete deletes the specified volume pased on pv
+// VolumeDelete deletes the specified volume passed on pv
 func (c *cinderPlugin) VolumeDelete(pv *v1.PersistentVolume) error {
 	if pv == nil || pv.Spec.Cinder == nil {
 		return fmt.Errorf("invalid Cinder PV: %v", pv)

@@ -197,7 +197,7 @@ func (d *Discoverer) discoverVolumesAtPath(class string, config common.MountConf
 		return
 	}
 
-	// Retreive list of mount points to iterate through discovered paths (aka files) below
+	// Retrieve list of mount points to iterate through discovered paths (aka files) below
 	mountPoints, mountPointsErr := d.RuntimeConfig.Mounter.List()
 	if mountPointsErr != nil {
 		glog.Errorf("Error retreiving mountpoints: %v", err)
