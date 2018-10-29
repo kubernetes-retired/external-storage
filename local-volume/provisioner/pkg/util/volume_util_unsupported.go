@@ -23,7 +23,7 @@ import (
 )
 
 // GetBlockCapacityByte is defined here for darwin and other platforms
-// so that make test suceeds on them.
+// so that make test succeeds on them.
 func (u *volumeUtil) GetBlockCapacityByte(fullPath string) (int64, error) {
 	return 0, fmt.Errorf("GetBlockCapacityByte is unsupported in this build")
 }

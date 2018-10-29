@@ -886,7 +886,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 
 			err := createNodeSecurityGroup(lbaas.network, lbaas.opts.NodeSecurityGroupID, int(port.NodePort), port.Protocol, lbSecGroup.ID)
 			if err != nil {
-				glog.Errorf("Error occured creating security group for loadbalancer %s:", loadbalancer.ID)
+				glog.Errorf("Error occurred creating security group for loadbalancer %s:", loadbalancer.ID)
 				_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
 				return nil, err
 			}
@@ -933,7 +933,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 		updateOpts := neutronports.UpdateOpts{SecurityGroups: &newOpts}
 		res := neutronports.Update(lbaas.network, portID, updateOpts)
 		if res.Err != nil {
-			glog.Errorf("Error occured updating port: %s", portID)
+			glog.Errorf("Error occurred updating port: %s", portID)
 			// cleanup what was created so far
 			_ = lbaas.EnsureLoadBalancerDeleted(clusterName, apiService)
 			return nil, res.Err
