@@ -441,7 +441,7 @@ func waitLoadbalancerActiveProvisioningStatus(client *gophercloud.ServiceClient,
 	})
 
 	if err == wait.ErrWaitTimeout {
-		err = fmt.Errorf("Loadbalancer failed to go into ACTIVE provisioning status within alloted time")
+		err = fmt.Errorf("Loadbalancer failed to go into ACTIVE provisioning status within allotted time")
 	}
 	return provisioningStatus, err
 }
@@ -464,7 +464,7 @@ func waitLoadbalancerDeleted(client *gophercloud.ServiceClient, loadbalancerID s
 	})
 
 	if err == wait.ErrWaitTimeout {
-		err = fmt.Errorf("Loadbalancer failed to delete within the alloted time")
+		err = fmt.Errorf("Loadbalancer failed to delete within the allotted time")
 	}
 
 	return err
