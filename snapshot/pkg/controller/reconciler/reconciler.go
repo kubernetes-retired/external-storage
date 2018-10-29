@@ -121,7 +121,7 @@ func (rc *reconciler) reconcile() {
 		if !rc.actualStateOfWorld.SnapshotExists(name) {
 			// Call snapshotter to start creating the snapshot: it should use the volume
 			// plugin to create the on-disk snapshot, create the SnapshotData object for it
-			// and update adn put the Snapshot object to the actualStateOfWorld once the operation finishes.
+			// and update and put the Snapshot object to the actualStateOfWorld once the operation finishes.
 			// It's likely that the operation exists already: it should be fired by the controller right
 			// after the event has arrived.
 			rc.snapshotter.CreateVolumeSnapshot(snapshot)
