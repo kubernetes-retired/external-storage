@@ -1,10 +1,22 @@
 ---
+# Source: provisioner/templates/namespace.yaml
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: "local-provisioner"
+  labels:
+    heritage: "Tiller"
+    release: "RELEASE-NAME"
+    chart: provisioner-2.3.0
+
+---
 # Source: provisioner/templates/provisioner.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: local-provisioner-config
-  namespace: default
+  namespace: local-provisioner
   labels:
     heritage: "Tiller"
     release: "RELEASE-NAME"
@@ -15,15 +27,14 @@ data:
        hostDir: /mnt/disks
        mountDir: /mnt/disks
        blockCleanerCommand:
-         - "/scripts/shred.sh"
-         - "2"
+         - "/scripts/quick_reset.sh"
        volumeMode: Block
 ---
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: local-volume-provisioner
-  namespace: default
+  namespace: local-provisioner
   labels:
     app: local-volume-provisioner
     heritage: "Tiller"
@@ -94,7 +105,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: local-storage-admin
-  namespace: default
+  namespace: local-provisioner
   labels:
     heritage: "Tiller"
     release: "RELEASE-NAME"
@@ -107,7 +118,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: local-storage-provisioner-pv-binding
-  namespace: default
+  namespace: local-provisioner
   labels:
     heritage: "Tiller"
     release: "RELEASE-NAME"
@@ -115,7 +126,7 @@ metadata:
 subjects:
 - kind: ServiceAccount
   name: local-storage-admin
-  namespace: default
+  namespace: local-provisioner
 roleRef:
   kind: ClusterRole
   name: system:persistent-volume-provisioner
@@ -125,7 +136,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: local-storage-provisioner-node-clusterrole
-  namespace: default
+  namespace: local-provisioner
   labels:
     heritage: "Tiller"
     release: "RELEASE-NAME"
@@ -139,7 +150,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: local-storage-provisioner-node-binding
-  namespace: default
+  namespace: local-provisioner
   labels:
     heritage: "Tiller"
     release: "RELEASE-NAME"
@@ -147,13 +158,9 @@ metadata:
 subjects:
 - kind: ServiceAccount
   name: local-storage-admin
-  namespace: default
+  namespace: local-provisioner
 roleRef:
   kind: ClusterRole
   name: local-storage-provisioner-node-clusterrole
   apiGroup: rbac.authorization.k8s.io
-
----
-# Source: provisioner/templates/namespace.yaml
-
 

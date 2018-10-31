@@ -11,6 +11,9 @@ common:
   #
   namespace: default
   #
+  # Defines whether to create provisioner namespace
+  # 
+  createNamespace: false
   # Beta PV.NodeAffinity field is used by default. If running against pre-1.10
   # k8s version, the `useAlphaAPI` flag must be enabled in the configMap.
   #

@@ -53,6 +53,7 @@ provisioner chart and their default values.
 | ---                                          | ---                                                                                                   | ---      | ---                                                        |
 | common.rbac                                  | Generating RBAC (Role Based Access Control) objects.                                                  | bool     | `true`                                                     |
 | common.namespace                             | Namespace where provisioner runs.                                                                     | str      | `default`                                                  |
+| common.createNamespace                       | Whether to create namespace for provisioner.                                                          | bool      | `false`                                                  |
 | common.useAlphaAPI                           | If running against pre-1.10 k8s version, the `useAlphaAPI` flag must be enabled.                      | bool     | `false`                                                    |
 | common.useJobForCleaning                     | If set to true, provisioner will use jobs-based block cleaning.                                       | bool     | `false`                                                    |
 | common.useNodeNameOnly                       | If set to true, provisioner name will only use Node.Name and not Node.UID.                            | bool     | `false`                                                    |
@@ -101,3 +102,4 @@ Currently you can try the following examples:
 * [examples/gce-retain.yaml](examples/gce-retain.yaml)
 * [examples/gce.yaml](examples/gce.yaml)
 * [examples/gke.yaml](examples/gke.yaml)
+* [more...](examples/)
