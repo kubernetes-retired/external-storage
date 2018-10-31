@@ -18,7 +18,7 @@ data:
          - "/scripts/quick_reset.sh"
        volumeMode: Block
 ---
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: local-volume-provisioner
@@ -85,6 +85,10 @@ metadata:
 provisioner: kubernetes.io/no-provisioner
 volumeBindingMode: WaitForFirstConsumer
 reclaimPolicy: Delete
+
+---
+# Source: provisioner/templates/namespace.yaml
+
 
 ---
 # Source: provisioner/templates/provisioner-cluster-role-binding.yaml
