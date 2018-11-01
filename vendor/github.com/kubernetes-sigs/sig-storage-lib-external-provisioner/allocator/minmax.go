@@ -28,21 +28,23 @@ import (
 )
 
 var (
-	// ErrNotFound the number was never allocated
-	ErrNotFound = errors.New("number not allocated")
-	// ErrConflict the number was already allocated
+	//ErrConflict returned when value is already in use.
 	ErrConflict = errors.New("number already allocated")
-	// ErrInvalidRange the range is invalid
+
+	//ErrInvalidRange returned invalid range, for eg# min > max
 	ErrInvalidRange = errors.New("invalid range")
-	// ErrOutOfRange the number is out of range
+
+	//ErrOutOfRange returned when value is not in pool range.
 	ErrOutOfRange = errors.New("out of range")
-	// ErrRangeFull the range is full
+
+	//ErrRangeFull returned when no more free values in the pool.
 	ErrRangeFull = errors.New("range full")
-	// ErrInternal something is wrong internally
+
+	//ErrInternal returned when no free item found, but a.free != 0.
 	ErrInternal = errors.New("internal error")
 )
 
-// MinMaxAllocator is an allocator over a range [min-max]
+//MinMaxAllocator defines allocator struct.
 type MinMaxAllocator struct {
 	lock sync.Mutex
 	min  int
@@ -64,7 +66,7 @@ type Rangeable interface {
 	SetRange(min, max int) error
 }
 
-// NewMinMaxAllocator creates a new MinMaxAllocator
+// NewMinMaxAllocator return a new allocator or error based on provided min/max value.
 func NewMinMaxAllocator(min, max int) (*MinMaxAllocator, error) {
 	if min > max {
 		return nil, ErrInvalidRange
@@ -77,7 +79,7 @@ func NewMinMaxAllocator(min, max int) (*MinMaxAllocator, error) {
 	}, nil
 }
 
-// SetRange sets the range of the MinMaxAllocator
+//SetRange defines the range/pool with provided min and max values.
 func (a *MinMaxAllocator) SetRange(min, max int) error {
 	if min > max {
 		return ErrInvalidRange
@@ -106,7 +108,7 @@ func (a *MinMaxAllocator) SetRange(min, max int) error {
 	return nil
 }
 
-// Allocate allocates a given number
+//Allocate allocates provided value in the allocator and mark it as used.
 func (a *MinMaxAllocator) Allocate(i int) (bool, error) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
@@ -125,7 +127,7 @@ func (a *MinMaxAllocator) Allocate(i int) (bool, error) {
 	return true, nil
 }
 
-// AllocateNext allocates the first free number
+//AllocateNext allocates next value from the allocator.
 func (a *MinMaxAllocator) AllocateNext() (int, bool, error) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
@@ -148,7 +150,7 @@ func (a *MinMaxAllocator) AllocateNext() (int, bool, error) {
 	return 0, false, ErrInternal
 }
 
-// Release releases the given number
+//Release free/delete provided value from the allocator.
 func (a *MinMaxAllocator) Release(i int) error {
 	a.lock.Lock()
 	defer a.lock.Unlock()
@@ -171,7 +173,7 @@ func (a *MinMaxAllocator) has(i int) bool {
 	return ok
 }
 
-// Has returns whether the allocator has the given number
+//Has check whether the provided value is used in the allocator
 func (a *MinMaxAllocator) Has(i int) bool {
 	a.lock.Lock()
 	defer a.lock.Unlock()
@@ -179,7 +181,7 @@ func (a *MinMaxAllocator) Has(i int) bool {
 	return a.has(i)
 }
 
-// Free returns the next free number
+//Free returns the number of free values in the allocator.
 func (a *MinMaxAllocator) Free() int {
 	a.lock.Lock()
 	defer a.lock.Unlock()

@@ -19,11 +19,11 @@ package volume
 import (
 	"fmt"
 
+	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/util"
 	"k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 )
 
 // GetClassForVolume returns StorageClass
@@ -31,7 +31,7 @@ func GetClassForVolume(kubeClient kubernetes.Interface, pv *v1.PersistentVolume)
 	if kubeClient == nil {
 		return nil, fmt.Errorf("Cannot get kube client")
 	}
-	className := helper.GetPersistentVolumeClass(pv)
+	className := util.GetPersistentVolumeClass(pv)
 	if className == "" {
 		return nil, fmt.Errorf("Volume has no storage class")
 	}
