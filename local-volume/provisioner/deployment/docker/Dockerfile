@@ -19,12 +19,11 @@ ADD . .
 RUN cd local-volume/provisioner; \
 	CGO_ENABLED=0 go build -a -ldflags '-extldflags "-static"' -o local-volume-provisioner ./cmd
 
-FROM centos:7
+FROM k8s.gcr.io/debian-base-amd64:0.4.0
 
-RUN yum update -y && \
-    yum install -y e2fsprogs && \
-    yum install -y hdparm && \
-    yum clean all
+RUN clean-install \
+    util-linux \
+    e2fsprogs 
 
 COPY --from=builder /go/src/github.com/kubernetes-incubator/external-storage/local-volume/provisioner/local-volume-provisioner /local-provisioner
 ADD local-volume/provisioner/deployment/docker/scripts /scripts
