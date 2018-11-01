@@ -20,12 +20,26 @@ ifeq ($(VERSION),)
 	VERSION = latest
 endif
 
+ifeq ($(GOVERSION),)
+	GOVERSION = 1.11.1
+endif
+
 IMAGE = $(REGISTRY)local-volume-provisioner:$(VERSION)
 MUTABLE_IMAGE = $(REGISTRY)local-volume-provisioner:latest
 
-all build:
+all: build
+.PHONY: all
+
+build:
+	docker run --rm -w /go/src/github.com/kubernetes-incubator/external-storage/local-volume/provisioner \
+		-v $(PWD)/../..:/go/src/github.com/kubernetes-incubator/external-storage -e CGO_ENABLED=0 -e GOOS=linux \
+		golang:$(GOVERSION)-alpine \
+		go build -a -ldflags '-extldflags "-static"' -o local-volume-provisioner ./cmd
+.PHONY: build
+
+build-local:
 	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o local-volume-provisioner ./cmd
-.PHONY: all build
+.PHONY: build-local
 
 container: build quick-container
 .PHONY: container
