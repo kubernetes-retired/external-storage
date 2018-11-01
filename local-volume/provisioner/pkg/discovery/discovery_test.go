@@ -23,11 +23,11 @@ import (
 	"testing"
 
 	"github.com/golang/glog"
-	esUtil "github.com/kubernetes-incubator/external-storage/lib/util"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/cache"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/common"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/deleter"
 	"github.com/kubernetes-incubator/external-storage/local-volume/provisioner/pkg/util"
+	esUtil "github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/util"
 
 	"k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"

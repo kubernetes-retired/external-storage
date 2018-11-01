@@ -29,8 +29,8 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/kubernetes-incubator/external-storage/lib/controller/metrics"
-	"github.com/kubernetes-incubator/external-storage/lib/util"
+	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/controller/metrics"
+	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"golang.org/x/time/rate"
@@ -53,7 +53,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 )
 
 // annClass annotation represents the storage class associated with a resource:
@@ -830,7 +829,7 @@ func (ctrl *ProvisionController) shouldProvision(claim *v1.PersistentVolumeClaim
 		}
 	} else {
 		// Kubernetes 1.4 provisioning, evaluating class.Provisioner
-		claimClass := helper.GetPersistentVolumeClaimClass(claim)
+		claimClass := util.GetPersistentVolumeClaimClass(claim)
 		provisioner, _, err := ctrl.getStorageClassFields(claimClass)
 		if err != nil {
 			glog.Errorf("Error getting claim %q's StorageClass's fields: %v", claimToClaimKey(claim), err)
@@ -922,7 +921,7 @@ func (ctrl *ProvisionController) updateDeleteStats(volume *v1.PersistentVolume, 
 // (requeue the claim) or not
 func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVolumeClaim) error {
 	// Most code here is identical to that found in controller.go of kube's PV controller...
-	claimClass := helper.GetPersistentVolumeClaimClass(claim)
+	claimClass := util.GetPersistentVolumeClaimClass(claim)
 	operation := fmt.Sprintf("provision %q class %q", claimToClaimKey(claim), claimClass)
 	glog.Info(logOperation(operation, "started"))
 

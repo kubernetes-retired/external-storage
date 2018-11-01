@@ -26,7 +26,7 @@ import (
 	"github.com/digitalocean/godo"
 	"github.com/golang/glog"
 	vol "github.com/kubernetes-incubator/external-storage/digitalocean/pkg/volume"
-	"github.com/kubernetes-incubator/external-storage/lib/controller"
+	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/controller"
 	"golang.org/x/oauth2"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"

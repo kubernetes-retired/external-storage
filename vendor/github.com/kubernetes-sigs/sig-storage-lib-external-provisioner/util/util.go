@@ -67,6 +67,31 @@ func AccessModesContainedInAll(indexedModes []v1.PersistentVolumeAccessMode, req
 	return true
 }
 
+// GetPersistentVolumeClass returns StorageClassName.
+func GetPersistentVolumeClass(volume *v1.PersistentVolume) string {
+	// Use beta annotation first
+	if class, found := volume.Annotations[v1.BetaStorageClassAnnotation]; found {
+		return class
+	}
+
+	return volume.Spec.StorageClassName
+}
+
+// GetPersistentVolumeClaimClass returns StorageClassName. If no storage class was
+// requested, it returns "".
+func GetPersistentVolumeClaimClass(claim *v1.PersistentVolumeClaim) string {
+	// Use beta annotation first
+	if class, found := claim.Annotations[v1.BetaStorageClassAnnotation]; found {
+		return class
+	}
+
+	if claim.Spec.StorageClassName != nil {
+		return *claim.Spec.StorageClassName
+	}
+
+	return ""
+}
+
 // CheckPersistentVolumeClaimModeBlock checks VolumeMode.
 // If the mode is Block, return true otherwise return false.
 func CheckPersistentVolumeClaimModeBlock(pvc *v1.PersistentVolumeClaim) bool {
@@ -78,9 +103,7 @@ func FindDNSIP(client kubernetes.Interface) (dnsip string) {
 	// find DNS server address through client API
 	// cache result in rbdProvisioner
 	var dnssvc *v1.Service
-
 	coredns, err := client.CoreV1().Services(metav1.NamespaceSystem).Get("coredns", metav1.GetOptions{})
-
 	if err != nil {
 		glog.Warningf("error getting coredns service: %v. Falling back to kube-dns\n", err)
 		kubedns, err := client.CoreV1().Services(metav1.NamespaceSystem).Get("kube-dns", metav1.GetOptions{})
@@ -92,12 +115,10 @@ func FindDNSIP(client kubernetes.Interface) (dnsip string) {
 	} else {
 		dnssvc = coredns
 	}
-
 	if len(dnssvc.Spec.ClusterIP) == 0 {
 		glog.Errorf("DNS service ClusterIP bad\n")
 		return ""
 	}
-
 	return dnssvc.Spec.ClusterIP
 }
 
@@ -117,7 +138,6 @@ func LookupHost(hostname string, serverip string) (iplist []string, err error) {
 			iplist = append(iplist, t.A.String())
 		}
 	}
-
 	return iplist, nil
 }
 
