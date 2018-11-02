@@ -848,6 +848,13 @@ func (ctrl *ProvisionController) shouldProvision(claim *v1.PersistentVolumeClaim
 // shouldDelete returns whether a volume should have its backing volume
 // deleted, i.e. whether a Delete is "desired"
 func (ctrl *ProvisionController) shouldDelete(volume *v1.PersistentVolume) bool {
+
+	if qualifier, ok := ctrl.provisioner.(Qualifier); ok {
+		if !qualifier.ShouldDelete(volume) {
+			return false
+		}
+	}
+
 	// In 1.9+ PV protection means the object will exist briefly with a
 	// deletion timestamp even after our successful Delete. Ignore it.
 	if ctrl.kubeVersion.AtLeast(utilversion.MustParseSemantic("v1.9.0")) {

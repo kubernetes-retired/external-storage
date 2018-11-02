@@ -45,6 +45,9 @@ type Qualifier interface {
 	// ShouldProvision returns whether provisioning for the claim should
 	// be attempted.
 	ShouldProvision(*v1.PersistentVolumeClaim) bool
+
+	// ShouldDelete returns whether deleting the PV should be attempted.
+	ShouldDelete(volume *v1.PersistentVolume) bool
 }
 
 // BlockProvisioner is an optional interface implemented by provisioners to determine
