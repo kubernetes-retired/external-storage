@@ -31,24 +31,13 @@ all: build
 .PHONY: all
 
 build:
-	docker run --rm -w /go/src/github.com/kubernetes-incubator/external-storage/local-volume/provisioner \
-		-v $(PWD)/../..:/go/src/github.com/kubernetes-incubator/external-storage -e CGO_ENABLED=0 -e GOOS=linux \
-		golang:$(GOVERSION)-alpine \
-		go build -a -ldflags '-extldflags "-static"' -o local-volume-provisioner ./cmd
+	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o local-volume-provisioner ./cmd
 .PHONY: build
 
-build-local:
-	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o local-volume-provisioner ./cmd
-.PHONY: build-local
-
-container: build quick-container
-.PHONY: container
-
-quick-container:
-	cp local-volume-provisioner deployment/docker
-	docker build -t $(MUTABLE_IMAGE) deployment/docker
+container:
+	docker build -t $(MUTABLE_IMAGE) --build-arg GOVERSION=${GOVERSION} -f deployment/docker/Dockerfile $(PWD)/../..
 	docker tag $(MUTABLE_IMAGE) $(IMAGE)
-.PHONY: quick-container
+.PHONY: container
 
 push: container
 	docker push $(IMAGE)
