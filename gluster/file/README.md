@@ -39,13 +39,13 @@ The following example uses `gluster.org/glusterfile` as the identity for the ins
 [root@localhost] docker run -ti -v /root/.kube:/kube -v /var/run/kubernetes:/var/run/kubernetes --privileged --net=host  glusterfile-provisioner  -master=http://127.0.0.1:8080 -kubeconfig=/kube/config -id=gluster.org/glusterfile
 ```
 
-## Create a glusterfile Storage Class
+## Create a glusterfile StorageClass
 
 ```
 [root@localhost] kubectl create -f examples/class.yaml
 ```
 
-The available storage class parameter are listed below:
+The available storageclass parameters are listed below:
 
 ```yaml
 parameters:
@@ -68,7 +68,7 @@ parameters:
 
 * `restsecretnamespace` + `restsecretname` : Identification of Secret instance that contains user password to use when talking to Gluster REST service. These parameters are optional, empty password will be used when both `restsecretnamespace` and `restsecretname` are omitted. The provided secret must have type "gluster.org/glusterfile".
 
-* `gidMin` + `gidMax` : The minimum and maximum value of GID range for the storage class. A unique value (GID) in this range ( gidMin-gidMax ) will be used for dynamically provisioned volumes. These are optional values. If not specified, the volume will be provisioned with a value between 2000-2147483647 which are defaults for gidMin and gidMax respectively.
+* `gidMin` + `gidMax` : The minimum and maximum value of GID range for the storageclass. A unique value (GID) in this range ( gidMin-gidMax ) will be used for dynamically provisioned volumes. These are optional values. If not specified, the volume will be provisioned with a value between 2000-2147483647 which are defaults for gidMin and gidMax respectively.
 
 * `clusterid`: It is the ID of the cluster which will be used by Heketi when provisioning the volume. It can also be a list of comma separated cluster IDs. This is an optional parameter.
 
@@ -93,7 +93,7 @@ For available volume types and its administration options refer: ([Administratio
 
 For available volume options and its administration refer: ([Administration Guide](http://docs.gluster.org/en/latest/Administrator%20Guide/Managing%20Volumes/))
 
-* `volumenameprefix` : By default dynamically provisioned volumes has the naming schema of `vol_UUID` format. With this option present in storageclass, an admin can now prefix the desired volume name from storageclass. If `volumenameprefix` storageclass parameter is set, the dynamically provisioned volumes are created in below format where `_` is the field separator/delimiter:
+* `volumenameprefix` : By default dynamically provisioned volumes have the naming schema of `vol_UUID` format. With this option present in storageclass, an admin can now prefix the desired volume name from storageclass. If `volumenameprefix` storageclass parameter is set, the dynamically provisioned volumes are created in below format where `_` is the field separator/delimiter:
 
 `volumenameprefix_Namespace_PVCname_randomUUID`
 
@@ -110,7 +110,7 @@ Additional Reference:
 
 ([How to configure Heketi](https://github.com/heketi/heketi/wiki/Setting-up-the-topology))
 
-When the persistent volumes are dynamically provisioned, the Gluster plugin automatically create an endpoint and a headless service in the name `glusterfile-dynamic-<claimname>`. This dynamic endpoint and service will be deleted automatically when the persistent volume claim is deleted.
+When the persistent volumes are dynamically provisioned, the Gluster plugin automatically creates an endpoint and a headless service in the name `glusterfile-dynamic-<claimname>`. This dynamic endpoint and service will be deleted automatically when the persistent volume claim is deleted.
 
 
 ## Testing: Create a PersistentVolumeClaim
