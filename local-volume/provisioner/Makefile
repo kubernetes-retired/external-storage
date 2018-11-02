@@ -44,8 +44,9 @@ push: container
 	docker push $(MUTABLE_IMAGE)
 .PHONY: push
 
-test:
+test: container
 	go test ./...
+	docker run --privileged -v $(PWD)/deployment/docker/test.sh:/test.sh --entrypoint bash quay.io/external_storage/local-volume-provisioner:latest /test.sh
 .PHONY: test
 
 clean:
