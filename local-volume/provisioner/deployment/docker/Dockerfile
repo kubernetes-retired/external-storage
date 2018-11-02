@@ -23,7 +23,8 @@ FROM k8s.gcr.io/debian-base-amd64:0.4.0
 
 RUN clean-install \
     util-linux \
-    e2fsprogs 
+    e2fsprogs \
+    bash
 
 COPY --from=builder /go/src/github.com/kubernetes-incubator/external-storage/local-volume/provisioner/local-volume-provisioner /local-provisioner
 ADD local-volume/provisioner/deployment/docker/scripts /scripts
