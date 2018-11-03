@@ -20,21 +20,24 @@ ifeq ($(VERSION),)
 	VERSION = latest
 endif
 
+ifeq ($(GOVERSION),)
+	GOVERSION = 1.11.1
+endif
+
 IMAGE = $(REGISTRY)local-volume-provisioner:$(VERSION)
 MUTABLE_IMAGE = $(REGISTRY)local-volume-provisioner:latest
 
-all build:
+all: build
+.PHONY: all
+
+build:
 	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o local-volume-provisioner ./cmd
-.PHONY: all build
+.PHONY: build
 
-container: build quick-container
-.PHONY: container
-
-quick-container:
-	cp local-volume-provisioner deployment/docker
-	docker build -t $(MUTABLE_IMAGE) deployment/docker
+container:
+	docker build -t $(MUTABLE_IMAGE) --build-arg GOVERSION=${GOVERSION} -f deployment/docker/Dockerfile $(PWD)/../..
 	docker tag $(MUTABLE_IMAGE) $(IMAGE)
-.PHONY: quick-container
+.PHONY: container
 
 push: container
 	docker push $(IMAGE)
