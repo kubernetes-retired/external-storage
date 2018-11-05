@@ -49,7 +49,7 @@ Edit the `provisioner` argument in the `args` field in `deploy/kubernetes/deploy
 
 Note that if you continue with the `hostPath` volume, its path must exist on the node the provisioner is scheduled to, so you may want to use a `nodeSelector` to choose a particular node and ensure the directory exists there: `mkdir -p /srv`. If SELinux is enforcing on the node, you may need to make the container [privileged](http://kubernetes.io/docs/user-guide/security-context/) or change the security context of the directory on the node: `sudo chcon -Rt svirt_sandbox_file_t /srv`.
 
-`deploy/kubernetes/deployment.yaml` also configures a service. The deployment's pod will use the service's cluster IP as the NFS server IP to put on its `PersistentVolumes`, instead of its own unstable pod IP, because the service's name is passed in via the `SERVICE_NAME` env variable.
+`deploy/kubernetes/deployment.yaml` also configures a service. The deployment's pod will use the service's cluster IP as the NFS server IP to put on its `PersistentVolumes`, instead of its own unstable pod IP, because the service's name is passed in via the `SERVICE_NAME` env variable. There must always be one service per pod or provisioning will fail, meaning the deployment cannot be scaled beyond 1 replica. To scale (where multiple instances do leader election), new deployment and service pairs need to be created with new names, matching labels+selectors and `SERVICE_NAME` variables.
 
 Create the deployment and its service.
 
@@ -64,7 +64,7 @@ $ kubectl create -f deploy/kubernetes/deployment.yaml
 
 ### In Kubernetes - StatefulSet of 1 replica
 
-The procedure for running a stateful set is identical to [that for a deployment, above,](#in-kubernetes---deployment-of-1-replica) so wherever you see `deployment` there, replace it with `statefulset`. The benefit is that you get a stable hostname. But note that stateful sets are in beta. Note that the service cannot be headless, unlike in most examples of stateful sets.
+The procedure for running a stateful set is identical to [that for a deployment, above,](#in-kubernetes---deployment-of-1-replica) so wherever you see `deployment` there, replace it with `statefulset`. The benefit is that you get a stable hostname. Note that the service cannot be headless, unlike in most examples of stateful sets.
 
 ### Outside of Kubernetes - container
 
