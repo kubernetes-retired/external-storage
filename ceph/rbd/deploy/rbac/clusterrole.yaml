@@ -19,3 +19,6 @@ rules:
     resources: ["services"]
     resourceNames: ["kube-dns","coredns"]
     verbs: ["list", "get"]
+  - apiGroups: [""]
+    resources: ["endpoints"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
