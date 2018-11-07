@@ -36,7 +36,7 @@ pvc-dce84888-7a9d-11e6-b1ee-5254001e0c1b   1Mi        RWX           Delete      
 A pod can consume the PVC and write to the backing NFS share. Create a pod to test this.
 
 ```
-$ kubectl create -f deploy/kubernetes/write_pod.yaml
+$ kubectl create -f deploy/kubernetes/write-pod.yaml
 pod "write-pod" created
 $ kubectl get pod --show-all
 nfs-provisioner   1/1       Running     0          31s
