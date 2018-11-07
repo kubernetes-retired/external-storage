@@ -317,7 +317,7 @@ type AWSElasticBlockStoreVolumeSnapshotSource struct {
 ### Event loop in controller
 
 The volume snapshot controller maintains two data structures (ActualStateOfWorld and DesiredStateOfWorld) and
-periodically reconciles the two. The data structures are being update by the API sever event handlers.
+periodically reconciles the two. The data structures are being update by the API server event handlers.
 
 * If a new `VolumeSnapshot` is added, the *add* handler adds it to the DesiredStateOfWorld (DSW)
 
@@ -395,7 +395,7 @@ For the `PersistentVolumeClaim` provisioned by the snapshot external provisioner
 ### Alice wants to backup her MySQL database data
 
 Alice is a DB admin who runs a MySQL database and needs to backup the data on a remote server prior to the database
-upgrade. She has a short maintenance window dedicated to the operation that allows her to pause the dabase only for
+upgrade. She has a short maintenance window dedicated to the operation that allows her to pause the database only for
 a short while. Alice will therefore stop the database, create a snapshot of the data, re-start the database and after
 that start time-consuming network transfer to the backup server.
 
