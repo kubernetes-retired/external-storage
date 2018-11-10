@@ -234,7 +234,7 @@ Yes you can but it's not recommended. You lose the reusability of the StorageCla
 
 Your containers will continue to have EFS storage as they are mapped directly to EFS but behind the scenes they were mounted to a folder created by the EFS provisioner. New claims will not be provisioned nor deleted while the efs-provisioner pod is not running. When it comes backup it will catchup on any work it has missed.
 
-- Can I scale the efs-provisioner accross my nodes? 
+- Can I scale the efs-provisioner across my nodes? 
 
 You can but it's not needed. You won't see a performance increase and you wont have a storage outage if the underlying node dies.
 
@@ -259,7 +259,7 @@ It's not needed but it is helpful if you are going to use your EFS for other thi
 
 - I noticed when creating the claim it has request for a really small amount of storage?
 
-The storage section size is a requirment because most other PersistentVolumes need it. Every pod accessing EFS will have unlimited storage. I use 1Mi to remind my self it's unlimited.
+The storage section size is a requirement because most other PersistentVolumes need it. Every pod accessing EFS will have unlimited storage. I use 1Mi to remind my self it's unlimited.
 
 - Can I omit that part of the claim?
 
