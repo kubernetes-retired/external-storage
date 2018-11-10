@@ -101,7 +101,7 @@ spec:
         requests:
           storage: 1Mi
 ```
-Note: We do not reference a claim name, instead we give the new claim the name efs and we list the StorageClass we wish to use when creating the claim. I like to use the type of storage, because the name of the pod will be be added to it. This example when ran will create the claim `efs-web-0` and scaling the pod up to 3 will create `efs-web-1` and `efs-web-2`.
+Note: We do not reference a claim name, instead we give the new claim the name efs and we list the StorageClass we wish to use when creating the claim. I like to use the type of storage, because the name of the pod will be added to it. This example when ran will create the claim `efs-web-0` and scaling the pod up to 3 will create `efs-web-1` and `efs-web-2`.
 
 If you wish to learn more about efs-provisioner and how to change additional settings, you can continue on in the deployment section. You might also want to check the FAQ at the bottom.
 
