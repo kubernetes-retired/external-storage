@@ -1068,7 +1068,7 @@ func TestFindInstancesByNodeNameCached(t *testing.T) {
 	}
 
 	if len(returnedInstances) != 1 {
-		t.Errorf("Expected a single isntance but found: %v", returnedInstances)
+		t.Errorf("Expected a single instance but found: %v", returnedInstances)
 	}
 
 	if *returnedInstances[0].PrivateDnsName != nodeNameOne {
