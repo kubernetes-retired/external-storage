@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # Modified from https://github.com/rootfs/nfs-ganesha-docker by Huamin Chen
-FROM fedora:28
+FROM fedora:29
 
 # Build ganesha from source, installing deps and removing them in one line.
 # Why?
@@ -21,17 +21,17 @@ FROM fedora:28
 # 2. Set NFS_V4_RECOV_ROOT to /export
 
 RUN dnf install -y tar gcc cmake autoconf libtool bison flex make gcc-c++ krb5-devel dbus-devel jemalloc-devel libnfsidmap-devel libnsl2-devel patch && dnf clean all \
-	&& curl -L https://github.com/nfs-ganesha/nfs-ganesha/archive/V2.7-rc2.tar.gz | tar zx \
-	&& curl -L https://github.com/nfs-ganesha/ntirpc/archive/b69c2c1.tar.gz | tar zx \
-	&& rm -r nfs-ganesha-2.7-rc2/src/libntirpc \
-	&& mv ntirpc-b69c2c1e3532d8e119712ad0269a7acd9d778251 nfs-ganesha-2.7-rc2/src/libntirpc \
-	&& cd nfs-ganesha-2.7-rc2 \
+	&& curl -L https://github.com/nfs-ganesha/nfs-ganesha/archive/V2.7.1.tar.gz | tar zx \
+	&& curl -L https://github.com/nfs-ganesha/ntirpc/archive/05fe1d.tar.gz | tar zx \
+	&& rm -r nfs-ganesha-2.7.1/src/libntirpc \
+	&& mv ntirpc-05fe1d01b68f50d1220f4b1f51159e67f211078b nfs-ganesha-2.7.1/src/libntirpc \
+	&& cd nfs-ganesha-2.7.1 \
 	&& cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_CONFIG=vfs_only src/ \
 	&& make \
 	&& make install \
 	&& cp src/scripts/ganeshactl/org.ganesha.nfsd.conf /etc/dbus-1/system.d/ \
 	&& cd .. \
-	&& rm -rf nfs-ganesha-2.7-rc2 \
+	&& rm -rf nfs-ganesha-2.7.1 \
 	&& dnf remove -y tar gcc cmake autoconf libtool bison flex make gcc-c++ krb5-devel dbus-devel jemalloc-devel libnfsidmap-devel patch && dnf clean all
 
 RUN dnf install -y dbus-x11 rpcbind hostname nfs-utils xfsprogs jemalloc libnfsidmap && dnf clean all
