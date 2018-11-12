@@ -31,42 +31,8 @@ function install_helm() {
     curl -s "$HELM_URL" | sudo tar --strip-components 1 -C /usr/local/bin -zxf - ${OS}-${ARCH}/helm
 }
 
-# Skip duplicate build and test runs through the CI, that occur because we are now running on osx and linux.
-# Skipping these steps saves time and travis-ci resources.
-if [ "$TRAVIS_OS_NAME" = "osx" ]; then
-        if [ "$TEST_SUITE" != "osx" ]; then
-	        exit 0
-        fi
-fi
-if [ "$TRAVIS_OS_NAME" != "osx" ]; then
-        if [ "$TEST_SUITE" = "osx" ]; then
-	        exit 0
-        fi
-fi
-
-# Install golint, cfssl
-go get -u golang.org/x/lint/golint
-export PATH=$PATH:$GOPATH/bin
-go get -u github.com/alecthomas/gometalinter
-gometalinter --install
-make verify
-
-if [ "$TRAVIS_OS_NAME" = "osx" ]; then
-        if [ "$TEST_SUITE" = "osx" ]; then
-                # Presently travis-ci does not support docker on osx.
-                echo '#!/bin/bash' > docker
-                echo 'echo "***docker not currently supported on osx travis-ci, skipping docker commands for osx***"' >> docker
-                chmod u+x docker
-                export PATH=$(pwd):${PATH}
-                make
-                make test
-                install_helm
-                make test-local-volume/helm
-        fi
-elif [ "$TEST_SUITE" = "linux-nfs" ]; then
-	# Install nfs, cfssl
-	sudo apt-get -qq update
-	sudo apt-get install -y nfs-common
+function run_k8s_locally() {
+	# Install cfssl
 	go get -u github.com/cloudflare/cfssl/cmd/...
 
 	# Install etcd
@@ -85,9 +51,9 @@ elif [ "$TEST_SUITE" = "linux-nfs" ]; then
 	mkdir -p $HOME/.kube
 	sudo chmod -R 777 $HOME/.kube
 	if [ "$KUBE_VERSION" = "1.5.8" ]; then
-	    sudo "PATH=$PATH" KUBECTL=$HOME/kubernetes/server/bin/kubectl ENABLE_RBAC=true  ALLOW_SECURITY_CONTEXT=true API_HOST_IP=0.0.0.0 $HOME/kubernetes-${KUBE_VERSION}/hack/local-up-cluster.sh -o $HOME/kubernetes/server/bin >/tmp/local-up-cluster.log 2>&1 &
+		sudo "PATH=$PATH" KUBECTL=$HOME/kubernetes/server/bin/kubectl ENABLE_RBAC=true  ALLOW_SECURITY_CONTEXT=true API_HOST_IP=0.0.0.0 $HOME/kubernetes-${KUBE_VERSION}/hack/local-up-cluster.sh -o $HOME/kubernetes/server/bin >/tmp/local-up-cluster.log 2>&1 &
 	else
-	    sudo "PATH=$PATH" KUBECTL=$HOME/kubernetes/server/bin/kubectl ALLOW_SECURITY_CONTEXT=true $HOME/kubernetes-${KUBE_VERSION}/hack/local-up-cluster.sh -o $HOME/kubernetes/server/bin >/tmp/local-up-cluster.log 2>&1 &
+		sudo "PATH=$PATH" KUBECTL=$HOME/kubernetes/server/bin/kubectl ALLOW_SECURITY_CONTEXT=true $HOME/kubernetes-${KUBE_VERSION}/hack/local-up-cluster.sh -o $HOME/kubernetes/server/bin >/tmp/local-up-cluster.log 2>&1 &
 	fi
 	touch /tmp/local-up-cluster.log
 	ret=0
@@ -109,6 +75,47 @@ elif [ "$TEST_SUITE" = "linux-nfs" ]; then
 	if [ "$KUBE_VERSION" != "1.5.8" ]; then
 		sudo chown -R $(logname) /var/run/kubernetes;
 	fi
+}
+
+# Skip duplicate build and test runs through the CI, that occur because we are now running on osx and linux.
+# Skipping these steps saves time and travis-ci resources.
+if [ "$TRAVIS_OS_NAME" = "osx" ]; then
+        if [ "$TEST_SUITE" != "osx" ]; then
+	        exit 0
+        fi
+fi
+if [ "$TRAVIS_OS_NAME" != "osx" ]; then
+        if [ "$TEST_SUITE" = "osx" ]; then
+	        exit 0
+        fi
+fi
+
+# Install golint, gometalinter
+go get -u golang.org/x/lint/golint
+export PATH=$PATH:$GOPATH/bin
+go get -u github.com/alecthomas/gometalinter
+gometalinter --install
+make verify
+
+if [ "$TRAVIS_OS_NAME" = "osx" ]; then
+        if [ "$TEST_SUITE" = "osx" ]; then
+                # Presently travis-ci does not support docker on osx.
+                echo '#!/bin/bash' > docker
+                echo 'echo "***docker not currently supported on osx travis-ci, skipping docker commands for osx***"' >> docker
+                chmod u+x docker
+                export PATH=$(pwd):${PATH}
+                make
+                make test
+                install_helm
+                make test-local-volume/helm
+        fi
+elif [ "$TEST_SUITE" = "linux-nfs" ]; then
+	# Install nfs
+	sudo apt-get -qq update
+	sudo apt-get install -y nfs-common
+
+	# Run kubernetes
+	run_k8s_locally
 
 	# Build nfs-provisioner and run tests
 	make nfs
@@ -127,6 +134,10 @@ elif [ "$TEST_SUITE" = "linux-everything-else" ]; then
 	make snapshot
 	make test-snapshot
 elif [ "$TEST_SUITE" = "linux-local-volume" ]; then
+	export ALLOW_PRIVILEGED=true
+	export FEATURE_GATES="PersistentLocalVolumes=true,VolumeScheduling=true,MountPropagation=true,BlockVolume=true"
+    sudo mount --make-rshared / # required to use MountPropagation 
+	run_k8s_locally
 	make local-volume/provisioner
 	make test-local-volume/provisioner
 	install_helm

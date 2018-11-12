@@ -123,7 +123,7 @@ local-volume/provisioner:
 
 test-local-volume/provisioner:
 	cd local-volume/provisioner; \
-	make test
+	make test e2e
 .PHONY: test-local-volume/provisioner
 
 test-local-volume/helm:

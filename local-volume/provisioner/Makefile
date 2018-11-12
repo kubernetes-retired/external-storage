@@ -45,9 +45,13 @@ push: container
 .PHONY: push
 
 test: container
-	go test ./...
+	go test ./cmd/... ./pkg/...
 	docker run --privileged -v $(PWD)/deployment/docker/test.sh:/test.sh --entrypoint bash quay.io/external_storage/local-volume-provisioner:latest /test.sh
 .PHONY: test
+
+e2e: container
+	./test/e2e/test.sh
+.PHONY: e2e
 
 clean:
 	rm -f local-volume-provisioner

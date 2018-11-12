@@ -60,37 +60,47 @@ ignored = [
 
 [[constraint]]
   name = "k8s.io/api"
-  version = "kubernetes-1.13.0-alpha.1"
+  version = "kubernetes-1.13.0-beta.0"
 
 [[constraint]]
   name = "k8s.io/apiextensions-apiserver"
-  version = "kubernetes-1.13.0-alpha.1"
+  version = "kubernetes-1.13.0-beta.0"
 
 [[constraint]]
   name = "k8s.io/apimachinery"
-  version = "kubernetes-1.13.0-alpha.1"
+  version = "kubernetes-1.13.0-beta.0"
 
 [[constraint]]
   name = "k8s.io/client-go"
-  version = "kubernetes-1.13.0-alpha.1"
+  version = "kubernetes-1.13.0-beta.0"
 
 [[constraint]]
   name = "k8s.io/kubernetes"
-  version = "v1.13.0-alpha.1"
+  version = "v1.13.0-beta.0"
 
 [[constraint]]
   name = "github.com/kubernetes-sigs/sig-storage-lib-external-provisioner"
   revision = "712c5819bca548e64c5fb29d2946c5d69126c3fa"
 
-# https://github.com/kubernetes/kubernetes/blob/v1.12.0-beta.1/Godeps/Godeps.json#L3213
+# required by k8s packages
+[[override]]
+  name = "k8s.io/apiserver"
+  version = "kubernetes-1.13.0-beta.0"
+
+# https://github.com/kubernetes/kubernetes/blob/v1.13.0-beta.0/Godeps/Godeps.json#L3416
 [[override]]
   name = "golang.org/x/exp"
   revision = "292a51b8d262487dab23a588950e8052d63d9113"
 
-# https://github.com/kubernetes/kubernetes/blob/v1.12.0-beta.1/Godeps/Godeps.json#L1307
+# https://github.com/kubernetes/kubernetes/blob/v1.13.0-beta.0/Godeps/Godeps.json#L1349
 [[override]]
   name = "github.com/docker/distribution"
   revision = "edc3ab29cdff8694dd6feb85cfeb4b5f1b38ed9c"
+
+# https://github.com/kubernetes/kubernetes/blob/v1.13.0-beta.0/Godeps/Godeps.json#L1359
+[[override]]
+  name = "github.com/docker/docker"
+  revision = "a9fbbdc8dd8794b20af358382ab780559bca589d"
 
 # https://github.com/golang/dep/issues/1799
 [[override]]
