@@ -98,7 +98,7 @@ type UserConfig struct {
 	UseJobForCleaning bool
 	// Namespace of this Pod (optional)
 	Namespace string
-	// Image of container to use for jobs (optional)
+	// JobContainerImage of container to use for jobs (optional)
 	JobContainerImage string
 	// MinResyncPeriod is minimum resync period. Resync period in reflectors
 	// will be random between MinResyncPeriod and 2*MinResyncPeriod.
