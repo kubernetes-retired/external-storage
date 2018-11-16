@@ -10,13 +10,16 @@ metadata:
     release: "RELEASE-NAME"
     chart: provisioner-2.3.0
 data:
-  useNodeNameOnly: "true"
   storageClassMap: |
-    local-scsi:
+    local-storage:
        hostDir: /mnt/disks
        mountDir: /mnt/disks
+       blockCleanerCommand:
+         - "/scripts/shred.sh"
+         - "2"
+       volumeMode: Block
 ---
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: local-volume-provisioner
@@ -59,7 +62,7 @@ spec:
             - mountPath: /dev
               name: provisioner-dev
             - mountPath: /mnt/disks
-              name: local-scsi
+              name: local-storage
               mountPropagation: "HostToContainer"
       volumes:
         - name: provisioner-config
@@ -68,14 +71,14 @@ spec:
         - name: provisioner-dev
           hostPath:
             path: /dev
-        - name: local-scsi
+        - name: local-storage
           hostPath:
             path: /mnt/disks
 ---
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: local-scsi
+  name: local-storage
   labels:
     heritage: "Tiller"
     release: "RELEASE-NAME"
@@ -149,4 +152,8 @@ roleRef:
   kind: ClusterRole
   name: local-storage-provisioner-node-clusterrole
   apiGroup: rbac.authorization.k8s.io
+
+---
+# Source: provisioner/templates/namespace.yaml
+
 

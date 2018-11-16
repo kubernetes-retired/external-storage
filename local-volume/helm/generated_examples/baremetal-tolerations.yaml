@@ -10,16 +10,16 @@ metadata:
     release: "RELEASE-NAME"
     chart: provisioner-2.3.0
 data:
-  useJobForCleaning: "yes"
   storageClassMap: |
     local-storage:
        hostDir: /mnt/disks
        mountDir: /mnt/disks
        blockCleanerCommand:
-         - "/scripts/quick_reset.sh"
+         - "/scripts/shred.sh"
+         - "2"
        volumeMode: Block
 ---
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: local-volume-provisioner
@@ -39,6 +39,9 @@ spec:
         app: local-volume-provisioner
     spec:
       serviceAccountName: local-storage-admin
+      tolerations:
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/master
       containers:
         - image: "quay.io/external_storage/local-volume-provisioner:v2.2.0"
           name: provisioner
@@ -152,39 +155,8 @@ roleRef:
   kind: ClusterRole
   name: local-storage-provisioner-node-clusterrole
   apiGroup: rbac.authorization.k8s.io
+
 ---
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: local-storage-provisioner-jobs-role
-  namespace: default
-  labels:
-    heritage: "Tiller"
-    release: "RELEASE-NAME"
-    chart: provisioner-2.3.0
-rules:
-- apiGroups:
-    - 'batch'
-  resources:
-    - jobs
-  verbs:
-    - '*'
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: local-storage-provisioner-jobs-rolebinding
-  namespace: default
-  labels:
-    heritage: "Tiller"
-    release: "RELEASE-NAME"
-    chart: provisioner-2.3.0
-subjects:
-- kind: ServiceAccount
-  name: local-storage-admin
-  namespace: default
-roleRef:
-  kind: Role
-  name: local-storage-provisioner
-  apiGroup: rbac.authorization.k8s.io
+# Source: provisioner/templates/namespace.yaml
+
 

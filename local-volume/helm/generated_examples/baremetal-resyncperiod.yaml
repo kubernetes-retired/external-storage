@@ -10,16 +10,16 @@ metadata:
     release: "RELEASE-NAME"
     chart: provisioner-2.3.0
 data:
+  minResyncPeriod: "1h"
   storageClassMap: |
     local-storage:
        hostDir: /mnt/disks
        mountDir: /mnt/disks
        blockCleanerCommand:
-         - "/scripts/shred.sh"
-         - "2"
+         - "/scripts/quick_reset.sh"
        volumeMode: Block
 ---
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: local-volume-provisioner
@@ -55,9 +55,6 @@ spec:
                 fieldPath: metadata.namespace
           - name: JOB_CONTAINER_IMAGE
             value: "quay.io/external_storage/local-volume-provisioner:v2.2.0"
-          ports:
-          - containerPort: 8080
-            name: http
           volumeMounts:
             - mountPath: /etc/provisioner/config
               name: provisioner-config
@@ -89,51 +86,6 @@ metadata:
 provisioner: kubernetes.io/no-provisioner
 volumeBindingMode: WaitForFirstConsumer
 reclaimPolicy: Delete
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: local-volume-provisioner
-  namespace: default
-  labels:
-    app: local-volume-provisioner
-    heritage: "Tiller"
-    release: "RELEASE-NAME"
-    chart: provisioner-2.3.0
-spec:
-  type: ClusterIP
-  ports:
-    - port: 8080
-      targetPort: 8080
-      name: http
-  selector:
-    app: local-volume-provisioner
----
-apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
-metadata:
-  name: local-volume-provisioner
-  namespace: monitoring
-  labels:
-    app: local-volume-provisioner
-    heritage: "Tiller"
-    release: "RELEASE-NAME"
-    chart: provisioner-2.3.0
-        prometheus: kube-prometheus
-    
-spec:
-  jobLabel: app
-  selector:
-    matchLabels:
-      app: local-volume-provisioner
-      release: "RELEASE-NAME"
-  namespaceSelector:
-    matchNames:
-      - default
-  endpoints:
-    - port: http
-      interval: 10s
-      scheme: http
 
 ---
 # Source: provisioner/templates/provisioner-service-account.yaml
@@ -200,4 +152,8 @@ roleRef:
   kind: ClusterRole
   name: local-storage-provisioner-node-clusterrole
   apiGroup: rbac.authorization.k8s.io
+
+---
+# Source: provisioner/templates/namespace.yaml
+
 
