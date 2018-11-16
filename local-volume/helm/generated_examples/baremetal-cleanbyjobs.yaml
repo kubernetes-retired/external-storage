@@ -10,6 +10,7 @@ metadata:
     release: "RELEASE-NAME"
     chart: provisioner-2.3.0
 data:
+  useJobForCleaning: "yes"
   storageClassMap: |
     local-storage:
        hostDir: /mnt/disks
@@ -18,7 +19,7 @@ data:
          - "/scripts/quick_reset.sh"
        volumeMode: Block
 ---
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: local-volume-provisioner
@@ -87,10 +88,107 @@ volumeBindingMode: WaitForFirstConsumer
 reclaimPolicy: Delete
 
 ---
-# Source: provisioner/templates/provisioner-cluster-role-binding.yaml
+# Source: provisioner/templates/provisioner-service-account.yaml
 
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: local-storage-admin
+  namespace: default
+  labels:
+    heritage: "Tiller"
+    release: "RELEASE-NAME"
+    chart: provisioner-2.3.0
 
 ---
-# Source: provisioner/templates/provisioner-service-account.yaml
+# Source: provisioner/templates/provisioner-cluster-role-binding.yaml
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: local-storage-provisioner-pv-binding
+  namespace: default
+  labels:
+    heritage: "Tiller"
+    release: "RELEASE-NAME"
+    chart: provisioner-2.3.0
+subjects:
+- kind: ServiceAccount
+  name: local-storage-admin
+  namespace: default
+roleRef:
+  kind: ClusterRole
+  name: system:persistent-volume-provisioner
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: local-storage-provisioner-node-clusterrole
+  namespace: default
+  labels:
+    heritage: "Tiller"
+    release: "RELEASE-NAME"
+    chart: provisioner-2.3.0
+rules:
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: local-storage-provisioner-node-binding
+  namespace: default
+  labels:
+    heritage: "Tiller"
+    release: "RELEASE-NAME"
+    chart: provisioner-2.3.0
+subjects:
+- kind: ServiceAccount
+  name: local-storage-admin
+  namespace: default
+roleRef:
+  kind: ClusterRole
+  name: local-storage-provisioner-node-clusterrole
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: local-storage-provisioner-jobs-role
+  namespace: default
+  labels:
+    heritage: "Tiller"
+    release: "RELEASE-NAME"
+    chart: provisioner-2.3.0
+rules:
+- apiGroups:
+    - 'batch'
+  resources:
+    - jobs
+  verbs:
+    - '*'
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: local-storage-provisioner-jobs-rolebinding
+  namespace: default
+  labels:
+    heritage: "Tiller"
+    release: "RELEASE-NAME"
+    chart: provisioner-2.3.0
+subjects:
+- kind: ServiceAccount
+  name: local-storage-admin
+  namespace: default
+roleRef:
+  kind: Role
+  name: local-storage-provisioner
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Source: provisioner/templates/namespace.yaml
 
 

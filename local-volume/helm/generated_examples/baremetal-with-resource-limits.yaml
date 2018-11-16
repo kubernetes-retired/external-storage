@@ -10,20 +10,16 @@ metadata:
     release: "RELEASE-NAME"
     chart: provisioner-2.3.0
 data:
-  useNodeNameOnly: "true"
   storageClassMap: |
-    local-scsi:
-       hostDir: /mnt/disks/by-uuid/google-local-ssds-scsi-fs
-       mountDir: /mnt/disks/by-uuid/google-local-ssds-scsi-fs
-       volumeMode: Filesystem
-       fsType: ext4
-    local-nvme:
-       hostDir: /mnt/disks/by-uuid/google-local-ssds-nvme-fs
-       mountDir: /mnt/disks/by-uuid/google-local-ssds-nvme-fs
-       volumeMode: Filesystem
-       fsType: ext4
+    local-storage:
+       hostDir: /mnt/disks
+       mountDir: /mnt/disks
+       blockCleanerCommand:
+         - "/scripts/shred.sh"
+         - "2"
+       volumeMode: Block
 ---
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: local-volume-provisioner
@@ -48,6 +44,13 @@ spec:
           name: provisioner
           securityContext:
             privileged: true
+          resources:
+            limits:
+              cpu: 100m
+              memory: 200Mi
+            requests:
+              cpu: 50m
+              memory: 100Mi
           env:
           - name: MY_NODE_NAME
             valueFrom:
@@ -65,11 +68,8 @@ spec:
               readOnly: true
             - mountPath: /dev
               name: provisioner-dev
-            - mountPath: /mnt/disks/by-uuid/google-local-ssds-scsi-fs
-              name: local-scsi
-              mountPropagation: "HostToContainer"
-            - mountPath: /mnt/disks/by-uuid/google-local-ssds-nvme-fs
-              name: local-nvme
+            - mountPath: /mnt/disks
+              name: local-storage
               mountPropagation: "HostToContainer"
       volumes:
         - name: provisioner-config
@@ -78,29 +78,14 @@ spec:
         - name: provisioner-dev
           hostPath:
             path: /dev
-        - name: local-scsi
+        - name: local-storage
           hostPath:
-            path: /mnt/disks/by-uuid/google-local-ssds-scsi-fs
-        - name: local-nvme
-          hostPath:
-            path: /mnt/disks/by-uuid/google-local-ssds-nvme-fs
+            path: /mnt/disks
 ---
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: local-scsi
-  labels:
-    heritage: "Tiller"
-    release: "RELEASE-NAME"
-    chart: provisioner-2.3.0
-provisioner: kubernetes.io/no-provisioner
-volumeBindingMode: WaitForFirstConsumer
-reclaimPolicy: Delete
----
-apiVersion: storage.k8s.io/v1
-kind: StorageClass
-metadata:
-  name: local-nvme
+  name: local-storage
   labels:
     heritage: "Tiller"
     release: "RELEASE-NAME"
@@ -174,4 +159,8 @@ roleRef:
   kind: ClusterRole
   name: local-storage-provisioner-node-clusterrole
   apiGroup: rbac.authorization.k8s.io
+
+---
+# Source: provisioner/templates/namespace.yaml
+
 

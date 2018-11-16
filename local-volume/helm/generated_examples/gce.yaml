@@ -10,14 +10,20 @@ metadata:
     release: "RELEASE-NAME"
     chart: provisioner-2.3.0
 data:
-  useAlphaAPI: "true"
   useNodeNameOnly: "true"
   storageClassMap: |
     local-scsi:
-       hostDir: /mnt/disks
-       mountDir: /mnt/disks
+       hostDir: /mnt/disks/by-uuid/google-local-ssds-scsi-fs
+       mountDir: /mnt/disks/by-uuid/google-local-ssds-scsi-fs
+       volumeMode: Filesystem
+       fsType: ext4
+    local-nvme:
+       hostDir: /mnt/disks/by-uuid/google-local-ssds-nvme-fs
+       mountDir: /mnt/disks/by-uuid/google-local-ssds-nvme-fs
+       volumeMode: Filesystem
+       fsType: ext4
 ---
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: local-volume-provisioner
@@ -59,8 +65,11 @@ spec:
               readOnly: true
             - mountPath: /dev
               name: provisioner-dev
-            - mountPath: /mnt/disks
+            - mountPath: /mnt/disks/by-uuid/google-local-ssds-scsi-fs
               name: local-scsi
+              mountPropagation: "HostToContainer"
+            - mountPath: /mnt/disks/by-uuid/google-local-ssds-nvme-fs
+              name: local-nvme
               mountPropagation: "HostToContainer"
       volumes:
         - name: provisioner-config
@@ -71,12 +80,27 @@ spec:
             path: /dev
         - name: local-scsi
           hostPath:
-            path: /mnt/disks
+            path: /mnt/disks/by-uuid/google-local-ssds-scsi-fs
+        - name: local-nvme
+          hostPath:
+            path: /mnt/disks/by-uuid/google-local-ssds-nvme-fs
 ---
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
   name: local-scsi
+  labels:
+    heritage: "Tiller"
+    release: "RELEASE-NAME"
+    chart: provisioner-2.3.0
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Delete
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: local-nvme
   labels:
     heritage: "Tiller"
     release: "RELEASE-NAME"
@@ -150,4 +174,8 @@ roleRef:
   kind: ClusterRole
   name: local-storage-provisioner-node-clusterrole
   apiGroup: rbac.authorization.k8s.io
+
+---
+# Source: provisioner/templates/namespace.yaml
+
 
