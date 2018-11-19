@@ -61,9 +61,37 @@ func Create(client *gophercloud.ServiceClient, opts CreateOptsBuilder) (r Create
 	return
 }
 
+// DeleteOptsBuilder allows extensions to add additional parameters to the
+// Delete request.
+type DeleteOptsBuilder interface {
+	ToVolumeDeleteQuery() (string, error)
+}
+
+// DeleteOpts contains options for deleting a Volume. This object is passed to
+// the volumes.Delete function.
+type DeleteOpts struct {
+	// Delete all snapshots of this volume as well.
+	Cascade bool `q:"cascade"`
+}
+
+// ToLoadBalancerDeleteQuery formats a DeleteOpts into a query string.
+func (opts DeleteOpts) ToVolumeDeleteQuery() (string, error) {
+	q, err := gophercloud.BuildQueryString(opts)
+	return q.String(), err
+}
+
 // Delete will delete the existing Volume with the provided ID.
-func Delete(client *gophercloud.ServiceClient, id string) (r DeleteResult) {
-	_, r.Err = client.Delete(deleteURL(client, id), nil)
+func Delete(client *gophercloud.ServiceClient, id string, opts DeleteOptsBuilder) (r DeleteResult) {
+	url := deleteURL(client, id)
+	if opts != nil {
+		query, err := opts.ToVolumeDeleteQuery()
+		if err != nil {
+			r.Err = err
+			return
+		}
+		url += query
+	}
+	_, r.Err = client.Delete(url, nil)
 	return
 }
 

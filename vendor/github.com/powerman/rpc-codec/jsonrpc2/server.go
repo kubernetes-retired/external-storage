@@ -14,6 +14,11 @@ import (
 	"sync"
 )
 
+const (
+	batchMethod = "JSONRPC2.Batch"
+	protoVer    = "2.0"
+)
+
 type serverCodec struct {
 	encmutex sync.Mutex    // protects enc
 	dec      *json.Decoder // for reading JSON values
@@ -50,7 +55,7 @@ func NewServerCodec(conn io.ReadWriteCloser, srv *rpc.Server) rpc.ServerCodec {
 	if srv == nil {
 		srv = rpc.DefaultServer
 	}
-	srv.Register(JSONRPC2{})
+	_ = srv.Register(JSONRPC2{})
 	return &serverCodec{
 		dec:     json.NewDecoder(conn),
 		enc:     json.NewEncoder(conn),
@@ -102,7 +107,7 @@ func (r *serverRequest) UnmarshalJSON(raw []byte) error {
 	if len(o) == 3 && !(okID || okParams) || len(o) == 4 && !(okID && okParams) || len(o) > 4 {
 		return errors.New("bad request")
 	}
-	if r.Version != "2.0" {
+	if r.Version != protoVer {
 		return errors.New("bad request")
 	}
 	if okParams {
@@ -145,20 +150,20 @@ func (c *serverCodec) ReadRequestHeader(r *rpc.Request) (err error) {
 	var raw json.RawMessage
 	if err := c.dec.Decode(&raw); err != nil {
 		c.encmutex.Lock()
-		c.enc.Encode(serverResponse{Version: "2.0", ID: &null, Error: errParse})
+		_ = c.enc.Encode(serverResponse{Version: protoVer, ID: &null, Error: errParse})
 		c.encmutex.Unlock()
 		return err
 	}
 
 	if len(raw) > 0 && raw[0] == '[' {
-		c.req.Version = "2.0"
-		c.req.Method = "JSONRPC2.Batch"
+		c.req.Version = protoVer
+		c.req.Method = batchMethod
 		c.req.Params = &raw
 		c.req.ID = &null
 	} else if err := json.Unmarshal(raw, &c.req); err != nil {
 		if err.Error() == "bad request" {
 			c.encmutex.Lock()
-			c.enc.Encode(serverResponse{Version: "2.0", ID: &null, Error: errRequest})
+			_ = c.enc.Encode(serverResponse{Version: protoVer, ID: &null, Error: errRequest})
 			c.encmutex.Unlock()
 		}
 		return err
@@ -191,7 +196,7 @@ func (c *serverCodec) ReadRequestBody(x interface{}) error {
 	if c.req.Params == nil {
 		return nil
 	}
-	if c.req.Method == "JSONRPC2.Batch" {
+	if c.req.Method == batchMethod {
 		arg := x.(*BatchArg)
 		arg.srv = c.srv
 		if err := json.Unmarshal(*c.req.Params, &arg.reqs); err != nil {
@@ -222,7 +227,7 @@ func (c *serverCodec) WriteResponse(r *rpc.Response, x interface{}) error {
 	delete(c.pending, r.Seq)
 	c.mutex.Unlock()
 
-	if replies, ok := x.(*[]*json.RawMessage); r.ServiceMethod == "JSONRPC2.Batch" && ok {
+	if replies, ok := x.(*[]*json.RawMessage); r.ServiceMethod == batchMethod && ok {
 		if len(*replies) == 0 {
 			return nil
 		}
@@ -235,21 +240,22 @@ func (c *serverCodec) WriteResponse(r *rpc.Response, x interface{}) error {
 		// Notification. Do not respond.
 		return nil
 	}
-	resp := serverResponse{Version: "2.0", ID: b}
-	if r.Error == "" {
+	resp := serverResponse{Version: protoVer, ID: b}
+	switch {
+	case r.Error == "":
 		if x == nil {
 			resp.Result = &null
 		} else {
 			resp.Result = x
 		}
-	} else if r.Error[0] == '{' && r.Error[len(r.Error)-1] == '}' {
+	case r.Error[0] == '{' && r.Error[len(r.Error)-1] == '}':
 		// Well… this check for '{'…'}' isn't too strict, but I
 		// suppose we're trusting our own RPC methods (this way they
 		// can force sending wrong reply or many replies instead
 		// of one) and normal errors won't be formatted this way.
 		raw := json.RawMessage(r.Error)
 		resp.Error = &raw
-	} else {
+	default:
 		raw := json.RawMessage(newError(r.Error).Error())
 		resp.Error = &raw
 	}

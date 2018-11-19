@@ -1,5 +1,13 @@
 # Change Log
 
+## [v1.6.0] - 2018-10-16
+
+- #185 Projects support [beta] - @mchitten
+
+## [v1.5.0] - 2018-10-01
+
+- #181 Adding tagging images support - @hugocorbucci
+
 ## [v1.4.2] - 2018-08-30
 
 - #178 Allowing creating domain records with weight of 0 - @TFaga

@@ -16,7 +16,7 @@ const contentType = "application/json"
 
 type contextKey int
 
-var httpRequestContextKey contextKey = 0
+var httpRequestContextKey contextKey
 
 // HTTPRequestFromContext returns HTTP request related to this RPC (if
 // you use HTTPHander to serve JSON RPC 2.0 over HTTP) or nil otherwise.
@@ -76,7 +76,7 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	ctx := context.WithValue(context.Background(), httpRequestContextKey, req)
 	conn := &httpServerConn{req: req.Body, res: w}
-	h.rpc.ServeRequest(NewServerCodecContext(ctx, conn, h.rpc))
+	_ = h.rpc.ServeRequest(NewServerCodecContext(ctx, conn, h.rpc))
 	if !conn.replied {
 		w.WriteHeader(http.StatusNoContent)
 	}
@@ -139,20 +139,21 @@ func (conn *httpClientConn) Write(buf []byte) (int, error) {
 
 			if err == nil {
 				mediaType, _, err2 := mime.ParseMediaType(resp.Header.Get("Content-Type"))
-				if mediaType != contentType || err2 != nil {
+				switch {
+				case mediaType != contentType || err2 != nil:
 					err = fmt.Errorf("bad HTTP Content-Type: %s", resp.Header.Get("Content-Type"))
-				} else if resp.StatusCode == http.StatusOK {
+				case resp.StatusCode == http.StatusOK:
 					conn.ready <- resp.Body
 					return
-				} else if resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusAccepted {
+				case resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusAccepted:
 					// Read the body if small so underlying TCP connection will be re-used.
 					// No need to check for errors: if it fails, Transport won't reuse it anyway.
 					if resp.ContentLength == -1 || resp.ContentLength <= maxBodySlurpSize {
-						io.CopyN(ioutil.Discard, resp.Body, maxBodySlurpSize)
+						_, _ = io.CopyN(ioutil.Discard, resp.Body, maxBodySlurpSize)
 					}
 					resp.Body.Close()
 					return
-				} else {
+				default:
 					err = fmt.Errorf("bad HTTP Status: %s", resp.Status)
 				}
 			}
@@ -160,7 +161,7 @@ func (conn *httpClientConn) Write(buf []byte) (int, error) {
 				// Read the body if small so underlying TCP connection will be re-used.
 				// No need to check for errors: if it fails, Transport won't reuse it anyway.
 				if resp.ContentLength == -1 || resp.ContentLength <= maxBodySlurpSize {
-					io.CopyN(ioutil.Discard, resp.Body, maxBodySlurpSize)
+					_, _ = io.CopyN(ioutil.Discard, resp.Body, maxBodySlurpSize)
 				}
 				resp.Body.Close()
 			}
@@ -171,7 +172,7 @@ func (conn *httpClientConn) Write(buf []byte) (int, error) {
 		}
 		res.Error = NewError(errInternal.Code, err.Error())
 		buf := &bytes.Buffer{}
-		json.NewEncoder(buf).Encode(res)
+		_ = json.NewEncoder(buf).Encode(res)
 		conn.ready <- ioutil.NopCloser(buf)
 	}()
 	return len(buf), nil
