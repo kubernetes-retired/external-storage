@@ -810,6 +810,7 @@ func (ctrl *ProvisionController) syncVolume(obj interface{}) error {
 // shouldProvision returns whether a claim should have a volume provisioned for
 // it, i.e. whether a Provision is "desired"
 func (ctrl *ProvisionController) shouldProvision(claim *v1.PersistentVolumeClaim) bool {
+	needCheckVolumeMode := bool(false)
 	if claim.Spec.VolumeName != "" {
 		return false
 	}
@@ -819,7 +820,6 @@ func (ctrl *ProvisionController) shouldProvision(claim *v1.PersistentVolumeClaim
 			return false
 		}
 	}
-
 	// Kubernetes 1.5 provisioning with annStorageProvisioner
 	if ctrl.kubeVersion.AtLeast(utilversion.MustParseSemantic("v1.5.0")) {
 		if provisioner, found := claim.Annotations[annStorageProvisioner]; found {
@@ -828,18 +828,22 @@ func (ctrl *ProvisionController) shouldProvision(claim *v1.PersistentVolumeClaim
 			}
 			return false
 		}
-	} else {
-		// Kubernetes 1.4 provisioning, evaluating class.Provisioner
-		claimClass := helper.GetPersistentVolumeClaimClass(claim)
-		provisioner, _, err := ctrl.getStorageClassFields(claimClass)
-		if err != nil {
-			glog.Errorf("Error getting claim %q's StorageClass's fields: %v", claimToClaimKey(claim), err)
-			return false
-		}
-		if provisioner != ctrl.provisionerName {
-			return false
-		}
+		needCheckVolumeMode = true
+	}
 
+	// 1. Claim that should delay binding
+	// 2. Kubernetes 1.4 provisioning,
+	//  need to evaluating storage class.Provisioner
+	claimClass := helper.GetPersistentVolumeClaimClass(claim)
+	provisioner, _, shouldDelayBinding, err := ctrl.getStorageClassFields(claimClass)
+	if err != nil {
+		glog.Errorf("Error getting claim %q's StorageClass's fields: %v", claimToClaimKey(claim), err)
+		return false
+	}
+
+	if needCheckVolumeMode {
+		return shouldDelayBinding == true
+	} else if provisioner == ctrl.provisionerName {
 		return true
 	}
 
@@ -945,7 +949,7 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 		return nil
 	}
 
-	provisioner, parameters, err := ctrl.getStorageClassFields(claimClass)
+	provisioner, parameters, _, err := ctrl.getStorageClassFields(claimClass)
 	if err != nil {
 		glog.Error(logOperation(operation, "error getting claim's StorageClass's fields: %v", err))
 		return nil
@@ -1002,12 +1006,12 @@ func (ctrl *ProvisionController) provisionClaimOperation(claim *v1.PersistentVol
 
 	options := VolumeOptions{
 		PersistentVolumeReclaimPolicy: reclaimPolicy,
-		PVName:            pvName,
-		PVC:               claim,
-		MountOptions:      mountOptions,
-		Parameters:        parameters,
-		SelectedNode:      selectedNode,
-		AllowedTopologies: allowedTopologies,
+		PVName:                        pvName,
+		PVC:                           claim,
+		MountOptions:                  mountOptions,
+		Parameters:                    parameters,
+		SelectedNode:                  selectedNode,
+		AllowedTopologies:             allowedTopologies,
 	}
 
 	ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, "Provisioning", fmt.Sprintf("External provisioner is provisioning volume for claim %q", claimToClaimKey(claim)))
@@ -1165,13 +1169,13 @@ func (ctrl *ProvisionController) getProvisionedVolumeNameForClaim(claim *v1.Pers
 	return "pvc-" + string(claim.UID)
 }
 
-func (ctrl *ProvisionController) getStorageClassFields(name string) (string, map[string]string, error) {
+func (ctrl *ProvisionController) getStorageClassFields(name string) (string, map[string]string, bool, error) {
 	classObj, found, err := ctrl.classes.GetByKey(name)
 	if err != nil {
-		return "", nil, err
+		return "", nil, false, err
 	}
 	if !found {
-		return "", nil, fmt.Errorf("storageClass %q not found", name)
+		return "", nil, false, fmt.Errorf("storageClass %q not found", name)
 		// 3. It tries to find a StorageClass instance referenced by annotation
 		//    `claim.Annotations["volume.beta.kubernetes.io/storage-class"]`. If not
 		//    found, it SHOULD report an error (by sending an event to the claim) and it
@@ -1179,11 +1183,13 @@ func (ctrl *ProvisionController) getStorageClassFields(name string) (string, map
 	}
 	switch class := classObj.(type) {
 	case *storage.StorageClass:
-		return class.Provisioner, class.Parameters, nil
+		shouldDelayBinding := class.VolumeBindingMode != nil && *class.VolumeBindingMode == storage.VolumeBindingWaitForFirstConsumer
+		return class.Provisioner, class.Parameters, shouldDelayBinding, nil
 	case *storagebeta.StorageClass:
-		return class.Provisioner, class.Parameters, nil
+		shouldDelayBinding := class.VolumeBindingMode != nil && *class.VolumeBindingMode == storagebeta.VolumeBindingWaitForFirstConsumer
+		return class.Provisioner, class.Parameters, shouldDelayBinding, nil
 	}
-	return "", nil, fmt.Errorf("cannot convert object to StorageClass: %+v", classObj)
+	return "", nil, false, fmt.Errorf("cannot convert object to StorageClass: %+v", classObj)
 }
 
 func claimToClaimKey(claim *v1.PersistentVolumeClaim) string {
