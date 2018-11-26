@@ -7,6 +7,7 @@ data:
   file.system.id: yourEFSsystemid
   aws.region: regionyourEFSisin
   provisioner.name: example.com/aws-efs
+  dns.name: ""
 ---
 kind: Deployment
 apiVersion: extensions/v1beta1
@@ -35,6 +36,12 @@ spec:
                 configMapKeyRef:
                   name: efs-provisioner
                   key: aws.region
+            - name: DNS_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: efs-provisioner
+                  key: dns.name
+                  optional: true
             - name: PROVISIONER_NAME
               valueFrom:
                 configMapKeyRef:
