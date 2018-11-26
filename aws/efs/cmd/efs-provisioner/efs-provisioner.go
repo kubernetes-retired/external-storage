@@ -43,6 +43,7 @@ const (
 	provisionerNameKey = "PROVISIONER_NAME"
 	fileSystemIDKey    = "FILE_SYSTEM_ID"
 	awsRegionKey       = "AWS_REGION"
+	dnsNameKey         = "DNS_NAME"
 )
 
 type efsProvisioner struct {
@@ -64,7 +65,11 @@ func NewEFSProvisioner(client kubernetes.Interface) controller.Provisioner {
 		glog.Fatalf("environment variable %s is not set! Please set it.", awsRegionKey)
 	}
 
-	dnsName := getDNSName(fileSystemID, awsRegion)
+	dnsName := os.Getenv(dnsNameKey)
+	glog.Errorf("%v", dnsName)
+	if dnsName == "" {
+		dnsName = getDNSName(fileSystemID, awsRegion)
+	}
 
 	mountpoint, source, err := getMount(dnsName)
 	if err != nil {

@@ -17,7 +17,7 @@ If you are new to Kubernetes or to PersistentVolumes this quick start will get y
   wget https://raw.githubusercontent.com/kubernetes-incubator/external-storage/master/aws/efs/deploy/manifest.yaml
   ```
 
-- In the configmap section change the `file.system.id:` and `aws.region:` to match the details of the EFS you created.
+- In the configmap section change the `file.system.id:` and `aws.region:` to match the details of the EFS you created. Change `dns.name` if you want to mount by your own DNS name and not by AWS's `*file-system-id*.efs.*aws-region*.amazonaws.com`.
 
 - In the deployment section change the `server:` to the DNS endpoint of the EFS you created.
 
@@ -113,6 +113,7 @@ Create a configmap containing the [**File system ID**](http://docs.aws.amazon.co
 $ kubectl create configmap efs-provisioner \
 --from-literal=file.system.id=fs-47a2c22e \
 --from-literal=aws.region=us-west-2 \
+--from-literal=dns.name="" \ # if you want to mount by your own DNS name and not by AWS's `*file-system-id*.efs.*aws-region*.amazonaws.com`.
 --from-literal=provisioner.name=example.com/aws-efs
 ```
 
@@ -253,7 +254,7 @@ It's not needed but it is helpful if you are going to use your EFS for other thi
       volumes:
         - name: pv-volume
           nfs:
-            server: {{ efs_file_system_id }}.efs.{{ aws_region }}.amazonaws.com
+            server: {{ efs_file_system_id }}.efs.{{ aws_region }}.amazonaws.com # or the same value as `dns.name`/DNS_NAME if you want to mount by your own DNS name and not by AWS's `*file-system-id*.efs.*aws-region*.amazonaws.com`.
             path: /
 ```
 
