@@ -159,6 +159,11 @@ func (p *efsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 		return nil, err
 	}
 
+	mountOptions := []string{"vers=4.1"}
+	if options.MountOptions != nil {
+		mountOptions = options.MountOptions
+	}
+
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: options.PVName,
@@ -176,9 +181,10 @@ func (p *efsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 					ReadOnly: false,
 				},
 			},
-			MountOptions: []string{"vers=4.1"},
+			MountOptions: mountOptions,
 		},
 	}
+
 	if gidAllocate {
 		pv.ObjectMeta.Annotations = map[string]string{
 			gidallocator.VolumeGidAnnotationKey: strconv.FormatInt(int64(*gid), 10),
