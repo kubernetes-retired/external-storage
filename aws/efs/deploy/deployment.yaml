@@ -31,6 +31,12 @@ spec:
                 configMapKeyRef:
                   name: efs-provisioner
                   key: aws.region
+            - name: DNS_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: efs-provisioner
+                  key: dns.name
+                  optional: true
             - name: PROVISIONER_NAME
               valueFrom:
                 configMapKeyRef:
