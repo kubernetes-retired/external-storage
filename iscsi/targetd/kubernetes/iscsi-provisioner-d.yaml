@@ -14,7 +14,7 @@ rules:
     verbs: ["get", "list", "watch"]
   - apiGroups: [""]
     resources: ["events"]
-    verbs: ["create", "update", "patch"]
+    verbs: ["get", "list", "create", "update", "patch"]
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
