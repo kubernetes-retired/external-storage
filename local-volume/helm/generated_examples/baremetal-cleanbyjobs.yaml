@@ -185,7 +185,7 @@ subjects:
   namespace: default
 roleRef:
   kind: Role
-  name: local-storage-provisioner
+  name: local-storage-provisioner-jobs-role
   apiGroup: rbac.authorization.k8s.io
 
 ---
