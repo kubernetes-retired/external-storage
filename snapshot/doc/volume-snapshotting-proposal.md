@@ -361,7 +361,7 @@ periodically reconciles the two. The data structures are being update by the API
 
 To create a snapshot:
 
-* Acquire operation lock for volume so that only one one snapshot creation operation is running for the specified volume
+* Acquire operation lock for volume so that only one snapshot creation operation is running for the specified volume
 
     * Abort if there is already a pending operation (reconciliation loop will retry, if needed).
 
