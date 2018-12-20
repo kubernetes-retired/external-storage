@@ -221,6 +221,9 @@ Add a reference to the secret in the deployment yaml.
 ...
 ```
 
+## Building
+The Docker image can either be built by running `make quick-container` which will result in an image named `quay.io/external_storage/efs-provisioner:latest`. It's built with a multi stage Docker file so the only local dependency is that you have Docker installed.
+
 ## FAQ
 
 - Do I have to use a configmap?
