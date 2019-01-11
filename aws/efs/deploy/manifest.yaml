@@ -9,6 +9,11 @@ data:
   provisioner.name: example.com/aws-efs
   dns.name: ""
 ---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: efs-provisioner
+---
 kind: Deployment
 apiVersion: extensions/v1beta1
 metadata:
