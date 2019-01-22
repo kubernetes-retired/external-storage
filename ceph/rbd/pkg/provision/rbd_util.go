@@ -17,9 +17,11 @@ limitations under the License.
 package provision
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/controller"
@@ -28,7 +30,8 @@ import (
 )
 
 const (
-	imageWatcherStr = "watcher="
+	imageWatcherStr       = "watcher="
+	defaultCommandTimeOut = 5
 )
 
 // RBDUtil is the utility structure to interact with the RBD.
@@ -144,6 +147,22 @@ func (u *RBDUtil) DeleteImage(image string, pOpts *rbdProvisionOptions) error {
 }
 
 func (u *RBDUtil) execCommand(command string, args []string) ([]byte, error) {
-	cmd := exec.Command(command, args...)
-	return cmd.CombinedOutput()
+	ctx, cancel := context.WithTimeout(context.Background(), defaultCommandTimeOut*time.Second)
+	defer cancel()
+
+	// Create the command with our context
+	cmd := exec.CommandContext(ctx, command, args...)
+	glog.V(4).Infof("Executing command: %v %v", command, args)
+	out, err := cmd.CombinedOutput()
+
+	if ctx.Err() == context.DeadlineExceeded {
+		return nil, fmt.Errorf("rbd: Command timed out")
+	}
+
+	// If there's no context error, we know the command completed (or errored).
+	if err != nil {
+		return nil, fmt.Errorf("rbd: Command exited with non-zero code: %v", err)
+	}
+
+	return out, err
 }
