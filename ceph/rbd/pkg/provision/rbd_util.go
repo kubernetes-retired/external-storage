@@ -30,12 +30,14 @@ import (
 )
 
 const (
-	imageWatcherStr       = "watcher="
-	defaultCommandTimeOut = 5
+	imageWatcherStr = "watcher="
 )
 
 // RBDUtil is the utility structure to interact with the RBD.
-type RBDUtil struct{}
+type RBDUtil struct {
+	// Command execution timeout
+	timeout int
+}
 
 // See https://github.com/kubernetes/kubernetes/pull/57512.
 func (u *RBDUtil) kernelRBDMonitorsOpt(mons []string) string {
@@ -147,7 +149,7 @@ func (u *RBDUtil) DeleteImage(image string, pOpts *rbdProvisionOptions) error {
 }
 
 func (u *RBDUtil) execCommand(command string, args []string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), defaultCommandTimeOut*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(u.timeout)*time.Second)
 	defer cancel()
 
 	// Create the command with our context

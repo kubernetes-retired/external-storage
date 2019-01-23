@@ -90,11 +90,13 @@ type rbdProvisioner struct {
 }
 
 // NewRBDProvisioner creates a Provisioner that provisions Ceph RBD PVs backed by Ceph RBD images.
-func NewRBDProvisioner(client kubernetes.Interface, id string) controller.Provisioner {
+func NewRBDProvisioner(client kubernetes.Interface, id string, timeout int) controller.Provisioner {
 	return &rbdProvisioner{
 		client:   client,
 		identity: id,
-		rbdUtil:  &RBDUtil{},
+		rbdUtil: &RBDUtil{
+			timeout: timeout,
+		},
 	}
 }
 
