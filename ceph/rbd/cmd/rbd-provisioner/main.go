@@ -30,10 +30,11 @@ import (
 )
 
 var (
-	master      = flag.String("master", "", "Master URL")
-	kubeconfig  = flag.String("kubeconfig", "", "Absolute path to the kubeconfig")
-	id          = flag.String("id", "", "Unique provisioner identity")
-	metricsPort = flag.Int("metrics-port", 0, "The port of the metrics server (set to non-zero to enable)")
+	master         = flag.String("master", "", "Master URL")
+	kubeconfig     = flag.String("kubeconfig", "", "Absolute path to the kubeconfig")
+	id             = flag.String("id", "", "Unique provisioner identity")
+	metricsPort    = flag.Int("metrics-port", 0, "The port of the metrics server (set to non-zero to enable)")
+	commandTimeout = flag.Int("command-timeout", 5, "Timeout for command execution (in seconds)")
 )
 
 const (
@@ -83,7 +84,7 @@ func main() {
 	// Create the provisioner: it implements the Provisioner interface expected by
 	// the controller
 	glog.Infof("Creating RBD provisioner %s with identity: %s", prName, prID)
-	rbdProvisioner := provision.NewRBDProvisioner(clientset, prID)
+	rbdProvisioner := provision.NewRBDProvisioner(clientset, prID, *commandTimeout)
 
 	// Start the provision controller which will dynamically provision rbd
 	// PVs
