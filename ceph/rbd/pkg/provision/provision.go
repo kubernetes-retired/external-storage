@@ -84,19 +84,21 @@ type rbdProvisioner struct {
 	client kubernetes.Interface
 	// Identity of this rbdProvisioner, generated. Used to identify "this"
 	// provisioner's PVs.
-	identity string
-	rbdUtil  *RBDUtil
-	dnsip    string
+	identity  string
+	rbdUtil   *RBDUtil
+	dnsip     string
+	usePVName bool
 }
 
 // NewRBDProvisioner creates a Provisioner that provisions Ceph RBD PVs backed by Ceph RBD images.
-func NewRBDProvisioner(client kubernetes.Interface, id string, timeout int) controller.Provisioner {
+func NewRBDProvisioner(client kubernetes.Interface, id string, timeout int, usePVName bool) controller.Provisioner {
 	return &rbdProvisioner{
 		client:   client,
 		identity: id,
 		rbdUtil: &RBDUtil{
 			timeout: timeout,
 		},
+		usePVName: usePVName,
 	}
 }
 
@@ -122,8 +124,12 @@ func (p *rbdProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 	if err != nil {
 		return nil, err
 	}
-	// create random image name
-	image := fmt.Sprintf("kubernetes-dynamic-pvc-%s", uuid.NewUUID())
+	image := options.PVName
+	// If use-pv-name flag not set, generate image name
+	if !p.usePVName {
+		// create random image name
+		image = fmt.Sprintf("kubernetes-dynamic-pvc-%s", uuid.NewUUID())
+	}
 	rbd, sizeMB, err := p.rbdUtil.CreateImage(image, opts, options)
 	if err != nil {
 		glog.Errorf("rbd: create volume failed, err: %v", err)
