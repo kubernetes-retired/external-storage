@@ -1129,6 +1129,13 @@
   revision = "2966180a4e54fab57c98153a33cf018cc4017ba3"
 
 [[projects]]
+  digest = "1:e2999bf1bb6eddc2a6aa03fe5e6629120a53088926520ca3b4765f77d7ff7eab"
+  name = "k8s.io/klog"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "8139d8cb77af419532b33dfa7dd09fbc5f1d344f"
+
+[[projects]]
   branch = "master"
   digest = "1:a2c842a1e0aed96fd732b535514556323a6f5edfded3b63e5e0ab1bce188aa54"
   name = "k8s.io/kube-openapi"
@@ -1259,7 +1266,6 @@
     "github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/mount",
     "github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/util",
     "github.com/magiconair/properties",
-    "github.com/miekg/dns",
     "github.com/mitchellh/mapstructure",
     "github.com/pborman/uuid",
     "github.com/powerman/rpc-codec/jsonrpc2",
@@ -1273,7 +1279,6 @@
     "golang.org/x/oauth2",
     "golang.org/x/oauth2/google",
     "golang.org/x/sys/unix",
-    "golang.org/x/time/rate",
     "google.golang.org/api/compute/v1",
     "google.golang.org/api/container/v1",
     "google.golang.org/api/googleapi",
@@ -1282,7 +1287,6 @@
     "k8s.io/api/batch/v1",
     "k8s.io/api/core/v1",
     "k8s.io/api/storage/v1",
-    "k8s.io/api/storage/v1beta1",
     "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1",
     "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset",
     "k8s.io/apimachinery/pkg/api/errors",
@@ -1301,7 +1305,6 @@
     "k8s.io/apimachinery/pkg/util/uuid",
     "k8s.io/apimachinery/pkg/util/validation",
     "k8s.io/apimachinery/pkg/util/validation/field",
-    "k8s.io/apimachinery/pkg/util/version",
     "k8s.io/apimachinery/pkg/util/wait",
     "k8s.io/client-go/informers",
     "k8s.io/client-go/kubernetes",
@@ -1312,19 +1315,16 @@
     "k8s.io/client-go/listers/storage/v1",
     "k8s.io/client-go/plugin/pkg/client/auth/gcp",
     "k8s.io/client-go/rest",
-    "k8s.io/client-go/testing",
     "k8s.io/client-go/tools/cache",
     "k8s.io/client-go/tools/clientcmd",
-    "k8s.io/client-go/tools/leaderelection",
-    "k8s.io/client-go/tools/leaderelection/resourcelock",
     "k8s.io/client-go/tools/record",
-    "k8s.io/client-go/tools/reference",
     "k8s.io/client-go/tools/remotecommand",
     "k8s.io/client-go/util/cert",
     "k8s.io/client-go/util/flowcontrol",
     "k8s.io/client-go/util/retry",
     "k8s.io/client-go/util/testing",
     "k8s.io/client-go/util/workqueue",
+    "k8s.io/klog",
     "k8s.io/kube-state-metrics/pkg/collectors/testutils",
     "k8s.io/kubernetes/pkg/api/v1/service",
     "k8s.io/kubernetes/pkg/apis/core/v1/helper",

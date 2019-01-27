@@ -25,7 +25,6 @@ import (
 	"strconv"
 	dstrings "strings"
 
-	"github.com/golang/glog"
 	gcli "github.com/heketi/heketi/client/api/go-client"
 	gapi "github.com/heketi/heketi/pkg/glusterfs/api"
 	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/controller"
@@ -38,6 +37,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/klog"
 )
 
 const (
@@ -175,14 +175,14 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", options.PVC.Spec.AccessModes, p.GetAccessModes())
 	}
 
-	glog.V(4).Infof("VolumeOptions %v", options)
+	klog.V(4).Infof("VolumeOptions %v", options)
 
 	cfg, parseErr := parseClassParameters(options.Parameters, p.client)
 	if parseErr != nil {
 		return nil, fmt.Errorf("failed to parse storage class parameters: %v", parseErr)
 	}
 
-	glog.V(4).Infof("creating volume with configuration %+v", *cfg)
+	klog.V(4).Infof("creating volume with configuration %+v", *cfg)
 
 	// Calculate the size
 	volSize := options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
@@ -222,7 +222,7 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 		return nil, fmt.Errorf("failed to create volume, Target portal/IQN is nil in iscsi volume spec")
 	}
 
-	glog.V(1).Infof("Volume configuration %+v", blockVol)
+	klog.V(1).Infof("Volume configuration %+v", blockVol)
 
 	secretRef := &v1.SecretReference{}
 
@@ -231,7 +231,7 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 		secretName := "glusterblk-" + iscsiVol.User + "-secret"
 		secretRef, err = p.createSecretRef(nameSpace, secretName, iscsiVol.User, iscsiVol.AuthKey)
 		if err != nil {
-			glog.Errorf("failed to create CHAP auth credentials for pv: %v", err)
+			klog.Errorf("failed to create CHAP auth credentials for pv: %v", err)
 			return nil, fmt.Errorf("failed to create CHAP auth credentials for pv: %v", err)
 
 		}
@@ -239,11 +239,11 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 		iscsiVol.BlockSecret = secretName
 		iscsiVol.BlockSecretNs = nameSpace
 	} else if !(cfg.chapAuthEnabled) {
-		glog.V(1).Infof("CHAP authentication is not requested for this PV")
+		klog.V(1).Infof("CHAP authentication is not requested for this PV")
 		iscsiVol.SessionCHAPAuth = false
 		secretRef = nil
 	} else {
-		glog.Errorf("chapauth enabled - but CHAP credentials are missing in the %v response", cfg.opMode)
+		klog.Errorf("chapauth enabled - but CHAP credentials are missing in the %v response", cfg.opMode)
 		return nil, fmt.Errorf("chapauth enabled - but CHAP credentials are missing in the %v response", cfg.opMode)
 	}
 
@@ -297,7 +297,7 @@ func (p *glusterBlockProvisioner) Provision(options controller.VolumeOptions) (*
 			},
 		},
 	}
-	glog.V(1).Infof("successfully created Gluster Block volume %+v", pv.Spec.PersistentVolumeSource.ISCSI)
+	klog.V(1).Infof("successfully created Gluster Block volume %+v", pv.Spec.PersistentVolumeSource.ISCSI)
 	return pv, nil
 }
 
@@ -352,7 +352,7 @@ func (p *glusterBlockProvisioner) createSecretRef(nameSpace string, secretName s
 		_, err = p.client.CoreV1().Secrets(nameSpace).Create(secret)
 		if err != nil && errors.IsAlreadyExists(err) {
 
-			glog.V(1).Infof("secret %s already exist in namespace %s", secret, nameSpace)
+			klog.V(1).Infof("secret %s already exist in namespace %s", secret, nameSpace)
 			err = nil
 		}
 		if err != nil {
@@ -361,7 +361,7 @@ func (p *glusterBlockProvisioner) createSecretRef(nameSpace string, secretName s
 
 		if secretRef != nil {
 			secretRef.Name = secretName
-			glog.V(1).Infof("secret %v and secretRef %v", secret, secretRef)
+			klog.V(1).Infof("secret %v and secretRef %v", secret, secretRef)
 		}
 	} else {
 		return nil, fmt.Errorf("secret is nil")
@@ -377,7 +377,7 @@ func (p *glusterBlockProvisioner) createVolume(volSizeInt int, blockVol string, 
 	sizeStr := strconv.Itoa(volSizeInt)
 	haCountStr := strconv.Itoa(config.haCount)
 
-	glog.V(2).Infof("create block volume of size %d  and configuration %+v", volSizeInt, config)
+	klog.V(2).Infof("create block volume of size %d  and configuration %+v", volSizeInt, config)
 
 	// Possible opModes are gluster-block and heketi:
 	switch config.opMode {
@@ -387,14 +387,14 @@ func (p *glusterBlockProvisioner) createVolume(volSizeInt int, blockVol string, 
 
 		gBlockCreateErr := p.glusterBlockExecCreate(blockRes, config, sizeStr, haCountStr, blockVol)
 		if gBlockCreateErr != nil {
-			glog.Errorf("gluster block volume creation failed: %v", gBlockCreateErr)
+			klog.Errorf("gluster block volume creation failed: %v", gBlockCreateErr)
 			return nil, fmt.Errorf("gluster block volume creation failed: %v", gBlockCreateErr)
 		}
 
 	case heketiOpmode:
 		hBlockCreateErr := p.heketiBlockVolCreate(blockRes, config, volSizeInt, haCountStr, blockVol)
 		if hBlockCreateErr != nil {
-			glog.Errorf("heketi block volume creation failed: %v", hBlockCreateErr)
+			klog.Errorf("heketi block volume creation failed: %v", hBlockCreateErr)
 			return nil, fmt.Errorf("heketi block volume creation failed: %v", hBlockCreateErr)
 		}
 
@@ -421,7 +421,7 @@ func (p *glusterBlockProvisioner) glusterBlockExecCreate(blockRes *glusterBlockV
 
 	out, cmdErr := cmd.CombinedOutput()
 	if cmdErr != nil {
-		glog.Errorf("command %v failed,%v", cmd, cmdErr)
+		klog.Errorf("command %v failed,%v", cmd, cmdErr)
 		return fmt.Errorf("gluster block command %v failed: %v", cmd, cmdErr)
 	}
 
@@ -433,7 +433,7 @@ func (p *glusterBlockProvisioner) glusterBlockExecCreate(blockRes *glusterBlockV
 	execBlockRes := &blockRes.glusterBlockExecVolRes
 	unmarshErr := json.Unmarshal([]byte(out), execBlockRes)
 	if unmarshErr != nil {
-		glog.Errorf("failed to unmarshal gluster-block command response: %v", unmarshErr)
+		klog.Errorf("failed to unmarshal gluster-block command response: %v", unmarshErr)
 		return fmt.Errorf("failed to unmarshal gluster-block command response: %v", unmarshErr)
 	}
 
@@ -445,13 +445,13 @@ func (p *glusterBlockProvisioner) glusterBlockExecCreate(blockRes *glusterBlockV
 
 		out, cmdErr := cmd.CombinedOutput()
 		if cmdErr != nil {
-			glog.Errorf("error: %v when running command %v", cmdErr, cmd)
+			klog.Errorf("error: %v when running command %v", cmdErr, cmd)
 			return cmdErr
 		}
 		unmarshErr = json.Unmarshal([]byte(out), execBlockRes)
 		if unmarshErr != nil {
 
-			glog.Errorf("failed to unmarshal gluster-block command response: %v", unmarshErr)
+			klog.Errorf("failed to unmarshal gluster-block command response: %v", unmarshErr)
 			return fmt.Errorf("failed to unmarshal auth response from gluster-block command output: %v", unmarshErr)
 		}
 		if *execBlockRes == nil {
@@ -472,13 +472,13 @@ func (p *glusterBlockProvisioner) heketiBlockVolCreate(blockRes *glusterBlockVol
 	blockRes.glusterBlockExecVolRes = nil
 	cli := gcli.NewClient(config.url, config.user, config.restSecretValue)
 	if cli == nil {
-		glog.Errorf("failed to create glusterblock REST client")
+		klog.Errorf("failed to create glusterblock REST client")
 		return fmt.Errorf("failed to create glusterblock REST client, REST server authentication failed")
 	}
 
 	if config.clusterID != "" {
 		clusterIDs = dstrings.Split(config.clusterID, ",")
-		glog.V(4).Infof("provided clusterIDs %v", clusterIDs)
+		klog.V(4).Infof("provided clusterIDs %v", clusterIDs)
 	}
 
 	blockVolumeReq := &gapi.BlockVolumeCreateRequest{
@@ -492,7 +492,7 @@ func (p *glusterBlockProvisioner) heketiBlockVolCreate(blockRes *glusterBlockVol
 	blockVolumeInfoRes, err := cli.BlockVolumeCreate(blockVolumeReq)
 
 	if err != nil {
-		glog.Errorf("[heketi] failed to create volume: %v", err)
+		klog.Errorf("[heketi] failed to create volume: %v", err)
 		return fmt.Errorf("[heketi] failed to create volume: %v", err)
 
 	}
@@ -564,38 +564,38 @@ func (p *glusterBlockProvisioner) Delete(volume *v1.PersistentVolume) error {
 	}
 
 	// Delete this blockVol
-	glog.V(1).Infof("blockVolume %v to be deleted", delBlockVolName)
+	klog.V(1).Infof("blockVolume %v to be deleted", delBlockVolName)
 
 	//Call subjected volume delete operation.
 	switch config.opMode {
 
 	case glusterBlockOpmode:
-		glog.V(1).Infof("Deleting Volume %v ", delBlockVolName)
+		klog.V(1).Infof("Deleting Volume %v ", delBlockVolName)
 		deleteCmd := exec.Command(
 			config.opMode, "delete",
 			config.blockModeArgs["glustervol"]+"/"+delBlockVolName, "--json")
 		_, cmdErr := deleteCmd.CombinedOutput()
 		if cmdErr != nil {
-			glog.Errorf("error %v when running gluster-block command %v", cmdErr, deleteCmd)
+			klog.Errorf("error %v when running gluster-block command %v", cmdErr, deleteCmd)
 			return cmdErr
 		}
-		glog.V(1).Infof("successfully deleted Volume %v", delBlockVolName)
+		klog.V(1).Infof("successfully deleted Volume %v", delBlockVolName)
 
 	case heketiOpmode:
 
-		glog.V(1).Infof("opmode[heketi]: deleting Volume %v", delBlockVolName)
+		klog.V(1).Infof("opmode[heketi]: deleting Volume %v", delBlockVolName)
 		heketiModeArgs["restsecretvalue"] = ""
 		if heketiModeArgs["secret"] != "" && heketiModeArgs["secretnamespace"] != "" {
 			var err error
 			heketiModeArgs["restsecretvalue"], err = parseSecret(heketiModeArgs["secretnamespace"], heketiModeArgs["secret"], p.client)
 			if err != nil {
-				glog.Errorf("[heketi]: failed to parse secret %s : Error, %v", heketiModeArgs["secret"], err)
+				klog.Errorf("[heketi]: failed to parse secret %s : Error, %v", heketiModeArgs["secret"], err)
 				return err
 			}
 		}
 		cli := gcli.NewClient(heketiModeArgs["url"], heketiModeArgs["user"], heketiModeArgs["restsecretvalue"])
 		if cli == nil {
-			glog.Errorf("[heketi]: failed to create REST client")
+			klog.Errorf("[heketi]: failed to create REST client")
 			return fmt.Errorf("[heketi]: failed to create REST client, REST server authentication failed")
 		}
 
@@ -607,17 +607,17 @@ func (p *glusterBlockProvisioner) Delete(volume *v1.PersistentVolume) error {
 		deleteErr := cli.BlockVolumeDelete(volumeID)
 		if deleteErr != nil {
 			if dstrings.Contains(deleteErr.Error(), errIDNotFound) {
-				glog.Errorf("[heketi]: failed to find volume ID %v in database, manual intervention required", volumeID)
+				klog.Errorf("[heketi]: failed to find volume ID %v in database, manual intervention required", volumeID)
 				return fmt.Errorf("[heketi]: failed to find volume ID %v in database : %v", volumeID, deleteErr)
 			}
 
-			glog.Errorf("[heketi]: failed to delete gluster block volume %v: %v", delBlockVolName, deleteErr)
+			klog.Errorf("[heketi]: failed to delete gluster block volume %v: %v", delBlockVolName, deleteErr)
 			return fmt.Errorf("[heketi]: failed to delete glusterblock volume %v: %v", delBlockVolName, deleteErr)
 		}
-		glog.V(1).Infof("[heketi]: successfully deleted Volume %v", delBlockVolName)
+		klog.V(1).Infof("[heketi]: successfully deleted Volume %v", delBlockVolName)
 
 	default:
-		glog.Errorf("Unknown OpMode, failed to delete volume %v", delBlockVolName)
+		klog.Errorf("Unknown OpMode, failed to delete volume %v", delBlockVolName)
 
 	}
 
@@ -625,11 +625,11 @@ func (p *glusterBlockProvisioner) Delete(volume *v1.PersistentVolume) error {
 		deleteSecErr := p.client.CoreV1().Secrets(volume.Annotations["AccessKeyNs"]).Delete(volume.Annotations["AccessKey"], nil)
 
 		if deleteSecErr != nil && errors.IsNotFound(deleteSecErr) {
-			glog.V(1).Infof("secret %s does not exist in namespace %s", volume.Annotations["AccessKey"], volume.Annotations["AccessKeyNs"])
+			klog.V(1).Infof("secret %s does not exist in namespace %s", volume.Annotations["AccessKey"], volume.Annotations["AccessKeyNs"])
 			deleteSecErr = nil
 		}
 		if deleteSecErr != nil {
-			glog.Errorf("failed to delete secret %v/%v: %v", volume.Annotations["AccessKey"], volume.Annotations["AccessKeyNs"], deleteSecErr)
+			klog.Errorf("failed to delete secret %v/%v: %v", volume.Annotations["AccessKey"], volume.Annotations["AccessKeyNs"], deleteSecErr)
 			return fmt.Errorf("failed to delete secret %v/%v: %v", volume.Annotations["AccessKey"], volume.Annotations["AccessKeyNs"], deleteSecErr)
 		}
 	}
@@ -763,7 +763,7 @@ func parseClassParameters(params map[string]string, kubeclient kubernetes.Interf
 		} else if authEnabled {
 			return nil, fmt.Errorf("`restauthenabled` should be set to false if `restsecret` and `restsecretnamespace` is nil")
 		} else {
-			glog.V(1).Infof("rest authentication is not enabled")
+			klog.V(1).Infof("rest authentication is not enabled")
 		}
 
 	}
@@ -840,7 +840,7 @@ func parseSecret(namespace, secretName string, kubeClient kubernetes.Interface) 
 
 	secretMap, err := GetSecretForPV(namespace, secretName, provisionerName, kubeClient)
 	if err != nil {
-		glog.Errorf("failed to get secret [%s/%s], %v", namespace, secretName, err)
+		klog.Errorf("failed to get secret [%s/%s], %v", namespace, secretName, err)
 		return "", fmt.Errorf("failed to get secret [%s/%s], %v", namespace, secretName, err)
 	}
 	if len(secretMap) == 0 {
@@ -898,7 +898,7 @@ func main() {
 	}
 
 	if err != nil {
-		glog.Fatalf("Failed to create kubernetes config: %v", err)
+		klog.Fatalf("Failed to create kubernetes config: %v", err)
 	}
 
 	provName := provisionerName
@@ -915,14 +915,14 @@ func main() {
 
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		glog.Fatalf("failed to create kubernetes client: %v", err)
+		klog.Fatalf("failed to create kubernetes client: %v", err)
 	}
 
 	// The controller needs to know what the server version is because out-of-tree
 	// provisioners aren't officially supported until 1.5
 	serverVersion, err := clientset.Discovery().ServerVersion()
 	if err != nil {
-		glog.Fatalf("failed to get server version: %v", err)
+		klog.Fatalf("failed to get server version: %v", err)
 	}
 
 	// Create the provisioner: it implements the Provisioner interface expected by
