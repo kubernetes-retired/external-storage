@@ -17,13 +17,13 @@ limitations under the License.
 package volume
 
 import (
-	"github.com/golang/glog"
 	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/controller"
 	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/util"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
 	"k8s.io/utils/exec"
 	"strconv"
 )
@@ -124,9 +124,9 @@ func (p *flexProvisioner) createVolume(volumeOptions controller.VolumeOptions) e
 	output, err := call.Run()
 	if err != nil {
 		if output == nil || output.Message == "" {
-			glog.Errorf("Failed to create volume %s, output: %s, error: %s", volumeOptions, "<missing>", err.Error())
+			klog.Errorf("Failed to create volume %s, output: %s, error: %s", volumeOptions, "<missing>", err.Error())
 		} else {
-			glog.Errorf("Failed to create volume %s, output: %s, error: %s", volumeOptions, output.Message, err.Error())
+			klog.Errorf("Failed to create volume %s, output: %s, error: %s", volumeOptions, output.Message, err.Error())
 		}
 		return err
 	}
