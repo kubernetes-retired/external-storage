@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	"github.com/digitalocean/godo"
-	"github.com/golang/glog"
 	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/controller"
 	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/util"
 	"k8s.io/api/core/v1"
@@ -29,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
@@ -143,7 +143,7 @@ func (p *digitaloceanProvisioner) createVolume(volumeOptions controller.VolumeOp
 
 	vol, _, err := p.doClient.Storage.CreateVolume(p.ctx, createRequest)
 	if err != nil {
-		glog.Errorf("Failed to create volume %s, error: %s", volumeOptions, err.Error())
+		klog.Errorf("Failed to create volume %s, error: %s", volumeOptions, err.Error())
 		return nil, err
 	}
 	return vol, nil
