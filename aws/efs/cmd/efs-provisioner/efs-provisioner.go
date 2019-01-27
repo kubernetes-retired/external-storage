@@ -28,7 +28,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/efs"
-	"github.com/golang/glog"
 	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/controller"
 	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/gidallocator"
 	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/mount"
@@ -37,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/klog"
 )
 
 const (
@@ -57,28 +57,28 @@ type efsProvisioner struct {
 func NewEFSProvisioner(client kubernetes.Interface) controller.Provisioner {
 	fileSystemID := os.Getenv(fileSystemIDKey)
 	if fileSystemID == "" {
-		glog.Fatalf("environment variable %s is not set! Please set it.", fileSystemIDKey)
+		klog.Fatalf("environment variable %s is not set! Please set it.", fileSystemIDKey)
 	}
 
 	awsRegion := os.Getenv(awsRegionKey)
 	if awsRegion == "" {
-		glog.Fatalf("environment variable %s is not set! Please set it.", awsRegionKey)
+		klog.Fatalf("environment variable %s is not set! Please set it.", awsRegionKey)
 	}
 
 	dnsName := os.Getenv(dnsNameKey)
-	glog.Errorf("%v", dnsName)
+	klog.Errorf("%v", dnsName)
 	if dnsName == "" {
 		dnsName = getDNSName(fileSystemID, awsRegion)
 	}
 
 	mountpoint, source, err := getMount(dnsName)
 	if err != nil {
-		glog.Fatal(err)
+		klog.Fatal(err)
 	}
 
 	sess, err := session.NewSession()
 	if err != nil {
-		glog.Warningf("couldn't create an AWS session: %v", err)
+		klog.Warningf("couldn't create an AWS session: %v", err)
 	}
 
 	svc := efs.New(sess, &aws.Config{Region: aws.String(awsRegion)})
@@ -88,7 +88,7 @@ func NewEFSProvisioner(client kubernetes.Interface) controller.Provisioner {
 
 	_, err = svc.DescribeFileSystems(params)
 	if err != nil {
-		glog.Warningf("couldn't confirm that the EFS file system exists: %v", err)
+		klog.Warningf("couldn't confirm that the EFS file system exists: %v", err)
 	}
 
 	return &efsProvisioner{
@@ -279,18 +279,18 @@ func main() {
 	// to use to communicate with Kubernetes
 	config, err := rest.InClusterConfig()
 	if err != nil {
-		glog.Fatalf("Failed to create config: %v", err)
+		klog.Fatalf("Failed to create config: %v", err)
 	}
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		glog.Fatalf("Failed to create client: %v", err)
+		klog.Fatalf("Failed to create client: %v", err)
 	}
 
 	// The controller needs to know what the server version is because out-of-tree
 	// provisioners aren't officially supported until 1.5
 	serverVersion, err := clientset.Discovery().ServerVersion()
 	if err != nil {
-		glog.Fatalf("Error getting server version: %v", err)
+		klog.Fatalf("Error getting server version: %v", err)
 	}
 
 	// Create the provisioner: it implements the Provisioner interface expected by
@@ -299,7 +299,7 @@ func main() {
 
 	provisionerName := os.Getenv(provisionerNameKey)
 	if provisionerName == "" {
-		glog.Fatalf("environment variable %s is not set! Please set it.", provisionerNameKey)
+		klog.Fatalf("environment variable %s is not set! Please set it.", provisionerNameKey)
 	}
 
 	// Start the provision controller which will dynamically provision efs NFS
