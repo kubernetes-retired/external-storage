@@ -19,13 +19,13 @@ package volume
 import (
 	"fmt"
 
-	"github.com/golang/glog"
 	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/controller"
 	"k8s.io/api/core/v1"
+	"k8s.io/klog"
 )
 
 func (p *digitaloceanProvisioner) Delete(volume *v1.PersistentVolume) error {
-	glog.Infof("Delete called for volume: %s", volume.Name)
+	klog.Infof("Delete called for volume: %s", volume.Name)
 
 	provisioned, err := p.provisioned(volume)
 	if err != nil {
@@ -38,7 +38,7 @@ func (p *digitaloceanProvisioner) Delete(volume *v1.PersistentVolume) error {
 
 	_, err = p.doClient.Storage.DeleteVolume(p.ctx, volume.Annotations[annVolumeID])
 	if err != nil {
-		glog.Errorf("Failed to delete volume %s, error: %s", volume, err.Error())
+		klog.Errorf("Failed to delete volume %s, error: %s", volume, err.Error())
 		return err
 	}
 	return nil

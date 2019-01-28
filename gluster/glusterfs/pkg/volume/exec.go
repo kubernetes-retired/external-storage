@@ -20,10 +20,10 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/remotecommand"
+	"k8s.io/klog"
 )
 
 func (p *glusterfsProvisioner) ExecuteCommands(host string,
@@ -47,7 +47,7 @@ func (p *glusterfsProvisioner) ExecuteCommands(host string,
 func (p *glusterfsProvisioner) ExecuteCommand(
 	command string,
 	pod *v1.Pod) error {
-	glog.V(4).Infof("Pod: %s, ExecuteCommand: %s", pod.Name, command)
+	klog.V(4).Infof("Pod: %s, ExecuteCommand: %s", pod.Name, command)
 
 	containerName := pod.Spec.Containers[0].Name
 	req := p.restClient.Post().
@@ -65,7 +65,7 @@ func (p *glusterfsProvisioner) ExecuteCommand(
 
 	exec, err := remotecommand.NewSPDYExecutor(p.config, "POST", req.URL())
 	if err != nil {
-		glog.Fatalf("Failed to create NewExecutor: %v", err)
+		klog.Fatalf("Failed to create NewExecutor: %v", err)
 		return err
 	}
 
@@ -78,10 +78,10 @@ func (p *glusterfsProvisioner) ExecuteCommand(
 		Tty:    false,
 	})
 
-	glog.Infof("Result: %v", b.String())
-	glog.Infof("Result: %v", berr.String())
+	klog.Infof("Result: %v", b.String())
+	klog.Infof("Result: %v", berr.String())
 	if err != nil {
-		glog.Errorf("Failed to create Stream: %v", err)
+		klog.Errorf("Failed to create Stream: %v", err)
 		return err
 	}
 
@@ -105,7 +105,7 @@ func (p *glusterfsProvisioner) selectPod(host string,
 	}
 	for _, pod := range pods {
 		if pod.Status.PodIP == host {
-			glog.Infof("Pod selecterd: %v/%v\n", pod.Namespace, pod.Name)
+			klog.Infof("Pod selecterd: %v/%v\n", pod.Namespace, pod.Name)
 			return &pod, nil
 		}
 	}
