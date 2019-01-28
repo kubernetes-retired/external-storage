@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 const (
@@ -110,11 +110,11 @@ func (dc *DriverCall) Run() (*DriverStatus, error) {
 		}
 		_, err := handleCmdResponse(dc.Command, output)
 		if err == nil {
-			glog.Errorf("FlexVolume: driver bug: %s: exec error (%s) but no error in response.", dc.Execpath, execErr)
+			klog.Errorf("FlexVolume: driver bug: %s: exec error (%s) but no error in response.", dc.Execpath, execErr)
 			return nil, execErr
 		}
 
-		glog.Warningf("FlexVolume: driver call failed: executable: %s, args: %s, error: %s, output: %q", dc.Execpath, dc.args, execErr.Error(), output)
+		klog.Warningf("FlexVolume: driver call failed: executable: %s, args: %s, error: %s, output: %q", dc.Execpath, dc.args, execErr.Error(), output)
 		return nil, err
 	}
 
@@ -184,14 +184,14 @@ func handleCmdResponse(cmd string, output []byte) (*DriverStatus, error) {
 		Message:      "",
 	}
 	if err := json.Unmarshal(output, &status); err != nil {
-		glog.Errorf("Failed to unmarshal output for command: %s, output: %q, error: %s", cmd, string(output), err.Error())
+		klog.Errorf("Failed to unmarshal output for command: %s, output: %q, error: %s", cmd, string(output), err.Error())
 		return nil, err
 	} else if status.Status == StatusNotSupported {
-		glog.V(5).Infof("%s command is not supported by the driver", cmd)
+		klog.V(5).Infof("%s command is not supported by the driver", cmd)
 		return nil, errors.New(status.Status)
 	} else if status.Status != StatusSuccess {
 		errMsg := fmt.Sprintf("%s command failed, status: %s, reason: %s", cmd, status.Status, status.Message)
-		glog.Error(errMsg)
+		klog.Error(errMsg)
 		return nil, fmt.Errorf("%s", errMsg)
 	}
 

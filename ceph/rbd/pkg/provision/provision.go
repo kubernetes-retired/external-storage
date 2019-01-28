@@ -22,7 +22,6 @@ import (
 	"net"
 	"strings"
 
-	"github.com/golang/glog"
 	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/controller"
 	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/util"
 	"k8s.io/api/core/v1"
@@ -31,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -132,10 +132,10 @@ func (p *rbdProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 	}
 	rbd, sizeMB, err := p.rbdUtil.CreateImage(image, opts, options)
 	if err != nil {
-		glog.Errorf("rbd: create volume failed, err: %v", err)
+		klog.Errorf("rbd: create volume failed, err: %v", err)
 		return nil, err
 	}
-	glog.Infof("successfully created rbd image %q", image)
+	klog.Infof("successfully created rbd image %q", image)
 
 	rbd.SecretRef = new(v1.SecretReference)
 	rbd.SecretRef.Name = opts.userSecretName
@@ -165,7 +165,7 @@ func (p *rbdProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 	}
 	// use default access modes if missing
 	if len(pv.Spec.AccessModes) == 0 {
-		glog.Warningf("no access modes specified, use default: %v", p.getAccessModes())
+		klog.Warningf("no access modes specified, use default: %v", p.getAccessModes())
 		pv.Spec.AccessModes = p.getAccessModes()
 	}
 
@@ -218,7 +218,7 @@ func (p *rbdProvisioner) parseParameters(parameters map[string]string) (*rbdProv
 			if p.dnsip == "" {
 				p.dnsip = util.FindDNSIP(p.client)
 			}
-			glog.V(4).Infof("dnsip: %q\n", p.dnsip)
+			klog.V(4).Infof("dnsip: %q\n", p.dnsip)
 			arr := strings.Split(v, ",")
 			for _, m := range arr {
 				mhost, mport := util.SplitHostPort(m)
@@ -226,7 +226,7 @@ func (p *rbdProvisioner) parseParameters(parameters map[string]string) (*rbdProv
 					var lookup []string
 					if lookup, err = util.LookupHost(mhost, p.dnsip); err == nil {
 						for _, a := range lookup {
-							glog.V(1).Infof("adding %+v from mon lookup\n", a)
+							klog.V(1).Infof("adding %+v from mon lookup\n", a)
 							opts.monitors = append(opts.monitors, util.JoinHostPort(a, mport))
 						}
 					} else {
@@ -236,7 +236,7 @@ func (p *rbdProvisioner) parseParameters(parameters map[string]string) (*rbdProv
 					opts.monitors = append(opts.monitors, util.JoinHostPort(mhost, mport))
 				}
 			}
-			glog.V(4).Infof("final monitors list: %v\n", opts.monitors)
+			klog.V(4).Infof("final monitors list: %v\n", opts.monitors)
 			if len(opts.monitors) < 1 {
 				return nil, fmt.Errorf("missing Ceph monitors")
 			}

@@ -82,6 +82,10 @@ ignored = [
   name = "github.com/kubernetes-sigs/sig-storage-lib-external-provisioner"
   revision = "712c5819bca548e64c5fb29d2946c5d69126c3fa"
 
+[[constraint]]
+  name = "k8s.io/klog"
+  revision = "8139d8cb77af419532b33dfa7dd09fbc5f1d344f"
+
 # https://github.com/kubernetes/kubernetes/blob/v1.12.0-beta.1/Godeps/Godeps.json#L3213
 [[override]]
   name = "golang.org/x/exp"
