@@ -71,7 +71,7 @@ type rbdProvisionOptions struct {
 	userSecretNamespace string
 	// fsType that is supported by kubernetes. Default: "ext4".
 	fsType string
-	// Ceph RBD image format, "1" or "2". Default is "1".
+	// Ceph RBD image format, "1" or "2". Default is "2".
 	imageFormat string
 	// This parameter is optional and should only be used if you set
 	// imageFormat to "2". Currently supported features are layering only.
@@ -201,7 +201,7 @@ func (p *rbdProvisioner) parseParameters(parameters map[string]string) (*rbdProv
 	opts := &rbdProvisionOptions{
 		pool:        "rbd",
 		adminID:     "admin",
-		imageFormat: rbdImageFormat1,
+		imageFormat: rbdImageFormat2,
 	}
 
 	var (
