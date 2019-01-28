@@ -385,6 +385,7 @@ var (
 )
 
 func main() {
+	klog.InitFlags(nil)
 	flag.Parse()
 	flag.Set("logtostderr", "true")
 
