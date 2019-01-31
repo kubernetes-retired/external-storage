@@ -49,7 +49,7 @@ spec:
         claimName: efs
 ```
 
-If you scale this pod each aditional pod will also be able to read and write the same files. You may also reference the same claimName in another type of pod so your 2 applications can read and write the same files. If you wish to have a second application that uses EFS storage but don't want other pods to access the files, create a new claim using a new name but the same storage class.
+If you scale this pod each additional pod will also be able to read and write the same files. You may also reference the same claimName in another type of pod so your 2 applications can read and write the same files. If you wish to have a second application that uses EFS storage but don't want other pods to access the files, create a new claim using a new name but the same storage class.
 
 Some times you want the replica pods to be on EFS but you do not wish them to share the same files. In those situations it's best to use a [StatefulSet](./https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/). When a StatefulSet scales up it will dynamically create new claims for your pods.
 
