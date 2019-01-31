@@ -38,6 +38,15 @@ service "nfs-provisioner" created
 deployment "nfs-provisioner" created
 ```
 
+Create `ClusterRole`, `ClusterRoleBinding`, `Role` and `RoleBinding` (this is necessary if you use RBAC authorization on your cluster, which is the default for newer kubernetes versions).
+```console
+$ kubectl create -f deploy/kubernetes/rbac.yaml
+clusterrole.rbac.authorization.k8s.io/nfs-provisioner-runner created
+clusterrolebinding.rbac.authorization.k8s.io/run-nfs-provisioner created
+role.rbac.authorization.k8s.io/leader-locking-nfs-provisioner created
+rolebinding.rbac.authorization.k8s.io/leader-locking-nfs-provisioner created
+```
+
 Create a `StorageClass` named "example-nfs" with `provisioner: example.com/nfs`.
 ```console
 $ kubectl create -f deploy/kubernetes/class.yaml
