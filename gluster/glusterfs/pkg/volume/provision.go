@@ -131,7 +131,7 @@ func (p *glusterfsProvisioner) getClusterNodes(cfg *ProvisionerConfig) []string 
 }
 
 func (p *glusterfsProvisioner) createVolume(
-	namespace string, name string, cfg *ProvisionerConfig, gid int) (*v1.GlusterfsVolumeSource, error) {
+	namespace string, name string, cfg *ProvisionerConfig, gid int) (*v1.GlusterfsPersistentVolumeSource, error) {
 	var err error
 	var bricks []glusterBrick
 	var endpoint *v1.Endpoints
@@ -156,7 +156,7 @@ func (p *glusterfsProvisioner) createVolume(
 			klog.Errorf("glusterfs: failed to create endpoint/service: %v", err)
 		} else {
 			klog.V(3).Infof("glusterfs: dynamic ep %v and svc : %v ", endpoint, service)
-			return &v1.GlusterfsVolumeSource{
+			return &v1.GlusterfsPersistentVolumeSource{
 				EndpointsName: endpoint.Name,
 				Path:          cfg.VolumeName,
 				ReadOnly:      false,
