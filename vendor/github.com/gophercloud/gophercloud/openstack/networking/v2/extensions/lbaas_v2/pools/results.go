@@ -96,6 +96,11 @@ type Pool struct {
 	// The provisioning status of the pool.
 	// This value is ACTIVE, PENDING_* or ERROR.
 	ProvisioningStatus string `json:"provisioning_status"`
+
+	// The operating status of the pool.
+	// This field seems to only be returned during a call to a load balancer's /status
+	// see: https://github.com/gophercloud/gophercloud/issues/1362
+	OperatingStatus string `json:"operating_status"`
 }
 
 // PoolPage is the page returned by a pager when traversing over a
@@ -204,6 +209,11 @@ type Member struct {
 	// The provisioning status of the member.
 	// This value is ACTIVE, PENDING_* or ERROR.
 	ProvisioningStatus string `json:"provisioning_status"`
+
+	// The operating status of the member.
+	// This field seems to only be returned during a call to a load balancer's /status
+	// see: https://github.com/gophercloud/gophercloud/issues/1362
+	OperatingStatus string `json:"operating_status"`
 }
 
 // MemberPage is the page returned by a pager when traversing over a

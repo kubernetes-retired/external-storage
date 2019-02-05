@@ -16,6 +16,7 @@ before_script:
 - go vet ./...
 script:
 - ./script/coverage
+- ./script/unittest
 - ./script/format
 after_success:
 - $HOME/gopath/bin/goveralls -service=travis-ci -coverprofile=cover.out

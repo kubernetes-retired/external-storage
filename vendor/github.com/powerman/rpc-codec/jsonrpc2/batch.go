@@ -59,5 +59,5 @@ func (JSONRPC2) Batch(arg BatchArg, replies *[]*json.RawMessage) (err error) {
 
 	close(replyc)
 	<-donec
-	return
+	return err
 }

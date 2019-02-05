@@ -69,7 +69,7 @@ func (c *clientCodec) WriteRequest(r *rpc.Request, param interface{}) error {
 			}
 		case reflect.Array, reflect.Struct:
 		case reflect.Ptr:
-			switch k := reflect.TypeOf(param).Elem().Kind(); k {
+			switch kk := reflect.TypeOf(param).Elem().Kind(); kk {
 			case reflect.Map:
 				if reflect.TypeOf(param).Elem().Key().Kind() == reflect.String {
 					if reflect.ValueOf(param).Elem().IsNil() {
@@ -82,7 +82,7 @@ func (c *clientCodec) WriteRequest(r *rpc.Request, param interface{}) error {
 				}
 			case reflect.Array, reflect.Struct:
 			default:
-				return NewError(errInternal.Code, "unsupported param type: Ptr to "+k.String())
+				return NewError(errInternal.Code, "unsupported param type: Ptr to "+kk.String())
 			}
 		default:
 			return NewError(errInternal.Code, "unsupported param type: "+k.String())

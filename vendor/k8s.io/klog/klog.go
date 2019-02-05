@@ -408,15 +408,19 @@ func InitFlags(flagset *flag.FlagSet) {
 	if flagset == nil {
 		flagset = flag.CommandLine
 	}
-	flagset.StringVar(&logging.logDir, "log_dir", "", "If non-empty, write log files in this directory")
-	flagset.StringVar(&logging.logFile, "log_file", "", "If non-empty, use this log file")
-	flagset.BoolVar(&logging.toStderr, "logtostderr", false, "log to standard error instead of files")
-	flagset.BoolVar(&logging.alsoToStderr, "alsologtostderr", false, "log to standard error as well as files")
-	flagset.Var(&logging.verbosity, "v", "log level for V logs")
-	flagset.BoolVar(&logging.skipHeaders, "skip_headers", false, "If true, avoid header prefixes in the log messages")
-	flagset.Var(&logging.stderrThreshold, "stderrthreshold", "logs at or above this threshold go to stderr")
-	flagset.Var(&logging.vmodule, "vmodule", "comma-separated list of pattern=N settings for file-filtered logging")
-	flagset.Var(&logging.traceLocation, "log_backtrace_at", "when logging hits line file:N, emit a stack trace")
+
+	// Commenting these out temporarily, TODO jayunit100 once glog is cleaned up.
+	if flag.Lookup("log_dir") == nil {
+		flagset.StringVar(&logging.logDir, "log_dir", "", "If non-empty, write log files in this directory")
+		flagset.StringVar(&logging.logFile, "log_file", "", "If non-empty, use this log file")
+		flagset.BoolVar(&logging.toStderr, "logtostderr", false, "log to standard error instead of files")
+		flagset.BoolVar(&logging.alsoToStderr, "alsologtostderr", false, "log to standard error as well as files")
+		flagset.Var(&logging.verbosity, "v", "log level for V logs")
+		flagset.BoolVar(&logging.skipHeaders, "skip_headers", false, "If true, avoid header prefixes in the log messages")
+		flagset.Var(&logging.stderrThreshold, "stderrthreshold", "logs at or above this threshold go to stderr")
+		flagset.Var(&logging.vmodule, "vmodule", "comma-separated list of pattern=N settings for file-filtered logging")
+		flagset.Var(&logging.traceLocation, "log_backtrace_at", "when logging hits line file:N, emit a stack trace")
+	}
 }
 
 // Flush flushes all pending log I/O.

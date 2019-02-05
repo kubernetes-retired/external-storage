@@ -1,0 +1,7 @@
+- check coverage and add more tests
+- how to timeout/reconnect after errors
+  * tests
+- how to test for resource leaks
+  * fd
+  * memory
+  * goroutines
