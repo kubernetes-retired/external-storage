@@ -138,7 +138,7 @@ func (p *glusterfileProvisioner) Provision(options controller.VolumeOptions) (*v
 
 	sourceVolID := ""
 	volID := ""
-	var glusterfs *v1.GlusterfsVolumeSource
+	var glusterfs *v1.GlusterfsPersistentVolumeSource
 
 	smartclone := true
 	if options.PVC.Spec.Selector != nil {
@@ -288,7 +288,7 @@ func (p *glusterfileProvisioner) Provision(options controller.VolumeOptions) (*v
 	return pv, nil
 }
 
-func (p *glusterfileProvisioner) createVolumeClone(sourceVolID string, config *provisionerConfig) (r *v1.GlusterfsVolumeSource, size int, volID string, err error) {
+func (p *glusterfileProvisioner) createVolumeClone(sourceVolID string, config *provisionerConfig) (r *v1.GlusterfsPersistentVolumeSource, size int, volID string, err error) {
 
 	if config.url == "" {
 		klog.Errorf("REST server endpoint is empty")
@@ -322,7 +322,7 @@ func (p *glusterfileProvisioner) createVolumeClone(sourceVolID string, config *p
 	return volSource, cloneVolInfo.Size, cloneVolInfo.Id, nil
 }
 
-func (p *glusterfileProvisioner) createVolumeSource(cli *gcli.Client, volInfo *gapi.VolumeInfoResponse) (*v1.GlusterfsVolumeSource, error) {
+func (p *glusterfileProvisioner) createVolumeSource(cli *gcli.Client, volInfo *gapi.VolumeInfoResponse) (*v1.GlusterfsPersistentVolumeSource, error) {
 	dynamicHostIps, err := getClusterNodes(cli, volInfo.Cluster)
 	if err != nil {
 		klog.Errorf("error [%v] when getting cluster nodes for volume %s", err, volInfo.Name)
@@ -342,7 +342,7 @@ func (p *glusterfileProvisioner) createVolumeSource(cli *gcli.Client, volInfo *g
 	}
 	klog.V(3).Infof("dynamic endpoint %v and service %v", endpoint, service)
 
-	return &v1.GlusterfsVolumeSource{
+	return &v1.GlusterfsPersistentVolumeSource{
 		EndpointsName: endpoint.Name,
 		Path:          volInfo.Name,
 		ReadOnly:      false,
@@ -365,7 +365,7 @@ func (p *glusterfileProvisioner) annotateClonedPVC(VolID string, pvc *v1.Persist
 	return err
 }
 
-func (p *glusterfileProvisioner) CreateVolume(gid *int, config *provisionerConfig, sz int) (r *v1.GlusterfsVolumeSource, size int, volID string, err error) {
+func (p *glusterfileProvisioner) CreateVolume(gid *int, config *provisionerConfig, sz int) (r *v1.GlusterfsPersistentVolumeSource, size int, volID string, err error) {
 	var clusterIDs []string
 	customVolumeName := ""
 
