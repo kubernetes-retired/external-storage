@@ -44,7 +44,6 @@ var (
 
 func main() {
 	flag.Set("logtostderr", "true")
-	klog.InitFlags(nil)
 	flag.Parse()
 
 	if errs := validateProvisioner(*provisioner, field.NewPath("provisioner")); len(errs) != 0 {

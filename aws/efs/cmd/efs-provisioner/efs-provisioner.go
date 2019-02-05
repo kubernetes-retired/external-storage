@@ -272,7 +272,6 @@ func (p *efsProvisioner) getLocalPathToDelete(nfs *v1.NFSVolumeSource) (string, 
 }
 
 func main() {
-	klog.InitFlags(nil)
 	flag.Parse()
 	flag.Set("logtostderr", "true")
 
