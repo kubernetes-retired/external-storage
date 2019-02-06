@@ -72,6 +72,8 @@ docker run -ti \
               -kubeconfig=/kube/config
 ```
 
+(or see the in-cluster example of this provisioner in this repository).
+
 ## Create a glusterfs-simple Storage Class
 
 ```bash
