@@ -39,11 +39,11 @@ all build:
 		go install -installsuffix "asdf" ./cmd/efs-provisioner
 .PHONY: all build
 
-container: build quick-container
+container: quick-container
 .PHONY: container
 
 quick-container:
-	docker build -t $(MUTABLE_IMAGE) .
+	docker build -t $(MUTABLE_IMAGE) -f Dockerfile ../..
 	docker tag $(MUTABLE_IMAGE) $(IMAGE)
 .PHONY: quick-container
 
