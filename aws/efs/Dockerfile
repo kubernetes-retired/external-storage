@@ -23,7 +23,7 @@ WORKDIR /go/src/github.com/kubernetes-incubator/external-storage/aws/efs
 RUN go install ./cmd/efs-provisioner
 
 
-FROM alpine:3.6
+FROM alpine:3.9
 RUN apk add --no-cache ca-certificates
 COPY --from=builder /go/bin/efs-provisioner /
 ENTRYPOINT ["/efs-provisioner"]

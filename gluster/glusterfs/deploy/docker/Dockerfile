@@ -12,6 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM alpine:3.6
+FROM alpine:3.9
 COPY glusterfs-simple-provisioner /glusterfs-simple-provisioner
 ENTRYPOINT ["/glusterfs-simple-provisioner"]
