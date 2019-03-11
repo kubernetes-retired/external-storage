@@ -31,6 +31,18 @@ spec:
               name: efs-provisioner
               key: dns.name
               optional: true
+        - name: SKIP_PVC_NAMED_PATH
+          valueFrom:
+            configMapKeyRef:
+              name: efs-provisioner
+              key: skip.pvc.named.path
+              optional: true
+        - name: KEEP_PV_PATH
+          valueFrom:
+            configMapKeyRef:
+              name: efs-provisioner
+              key: keep.pv.path
+              optional: true
       volumeMounts:
         - name: pv-volume
           mountPath: /persistentvolumes

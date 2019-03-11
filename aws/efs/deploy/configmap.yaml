@@ -7,3 +7,5 @@ data:
   aws.region: us-west-2
   provisioner.name: example.com/aws-efs
   dns.name: ""
+  skip.pvc.named.path: ""
+  keep.pv.path: ""

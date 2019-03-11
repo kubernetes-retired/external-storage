@@ -40,17 +40,21 @@ import (
 )
 
 const (
-	provisionerNameKey = "PROVISIONER_NAME"
-	fileSystemIDKey    = "FILE_SYSTEM_ID"
-	awsRegionKey       = "AWS_REGION"
-	dnsNameKey         = "DNS_NAME"
+	provisionerNameKey  = "PROVISIONER_NAME"
+	fileSystemIDKey     = "FILE_SYSTEM_ID"
+	awsRegionKey        = "AWS_REGION"
+	dnsNameKey          = "DNS_NAME"
+	skipPvcNamedPathKey = "SKIP_PVC_NAMED_PATH"
+	keepPvPathKey       = "KEEP_PV_PATH"
 )
 
 type efsProvisioner struct {
-	dnsName    string
-	mountpoint string
-	source     string
-	allocator  gidallocator.Allocator
+	dnsName          string
+	mountpoint       string
+	source           string
+	skipPvcNamedPath string
+	keepPvPath       string
+	allocator        gidallocator.Allocator
 }
 
 // NewEFSProvisioner creates an AWS EFS volume provisioner
@@ -91,11 +95,16 @@ func NewEFSProvisioner(client kubernetes.Interface) controller.Provisioner {
 		klog.Warningf("couldn't confirm that the EFS file system exists: %v", err)
 	}
 
+	skipPvcNamedPath := os.Getenv(skipPvcNamedPathKey)
+	keepPvPath       := os.Getenv(keepPvPathKey)
+
 	return &efsProvisioner{
-		dnsName:    dnsName,
-		mountpoint: mountpoint,
-		source:     source,
-		allocator:  gidallocator.New(client),
+		dnsName:          dnsName,
+		mountpoint:       mountpoint,
+		source:           source,
+		skipPvcNamedPath: skipPvcNamedPath,
+		keepPvPath:       keepPvPath,
+		allocator:        gidallocator.New(client),
 	}
 }
 
@@ -223,12 +232,24 @@ func (p *efsProvisioner) createVolume(path string, gid *int) error {
 }
 
 func (p *efsProvisioner) getLocalPath(options controller.VolumeOptions) string {
-	return path.Join(p.mountpoint, p.getDirectoryName(options))
+	path := path.Join(p.mountpoint, p.getDirectoryName(options))
+
+	if p.skipPvcNamedPath == "true" {
+		path = p.mountpoint
+	}
+
+	return path
 }
 
 func (p *efsProvisioner) getRemotePath(options controller.VolumeOptions) string {
 	sourcePath := path.Clean(strings.Replace(p.source, p.dnsName+":", "", 1))
-	return path.Join(sourcePath, p.getDirectoryName(options))
+	path := path.Join(sourcePath, p.getDirectoryName(options))
+
+	if p.skipPvcNamedPath == "true" {
+		path = sourcePath
+	}
+
+	return path
 }
 
 func (p *efsProvisioner) getDirectoryName(options controller.VolumeOptions) string {
@@ -249,8 +270,10 @@ func (p *efsProvisioner) Delete(volume *v1.PersistentVolume) error {
 		return err
 	}
 
-	if err := os.RemoveAll(path); err != nil {
-		return err
+	if p.keepPvPath != "true" {
+		if err := os.RemoveAll(path); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -272,7 +295,6 @@ func (p *efsProvisioner) getLocalPathToDelete(nfs *v1.NFSVolumeSource) (string, 
 }
 
 func main() {
-	klog.InitFlags(nil)
 	flag.Parse()
 	flag.Set("logtostderr", "true")
 
