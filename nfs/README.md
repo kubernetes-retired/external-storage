@@ -34,6 +34,7 @@ args:
 Create the deployment.
 ```console
 $ kubectl create -f deploy/kubernetes/deployment.yaml
+serviceaccount/nfs-provisioner created
 service "nfs-provisioner" created
 deployment "nfs-provisioner" created
 ```
