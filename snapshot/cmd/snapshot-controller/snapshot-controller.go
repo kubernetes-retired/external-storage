@@ -88,8 +88,10 @@ func main() {
 		panic(err)
 	}
 	// build volume plugins map
-	buildVolumePlugins()
-
+	err = buildVolumePlugins()
+	if err != nil {
+		panic(err)
+	}
 	// start controller on instances of our CRD
 	glog.Infof("starting snapshot controller")
 	ssController := snapshotcontroller.NewSnapshotController(snapshotClient, snapshotScheme, clientset, &volumePlugins, defaultSyncDuration)
@@ -111,7 +113,7 @@ func buildConfig(kubeconfig string) (*rest.Config, error) {
 	return rest.InClusterConfig()
 }
 
-func buildVolumePlugins() {
+func buildVolumePlugins() error {
 	if len(*cloudProvider) != 0 {
 		cloud, err := cloudprovider.InitCloudProvider(*cloudProvider, *cloudConfigFile)
 		if err == nil && cloud != nil {
@@ -134,9 +136,12 @@ func buildVolumePlugins() {
 				glog.Infof("Register cloudprovider %s", cinder.GetPluginName())
 			}
 		} else {
-			glog.Warningf("failed to initialize cloudprovider: %v, supported cloudproviders are %#v", err, cloudprovider.CloudProviders())
+			glog.Errorf("failed to initialize cloudprovider: %v, supported cloudproviders are %#v", err, cloudprovider.CloudProviders())
+			return err
 		}
 	}
 	volumePlugins[gluster.GetPluginName()] = gluster.RegisterPlugin()
 	volumePlugins[hostpath.GetPluginName()] = hostpath.RegisterPlugin()
+
+	return nil
 }
