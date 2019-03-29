@@ -154,6 +154,7 @@ func (p *rbdProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: options.PersistentVolumeReclaimPolicy,
 			AccessModes:                   options.PVC.Spec.AccessModes,
+			VolumeMode:                    options.PVC.Spec.VolumeMode,
 			MountOptions:                  options.MountOptions,
 			Capacity: v1.ResourceList{
 				v1.ResourceName(v1.ResourceStorage): resource.MustParse(fmt.Sprintf("%dMi", sizeMB)),
@@ -325,4 +326,8 @@ func (p *rbdProvisioner) parsePVSecret(namespace, secretName string) (string, er
 
 	// If not found, the last secret in the map wins as done before
 	return secret, nil
+}
+
+func (p *rbdProvisioner) SupportsBlock() bool {
+	return true
 }
