@@ -905,13 +905,11 @@ func main() {
 	provName := provisionerName
 	provEnvName := os.Getenv(provisionerNameKey)
 
-	// Precedence is given for ProvisionerNameKey
-	if provEnvName != "" && *id != "" {
-		provName = provEnvName
-	}
-
-	if provEnvName == "" && *id != "" {
+	// cmd args override env
+	if *id != "" {
 		provName = *id
+	} else if provEnvName != "" {
+		provName = provEnvName
 	}
 
 	clientset, err := kubernetes.NewForConfig(config)
