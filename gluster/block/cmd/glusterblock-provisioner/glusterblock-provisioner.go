@@ -905,12 +905,10 @@ func main() {
 	provName := provisionerName
 	provEnvName := os.Getenv(provisionerNameKey)
 
-	// Precedence is given for ProvisionerNameKey
-	if provEnvName != "" && *id != "" {
+	// Precedence is given for ProvisionerNameKey if both are set
+	if provEnvName != "" && *id != "" || provEnvName != "" {
 		provName = provEnvName
-	}
-
-	if provEnvName == "" && *id != "" {
+	} else if *id != "" {
 		provName = *id
 	}
 
