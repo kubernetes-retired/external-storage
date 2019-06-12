@@ -17,86 +17,86 @@ limitations under the License.
 package main
 
 import (
-	"flag"
-	"os"
+    "flag"
+    "os"
 
-	"github.com/kubernetes-incubator/external-storage/ceph/rbd/pkg/provision"
-	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/controller"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/klog"
+    "github.com/kubernetes-incubator/external-storage/ceph/rbd/pkg/provision"
+    "github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/controller"
+    "k8s.io/apimachinery/pkg/util/wait"
+    "k8s.io/client-go/kubernetes"
+    "k8s.io/client-go/rest"
+    "k8s.io/client-go/tools/clientcmd"
+    "k8s.io/klog"
 )
 
 var (
-	master         = flag.String("master", "", "Master URL")
-	kubeconfig     = flag.String("kubeconfig", "", "Absolute path to the kubeconfig")
-	id             = flag.String("id", "", "Unique provisioner identity")
-	metricsPort    = flag.Int("metrics-port", 0, "The port of the metrics server (set to non-zero to enable)")
-	commandTimeout = flag.Int("command-timeout", 5, "Timeout for command execution (in seconds)")
-	usePVName      = flag.Bool("use-pv-name", false, "Defines which image name should be used: generated or PV name")
+    master         = flag.String("master", "", "Master URL")
+    kubeconfig     = flag.String("kubeconfig", "", "Absolute path to the kubeconfig")
+    id             = flag.String("id", "", "Unique provisioner identity")
+    metricsPort    = flag.Int("metrics-port", 0, "The port of the metrics server (set to non-zero to enable)")
+    commandTimeout = flag.Int("command-timeout", 5, "Timeout for command execution (in seconds)")
+    usePVName      = flag.Bool("use-pv-name", false, "Defines which image name should be used: generated or PV name")
 )
 
 const (
-	provisionerNameKey = "PROVISIONER_NAME"
+    provisionerNameKey = "PROVISIONER_NAME"
 )
 
 func main() {
-	klog.InitFlags(nil)
-	flag.Parse()
-	flag.Set("logtostderr", "true")
+    klog.InitFlags(nil)
+    flag.Parse()
+    flag.Set("logtostderr", "true")
 
-	var config *rest.Config
-	var err error
-	if *master != "" || *kubeconfig != "" {
-		config, err = clientcmd.BuildConfigFromFlags(*master, *kubeconfig)
-	} else {
-		config, err = rest.InClusterConfig()
-	}
-	if err != nil {
-		klog.Fatalf("Failed to create config: %v", err)
-	}
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		klog.Fatalf("Failed to create client: %v", err)
-	}
+    var config *rest.Config
+    var err error
+    if *master != "" || *kubeconfig != "" {
+        config, err = clientcmd.BuildConfigFromFlags(*master, *kubeconfig)
+    } else {
+        config, err = rest.InClusterConfig()
+    }
+    if err != nil {
+        klog.Fatalf("Failed to create config: %v", err)
+    }
+    clientset, err := kubernetes.NewForConfig(config)
+    if err != nil {
+        klog.Fatalf("Failed to create client: %v", err)
+    }
 
-	prName := provision.ProvisionerName
-	prNameFromEnv := os.Getenv(provisionerNameKey)
-	if prNameFromEnv != "" {
-		prName = prNameFromEnv
-	}
+    prName := provision.ProvisionerName
+    prNameFromEnv := os.Getenv(provisionerNameKey)
+    if prNameFromEnv != "" {
+        prName = prNameFromEnv
+    }
 
-	// By default, we use provisioner name as provisioner identity.
-	// User may specify their own identity with `-id` flag to distinguish each
-	// others, if they deploy more than one RBD provisioners under same provisioner name.
-	prID := prName
-	if *id != "" {
-		prID = *id
-	}
+    // By default, we use provisioner name as provisioner identity.
+    // User may specify their own identity with `-id` flag to distinguish each
+    // others, if they deploy more than one RBD provisioners under same provisioner name.
+    prID := prName
+    if *id != "" {
+        prID = *id
+    }
 
-	// The controller needs to know what the server version is because out-of-tree
-	// provisioners aren't officially supported until 1.5
-	serverVersion, err := clientset.Discovery().ServerVersion()
-	if err != nil {
-		klog.Fatalf("Error getting server version: %v", err)
-	}
+    // The controller needs to know what the server version is because out-of-tree
+    // provisioners aren't officially supported until 1.5
+    serverVersion, err := clientset.Discovery().ServerVersion()
+    if err != nil {
+        klog.Fatalf("Error getting server version: %v", err)
+    }
 
-	// Create the provisioner: it implements the Provisioner interface expected by
-	// the controller
-	klog.Infof("Creating RBD provisioner %s with identity: %s", prName, prID)
-	rbdProvisioner := provision.NewRBDProvisioner(clientset, prID, *commandTimeout, *usePVName)
+    // Create the provisioner: it implements the Provisioner interface expected by
+    // the controller
+    klog.Infof("Creating RBD provisioner %s with identity: %s", prName, prID)
+    rbdProvisioner := provision.NewRBDProvisioner(clientset, prID, *commandTimeout, *usePVName)
 
-	// Start the provision controller which will dynamically provision rbd
-	// PVs
-	pc := controller.NewProvisionController(
-		clientset,
-		prName,
-		rbdProvisioner,
-		serverVersion.GitVersion,
-		controller.MetricsPort(int32(*metricsPort)),
-	)
+    // Start the provision controller which will dynamically provision rbd
+    // PVs
+    pc := controller.NewProvisionController(
+        clientset,
+        prName,
+        rbdProvisioner,
+        serverVersion.GitVersion,
+        controller.MetricsPort(int32(*metricsPort)),
+    )
 
-	pc.Run(wait.NeverStop)
+    pc.Run(wait.NeverStop)
 }
