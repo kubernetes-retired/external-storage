@@ -77,6 +77,8 @@ type rbdProvisionOptions struct {
 	// imageFormat to "2". Currently supported features are layering only.
 	// Default is "", and no features are turned on.
 	imageFeatures []string
+	// Defines which image name should be used: generated or PV name
+	deterministicNames bool
 }
 
 type rbdProvisioner struct {
@@ -87,18 +89,16 @@ type rbdProvisioner struct {
 	identity  string
 	rbdUtil   *RBDUtil
 	dnsip     string
-	usePVName bool
 }
 
 // NewRBDProvisioner creates a Provisioner that provisions Ceph RBD PVs backed by Ceph RBD images.
-func NewRBDProvisioner(client kubernetes.Interface, id string, timeout int, usePVName bool) controller.Provisioner {
+func NewRBDProvisioner(client kubernetes.Interface, id string, timeout int) controller.Provisioner {
 	return &rbdProvisioner{
 		client:   client,
 		identity: id,
 		rbdUtil: &RBDUtil{
 			timeout: timeout,
 		},
-		usePVName: usePVName,
 	}
 }
 
@@ -124,9 +124,9 @@ func (p *rbdProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 	if err != nil {
 		return nil, err
 	}
-	image := options.PVName
-	// If use-pv-name flag not set, generate image name
-	if !p.usePVName {
+	if opts.deterministicNames {
+		image := options.PVName
+	} else {
 		// create random image name
 		image = fmt.Sprintf("kubernetes-dynamic-pvc-%s", uuid.NewUUID())
 	}
@@ -283,6 +283,9 @@ func (p *rbdProvisioner) parseParameters(parameters map[string]string) (*rbdProv
 			}
 		case volume.VolumeParameterFSType:
 			opts.fsType = v
+		case "deterministicnames":
+			// On error, strconv.ParseBool() returns false; leave that, as it is a perfectly fine default
+			opts.deterministicNames, _ = strconv.ParseBool(v)
 		default:
 			return nil, fmt.Errorf("invalid option %q for %s provisioner", k, ProvisionerName)
 		}
