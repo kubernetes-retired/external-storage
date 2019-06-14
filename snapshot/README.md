@@ -1,5 +1,8 @@
 # Volume Snapshot Controller
 
+## Deprecated
+Please note the volume snapshotting feature is now part of the Container Storage Interface API which makes this implementation obsolete. Consider using a [CSI driver](https://kubernetes-csi.github.io/docs/drivers.html) in case you need volume snapshots.
+
 ## Status
 
 Pre-alpha
