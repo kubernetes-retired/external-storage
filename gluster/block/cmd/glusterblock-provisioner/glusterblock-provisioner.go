@@ -49,7 +49,7 @@ const (
 	creatorAnn         = "kubernetes.io/createdby"
 	volumeTypeAnn      = "gluster.org/type"
 	descAnn            = "Gluster-external: Dynamically provisioned PV"
-	provisionerVersion = "v2.0.0"
+	provisionerVersion = "v5.0.0"
 	chapType           = "kubernetes.io/iscsi-chap"
 	blockVolPrefix     = "blockvol_"
 	heketiOpmode       = "heketi"
@@ -484,7 +484,7 @@ func (p *glusterBlockProvisioner) heketiBlockVolCreate(blockRes *glusterBlockVol
 	blockVolumeInfoRes, err := cli.BlockVolumeCreate(blockVolumeReq)
 
 	if err != nil {
-		return fmt.Errorf("[heketi] failed to create volume: %v", err)
+		return fmt.Errorf("failed to create volume: %v", err)
 
 	}
 
@@ -500,17 +500,17 @@ func (p *glusterBlockProvisioner) heketiBlockVolCreate(blockRes *glusterBlockVol
 			heketiBlockRes.Cluster = blockVolumeInfoRes.Cluster
 			heketiBlockRes.ID = blockVolumeInfoRes.Id
 		} else {
-			return fmt.Errorf("[heketi] Invalid response from heketi received: IQN and Target must not be empty")
+			return fmt.Errorf("invalid response from heketi received: IQN and Target must not be empty")
 		}
 
 		blockRes.heketiBlockVolRes = &heketiBlockRes
 
 		if config.chapAuthEnabled && (heketiBlockRes.User == "" || heketiBlockRes.AuthKey == "") {
-			return fmt.Errorf("[heketi] Invalid response from heketi received: CHAP credentials must not be empty  ")
+			return fmt.Errorf("invalid response from heketi received: CHAP credentials must not be empty  ")
 		}
 
 	} else {
-		return fmt.Errorf("[heketi] blockvolumeinforesponse is nil ")
+		return fmt.Errorf("blockvolumeinforesponse is nil ")
 	}
 	return nil
 }
@@ -561,7 +561,7 @@ func (p *glusterBlockProvisioner) Delete(volume *v1.PersistentVolume) error {
 	switch config.opMode {
 
 	case glusterBlockOpmode:
-		klog.V(1).Infof("Deleting Volume %v ", delBlockVolName)
+		klog.V(1).Infof("deleting Volume %v ", delBlockVolName)
 		deleteCmd := exec.Command(
 			config.opMode, "delete",
 			config.blockModeArgs["glustervol"]+"/"+delBlockVolName, "--json")
@@ -573,18 +573,18 @@ func (p *glusterBlockProvisioner) Delete(volume *v1.PersistentVolume) error {
 
 	case heketiOpmode:
 
-		klog.V(1).Infof("opmode[heketi]: deleting Volume %v", delBlockVolName)
+		klog.V(1).Infof("deleting Volume %v", delBlockVolName)
 		heketiModeArgs["restsecretvalue"] = ""
 		if heketiModeArgs["secret"] != "" && heketiModeArgs["secretnamespace"] != "" {
 			var err error
 			heketiModeArgs["restsecretvalue"], err = parseSecret(heketiModeArgs["secretnamespace"], heketiModeArgs["secret"], p.client)
 			if err != nil {
-				return fmt.Errorf("[heketi]: failed to parse secret %s : Error, %v", heketiModeArgs["secret"], err)
+				return fmt.Errorf("failed to parse secret %s : Error, %v", heketiModeArgs["secret"], err)
 			}
 		}
 		cli := gcli.NewClient(heketiModeArgs["url"], heketiModeArgs["user"], heketiModeArgs["restsecretvalue"])
 		if cli == nil {
-			return fmt.Errorf("[heketi]: failed to create REST client, REST server authentication failed")
+			return fmt.Errorf("failed to create REST client, REST server authentication failed")
 		}
 
 		volumeID, err := getVolumeID(volume, delBlockVolName)
@@ -595,15 +595,15 @@ func (p *glusterBlockProvisioner) Delete(volume *v1.PersistentVolume) error {
 		deleteErr := cli.BlockVolumeDelete(volumeID)
 		if deleteErr != nil {
 			if dstrings.TrimSpace(deleteErr.Error()) != errIDNotFound {
-				return fmt.Errorf("[heketi]: failed to delete glusterblock volume %v: %v", delBlockVolName, deleteErr)
+				return fmt.Errorf("failed to delete glusterblock volume %v: %v", delBlockVolName, deleteErr)
 			}
-			klog.V(4).Infof("[heketi]: Volume %v not present in heketi, ignoring", volumeID)
+			klog.V(4).Infof("volume %v not present in heketi, ignoring", volumeID)
 		} else {
-			klog.V(1).Infof("[heketi]: successfully deleted Volume %v", delBlockVolName)
+			klog.V(1).Infof("successfully deleted Volume %v", delBlockVolName)
 		}
 
 	default:
-		klog.Errorf("Unknown OpMode, failed to delete volume %v", delBlockVolName)
+		klog.Errorf("unknown OpMode, failed to delete volume %v", delBlockVolName)
 
 	}
 
@@ -724,7 +724,7 @@ func parseClassParameters(params map[string]string, kubeclient kubernetes.Interf
 	}
 
 	if len(cfg.url) == 0 && cfg.opMode == heketiOpmode {
-		return nil, fmt.Errorf("StorageClass for provisioner %s must contain 'resturl' parameter", "glusterblock")
+		return nil, fmt.Errorf("storageClass for provisioner %s must contain 'resturl' parameter", "glusterblock")
 	}
 
 	if cfg.opMode == heketiOpmode {
@@ -742,7 +742,7 @@ func parseClassParameters(params map[string]string, kubeclient kubernetes.Interf
 					return nil, err
 				}
 			} else {
-				return nil, fmt.Errorf("StorageClass for provisioner %q must have restSecretNamespace and restSecretName either both set or both empty", "glusterblock")
+				return nil, fmt.Errorf("storageclass for provisioner %q must have restSecretNamespace and restSecretName either both set or both empty", "glusterblock")
 
 			}
 		} else if authEnabled {
@@ -758,7 +758,7 @@ func parseClassParameters(params map[string]string, kubeclient kubernetes.Interf
 
 	if len(parseVolumeNamePrefix) != 0 {
 		if dstrings.Contains(parseVolumeNamePrefix, "_") {
-			return nil, fmt.Errorf("Storageclass parameter 'volumenameprefix' should not contain '_' in its value")
+			return nil, fmt.Errorf("storageclass parameter 'volumenameprefix' should not contain '_' in its value")
 		}
 		cfg.volumeNamePrefix = parseVolumeNamePrefix
 	}
@@ -787,7 +787,7 @@ func parseOpmodeArgs(parseOpmode string, cfg *provisionerConfig, blkmodeArgs str
 	case heketiOpmode:
 		cfg.opMode = heketiOpmode
 	default:
-		return fmt.Errorf("StorageClass for provisioner %s contains unknown %v parameter", "glusterblock", parseOpmode)
+		return fmt.Errorf("storageclass for provisioner %s contains unknown %v parameter", "glusterblock", parseOpmode)
 	}
 
 	return nil
@@ -845,14 +845,14 @@ func parseSecret(namespace, secretName string, kubeClient kubernetes.Interface) 
 func GetSecretForPV(restSecretNamespace, restSecretName, volumePluginName string, kubeClient kubernetes.Interface) (map[string]string, error) {
 	secret := make(map[string]string)
 	if kubeClient == nil {
-		return secret, fmt.Errorf("Cannot get kube client")
+		return secret, fmt.Errorf("cannot get kube client")
 	}
 	secrets, err := kubeClient.Core().Secrets(restSecretNamespace).Get(restSecretName, metav1.GetOptions{})
 	if err != nil {
 		return secret, err
 	}
 	if secrets.Type != v1.SecretType(volumePluginName) {
-		return secret, fmt.Errorf("Cannot get secret of type %s", volumePluginName)
+		return secret, fmt.Errorf("cannot get secret of type %s", volumePluginName)
 	}
 	for name, data := range secrets.Data {
 		secret[name] = string(data)
@@ -883,7 +883,7 @@ func main() {
 	}
 
 	if err != nil {
-		klog.Fatalf("Failed to create kubernetes config: %v", err)
+		klog.Fatalf("failed to create kubernetes config: %v", err)
 	}
 
 	provName := provisionerName
