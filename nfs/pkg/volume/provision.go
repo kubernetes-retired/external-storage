@@ -410,6 +410,9 @@ func (p *nfsProvisioner) getServer() (string, error) {
 		{111, v1.ProtocolTCP}:   true,
 	}
 	endpoints, err := p.client.CoreV1().Endpoints(namespace).Get(serviceName, metav1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("error getting endpoints for service %s=%s in namespace %s=%s", p.serviceEnv, serviceName, p.namespaceEnv, namespace)
+	}
 	for _, subset := range endpoints.Subsets {
 		// One service can't have multiple nfs-provisioner endpoints. If it had, kubernetes would round-robin
 		// the request which would probably go to the wrong instance.
