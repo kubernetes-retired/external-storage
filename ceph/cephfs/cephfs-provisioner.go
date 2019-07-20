@@ -37,6 +37,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 const (
@@ -185,7 +186,7 @@ func (p *cephFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 	}
 
 	_, err = p.client.CoreV1().Secrets(nameSpace).Create(secret)
-	if err != nil {
+	if err != nil && !apierrors.IsAlreadyExists(err) {
 		klog.Errorf("Cephfs Provisioner: create volume failed, err: %v", err)
 		return nil, fmt.Errorf("failed to create secret")
 	}
