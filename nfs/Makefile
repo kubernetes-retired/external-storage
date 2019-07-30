@@ -19,24 +19,53 @@ ifeq ($(VERSION),)
 	VERSION = latest
 endif
 IMAGE = $(REGISTRY)nfs-provisioner:$(VERSION)
+IMAGE_ARM = $(REGISTRY)nfs-provisioner-arm:$(VERSION)
 MUTABLE_IMAGE = $(REGISTRY)nfs-provisioner:latest
+MUTABLE_IMAGE_ARM = $(REGISTRY)nfs-provisioner-arm:latest
 
-all build:
-	GO111MODULE=on GOOS=linux go build ./cmd/nfs-provisioner
-.PHONY: all build
 
-container: build quick-container
+all: build quick-container build-arm quick-container-arm
+.PHONY: all
+
+build:
+	GOOS=linux go build ./cmd/nfs-provisioner
+.PHONY: build
+
+build-docker:
+	GOOS=linux go build -o deploy/docker/x86_64/nfs-provisioner ./cmd/nfs-provisioner
+.PHONY: build-docker
+
+build-docker-arm:
+	GOOS=linux GOARCH=arm GOARM=7 go build -o deploy/docker/arm/nfs-provisioner ./cmd/nfs-provisioner
+.PHONY: build-docker-arm
+
+container: build-docker quick-container
 .PHONY: container
 
+container-arm: build-docker-arm quick-container-arm
+.PHONY: container-arm
+
 quick-container:
-	cp nfs-provisioner deploy/docker/nfs-provisioner
-	docker build -t $(MUTABLE_IMAGE) deploy/docker
+	docker build -t $(MUTABLE_IMAGE) deploy/docker/x86_64
 	docker tag $(MUTABLE_IMAGE) $(IMAGE)
 .PHONY: quick-container
 
-push: container
+quick-container-arm:
+	docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+	docker build -t $(MUTABLE_IMAGE_ARM) deploy/docker/arm
+	docker tag $(MUTABLE_IMAGE_ARM) $(IMAGE_ARM)
+.PHONY: quick-container-arm
+
+push: container container-arm
 	docker push $(IMAGE)
 	docker push $(MUTABLE_IMAGE)
+	docker push $(IMAGE_ARM)
+	docker push $(MUTABLE_IMAGE_ARM)
+.PHONY: push
+
+push-arm: container-arm
+	docker push $(IMAGE_ARM)
+	docker push $(MUTABLE_IMAGE_ARM)
 .PHONY: push
 
 test-all: test test-e2e
