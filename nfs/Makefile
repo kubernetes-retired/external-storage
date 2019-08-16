@@ -22,7 +22,7 @@ IMAGE = $(REGISTRY)nfs-provisioner:$(VERSION)
 MUTABLE_IMAGE = $(REGISTRY)nfs-provisioner:latest
 
 all build:
-	GOOS=linux go build ./cmd/nfs-provisioner
+	GO111MODULE=on GOOS=linux go build ./cmd/nfs-provisioner
 .PHONY: all build
 
 container: build quick-container
