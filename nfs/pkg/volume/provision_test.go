@@ -32,6 +32,7 @@ import (
 
 	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/controller"
 	"k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -43,9 +44,11 @@ func TestCreateVolume(t *testing.T) {
 	tmpDir := utiltesting.MkTmpdirOrDie("nfsProvisionTest")
 	defer os.RemoveAll(tmpDir)
 
+	delete := v1.PersistentVolumeReclaimDelete
+
 	tests := []struct {
 		name             string
-		options          controller.VolumeOptions
+		options          controller.ProvisionOptions
 		envKey           string
 		expectedServer   string
 		expectedPath     string
@@ -57,11 +60,13 @@ func TestCreateVolume(t *testing.T) {
 	}{
 		{
 			name: "succeed creating volume",
-			options: controller.VolumeOptions{
-				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
-				PVName:                        "pvc-1",
-				PVC:                           newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
-				Parameters:                    map[string]string{},
+			options: controller.ProvisionOptions{
+				StorageClass: &storagev1.StorageClass{
+					ReclaimPolicy: &delete,
+					Parameters:    map[string]string{},
+				},
+				PVName: "pvc-1",
+				PVC:    newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
 			},
 			envKey:           podIPEnv,
 			expectedServer:   "1.1.1.1",
@@ -73,11 +78,13 @@ func TestCreateVolume(t *testing.T) {
 		},
 		{
 			name: "succeed creating volume again",
-			options: controller.VolumeOptions{
-				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
-				PVName:                        "pvc-2",
-				PVC:                           newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
-				Parameters:                    map[string]string{},
+			options: controller.ProvisionOptions{
+				StorageClass: &storagev1.StorageClass{
+					ReclaimPolicy: &delete,
+					Parameters:    map[string]string{},
+				},
+				PVName: "pvc-2",
+				PVC:    newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
 			},
 			envKey:           podIPEnv,
 			expectedServer:   "1.1.1.1",
@@ -89,11 +96,13 @@ func TestCreateVolume(t *testing.T) {
 		},
 		{
 			name: "bad parameter",
-			options: controller.VolumeOptions{
-				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
-				PVName:                        "pvc-3",
-				PVC:                           newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
-				Parameters:                    map[string]string{"foo": "bar"},
+			options: controller.ProvisionOptions{
+				StorageClass: &storagev1.StorageClass{
+					ReclaimPolicy: &delete,
+					Parameters:    map[string]string{"foo": "bar"},
+				},
+				PVName: "pvc-3",
+				PVC:    newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
 			},
 			envKey:           podIPEnv,
 			expectedServer:   "",
@@ -106,11 +115,13 @@ func TestCreateVolume(t *testing.T) {
 		},
 		{
 			name: "bad server",
-			options: controller.VolumeOptions{
-				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
-				PVName:                        "pvc-4",
-				PVC:                           newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
-				Parameters:                    map[string]string{},
+			options: controller.ProvisionOptions{
+				StorageClass: &storagev1.StorageClass{
+					ReclaimPolicy: &delete,
+					Parameters:    map[string]string{},
+				},
+				PVName: "pvc-4",
+				PVC:    newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
 			},
 			envKey:           serviceEnv,
 			expectedServer:   "",
@@ -123,11 +134,13 @@ func TestCreateVolume(t *testing.T) {
 		},
 		{
 			name: "dir already exists",
-			options: controller.VolumeOptions{
-				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
-				PVName:                        "pvc-1",
-				PVC:                           newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
-				Parameters:                    map[string]string{},
+			options: controller.ProvisionOptions{
+				StorageClass: &storagev1.StorageClass{
+					ReclaimPolicy: &delete,
+					Parameters:    map[string]string{},
+				},
+				PVName: "pvc-1",
+				PVC:    newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
 			},
 			envKey:           podIPEnv,
 			expectedServer:   "",
@@ -140,11 +153,13 @@ func TestCreateVolume(t *testing.T) {
 		},
 		{
 			name: "error exporting",
-			options: controller.VolumeOptions{
-				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
-				PVName:                        "FAIL_TO_EXPORT_ME",
-				PVC:                           newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
-				Parameters:                    map[string]string{},
+			options: controller.ProvisionOptions{
+				StorageClass: &storagev1.StorageClass{
+					ReclaimPolicy: &delete,
+					Parameters:    map[string]string{},
+				},
+				PVName: "FAIL_TO_EXPORT_ME",
+				PVC:    newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
 			},
 			envKey:           podIPEnv,
 			expectedServer:   "",
@@ -156,11 +171,13 @@ func TestCreateVolume(t *testing.T) {
 		},
 		{
 			name: "succeed creating volume last slot",
-			options: controller.VolumeOptions{
-				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
-				PVName:                        "pvc-3",
-				PVC:                           newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
-				Parameters:                    map[string]string{},
+			options: controller.ProvisionOptions{
+				StorageClass: &storagev1.StorageClass{
+					ReclaimPolicy: &delete,
+					Parameters:    map[string]string{},
+				},
+				PVName: "pvc-3",
+				PVC:    newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
 			},
 			envKey:           podIPEnv,
 			expectedServer:   "1.1.1.1",
@@ -172,11 +189,13 @@ func TestCreateVolume(t *testing.T) {
 		},
 		{
 			name: "max export limit exceeded",
-			options: controller.VolumeOptions{
-				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
-				PVName:                        "pvc-3",
-				PVC:                           newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
-				Parameters:                    map[string]string{},
+			options: controller.ProvisionOptions{
+				StorageClass: &storagev1.StorageClass{
+					ReclaimPolicy: &delete,
+					Parameters:    map[string]string{},
+				},
+				PVName: "pvc-3",
+				PVC:    newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
 			},
 			envKey:           podIPEnv,
 			expectedServer:   "",
@@ -227,69 +246,104 @@ func TestValidateOptions(t *testing.T) {
 	tmpDir := utiltesting.MkTmpdirOrDie("nfsProvisionTest")
 	defer os.RemoveAll(tmpDir)
 
+	delete := v1.PersistentVolumeReclaimDelete
+
 	tests := []struct {
 		name               string
-		options            controller.VolumeOptions
+		options            controller.ProvisionOptions
 		expectedGid        string
 		expectedRootSquash bool
 		expectError        bool
 	}{
 		{
 			name: "empty parameters",
-			options: controller.VolumeOptions{
-				Parameters: map[string]string{},
-				PVC:        newClaim(resource.MustParse("1Ki"), nil, nil),
+			options: controller.ProvisionOptions{
+				StorageClass: &storagev1.StorageClass{
+					ReclaimPolicy: &delete,
+					Parameters:    map[string]string{},
+				},
+				PVC: newClaim(resource.MustParse("1Ki"), nil, nil),
 			},
 			expectedGid: "none",
 			expectError: false,
 		},
 		{
 			name: "gid parameter value 'none'",
-			options: controller.VolumeOptions{
-				Parameters: map[string]string{"gid": "none"},
-				PVC:        newClaim(resource.MustParse("1Ki"), nil, nil),
+			options: controller.ProvisionOptions{
+				StorageClass: &storagev1.StorageClass{
+					ReclaimPolicy: &delete,
+					Parameters:    map[string]string{"gid": "none"},
+				},
+				PVC: newClaim(resource.MustParse("1Ki"), nil, nil),
 			},
 			expectedGid: "none",
 			expectError: false,
 		},
 		{
 			name: "gid parameter value id",
-			options: controller.VolumeOptions{
-				Parameters: map[string]string{"gid": "1"},
-				PVC:        newClaim(resource.MustParse("1Ki"), nil, nil),
+			options: controller.ProvisionOptions{
+				StorageClass: &storagev1.StorageClass{
+					ReclaimPolicy: &delete,
+					Parameters:    map[string]string{"gid": "1"},
+				},
+				PVC: newClaim(resource.MustParse("1Ki"), nil, nil),
 			},
 			expectedGid: "1",
 			expectError: false,
 		},
 		{
-			name:        "bad parameter name",
-			options:     controller.VolumeOptions{Parameters: map[string]string{"foo": "bar"}},
+			name: "bad parameter name",
+			options: controller.ProvisionOptions{
+				StorageClass: &storagev1.StorageClass{
+					ReclaimPolicy: &delete,
+					Parameters:    map[string]string{"foo": "bar"},
+				},
+			},
 			expectedGid: "",
 			expectError: true,
 		},
 		{
-			name:        "bad gid parameter value string",
-			options:     controller.VolumeOptions{Parameters: map[string]string{"gid": "foo"}},
+			name: "bad gid parameter value string",
+			options: controller.ProvisionOptions{
+				StorageClass: &storagev1.StorageClass{
+					ReclaimPolicy: &delete,
+					Parameters:    map[string]string{"gid": "foo"},
+				},
+			},
 			expectedGid: "",
 			expectError: true,
 		},
 		{
-			name:        "bad gid parameter value zero",
-			options:     controller.VolumeOptions{Parameters: map[string]string{"gid": "0"}},
+			name: "bad gid parameter value zero",
+			options: controller.ProvisionOptions{
+				StorageClass: &storagev1.StorageClass{
+					ReclaimPolicy: &delete,
+					Parameters:    map[string]string{"gid": "0"},
+				},
+			},
 			expectedGid: "",
 			expectError: true,
 		},
 		{
-			name:        "bad gid parameter value negative",
-			options:     controller.VolumeOptions{Parameters: map[string]string{"gid": "-1"}},
+			name: "bad gid parameter value negative",
+			options: controller.ProvisionOptions{
+				StorageClass: &storagev1.StorageClass{
+					ReclaimPolicy: &delete,
+					Parameters:    map[string]string{"gid": "-1"},
+				},
+			},
 			expectedGid: "",
 			expectError: true,
 		},
 		{
 			name: "root squash parameter value 'true'",
-			options: controller.VolumeOptions{
-				Parameters: map[string]string{"rootSquash": "true"},
-				PVC:        newClaim(resource.MustParse("1Ki"), nil, nil),
+			options: controller.ProvisionOptions{
+				StorageClass: &storagev1.StorageClass{
+					ReclaimPolicy: &delete,
+					Parameters:    map[string]string{"rootSquash": "true"},
+				},
+
+				PVC: newClaim(resource.MustParse("1Ki"), nil, nil),
 			},
 			expectedGid:        "none",
 			expectedRootSquash: true,
@@ -297,9 +351,13 @@ func TestValidateOptions(t *testing.T) {
 		},
 		{
 			name: "root squash parameter value 'false'",
-			options: controller.VolumeOptions{
-				Parameters: map[string]string{"rootSquash": "false"},
-				PVC:        newClaim(resource.MustParse("1Ki"), nil, nil),
+			options: controller.ProvisionOptions{
+				StorageClass: &storagev1.StorageClass{
+					ReclaimPolicy: &delete,
+					Parameters:    map[string]string{"rootSquash": "false"},
+				},
+
+				PVC: newClaim(resource.MustParse("1Ki"), nil, nil),
 			},
 			expectedGid:        "none",
 			expectedRootSquash: false,
@@ -307,9 +365,12 @@ func TestValidateOptions(t *testing.T) {
 		},
 		{
 			name: "bad root squash parameter value neither 'true' nor 'false'",
-			options: controller.VolumeOptions{
-				Parameters: map[string]string{"rootSquash": "asdf"},
-				PVC:        newClaim(resource.MustParse("1Ki"), nil, nil),
+			options: controller.ProvisionOptions{
+				StorageClass: &storagev1.StorageClass{
+					ReclaimPolicy: &delete,
+					Parameters:    map[string]string{"rootSquash": "asdf"},
+				},
+				PVC: newClaim(resource.MustParse("1Ki"), nil, nil),
 			},
 			expectError: true,
 		},
@@ -317,9 +378,12 @@ func TestValidateOptions(t *testing.T) {
 		// TODO implement options.ProvisionerSelector parsing
 		{
 			name: "mount options parameter key",
-			options: controller.VolumeOptions{
-				Parameters: map[string]string{"mountOptions": "asdf"},
-				PVC:        newClaim(resource.MustParse("1Ki"), nil, nil),
+			options: controller.ProvisionOptions{
+				StorageClass: &storagev1.StorageClass{
+					ReclaimPolicy: &delete,
+					Parameters:    map[string]string{"mountOptions": "asdf"},
+				},
+				PVC: newClaim(resource.MustParse("1Ki"), nil, nil),
 			},
 			expectedGid: "none",
 			expectError: false,
@@ -327,7 +391,10 @@ func TestValidateOptions(t *testing.T) {
 		// TODO implement options.ProvisionerSelector parsing
 		{
 			name: "non-nil selector",
-			options: controller.VolumeOptions{
+			options: controller.ProvisionOptions{
+				StorageClass: &storagev1.StorageClass{
+					ReclaimPolicy: &delete,
+				},
 				PVC: newClaim(resource.MustParse("1Ki"), nil, &metav1.LabelSelector{MatchLabels: nil}),
 			},
 			expectedGid: "",
@@ -335,7 +402,10 @@ func TestValidateOptions(t *testing.T) {
 		},
 		{
 			name: "bad capacity",
-			options: controller.VolumeOptions{
+			options: controller.ProvisionOptions{
+				StorageClass: &storagev1.StorageClass{
+					ReclaimPolicy: &delete,
+				},
 				PVC: newClaim(resource.MustParse("1Ei"), nil, nil),
 			},
 			expectedGid: "",
