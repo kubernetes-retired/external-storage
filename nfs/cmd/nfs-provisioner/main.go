@@ -44,6 +44,7 @@ var (
 	serverHostname = flag.String("server-hostname", "", "The hostname for the NFS server to export from. Only applicable when running out-of-cluster i.e. it can only be set if either master or kubeconfig are set. If unset, the first IP output by `hostname -i` is used.")
 	exportSubnet   = flag.String("export-subnet", "*", "Subnet for NFS export to allow mount only from")
 	maxExports     = flag.Int("max-exports", -1, "The maximum number of volumes to be exported by this provisioner. New claims will be ignored once this limit has been reached. A negative value is interpreted as 'unlimited'. Default -1.")
+	fsidDevice     = flag.Bool("device-based-fsids", true, "If file system handles created by NFS Ganesha should be based on major/minor device IDs of the backing storage volume ('/export'). Default true.")
 )
 
 const (
@@ -85,7 +86,7 @@ func main() {
 
 	if *runServer {
 		glog.Infof("Setting up NFS server!")
-		err := server.Setup(ganeshaConfig, *gracePeriod)
+		err := server.Setup(ganeshaConfig, *gracePeriod, *fsidDevice)
 		if err != nil {
 			glog.Fatalf("Error setting up NFS server: %v", err)
 		}
