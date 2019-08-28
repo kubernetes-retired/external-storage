@@ -1,46 +1,39 @@
-# Copyright 2017 The Kubernetes Authors.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+FROM fedora:30 AS build
 
-# Modified from https://github.com/rootfs/nfs-ganesha-docker by Huamin Chen
-FROM fedora:28
+# Build ganesha from source, install it to /usr/local and a use multi stage build to have a smaller image
 
-# Build ganesha from source, installing deps and removing them in one line.
-# Why?
-# 1. Ignore (bind mounted) files in mount table, only present in >= V2.7.1 which is not yet packaged
-# 2. Set NFS_V4_RECOV_ROOT to /export
+RUN dnf install -y tar gcc cmake autoconf libtool bison flex make gcc-c++ krb5-devel dbus-devel jemalloc-devel libnfsidmap-devel libnsl2-devel userspace-rcu-devel patch libblkid-devel
+RUN curl -L https://github.com/nfs-ganesha/nfs-ganesha/archive/V2.8.2.tar.gz | tar zx \
+	  && curl -L https://github.com/nfs-ganesha/ntirpc/archive/v1.8.0.tar.gz | tar zx \
+	  && rm -r nfs-ganesha-2.8.2/src/libntirpc \
+	  && mv ntirpc-1.8.0 nfs-ganesha-2.8.2/src/libntirpc
+WORKDIR /nfs-ganesha-2.8.2
+RUN mkdir -p /usr/local \
+    && cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_CONFIG=vfs_only -DCMAKE_INSTALL_PREFIX=/usr/local src/ \
+	  && make \
+	  && make install
+RUN mkdir -p /ganesha-extra \
+    && mkdir -p /ganesha-extra/etc/dbus-1/system.d \
+    && cp src/scripts/ganeshactl/org.ganesha.nfsd.conf /ganesha-extra/etc/dbus-1/system.d/
 
-RUN dnf install -y tar gcc cmake autoconf libtool bison flex make gcc-c++ krb5-devel dbus-devel jemalloc-devel libnfsidmap-devel libnsl2-devel patch && dnf clean all \
-	&& curl -L https://github.com/nfs-ganesha/nfs-ganesha/archive/V2.7.1.tar.gz | tar zx \
-	&& curl -L https://github.com/nfs-ganesha/ntirpc/archive/v1.7.1.tar.gz | tar zx \
-	&& rm -r nfs-ganesha-2.7.1/src/libntirpc \
-	&& mv ntirpc-1.7.1 nfs-ganesha-2.7.1/src/libntirpc \
-	&& cd nfs-ganesha-2.7.1 \
-	&& cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_CONFIG=vfs_only src/ \
-	&& make \
-	&& make install \
-	&& cp src/scripts/ganeshactl/org.ganesha.nfsd.conf /etc/dbus-1/system.d/ \
-	&& cd .. \
-	&& rm -rf nfs-ganesha-2.7.1 \
-	&& dnf remove -y tar gcc cmake autoconf libtool bison flex make gcc-c++ krb5-devel dbus-devel jemalloc-devel libnfsidmap-devel patch && dnf clean all
+FROM registry.fedoraproject.org/fedora-minimal:30 AS run
+RUN microdnf install -y libblkid userspace-rcu dbus-x11 rpcbind hostname nfs-utils xfsprogs jemalloc libnfsidmap && microdnf clean all
 
-RUN dnf install -y dbus-x11 rpcbind hostname nfs-utils xfsprogs jemalloc libnfsidmap && dnf clean all
+RUN mkdir -p /var/run/dbus \
+    && mkdir -p /export
 
-RUN mkdir -p /var/run/dbus
-RUN mkdir -p /export
+# add libs from /usr/local/lib64
+RUN echo /usr/local/lib64 > /etc/ld.so.conf.d/local_libs.conf \
+    && ldconfig
+
+# do not ask systemd for user IDs or groups (slows down dbus-daemon start)
+RUN sed -i s/systemd// /etc/nsswitch.conf
+
+COPY --from=build /usr/local /usr/local/
+COPY --from=build /ganesha-extra /
+COPY nfs-provisioner /nfs-provisioner
 
 # expose mountd 20048/tcp and nfsd 2049/tcp and rpcbind 111/tcp 111/udp
 EXPOSE 2049/tcp 20048/tcp 111/tcp 111/udp
 
-COPY nfs-provisioner /nfs-provisioner
 ENTRYPOINT ["/nfs-provisioner"]
