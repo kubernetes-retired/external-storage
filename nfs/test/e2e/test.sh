@@ -39,28 +39,19 @@ find ./test/e2e/testing-manifests -maxdepth 1 ! -name 'testing-manifests' ! -nam
 
 # Copy our sources
 mkdir ./test/e2e/storage
-ln -s $TEST_DIR/nfs.go ./test/e2e/storage/
+cp $TEST_DIR/nfs.go ./test/e2e/storage/
 rm ./test/e2e/e2e_test.go
-ln -s $TEST_DIR/e2e_test.go ./test/e2e/
+cp $TEST_DIR/e2e_test.go ./test/e2e/
 cp -r $TEST_DIR/testing-manifests/* ./test/e2e/testing-manifests
 
-# Build ginkgo and e2e.test
-hack/update-bazel.sh
-make ginkgo
-if ! type bazel; then
-  wget https://github.com/bazelbuild/bazel/releases/download/0.16.0/bazel-0.16.0-installer-linux-x86_64.sh
-  chmod +x bazel-0.16.0-installer-linux-x86_64.sh
-  ./bazel-0.16.0-installer-linux-x86_64.sh --user
-fi
-bazel build //test/e2e:gen_e2e.test
-rm -f ./_output/bin/e2e.test
-cp ./bazel-bin/test/e2e/e2e.test ./_output/bin
+# Build e2e.test
+./build/run.sh make KUBE_BUILD_PLATFORMS=linux/amd64 WHAT=test/e2e/e2e.test &> /dev/null
 
 # Download kubectl to _output directory
-if [ ! -e "./_output/bin/kubectl" ]; then
-  curl -o ./_output/bin/kubectl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
-  chmod +x ./_output/bin/kubectl
+if [ ! -e "$HOME/bin/kubectl" ]; then
+  curl -o $HOME/bin/kubectl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+  chmod +x $HOME/bin/kubectl
 fi
 
 # Run tests assuming local cluster i.e. one started with hack/local-up-cluster.sh
-go run hack/e2e.go -- --provider=local --check-version-skew=false --test --test_args="--ginkgo.focus=external-storage"
+./_output/dockerized/bin/linux/amd64/e2e.test --provider=local --ginkgo.focus=external-storage --kubeconfig=$HOME/.kube/config
