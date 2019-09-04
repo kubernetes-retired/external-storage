@@ -71,7 +71,7 @@ var _ = Describe("external-storage", func() {
 
 	Describe("NFS external provisioner", func() {
 		mkpath := func(file string) string {
-			return filepath.Join(framework.TestContext.RepoRoot, manifestPath, file)
+			return filepath.Join(manifestPath, file)
 		}
 
 		It("should create and delete persistent volumes when deployed with yamls", func() {
