@@ -38,8 +38,7 @@ RUN mkdir -p /var/run/dbus \
     && mkdir -p /export
 
 # add libs from /usr/local/lib64
-RUN echo /usr/local/lib64 > /etc/ld.so.conf.d/local_libs.conf \
-    && ldconfig
+RUN echo /usr/local/lib64 > /etc/ld.so.conf.d/local_libs.conf
 
 # do not ask systemd for user IDs or groups (slows down dbus-daemon start)
 RUN sed -i s/systemd// /etc/nsswitch.conf
@@ -47,6 +46,9 @@ RUN sed -i s/systemd// /etc/nsswitch.conf
 COPY --from=build /usr/local /usr/local/
 COPY --from=build /ganesha-extra /
 COPY nfs-provisioner /nfs-provisioner
+
+# run ldconfig after libs have been copied
+RUN ldconfig
 
 # expose mountd 20048/tcp and nfsd 2049/tcp and rpcbind 111/tcp 111/udp
 EXPOSE 2049/tcp 20048/tcp 111/tcp 111/udp
