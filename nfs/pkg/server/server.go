@@ -74,7 +74,7 @@ NFSV4
 
 // Setup sets up various prerequisites and settings for the server. If an error
 // is encountered at any point it returns it instantly
-func Setup(ganeshaConfig string, gracePeriod uint) error {
+func Setup(ganeshaConfig string, gracePeriod uint, fsidDevice bool) error {
 	// Start rpcbind if it is not started yet
 	cmd := exec.Command("/usr/sbin/rpcinfo", "127.0.0.1")
 	if err := cmd.Run(); err != nil {
@@ -111,7 +111,7 @@ func Setup(ganeshaConfig string, gracePeriod uint) error {
 	if err != nil {
 		return fmt.Errorf("error setting grace period to ganesha config: %v", err)
 	}
-	err = setFsidDevice(ganeshaConfig, true)
+	err = setFsidDevice(ganeshaConfig, fsidDevice)
 	if err != nil {
 		return fmt.Errorf("error setting fsid device to ganesha config: %v", err)
 	}
