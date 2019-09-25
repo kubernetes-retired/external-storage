@@ -1,0 +1,27 @@
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: iscsi-targetd-vg-targetd
+provisioner: iscsi-targetd
+parameters:
+# this is where the iscsi server is running
+  targetPortal: 10.11.12.13:3260
+# file system type for Windows
+  fsType: ntfs
+# this is the iscsi server iqn
+  iqn: iqn.2019-08.com.docker.linux:targetd
+
+# this is the iscsi interface to be used, the default is default
+# iscsiInterface: default
+
+# this must be on eof the volume groups condifgured in targetd.yaml, the default is vg-targetd
+# volumeGroup: vg-targetd
+
+# this is a comma separated list of initiators that will be give access to the created volumes, they must correspond to what you have configured in your nodes.
+  initiators: iqn.1991-05.com.microsoft:janedoe-e06115-win-1
+
+# whether or not to use chap authentication for discovery operations
+  chapAuthDiscovery: "false"
+
+# whether or not to use chap authentication for session operations
+  chapAuthSession: "false"

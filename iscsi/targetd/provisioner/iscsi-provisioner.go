@@ -108,6 +108,40 @@ func (p *iscsiProvisioner) getAccessModes() []v1.PersistentVolumeAccessMode {
 	}
 }
 
+func createPVSource(options controller.VolumeOptions, portals []string, lun int32) v1.PersistentVolumeSource {
+	if options.PVC.Annotations["os"] == "windows" {
+		return v1.PersistentVolumeSource{
+			FlexVolume: &v1.FlexPersistentVolumeSource{
+				Driver: "microsoft.com/iscsi.cmd",
+				FSType: getFsType(options.Parameters["fsType"]),
+				Options: map[string]string{
+					"chapAuthDiscovery": options.Parameters["chapAuthDiscovery"],
+					"chapAuthSession":   options.Parameters["chapAuthSession"],
+					"iqn":               options.Parameters["iqn"],
+					"lun":               strconv.FormatInt(int64(lun), 10),
+					"targetPortal":      options.Parameters["targetPortal"],
+				},
+				ReadOnly: getReadOnly(options.Parameters["readonly"]),
+			},
+		}
+	}
+
+	return v1.PersistentVolumeSource{
+		ISCSI: &v1.ISCSIPersistentVolumeSource{
+			TargetPortal:      options.Parameters["targetPortal"],
+			Portals:           portals,
+			IQN:               options.Parameters["iqn"],
+			ISCSIInterface:    options.Parameters["iscsiInterface"],
+			Lun:               lun,
+			ReadOnly:          getReadOnly(options.Parameters["readonly"]),
+			FSType:            getFsType(options.Parameters["fsType"]),
+			DiscoveryCHAPAuth: getBool(options.Parameters["chapAuthDiscovery"]),
+			SessionCHAPAuth:   getBool(options.Parameters["chapAuthSession"]),
+			SecretRef:         getSecretRef(getBool(options.Parameters["chapAuthDiscovery"]), getBool(options.Parameters["chapAuthSession"]), &v1.SecretReference{Name: viper.GetString("provisioner-name") + "-chap-secret"}),
+		},
+	}
+}
+
 // Provision creates a storage asset and returns a PV object representing it.
 func (p *iscsiProvisioner) Provision(options controller.VolumeOptions) (*v1.PersistentVolume, error) {
 	if !util.AccessModesContainedInAll(p.getAccessModes(), options.PVC.Spec.AccessModes) {
@@ -144,21 +178,8 @@ func (p *iscsiProvisioner) Provision(options controller.VolumeOptions) (*v1.Pers
 				v1.ResourceName(v1.ResourceStorage): options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)],
 			},
 			// set volumeMode from PVC Spec
-			VolumeMode: options.PVC.Spec.VolumeMode,
-			PersistentVolumeSource: v1.PersistentVolumeSource{
-				ISCSI: &v1.ISCSIPersistentVolumeSource{
-					TargetPortal:      options.Parameters["targetPortal"],
-					Portals:           portals,
-					IQN:               options.Parameters["iqn"],
-					ISCSIInterface:    options.Parameters["iscsiInterface"],
-					Lun:               lun,
-					ReadOnly:          getReadOnly(options.Parameters["readonly"]),
-					FSType:            getFsType(options.Parameters["fsType"]),
-					DiscoveryCHAPAuth: getBool(options.Parameters["chapAuthDiscovery"]),
-					SessionCHAPAuth:   getBool(options.Parameters["chapAuthSession"]),
-					SecretRef:         getSecretRef(getBool(options.Parameters["chapAuthDiscovery"]), getBool(options.Parameters["chapAuthSession"]), &v1.SecretReference{Name: viper.GetString("provisioner-name") + "-chap-secret"}),
-				},
-			},
+			VolumeMode:             options.PVC.Spec.VolumeMode,
+			PersistentVolumeSource: createPVSource(options, portals, lun),
 		},
 	}
 	return pv, nil
