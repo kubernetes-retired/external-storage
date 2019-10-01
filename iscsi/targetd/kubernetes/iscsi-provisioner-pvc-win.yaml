@@ -3,9 +3,9 @@ apiVersion: v1
 metadata:
   name: myclaim
   annotations:
-    volume.beta.kubernetes.io/storage-class: "iscsi-targetd-vg-targetd"
     os: "windows"
 spec:
+  storageClassName: "iscsi-targetd-vg-targetd"
   accessModes:
     - ReadWriteOnce
   resources:
