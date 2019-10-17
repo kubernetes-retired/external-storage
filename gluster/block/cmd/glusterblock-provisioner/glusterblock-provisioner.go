@@ -29,7 +29,7 @@ import (
 	gapi "github.com/heketi/heketi/pkg/glusterfs/api"
 	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/controller"
 	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/util"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -41,7 +41,6 @@ import (
 )
 
 const (
-	provisionerName    = "gluster.org/glusterblock"
 	secretKeyName      = "key"
 	provisionerNameKey = "PROVISIONER_NAME"
 	shareIDAnn         = "glusterBlockShare"
@@ -396,7 +395,7 @@ func (p *glusterBlockProvisioner) createVolume(volSizeInt int, blockVol string, 
 		}
 
 	default:
-		return nil, fmt.Errorf("error parsing value for 'opmode' for volume plugin %s", provisionerName)
+		return nil, fmt.Errorf("error parsing value for 'opmode' for volume plugin %s", os.Getenv(provisionerNameKey))
 	}
 	return blockRes, nil
 }
@@ -823,7 +822,7 @@ func parseBlockModeArgs(mode string, inArgs string) (*map[string]string, error) 
 // parseSecret finds a given Secret instance and reads user password from it.
 func parseSecret(namespace, secretName string, kubeClient kubernetes.Interface) (string, error) {
 
-	secretMap, err := GetSecretForPV(namespace, secretName, provisionerName, kubeClient)
+	secretMap, err := GetSecretForPV(namespace, secretName, os.Getenv(provisionerNameKey), kubeClient)
 	if err != nil {
 		return "", fmt.Errorf("failed to get secret [%s/%s], %v", namespace, secretName, err)
 	}
@@ -867,7 +866,7 @@ var (
 )
 
 func main() {
-	klog.InitFlags(nil)
+	// klog.InitFlags(nil)
 	flag.Parse()
 	flag.Set("logtostderr", "true")
 
@@ -886,15 +885,7 @@ func main() {
 		klog.Fatalf("Failed to create kubernetes config: %v", err)
 	}
 
-	provName := provisionerName
-	provEnvName := os.Getenv(provisionerNameKey)
-
-	// Precedence is given for ProvisionerNameKey if both are set
-	if provEnvName != "" && *id != "" || provEnvName != "" {
-		provName = provEnvName
-	} else if *id != "" {
-		provName = *id
-	}
+	provName := os.Getenv(provisionerNameKey)
 
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
