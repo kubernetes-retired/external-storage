@@ -29,7 +29,6 @@ import (
 	gapi "github.com/heketi/heketi/pkg/glusterfs/api"
 	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/controller"
 	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/util"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -395,7 +394,7 @@ func (p *glusterBlockProvisioner) createVolume(volSizeInt int, blockVol string, 
 		}
 
 	default:
-		return nil, fmt.Errorf("error parsing value for 'opmode' for volume plugin %s", os.Getenv(provisionerNameKey))
+		return nil, fmt.Errorf("error parsing value for 'opmode' for volume plugin %s", provisionerName)
 	}
 	return blockRes, nil
 }
@@ -822,7 +821,7 @@ func parseBlockModeArgs(mode string, inArgs string) (*map[string]string, error) 
 // parseSecret finds a given Secret instance and reads user password from it.
 func parseSecret(namespace, secretName string, kubeClient kubernetes.Interface) (string, error) {
 
-	secretMap, err := GetSecretForPV(namespace, secretName, os.Getenv(provisionerNameKey), kubeClient)
+	secretMap, err := GetSecretForPV(namespace, secretName, provisionerName, kubeClient)
 	if err != nil {
 		return "", fmt.Errorf("failed to get secret [%s/%s], %v", namespace, secretName, err)
 	}
@@ -860,13 +859,14 @@ func GetSecretForPV(restSecretNamespace, restSecretName, volumePluginName string
 }
 
 var (
-	master     = flag.String("master", "", "Master URL")
-	kubeconfig = flag.String("kubeconfig", "", "Absolute path to the kubeconfig")
-	id         = flag.String("id", "", "Unique provisioner identity")
+	master          = flag.String("master", "", "Master URL")
+	kubeconfig      = flag.String("kubeconfig", "", "Absolute path to the kubeconfig")
+	id              = flag.String("id", "", "Unique provisioner identity")
+	provisionerName = "gluster.org/glusterblock"
 )
 
 func main() {
-	// klog.InitFlags(nil)
+	//klog.InitFlags(nil)
 	flag.Parse()
 	flag.Set("logtostderr", "true")
 
@@ -885,7 +885,14 @@ func main() {
 		klog.Fatalf("Failed to create kubernetes config: %v", err)
 	}
 
-	provName := os.Getenv(provisionerNameKey)
+	provEnvName := os.Getenv(provisionerNameKey)
+
+	// Precedence is given for ProvisionerNameKey if both are set
+	if provEnvName != "" && *id != "" || provEnvName != "" {
+		provisionerName = provEnvName
+	} else if *id != "" {
+		provisionerName = *id
+	}
 
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
@@ -901,14 +908,14 @@ func main() {
 
 	// Create the provisioner: it implements the Provisioner interface expected by
 	// the controller
-	glusterBlockProvisioner := NewGlusterBlockProvisioner(clientset, provName)
+	glusterBlockProvisioner := NewGlusterBlockProvisioner(clientset, provisionerName)
 
 	// Start the provision controller which will dynamically provision glusterblock
 	// PVs
 
 	pc := controller.NewProvisionController(
 		clientset,
-		provName,
+		provisionerName,
 		glusterBlockProvisioner,
 		serverVersion.GitVersion,
 		controller.Threadiness(2),
