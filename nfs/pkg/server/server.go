@@ -64,6 +64,8 @@ NFS_Core_Param
 {
 	MNT_Port = 20048;
 	fsid_device = true;
+	NLM_Port = 32803;
+	Rquota_Port = 875;
 }
 
 NFSV4
@@ -84,7 +86,7 @@ func Setup(ganeshaConfig string, gracePeriod uint, fsidDevice bool) error {
 		}
 	}
 
-	cmd = exec.Command("/usr/sbin/rpc.statd")
+	cmd = exec.Command("/usr/sbin/rpc.statd", "--port", "662")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("rpc.statd failed with error: %v, output: %s", err, out)
 	}
