@@ -52,6 +52,9 @@ gometalinter --install
 pushd nfs
 GO111MODULE=on go mod vendor
 popd
+pushd aws/efs
+GO111MODULE=on go mod vendor
+popd
 make verify
 
 if [ "$TRAVIS_OS_NAME" = "osx" ]; then
