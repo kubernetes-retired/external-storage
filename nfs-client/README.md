@@ -87,12 +87,16 @@ spec:
               value: <YOUR NFS SERVER HOSTNAME>
             - name: NFS_PATH
               value: /var/nfs
+            - name: PATH_IS_IGNORE_PV_NAME
+              value: false
       volumes:
         - name: nfs-client-root
           nfs:
             server: <YOUR NFS SERVER HOSTNAME>
             path: /var/nfs
 ```
+
+If you want to keep nfs file paths static, change PATH_IS_IGNORE_PV_NAME to `true`, target directory will subtract pv name in target paths.
 
 You may also want to change the PROVISIONER_NAME above from ``fuseim.pri/ifs`` to something more descriptive like ``nfs-storage``, but if you do remember to also change the PROVISIONER_NAME in the storage class definition below:
 

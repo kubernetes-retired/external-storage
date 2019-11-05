@@ -41,6 +41,10 @@ const (
 	provisionerNameKey = "PROVISIONER_NAME"
 )
 
+var (
+	pathIsIgnorePvName = false
+)
+
 type nfsProvisioner struct {
 	client kubernetes.Interface
 	server string
@@ -61,8 +65,13 @@ func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 
 	pvcNamespace := options.PVC.Namespace
 	pvcName := options.PVC.Name
+	pvNamesToJoin := []string{pvcNamespace, pvcName}
 
-	pvName := strings.Join([]string{pvcNamespace, pvcName, options.PVName}, "-")
+	if !pathIsIgnorePvName {
+		pvNamesToJoin = append(pvNamesToJoin, options.PVName)
+	}
+
+	pvName := strings.Join(pvNamesToJoin, "-")
 
 	fullPath := filepath.Join(mountPath, pvName)
 	glog.V(4).Infof("creating path %s", fullPath)
@@ -160,6 +169,10 @@ func main() {
 	provisionerName := os.Getenv(provisionerNameKey)
 	if provisionerName == "" {
 		glog.Fatalf("environment variable %s is not set! Please set it.", provisionerNameKey)
+	}
+	pathIsIgnorePvNameValue := strings.ToLower(os.Getenv("PATH_IS_IGNORE_PV_NAME"))
+	if pathIsIgnorePvNameValue == "1" || pathIsIgnorePvNameValue == "true" {
+		pathIsIgnorePvName = true
 	}
 
 	// Create an InClusterConfig and use it to create a client for the controller

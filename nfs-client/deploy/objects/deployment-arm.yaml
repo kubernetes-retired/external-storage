@@ -25,6 +25,8 @@ spec:
               value: 10.10.10.60
             - name: NFS_PATH
               value: /ifs/kubernetes
+            - name: PATH_IS_IGNORE_PV_NAME
+              value: false
       volumes:
         - name: nfs-client-root
           nfs:
