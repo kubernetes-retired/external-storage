@@ -132,6 +132,21 @@ func (p *nfsProvisioner) Delete(volume *v1.PersistentVolume) error {
 		}
 	}
 
+	// Determine if the "archiveDoNotMove" parameter exists.
+	// If it exists and has a true value, don't move the directory.
+	// Otherwise, move to archive directory.
+	if archiveDoNotMove, exists := storageClass.Parameters["archiveDoNotMove"]; exists {
+		if exists {
+			archiveBool, err := strconv.ParseBool(archiveDoNotMove)
+			if err != nil {
+				return err
+			}
+			if archiveBool {
+				return nil
+			}
+		}
+	}
+
 	archivePath := filepath.Join(mountPath, "archived-"+pvName)
 	glog.V(4).Infof("archiving path %s to %s", oldPath, archivePath)
 	return os.Rename(oldPath, archivePath)

@@ -111,6 +111,7 @@ provisioner: fuseim.pri/ifs # or choose another name, must match deployment's en
 parameters:
   archiveOnDelete: "false" # When set to "false" your PVs will not be archived
                            # by the provisioner upon deletion of the PVC.
+  archiveDoNotMove: "false" # When set to "true" and archiveOnDelete=true archived will keep directory name.
 ```
 
 **Step 5: Finally, test your environment!**
