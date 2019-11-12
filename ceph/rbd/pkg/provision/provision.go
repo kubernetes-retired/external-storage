@@ -22,7 +22,6 @@ import (
 	"net"
 	"strings"
 
-	"github.com/golang/glog"
 	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/controller"
 	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/util"
 	"k8s.io/api/core/v1"
@@ -31,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -71,7 +71,7 @@ type rbdProvisionOptions struct {
 	userSecretNamespace string
 	// fsType that is supported by kubernetes. Default: "ext4".
 	fsType string
-	// Ceph RBD image format, "1" or "2". Default is "1".
+	// Ceph RBD image format, "1" or "2". Default is "2".
 	imageFormat string
 	// This parameter is optional and should only be used if you set
 	// imageFormat to "2". Currently supported features are layering only.
@@ -84,17 +84,21 @@ type rbdProvisioner struct {
 	client kubernetes.Interface
 	// Identity of this rbdProvisioner, generated. Used to identify "this"
 	// provisioner's PVs.
-	identity string
-	rbdUtil  *RBDUtil
-	dnsip    string
+	identity  string
+	rbdUtil   *RBDUtil
+	dnsip     string
+	usePVName bool
 }
 
 // NewRBDProvisioner creates a Provisioner that provisions Ceph RBD PVs backed by Ceph RBD images.
-func NewRBDProvisioner(client kubernetes.Interface, id string) controller.Provisioner {
+func NewRBDProvisioner(client kubernetes.Interface, id string, timeout int, usePVName bool) controller.Provisioner {
 	return &rbdProvisioner{
 		client:   client,
 		identity: id,
-		rbdUtil:  &RBDUtil{},
+		rbdUtil: &RBDUtil{
+			timeout: timeout,
+		},
+		usePVName: usePVName,
 	}
 }
 
@@ -120,14 +124,18 @@ func (p *rbdProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 	if err != nil {
 		return nil, err
 	}
-	// create random image name
-	image := fmt.Sprintf("kubernetes-dynamic-pvc-%s", uuid.NewUUID())
+	image := options.PVName
+	// If use-pv-name flag not set, generate image name
+	if !p.usePVName {
+		// create random image name
+		image = fmt.Sprintf("kubernetes-dynamic-pvc-%s", uuid.NewUUID())
+	}
 	rbd, sizeMB, err := p.rbdUtil.CreateImage(image, opts, options)
 	if err != nil {
-		glog.Errorf("rbd: create volume failed, err: %v", err)
+		klog.Errorf("rbd: create volume failed, err: %v", err)
 		return nil, err
 	}
-	glog.Infof("successfully created rbd image %q", image)
+	klog.Infof("successfully created rbd image %q", image)
 
 	rbd.SecretRef = new(v1.SecretReference)
 	rbd.SecretRef.Name = opts.userSecretName
@@ -146,6 +154,7 @@ func (p *rbdProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: options.PersistentVolumeReclaimPolicy,
 			AccessModes:                   options.PVC.Spec.AccessModes,
+			VolumeMode:                    options.PVC.Spec.VolumeMode,
 			MountOptions:                  options.MountOptions,
 			Capacity: v1.ResourceList{
 				v1.ResourceName(v1.ResourceStorage): resource.MustParse(fmt.Sprintf("%dMi", sizeMB)),
@@ -157,7 +166,7 @@ func (p *rbdProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 	}
 	// use default access modes if missing
 	if len(pv.Spec.AccessModes) == 0 {
-		glog.Warningf("no access modes specified, use default: %v", p.getAccessModes())
+		klog.Warningf("no access modes specified, use default: %v", p.getAccessModes())
 		pv.Spec.AccessModes = p.getAccessModes()
 	}
 
@@ -193,7 +202,7 @@ func (p *rbdProvisioner) parseParameters(parameters map[string]string) (*rbdProv
 	opts := &rbdProvisionOptions{
 		pool:        "rbd",
 		adminID:     "admin",
-		imageFormat: rbdImageFormat1,
+		imageFormat: rbdImageFormat2,
 	}
 
 	var (
@@ -210,7 +219,7 @@ func (p *rbdProvisioner) parseParameters(parameters map[string]string) (*rbdProv
 			if p.dnsip == "" {
 				p.dnsip = util.FindDNSIP(p.client)
 			}
-			glog.V(4).Infof("dnsip: %q\n", p.dnsip)
+			klog.V(4).Infof("dnsip: %q\n", p.dnsip)
 			arr := strings.Split(v, ",")
 			for _, m := range arr {
 				mhost, mport := util.SplitHostPort(m)
@@ -218,7 +227,7 @@ func (p *rbdProvisioner) parseParameters(parameters map[string]string) (*rbdProv
 					var lookup []string
 					if lookup, err = util.LookupHost(mhost, p.dnsip); err == nil {
 						for _, a := range lookup {
-							glog.V(1).Infof("adding %+v from mon lookup\n", a)
+							klog.V(1).Infof("adding %+v from mon lookup\n", a)
 							opts.monitors = append(opts.monitors, util.JoinHostPort(a, mport))
 						}
 					} else {
@@ -228,7 +237,7 @@ func (p *rbdProvisioner) parseParameters(parameters map[string]string) (*rbdProv
 					opts.monitors = append(opts.monitors, util.JoinHostPort(mhost, mport))
 				}
 			}
-			glog.V(4).Infof("final monitors list: %v\n", opts.monitors)
+			klog.V(4).Infof("final monitors list: %v\n", opts.monitors)
 			if len(opts.monitors) < 1 {
 				return nil, fmt.Errorf("missing Ceph monitors")
 			}
@@ -317,4 +326,8 @@ func (p *rbdProvisioner) parsePVSecret(namespace, secretName string) (string, er
 
 	// If not found, the last secret in the map wins as done before
 	return secret, nil
+}
+
+func (p *rbdProvisioner) SupportsBlock() bool {
+	return true
 }

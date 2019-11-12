@@ -27,16 +27,17 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/golang/glog"
 	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/controller"
 	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/util"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/klog"
 )
 
 const (
@@ -158,7 +159,7 @@ func (p *cephFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 
 	output, cmdErr := cmd.CombinedOutput()
 	if cmdErr != nil {
-		glog.Errorf("failed to provision share %q for %q, err: %v, output: %v", share, user, cmdErr, string(output))
+		klog.Errorf("failed to provision share %q for %q, err: %v, output: %v", share, user, cmdErr, string(output))
 		return nil, cmdErr
 	}
 	// validate output
@@ -185,8 +186,8 @@ func (p *cephFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 	}
 
 	_, err = p.client.CoreV1().Secrets(nameSpace).Create(secret)
-	if err != nil {
-		glog.Errorf("Cephfs Provisioner: create volume failed, err: %v", err)
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		klog.Errorf("Cephfs Provisioner: create volume failed, err: %v", err)
 		return nil, fmt.Errorf("failed to create secret")
 	}
 
@@ -222,7 +223,7 @@ func (p *cephFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 		},
 	}
 
-	glog.Infof("successfully created CephFS share %+v", pv.Spec.PersistentVolumeSource.CephFS)
+	klog.Infof("successfully created CephFS share %+v", pv.Spec.PersistentVolumeSource.CephFS)
 
 	return pv, nil
 }
@@ -268,19 +269,19 @@ func (p *cephFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 
 	output, cmdErr := cmd.CombinedOutput()
 	if cmdErr != nil {
-		glog.Errorf("failed to delete share %q for %q, err: %v, output: %v", share, user, cmdErr, string(output))
+		klog.Errorf("failed to delete share %q for %q, err: %v, output: %v", share, user, cmdErr, string(output))
 		return cmdErr
 	}
 
 	// Remove dynamic user secret
 	secretRef, err := getSecretFromCephFSPersistentVolume(volume)
 	if err != nil {
-		glog.Errorf("failed to get secret references, err: %v", err)
+		klog.Errorf("failed to get secret references, err: %v", err)
 		return err
 	}
 	err = p.client.CoreV1().Secrets(secretRef.Namespace).Delete(secretRef.Name, &metav1.DeleteOptions{})
 	if err != nil {
-		glog.Errorf("Cephfs Provisioner: delete secret failed, err: %v", err)
+		klog.Errorf("Cephfs Provisioner: delete secret failed, err: %v", err)
 		return fmt.Errorf("failed to delete secret")
 	}
 
@@ -311,7 +312,7 @@ func (p *cephFSProvisioner) parseParameters(parameters map[string]string) (strin
 			if p.dnsip == "" {
 				p.dnsip = util.FindDNSIP(p.client)
 			}
-			glog.V(4).Infof("dnsip: %q\n", p.dnsip)
+			klog.V(4).Infof("dnsip: %q\n", p.dnsip)
 			arr := strings.Split(v, ",")
 			for _, m := range arr {
 				mhost, mport := util.SplitHostPort(m)
@@ -319,7 +320,7 @@ func (p *cephFSProvisioner) parseParameters(parameters map[string]string) (strin
 					var lookup []string
 					if lookup, err = util.LookupHost(mhost, p.dnsip); err == nil {
 						for _, a := range lookup {
-							glog.V(1).Infof("adding %+v from mon lookup\n", a)
+							klog.V(1).Infof("adding %+v from mon lookup\n", a)
 							mon = append(mon, util.JoinHostPort(a, mport))
 						}
 					} else {
@@ -329,7 +330,7 @@ func (p *cephFSProvisioner) parseParameters(parameters map[string]string) (strin
 					mon = append(mon, util.JoinHostPort(mhost, mport))
 				}
 			}
-			glog.V(4).Infof("final monitors list: %v\n", mon)
+			klog.V(4).Infof("final monitors list: %v\n", mon)
 		case "adminid":
 			adminID = v
 		case "adminsecretname":
@@ -396,11 +397,11 @@ func main() {
 		config, err = rest.InClusterConfig()
 	}
 	if err != nil {
-		glog.Fatalf("Failed to create config: %v", err)
+		klog.Fatalf("Failed to create config: %v", err)
 	}
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		glog.Fatalf("Failed to create client: %v", err)
+		klog.Fatalf("Failed to create client: %v", err)
 	}
 
 	prName := provisionerName
@@ -426,12 +427,12 @@ func main() {
 	// provisioners aren't officially supported until 1.5
 	serverVersion, err := clientset.Discovery().ServerVersion()
 	if err != nil {
-		glog.Fatalf("Error getting server version: %v", err)
+		klog.Fatalf("Error getting server version: %v", err)
 	}
 
 	// Create the provisioner: it implements the Provisioner interface expected by
 	// the controller
-	glog.Infof("Creating CephFS provisioner %s with identity: %s, secret namespace: %s", prName, prID, *secretNamespace)
+	klog.Infof("Creating CephFS provisioner %s with identity: %s, secret namespace: %s", prName, prID, *secretNamespace)
 	cephFSProvisioner := newCephFSProvisioner(clientset, prID, *secretNamespace, *enableQuota)
 
 	// Start the provision controller which will dynamically provision cephFS

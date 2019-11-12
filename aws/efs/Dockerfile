@@ -12,7 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM alpine:3.6
-RUN apk update --no-cache && apk add ca-certificates
-COPY efs-provisioner /
+FROM golang:1.13.1-alpine AS builder
+
+ENV CGO_ENABLED=0
+
+COPY aws/efs /go/src/github.com/kubernetes-incubator/external-storage/aws/efs
+
+WORKDIR /go/src/github.com/kubernetes-incubator/external-storage/aws/efs
+RUN go install ./cmd/efs-provisioner
+
+
+FROM alpine:3.10.2
+RUN apk add --no-cache ca-certificates
+COPY --from=builder /go/bin/efs-provisioner /
 ENTRYPOINT ["/efs-provisioner"]

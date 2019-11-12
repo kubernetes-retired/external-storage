@@ -21,15 +21,15 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
+	"k8s.io/klog"
 )
 
 func (p *glusterfsProvisioner) Delete(volume *v1.PersistentVolume) error {
 	var err error
 	class, err := GetClassForVolume(p.client, volume)
 	if err != nil {
-		glog.Errorf("Fail to get class for volume: %v", volume)
+		klog.Errorf("Fail to get class for volume: %v", volume)
 		return err
 	}
 	cfg, err := NewProvisionerConfig(volume.Name, class.Parameters)
@@ -39,11 +39,11 @@ func (p *glusterfsProvisioner) Delete(volume *v1.PersistentVolume) error {
 
 	pvc := volume.Spec.ClaimRef
 	if pvc == nil {
-		glog.Errorf("glusterfs: ClaimRef is nil")
+		klog.Errorf("glusterfs: ClaimRef is nil")
 		return fmt.Errorf("glusterfs: ClaimRef is nil")
 	}
 	if pvc.Namespace == "" {
-		glog.Errorf("glusterfs: namespace is nil")
+		klog.Errorf("glusterfs: namespace is nil")
 		return fmt.Errorf("glusterfs: namespace is nil")
 	}
 	p.deleteVolume(pvc.Namespace, pvc.Name, cfg)
@@ -51,7 +51,7 @@ func (p *glusterfsProvisioner) Delete(volume *v1.PersistentVolume) error {
 	//TODO ignorederror
 	err = p.allocator.Release(volume)
 	if err != nil {
-		glog.Errorf("glusterfs: error to release GID: %v", err)
+		klog.Errorf("glusterfs: error to release GID: %v", err)
 	}
 
 	return nil
@@ -66,7 +66,7 @@ func (p *glusterfsProvisioner) deleteVolume(
 	epServiceName := dynamicEpSvcPrefix + name
 	err := p.deleteEndpointService(namespace, epServiceName)
 	if err != nil {
-		glog.Errorf("glusterfs: error deleting endpoint %s/%s: %v", namespace, epServiceName, err)
+		klog.Errorf("glusterfs: error deleting endpoint %s/%s: %v", namespace, epServiceName, err)
 	}
 
 	return
@@ -83,14 +83,14 @@ func (p *glusterfsProvisioner) deleteGlusterVolume(namespace string, name string
 
 	err = p.ExecuteCommands(host, cmds, cfg)
 	if err != nil {
-		glog.Errorf("glusterfs: failed to stop volume: %s", cfg.VolumeName)
+		klog.Errorf("glusterfs: failed to stop volume: %s", cfg.VolumeName)
 	} else {
 		cmds = []string{fmt.Sprintf(
 			"gluster --mode=script volume delete %s", cfg.VolumeName,
 		)}
 		err = p.ExecuteCommands(host, cmds, cfg)
 		if err != nil {
-			glog.Errorf("glusterfs: failed to delete volume: %s", cfg.VolumeName)
+			klog.Errorf("glusterfs: failed to delete volume: %s", cfg.VolumeName)
 		}
 	}
 
@@ -106,13 +106,13 @@ func (p *glusterfsProvisioner) deleteBricks(
 		host := root.Host
 		path := filepath.Join(root.Path, namespace, brickName)
 
-		glog.Infof("rm -rf %s:%s", host, path)
+		klog.Infof("rm -rf %s:%s", host, path)
 		cmds = []string{
 			fmt.Sprintf("rm -rf %s", path),
 		}
 		err := p.ExecuteCommands(host, cmds, cfg)
 		if err != nil {
-			glog.Errorf("Failed to delete brick: %s: %s, %v", host, path, err)
+			klog.Errorf("Failed to delete brick: %s: %s, %v", host, path, err)
 		}
 	}
 }
@@ -124,10 +124,10 @@ func (p *glusterfsProvisioner) deleteEndpointService(namespace string, epService
 	}
 	err = kubeClient.Core().Services(namespace).Delete(epServiceName, nil)
 	if err != nil {
-		glog.Errorf("glusterfs: error deleting service %s/%s: %v", namespace, epServiceName, err)
+		klog.Errorf("glusterfs: error deleting service %s/%s: %v", namespace, epServiceName, err)
 	}
 	if err == nil {
-		glog.V(1).Infof("glusterfs: service/endpoint %s/%s deleted successfully", namespace, epServiceName)
+		klog.V(1).Infof("glusterfs: service/endpoint %s/%s deleted successfully", namespace, epServiceName)
 	}
 	return nil
 }

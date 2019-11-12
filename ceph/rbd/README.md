@@ -31,8 +31,8 @@ See https://kubernetes.io/.
 * Create a Ceph admin secret
 
 ```bash
-ceph auth get client.admin 2>&1 |grep "key = " |awk '{print  $3'} |xargs echo -n > /tmp/secret
-kubectl create secret generic ceph-admin-secret --from-file=/tmp/secret --namespace=kube-system
+ceph auth get client.admin 2>&1 |grep "key = " |awk '{print  $3'} |xargs echo -n > /tmp/key
+kubectl create secret generic ceph-admin-secret --from-file=/tmp/key --namespace=kube-system --type=kubernetes.io/rbd
 ```
 
 * Create a Ceph pool and a user secret
@@ -40,8 +40,8 @@ kubectl create secret generic ceph-admin-secret --from-file=/tmp/secret --namesp
 ```bash
 ceph osd pool create kube 8 8
 ceph auth add client.kube mon 'allow r' osd 'allow rwx pool=kube'
-ceph auth get-key client.kube > /tmp/secret
-kubectl create secret generic ceph-secret --from-file=/tmp/secret --namespace=kube-system
+ceph auth get-key client.kube > /tmp/key
+kubectl create secret generic ceph-secret --from-file=/tmp/key --namespace=kube-system --type=kubernetes.io/rbd
 ```
 
 * Start RBD provisioner

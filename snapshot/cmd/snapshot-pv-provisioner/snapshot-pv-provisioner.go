@@ -226,7 +226,10 @@ func main() {
 	}
 
 	// build volume plugins map
-	buildVolumePlugins()
+	err = buildVolumePlugins()
+	if err != nil {
+		glog.Fatalf("Error initializing volume plugins: %v", err)
+	}
 
 	// make a crd client to list VolumeSnapshot
 	snapshotClient, _, err := crdclient.NewClient(config)
@@ -250,7 +253,7 @@ func main() {
 	pc.Run(wait.NeverStop)
 }
 
-func buildVolumePlugins() {
+func buildVolumePlugins() error {
 	if len(*cloudProvider) != 0 {
 		cloud, err := cloudprovider.InitCloudProvider(*cloudProvider, *cloudConfigFile)
 		if err == nil && cloud != nil {
@@ -272,10 +275,12 @@ func buildVolumePlugins() {
 				glog.Infof("Register cloudprovider %s", cinder.GetPluginName())
 			}
 		} else {
-			glog.Warningf("failed to initialize aws cloudprovider: %v, supported cloudproviders are %#v", err, cloudprovider.CloudProviders())
+			glog.Errorf("failed to initialize aws cloudprovider: %v, supported cloudproviders are %#v", err, cloudprovider.CloudProviders())
+			return err
 		}
 	}
 	volumePlugins[gluster.GetPluginName()] = gluster.RegisterPlugin()
 	volumePlugins[hostpath.GetPluginName()] = hostpath.RegisterPlugin()
 
+	return nil
 }

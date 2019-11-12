@@ -20,20 +20,22 @@ import (
 	"flag"
 	"os"
 
-	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/ceph/rbd/pkg/provision"
 	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/controller"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/klog"
 )
 
 var (
-	master      = flag.String("master", "", "Master URL")
-	kubeconfig  = flag.String("kubeconfig", "", "Absolute path to the kubeconfig")
-	id          = flag.String("id", "", "Unique provisioner identity")
-	metricsPort = flag.Int("metrics-port", 0, "The port of the metrics server (set to non-zero to enable)")
+	master         = flag.String("master", "", "Master URL")
+	kubeconfig     = flag.String("kubeconfig", "", "Absolute path to the kubeconfig")
+	id             = flag.String("id", "", "Unique provisioner identity")
+	metricsPort    = flag.Int("metrics-port", 0, "The port of the metrics server (set to non-zero to enable)")
+	commandTimeout = flag.Int("command-timeout", 5, "Timeout for command execution (in seconds)")
+	usePVName      = flag.Bool("use-pv-name", false, "Defines which image name should be used: generated or PV name")
 )
 
 const (
@@ -52,11 +54,11 @@ func main() {
 		config, err = rest.InClusterConfig()
 	}
 	if err != nil {
-		glog.Fatalf("Failed to create config: %v", err)
+		klog.Fatalf("Failed to create config: %v", err)
 	}
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		glog.Fatalf("Failed to create client: %v", err)
+		klog.Fatalf("Failed to create client: %v", err)
 	}
 
 	prName := provision.ProvisionerName
@@ -77,13 +79,13 @@ func main() {
 	// provisioners aren't officially supported until 1.5
 	serverVersion, err := clientset.Discovery().ServerVersion()
 	if err != nil {
-		glog.Fatalf("Error getting server version: %v", err)
+		klog.Fatalf("Error getting server version: %v", err)
 	}
 
 	// Create the provisioner: it implements the Provisioner interface expected by
 	// the controller
-	glog.Infof("Creating RBD provisioner %s with identity: %s", prName, prID)
-	rbdProvisioner := provision.NewRBDProvisioner(clientset, prID)
+	klog.Infof("Creating RBD provisioner %s with identity: %s", prName, prID)
+	rbdProvisioner := provision.NewRBDProvisioner(clientset, prID, *commandTimeout, *usePVName)
 
 	// Start the provision controller which will dynamically provision rbd
 	// PVs

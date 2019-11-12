@@ -195,7 +195,7 @@ func (p *nfsProvisioner) ShouldProvision(claim *v1.PersistentVolumeClaim) bool {
 
 // Provision creates a volume i.e. the storage asset and returns a PV object for
 // the volume.
-func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.PersistentVolume, error) {
+func (p *nfsProvisioner) Provision(options controller.ProvisionOptions) (*v1.PersistentVolume, error) {
 	volume, err := p.createVolume(options)
 	if err != nil {
 		return nil, err
@@ -211,7 +211,7 @@ func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 		annotations[VolumeGidAnnotationKey] = strconv.FormatUint(volume.supGroup, 10)
 	}
 	// Only use legacy mount options annotation if StorageClass.MountOptions is empty
-	if volume.mountOptions != "" && options.MountOptions == nil {
+	if volume.mountOptions != "" && options.StorageClass.MountOptions == nil {
 		annotations[MountOptionAnnotation] = volume.mountOptions
 	}
 	annotations[annProvisionerID] = string(p.identity)
@@ -223,7 +223,7 @@ func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 			Annotations: annotations,
 		},
 		Spec: v1.PersistentVolumeSpec{
-			PersistentVolumeReclaimPolicy: options.PersistentVolumeReclaimPolicy,
+			PersistentVolumeReclaimPolicy: *options.StorageClass.ReclaimPolicy,
 			AccessModes:                   options.PVC.Spec.AccessModes,
 			Capacity: v1.ResourceList{
 				v1.ResourceName(v1.ResourceStorage): options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)],
@@ -235,7 +235,7 @@ func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 					ReadOnly: false,
 				},
 			},
-			MountOptions: options.MountOptions,
+			MountOptions: options.StorageClass.MountOptions,
 		},
 	}
 
@@ -258,7 +258,7 @@ type volume struct {
 // zero/non-zero supplemental group, the block it added to either the ganesha
 // config or /etc/exports, and the exportID
 // TODO return values
-func (p *nfsProvisioner) createVolume(options controller.VolumeOptions) (volume, error) {
+func (p *nfsProvisioner) createVolume(options controller.ProvisionOptions) (volume, error) {
 	gid, rootSquash, mountOptions, err := p.validateOptions(options)
 	if err != nil {
 		return volume{}, fmt.Errorf("error validating options for volume: %v", err)
@@ -304,11 +304,11 @@ func (p *nfsProvisioner) createVolume(options controller.VolumeOptions) (volume,
 	}, nil
 }
 
-func (p *nfsProvisioner) validateOptions(options controller.VolumeOptions) (string, bool, string, error) {
+func (p *nfsProvisioner) validateOptions(options controller.ProvisionOptions) (string, bool, string, error) {
 	gid := "none"
 	rootSquash := false
 	mountOptions := ""
-	for k, v := range options.Parameters {
+	for k, v := range options.StorageClass.Parameters {
 		switch strings.ToLower(k) {
 		case "gid":
 			if strings.ToLower(v) == "none" {
@@ -410,6 +410,9 @@ func (p *nfsProvisioner) getServer() (string, error) {
 		{111, v1.ProtocolTCP}:   true,
 	}
 	endpoints, err := p.client.CoreV1().Endpoints(namespace).Get(serviceName, metav1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("error getting endpoints for service %s=%s in namespace %s=%s", p.serviceEnv, serviceName, p.namespaceEnv, namespace)
+	}
 	for _, subset := range endpoints.Subsets {
 		// One service can't have multiple nfs-provisioner endpoints. If it had, kubernetes would round-robin
 		// the request which would probably go to the wrong instance.

@@ -12,16 +12,29 @@ The efs-provisioner allows you to mount EFS storage as PersistentVolumes in kube
 
 If you are new to Kubernetes or to PersistentVolumes this quick start will get you up and running with simple defaults.
 
-- Download the manifest file [manifest.yaml](deploy/manifest.yaml).
+- Download the repository
   ```
-  wget https://raw.githubusercontent.com/kubernetes-incubator/external-storage/master/aws/efs/deploy/manifest.yaml
+  git clone https://github.com/kubernetes-incubator/external-storage
   ```
 
-- In the configmap section change the `file.system.id:` and `aws.region:` to match the details of the EFS you created. Change `dns.name` if you want to mount by your own DNS name and not by AWS's `*file-system-id*.efs.*aws-region*.amazonaws.com`.
+- Switch to the deploy directory
+  ```
+  cd external-storage/aws/efs/deploy/
+  ```
+
+- Apply rbac permissions
+  ```
+  kubectl apply -f rbac.yaml  
+  ```
+
+- Modify manifest.yaml. In the configmap section change the `file.system.id:` and `aws.region:` to match the details of the EFS you created. Change `dns.name` if you want to mount by your own DNS name and not by AWS's `*file-system-id*.efs.*aws-region*.amazonaws.com`.
 
 - In the deployment section change the `server:` to the DNS endpoint of the EFS you created.
 
-- `kubectl apply -f manifest.yaml` 
+- Apply the manifest
+  ```
+  kubectl apply -f manifest.yaml
+  ```
 
 - Now you can use your PersistentVolume in your pod or deployment by referencing your claim name when it's created.
 
@@ -49,7 +62,7 @@ spec:
         claimName: efs
 ```
 
-If you scale this pod each aditional pod will also be able to read and write the same files. You may also reference the same claimName in another type of pod so your 2 applications can read and write the same files. If you wish to have a second application that uses EFS storage but don't want other pods to access the files, create a new claim using a new name but the same storage class.
+If you scale this pod each additional pod will also be able to read and write the same files. You may also reference the same claimName in another type of pod so your 2 applications can read and write the same files. If you wish to have a second application that uses EFS storage but don't want other pods to access the files, create a new claim using a new name but the same storage class.
 
 Some times you want the replica pods to be on EFS but you do not wish them to share the same files. In those situations it's best to use a [StatefulSet](./https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/). When a StatefulSet scales up it will dynamically create new claims for your pods.
 
@@ -220,6 +233,9 @@ Add a reference to the secret in the deployment yaml.
               key: aws-secret-access-key
 ...
 ```
+
+## Building
+The Docker image can either be built by running `make quick-container` which will result in an image named `quay.io/external_storage/efs-provisioner:latest`. It's built with a multi stage Docker file so the only local dependency is that you have Docker installed.
 
 ## FAQ
 

@@ -1,3 +1,5 @@
+Although many of these recipes still work, this repo is now deprecated, moving work to https://github.com/kubernetes-sigs/sig-storage-lib-external-provisioner, come join us there !  
+
 # External Storage
 [![Build Status](https://travis-ci.org/kubernetes-incubator/external-storage.svg?branch=master)](https://travis-ci.org/kubernetes-incubator/external-storage)
 [![GoDoc](https://godoc.org/github.com/kubernetes-incubator/external-storage?status.svg)](https://godoc.org/github.com/kubernetes-incubator/external-storage)

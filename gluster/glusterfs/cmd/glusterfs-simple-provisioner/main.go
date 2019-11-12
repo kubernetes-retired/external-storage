@@ -20,7 +20,6 @@ import (
 	"flag"
 	"strings"
 
-	"github.com/golang/glog"
 	vol "github.com/kubernetes-incubator/external-storage/gluster/glusterfs/pkg/volume"
 	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/controller"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -29,6 +28,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/klog"
 )
 
 var (
@@ -42,33 +42,33 @@ func main() {
 	flag.Parse()
 
 	if errs := validateProvisioner(*provisioner, field.NewPath("provisioner")); len(errs) != 0 {
-		glog.Fatalf("Invalid provisioner specified: %v", errs)
+		klog.Fatalf("Invalid provisioner specified: %v", errs)
 	}
-	glog.Infof("Provisioner %s specified", *provisioner)
+	klog.Infof("Provisioner %s specified", *provisioner)
 
 	// Create the client according to whether we are running in or out-of-cluster
 	var config *rest.Config
 	var err error
 	if *master != "" || *kubeconfig != "" {
-		glog.Infof("Either master or kubeconfig specified. building kube config from that..")
+		klog.Infof("Either master or kubeconfig specified. building kube config from that..")
 		config, err = clientcmd.BuildConfigFromFlags(*master, *kubeconfig)
 	} else {
-		glog.Infof("Building kube configs for running in cluster...")
+		klog.Infof("Building kube configs for running in cluster...")
 		config, err = rest.InClusterConfig()
 	}
 	if err != nil {
-		glog.Fatalf("Failed to create config: %v", err)
+		klog.Fatalf("Failed to create config: %v", err)
 	}
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		glog.Fatalf("Failed to create client: %v", err)
+		klog.Fatalf("Failed to create client: %v", err)
 	}
 
 	// The controller needs to know what the server version is because out-of-tree
 	// provisioners aren't officially supported until 1.5
 	serverVersion, err := clientset.Discovery().ServerVersion()
 	if err != nil {
-		glog.Fatalf("Error getting server version: %v", err)
+		klog.Fatalf("Error getting server version: %v", err)
 	}
 
 	glusterfsProvisioner := vol.NewGlusterfsProvisioner(config, clientset)

@@ -22,28 +22,14 @@ IMAGE = $(REGISTRY)efs-provisioner:$(VERSION)
 MUTABLE_IMAGE = $(REGISTRY)efs-provisioner:latest
 
 all build:
-	@mkdir -p .go/src/github.com/kubernetes-incubator/external-storage/aws/efs/vendor
-	@mkdir -p .go/bin
-	@mkdir -p .go/stdlib
-	docker run \
-		--rm  \
-		-e "CGO_ENABLED=0" \
-		-u $$(id -u):$$(id -g) \
-		-v $$(pwd)/.go:/go \
-		-v $$(pwd):/go/src/github.com/kubernetes-incubator/external-storage/aws/efs \
-		-v "$${PWD%/*/*}/vendor":/go/src/github.com/kubernetes-incubator/external-storage/vendor \
-		-v $$(pwd):/go/bin \
-		-v $$(pwd)/.go/stdlib:/usr/local/go/pkg/linux_amd64_asdf \
-		-w /go/src/github.com/kubernetes-incubator/external-storage/aws/efs \
-		golang:1.11.1-alpine \
-		go install -installsuffix "asdf" ./cmd/efs-provisioner
+	go build ./cmd/efs-provisioner
 .PHONY: all build
 
-container: build quick-container
+container: quick-container
 .PHONY: container
 
 quick-container:
-	docker build -t $(MUTABLE_IMAGE) .
+	docker build -t $(MUTABLE_IMAGE) -f Dockerfile ../..
 	docker tag $(MUTABLE_IMAGE) $(IMAGE)
 .PHONY: quick-container
 
