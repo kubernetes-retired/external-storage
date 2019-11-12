@@ -1,12 +1,11 @@
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: nfs-client-provisioner
----
-kind: Deployment
 apiVersion: apps/v1
+kind: Deployment
 metadata:
   name: nfs-client-provisioner
+  labels:
+    app: nfs-client-provisioner
+  # replace with namespace where provisioner is deployed
+  namespace: default
 spec:
   replicas: 1
   selector:
@@ -14,6 +13,9 @@ spec:
       app: nfs-client-provisioner
   strategy:
     type: Recreate
+  selector:
+    matchLabels:
+      app: nfs-client-provisioner
   template:
     metadata:
       labels:

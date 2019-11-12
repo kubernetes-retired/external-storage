@@ -12,11 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM golang:1.11.1-alpine AS builder
+FROM golang:1.13.1-alpine AS builder
 
 ENV CGO_ENABLED=0
 
-COPY vendor /go/src/github.com/kubernetes-incubator/external-storage/vendor
 COPY aws/efs /go/src/github.com/kubernetes-incubator/external-storage/aws/efs
 
 WORKDIR /go/src/github.com/kubernetes-incubator/external-storage/aws/efs

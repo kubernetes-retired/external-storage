@@ -16,6 +16,7 @@
 FROM fedora:30 AS build
 
 # Build ganesha from source, install it to /usr/local and a use multi stage build to have a smaller image
+# Set NFS_V4_RECOV_ROOT to /export
 
 RUN dnf install -y tar gcc cmake autoconf libtool bison flex make gcc-c++ krb5-devel dbus-devel jemalloc-devel libnfsidmap-devel libnsl2-devel userspace-rcu-devel patch libblkid-devel
 RUN curl -L https://github.com/nfs-ganesha/nfs-ganesha/archive/V2.8.2.tar.gz | tar zx \
@@ -25,6 +26,7 @@ RUN curl -L https://github.com/nfs-ganesha/nfs-ganesha/archive/V2.8.2.tar.gz | t
 WORKDIR /nfs-ganesha-2.8.2
 RUN mkdir -p /usr/local \
     && cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_CONFIG=vfs_only -DCMAKE_INSTALL_PREFIX=/usr/local src/ \
+    && sed -i 's|@SYSSTATEDIR@/lib/nfs/ganesha|/export|' src/include/config-h.in.cmake \
 	  && make \
 	  && make install
 RUN mkdir -p /ganesha-extra \

@@ -28,15 +28,15 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/efs"
-	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/controller"
-	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/gidallocator"
-	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/mount"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog"
+	"sigs.k8s.io/sig-storage-lib-external-provisioner/controller"
+	"sigs.k8s.io/sig-storage-lib-external-provisioner/gidallocator"
+	"sigs.k8s.io/sig-storage-lib-external-provisioner/mount"
 )
 
 const (
@@ -124,13 +124,13 @@ func getMount(dnsName string) (string, string, error) {
 var _ controller.Provisioner = &efsProvisioner{}
 
 // Provision creates a storage asset and returns a PV object representing it.
-func (p *efsProvisioner) Provision(options controller.VolumeOptions) (*v1.PersistentVolume, error) {
+func (p *efsProvisioner) Provision(options controller.ProvisionOptions) (*v1.PersistentVolume, error) {
 	if options.PVC.Spec.Selector != nil {
 		return nil, fmt.Errorf("claim.Spec.Selector is not supported")
 	}
 
 	gidAllocate := true
-	for k, v := range options.Parameters {
+	for k, v := range options.StorageClass.Parameters {
 		switch strings.ToLower(k) {
 		case "gidmin":
 		// Let allocator handle
@@ -160,8 +160,8 @@ func (p *efsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 	}
 
 	mountOptions := []string{"vers=4.1"}
-	if options.MountOptions != nil {
-		mountOptions = options.MountOptions
+	if options.StorageClass.MountOptions != nil {
+		mountOptions = options.StorageClass.MountOptions
 	}
 
 	pv := &v1.PersistentVolume{
@@ -169,7 +169,7 @@ func (p *efsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 			Name: options.PVName,
 		},
 		Spec: v1.PersistentVolumeSpec{
-			PersistentVolumeReclaimPolicy: options.PersistentVolumeReclaimPolicy,
+			PersistentVolumeReclaimPolicy: *options.StorageClass.ReclaimPolicy,
 			AccessModes:                   options.PVC.Spec.AccessModes,
 			Capacity: v1.ResourceList{
 				v1.ResourceName(v1.ResourceStorage): options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)],
@@ -222,16 +222,16 @@ func (p *efsProvisioner) createVolume(path string, gid *int) error {
 	return nil
 }
 
-func (p *efsProvisioner) getLocalPath(options controller.VolumeOptions) string {
+func (p *efsProvisioner) getLocalPath(options controller.ProvisionOptions) string {
 	return path.Join(p.mountpoint, p.getDirectoryName(options))
 }
 
-func (p *efsProvisioner) getRemotePath(options controller.VolumeOptions) string {
+func (p *efsProvisioner) getRemotePath(options controller.ProvisionOptions) string {
 	sourcePath := path.Clean(strings.Replace(p.source, p.dnsName+":", "", 1))
 	return path.Join(sourcePath, p.getDirectoryName(options))
 }
 
-func (p *efsProvisioner) getDirectoryName(options controller.VolumeOptions) string {
+func (p *efsProvisioner) getDirectoryName(options controller.ProvisionOptions) string {
 	return options.PVC.Name + "-" + options.PVName
 }
 
@@ -272,7 +272,6 @@ func (p *efsProvisioner) getLocalPathToDelete(nfs *v1.NFSVolumeSource) (string, 
 }
 
 func main() {
-	klog.InitFlags(nil)
 	flag.Parse()
 	flag.Set("logtostderr", "true")
 
