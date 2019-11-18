@@ -24,31 +24,31 @@ MUTABLE_IMAGE = $(REGISTRY)nfs-provisioner:latest
 MUTABLE_IMAGE_ARM = $(REGISTRY)nfs-provisioner-arm:latest
 
 
-all: build quick-container build-arm quick-container-arm
-.PHONY: all
+all build: build-x86_64
+.PHONY: all build
 
-build:
+build-x86_64:
 	GOOS=linux go build ./cmd/nfs-provisioner
-.PHONY: build
+.PHONY: build-x86_64
 
-build-docker:
+build-docker build-docker-x86_64:
 	GOOS=linux go build -o deploy/docker/x86_64/nfs-provisioner ./cmd/nfs-provisioner
-.PHONY: build-docker
+.PHONY: build-docker build-docker-x86_64
 
 build-docker-arm:
 	GOOS=linux GOARCH=arm GOARM=7 go build -o deploy/docker/arm/nfs-provisioner ./cmd/nfs-provisioner
 .PHONY: build-docker-arm
 
-container: build-docker quick-container
-.PHONY: container
+container container-x86_64: build-docker-x86_64 quick-container-x86_64
+.PHONY: container container-x86_64
 
 container-arm: build-docker-arm quick-container-arm
 .PHONY: container-arm
 
-quick-container:
+quick-container quick-container-x86_64:
 	docker build -t $(MUTABLE_IMAGE) deploy/docker/x86_64
 	docker tag $(MUTABLE_IMAGE) $(IMAGE)
-.PHONY: quick-container
+.PHONY: quick-container quick-container-x86_64
 
 quick-container-arm:
 	docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
@@ -56,17 +56,18 @@ quick-container-arm:
 	docker tag $(MUTABLE_IMAGE_ARM) $(IMAGE_ARM)
 .PHONY: quick-container-arm
 
-push: container container-arm
+push-all: push-x86_64 push-arm
+.PHONY: push-all
+
+push push-x86_64: container
 	docker push $(IMAGE)
 	docker push $(MUTABLE_IMAGE)
-	docker push $(IMAGE_ARM)
-	docker push $(MUTABLE_IMAGE_ARM)
-.PHONY: push
+.PHONY: push push-x86_64
 
 push-arm: container-arm
 	docker push $(IMAGE_ARM)
 	docker push $(MUTABLE_IMAGE_ARM)
-.PHONY: push
+.PHONY: push-arm
 
 test-all: test test-e2e
 
