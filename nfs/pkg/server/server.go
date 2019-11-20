@@ -63,9 +63,8 @@ EXPORT
 NFS_Core_Param
 {
 	MNT_Port = 20048;
-	fsid_device = true;
 	NLM_Port = 32803;
-	Rquota_Port = 875;
+	fsid_device = true;
 }
 
 NFSV4
@@ -116,6 +115,10 @@ func Setup(ganeshaConfig string, gracePeriod uint, fsidDevice bool) error {
 	err = setFsidDevice(ganeshaConfig, fsidDevice)
 	if err != nil {
 		return fmt.Errorf("error setting fsid device to ganesha config: %v", err)
+	}
+	err = setNlmPort(ganeshaConfig)
+	if err != nil {
+		return fmt.Errorf("error setting NLM port to ganesha config: %v", err)
 	}
 
 	return nil
@@ -187,6 +190,37 @@ func setFsidDevice(ganeshaConfig string, fsidDevice bool) error {
 	} else {
 		// fsid_device there, just replace it
 		replaced := strings.Replace(string(read), string(oldLine), newLine, -1)
+		err = ioutil.WriteFile(ganeshaConfig, []byte(replaced), 0)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func setNlmPort(ganeshaConfig string) error {
+	newLine := "NLM_Port = 32803;"
+
+	re := regexp.MustCompile("NLM_Port = ([0-9]+);")
+
+	read, err := ioutil.ReadFile(ganeshaConfig)
+	if err != nil {
+		return err
+	}
+
+	oldLine := re.Find(read)
+
+	if oldLine == nil {
+		// fsid_device line not there, append it after MNT_Port
+		re := regexp.MustCompile("MNT_Port = 20048;")
+
+		mntPort := re.Find(read)
+
+		block := "MNT_Port = 20048;\n" +
+			"\t" + newLine
+
+		replaced := strings.Replace(string(read), string(mntPort), block, -1)
 		err = ioutil.WriteFile(ganeshaConfig, []byte(replaced), 0)
 		if err != nil {
 			return err
