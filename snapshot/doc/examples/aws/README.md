@@ -14,7 +14,7 @@ _output/bin/snapshot-controller  -kubeconfig=${HOME}/.kube/config -cloudprovider
 ```bash
 kubectl create namespace myns
 # if no default storage class, create one
-kubectl create -f https://raw.githubusercontent.com/kubernetes/kubernetes/master/examples/persistent-volume-provisioning/aws-ebs.yaml
+kubectl create -f https://github.com/kubernetes/examples/blob/master/staging/persistent-volume-provisioning/aws-ebs.yaml
 kubectl create -f examples/aws/pvc.yaml
 ```
  * Create a Snapshot Third Party Resource 

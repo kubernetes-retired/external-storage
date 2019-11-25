@@ -1,7 +1,7 @@
 Kubernetes Snapshotting Proposal
 ================================
 
-**Authors:** [Cindy Wang](https://github.com/ciwang), [Jing Xu](https://github.com/jinxu97),[Tomas Smetana](https://github.com/tsmetana), [Huamin Chen ](https://github.com/rootfs)
+**Authors:** [Cindy Wang](https://github.com/ciwang), [Jing Xu](https://github.com/jingxu97),[Tomas Smetana](https://github.com/tsmetana), [Huamin Chen ](https://github.com/rootfs)
 
 ## Background
 

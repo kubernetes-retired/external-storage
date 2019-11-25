@@ -3,7 +3,7 @@
 ## About OpenEBS
 
 OpenEBS is containerized storage for containers. More details on OpenEBS can be found on [OpenEBS project page.](https://github.com/openebs/openebs)
-OpenEBS Kubernetes PV provisioner is using API's exposed by [maya-apiserver](https://github.com/openebs/mayaserver) to perform provision and delete operation.
+OpenEBS Kubernetes PV provisioner is using API's exposed by [maya-apiserver](https://github.com/openebs/maya/tree/master/cmd/maya-apiserver) to perform provision and delete operation.
 
 ## Building OpenEBS provisioner from source
 
