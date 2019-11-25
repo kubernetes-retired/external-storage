@@ -405,9 +405,17 @@ func (p *nfsProvisioner) getServer() (string, error) {
 	}
 	expectedPorts := map[endpointPort]bool{
 		{2049, v1.ProtocolTCP}:  true,
+		{2049, v1.ProtocolUDP}:  true,
+		{32803, v1.ProtocolTCP}: true,
+		{32803, v1.ProtocolUDP}: true,
 		{20048, v1.ProtocolTCP}: true,
-		{111, v1.ProtocolUDP}:   true,
+		{20048, v1.ProtocolUDP}: true,
+		{875, v1.ProtocolTCP}:   true,
+		{875, v1.ProtocolUDP}:   true,
 		{111, v1.ProtocolTCP}:   true,
+		{111, v1.ProtocolUDP}:   true,
+		{662, v1.ProtocolTCP}:   true,
+		{662, v1.ProtocolUDP}:   true,
 	}
 	endpoints, err := p.client.CoreV1().Endpoints(namespace).Get(serviceName, metav1.GetOptions{})
 	if err != nil {
