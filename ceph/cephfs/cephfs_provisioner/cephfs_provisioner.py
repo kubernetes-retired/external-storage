@@ -225,7 +225,7 @@ class CephFSNativeDriver(object):
         volume_path = ceph_volume_client.VolumePath(self.volume_group, path)
 
         # Create the CephFS volume
-        volume = self.volume_client.create_volume(volume_path, size=size, namespace_isolated=not self.ceph_namespace_isolation_disabled)
+        volume = self.volume_client.create_volume(volume_path, size=size, namespace_isolated=not self.ceph_namespace_isolation_disabled, mode=0o2775)
 
         # To mount this you need to know the mon IPs and the path to the volume
         mon_addrs = self.volume_client.get_mon_addrs()
