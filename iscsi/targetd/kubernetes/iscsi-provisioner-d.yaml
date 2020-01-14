@@ -35,7 +35,7 @@ metadata:
   name: iscsi-provisioner
 ---
 kind: Deployment
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 metadata:
   name: iscsi-provisioner
 spec:

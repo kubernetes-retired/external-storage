@@ -16,7 +16,7 @@ data:
        hostDir: /mnt/disks/by-uuid/google-local-ssds-nvme-fs
        mountDir:  /mnt/disks/by-uuid/google-local-ssds-nvme-fs  
 ---
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: local-volume-provisioner
