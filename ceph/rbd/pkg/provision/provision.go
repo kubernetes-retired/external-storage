@@ -59,6 +59,8 @@ type rbdProvisionOptions struct {
 	monitors []string
 	// Ceph RBD pool. Default is "rbd".
 	pool string
+	// Optional data pool for erasure pool support, default is ""
+	dataPool string
 	// Ceph client ID that is capable of creating images in the pool. Default is "admin".
 	adminID string
 	// Secret of admin client ID.
@@ -201,6 +203,7 @@ func (p *rbdProvisioner) parseParameters(parameters map[string]string) (*rbdProv
 	// options with default values
 	opts := &rbdProvisionOptions{
 		pool:        "rbd",
+		dataPool:    "",
 		adminID:     "admin",
 		imageFormat: rbdImageFormat2,
 	}
@@ -261,6 +264,8 @@ func (p *rbdProvisioner) parseParameters(parameters map[string]string) (*rbdProv
 				v = "rbd"
 			}
 			opts.pool = v
+		case "datapool":
+			opts.dataPool = v
 		case "usersecretname":
 			if v == "" {
 				return nil, fmt.Errorf("missing user secret name")

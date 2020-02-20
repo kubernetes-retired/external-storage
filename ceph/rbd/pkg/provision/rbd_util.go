@@ -65,6 +65,9 @@ func (u *RBDUtil) CreateImage(image string, pOpts *rbdProvisionOptions, options 
 		klog.V(4).Infof("rbd: create %s size %s format %s using mon %s, pool %s id %s key %s", image, volSz, pOpts.imageFormat, mon, pOpts.pool, pOpts.adminID, pOpts.adminSecret)
 	}
 	args := []string{"create", image, "--size", volSz, "--pool", pOpts.pool, "--id", pOpts.adminID, "-m", mon, "--key=" + pOpts.adminSecret, "--image-format", pOpts.imageFormat}
+	if pOpts.dataPool != "" {
+		args = append(args, "--data-pool", pOpts.dataPool)
+	}
 	if pOpts.imageFormat == rbdImageFormat2 {
 		// if no image features is provided, it results in empty string
 		// which disable all RBD image format 2 features as we expected
