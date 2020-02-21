@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nfs-client-provisioner
+  labels:
+    app: nfs-client-provisioner
+  # replace with namespace where provisioner is deployed
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nfs-client-provisioner
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: nfs-client-provisioner
+  template:
+    metadata:
+      labels:
+        app: nfs-client-provisioner
+    spec:
+      serviceAccountName: nfs-client-provisioner
+      containers:
+        - name: nfs-client-provisioner
+          image: docker.io/ibmcom/nfs-client-provisioner-ppc64le:latest
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: nfs-client-root
+              mountPath: /persistentvolumes
+          env:
+            - name: PROVISIONER_NAME
+              value: fuseim.pri/ifs
+            - name: NFS_SERVER
+              # replace with ip address of NFS server
+              value: 10.10.10.60
+            - name: NFS_PATH
+              # replace with deployment path of NFS server
+              value: /ifs/kubernetes
+      volumes:
+        - name: nfs-client-root
+          nfs:
+            # replace with ip address of NFS server
+            server: 10.10.10.60
+            # replace with deployment path of NFS server
+            path: /ifs/kubernetes
