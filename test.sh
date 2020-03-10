@@ -55,6 +55,9 @@ popd
 pushd aws/efs
 GO111MODULE=on go mod vendor
 popd
+pushd nfs-client
+GO111MODULE=on go mod vendor
+popd
 make verify
 
 if [ "$TRAVIS_OS_NAME" = "osx" ]; then
