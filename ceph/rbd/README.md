@@ -28,6 +28,10 @@ make push
 
 See https://kubernetes.io/.
 
+* Install the rbd package on the worker nodes (fixes #1256)
+
+for example, on debian the package is ceph-common
+
 * Create a Ceph admin secret
 
 ```bash
