@@ -32,7 +32,7 @@ See https://kubernetes.io/.
 
 ```bash
 ceph auth get client.admin 2>&1 |grep "key = " |awk '{print  $3'} |xargs echo -n > /tmp/key
-kubectl create secret generic ceph-admin-secret --from-file=/tmp/key --namespace=kube-system --type=kubernetes.io/rbd
+kubectl create secret generic ceph-secret-admin --from-file=/tmp/key --namespace=kube-system --type=kubernetes.io/rbd
 ```
 
 * Create a Ceph pool and a user secret
