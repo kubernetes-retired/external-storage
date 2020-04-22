@@ -8,7 +8,7 @@ parameters:
   pool: kube
   adminId: admin
   adminSecretNamespace: kube-system
-  adminSecretName: ceph-admin-secret
+  adminSecretName: ceph-secret-admin
   userId: kube
   userSecretNamespace: kube-system
   userSecretName: ceph-secret

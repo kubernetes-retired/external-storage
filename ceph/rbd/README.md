@@ -28,11 +28,15 @@ make push
 
 See https://kubernetes.io/.
 
+* Install the rbd package on the worker nodes (fixes #1256)
+
+for example, on debian the package is ceph-common
+
 * Create a Ceph admin secret
 
 ```bash
 ceph auth get client.admin 2>&1 |grep "key = " |awk '{print  $3'} |xargs echo -n > /tmp/key
-kubectl create secret generic ceph-admin-secret --from-file=/tmp/key --namespace=kube-system --type=kubernetes.io/rbd
+kubectl create secret generic ceph-secret-admin --from-file=/tmp/key --namespace=kube-system --type=kubernetes.io/rbd
 ```
 
 * Create a Ceph pool and a user secret
