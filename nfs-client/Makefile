@@ -20,18 +20,24 @@ ifeq ($(VERSION),)
 endif
 IMAGE = $(REGISTRY)nfs-client-provisioner:$(VERSION)
 IMAGE_ARM = $(REGISTRY)nfs-client-provisioner-arm:$(VERSION) 
+IMAGE_Z = $(REGISTRY)nfs-client-provisioner-s390x:$(VERSION) 
 MUTABLE_IMAGE = $(REGISTRY)nfs-client-provisioner:latest
 MUTABLE_IMAGE_ARM = $(REGISTRY)nfs-client-provisioner-arm:latest
+MUTABLE_IMAGE_Z = $(REGISTRY)nfs-client-provisioner-s390x:latest
 
 all: build image build_arm image_arm 
 
 container: build image build_arm image_arm
+container_z: build_z image_z
 
 build:
 	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o docker/x86_64/nfs-client-provisioner ./cmd/nfs-client-provisioner
 
 build_arm:
 	CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 go build -a -ldflags '-extldflags "-static"' -o docker/arm/nfs-client-provisioner ./cmd/nfs-client-provisioner 
+
+build_z:
+	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o docker/s390x/nfs-client-provisioner ./cmd/nfs-client-provisioner
 
 image:
 	docker build -t $(MUTABLE_IMAGE) docker/x86_64
@@ -42,8 +48,14 @@ image_arm:
 	docker build -t $(MUTABLE_IMAGE_ARM) docker/arm
 	docker tag $(MUTABLE_IMAGE_ARM) $(IMAGE_ARM)
 
+image_z:
+	docker build -t $(MUTABLE_IMAGE_Z) docker/s390x
+	docker tag $(MUTABLE_IMAGE_Z) $(IMAGE_Z)
+
 push:
 	docker push $(IMAGE)
 	docker push $(MUTABLE_IMAGE)
 	docker push $(IMAGE_ARM)
 	docker push $(MUTABLE_IMAGE_ARM)
+	docker push $(IMAGE_Z)
+	docker push $(MUTABLE_IMAGE_Z)

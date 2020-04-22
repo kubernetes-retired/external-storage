@@ -137,4 +137,6 @@ elif [ "$TEST_SUITE" = "linux-local-volume" ]; then
 	make test-local-volume/provisioner
 	install_helm
 	make test-local-volume/helm
+elif [ "$TEST_SUITE" = "linux-nfs-client-s390x" ]; then
+	make nfs-client
 fi

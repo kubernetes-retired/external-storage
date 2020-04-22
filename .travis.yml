@@ -22,6 +22,15 @@ before_install:
 
 install: true
 
+linux-s390x: &linux-s390x
+  os: linux
+  arch: s390x
+
+jobs:
+    include:
+        - <<: *linux-s390x
+          env: TEST_SUITE=linux-nfs-client-s390x
+          
 script:
   - ./test.sh
 
@@ -30,4 +39,4 @@ deploy:
     script: ./deploy.sh
     on:
       tags: true
-      condition: $TEST_SUITE = linux-local-volume && $TRAVIS_OS_NAME = linux
+      condition: ($TEST_SUITE = linux-local-volume || $TEST_SUITE = linux-nfs-client-s390x) && $TRAVIS_OS_NAME = linux

@@ -136,9 +136,15 @@ clean-local-volume/provisioner:
 	make clean
 .PHONY: clean-local-volume/provisioner
 
+ARCH := $(shell uname -m)
+
 nfs-client:
 	cd nfs-client; \
-	make container
+	if [ $(ARCH) = "s390x" ]; then\
+		make container_z; \
+	else \
+		make container; \
+	fi
 .PHONY: nfs-client
 
 clean-nfs-client:
