@@ -32,10 +32,10 @@ Kubernetes:
 
 ```sh
 # Set the subject of the RBAC objects to the current namespace where the provisioner is being deployed
-$ NS=$(kubectl config get-contexts|grep -e "^\*" |awk '{print $5}')
-$ NAMESPACE=${NS:-default}
-$ sed -i'' "s/namespace:.*/namespace: $NAMESPACE/g" ./deploy/rbac.yaml ./deploy/deployment.yaml
-$ kubectl create -f deploy/rbac.yaml
+# NS=$(kubectl config get-contexts|grep -e "^\*" |awk '{print $5}')
+NAMESPACE=${NS:-default}
+sed -i'' "s/namespace:.*/namespace: $NAMESPACE/g" ./deploy/rbac.yaml ./deploy/deployment.yaml
+kubectl create -f deploy/rbac.yaml
 ```
 
 OpenShift:
@@ -44,10 +44,10 @@ On some installations of OpenShift the default admin user does not have cluster-
 
 ```sh
 # Set the subject of the RBAC objects to the current namespace where the provisioner is being deployed
-$ NAMESPACE=`oc project -q`
-$ sed -i'' "s/namespace:.*/namespace: $NAMESPACE/g" ./deploy/rbac.yaml
-$ oc create -f deploy/rbac.yaml
-$ oadm policy add-scc-to-user hostmount-anyuid system:serviceaccount:$NAMESPACE:nfs-client-provisioner
+NAMESPACE=`oc project -q`
+sed -i'' "s/namespace:.*/namespace: $NAMESPACE/g" ./deploy/rbac.yaml
+oc create -f deploy/rbac.yaml
+oc adm policy add-scc-to-user hostmount-anyuid system:serviceaccount:$NAMESPACE:nfs-client-provisioner
 ```
 
 **Step 4: Configure the NFS-Client provisioner**
