@@ -22,7 +22,7 @@ $ helm install stable/nfs-client-provisioner --set nfs.server=x.x.x.x --set nfs.
 
 **Step 1: Get connection information for your NFS server**. Make sure your NFS server is accessible from your Kubernetes cluster and get the information you need to connect to it. At a minimum you will need its hostname.
 
-**Step 2: Get the NFS-Client Provisioner files**. To setup the provisioner you will download a set of YAML files, edit them to add your NFS server's connection information and then apply each with the ``kubectl`` / ``oc`` command. 
+**Step 2: Get the NFS-Client Provisioner files**. To setup the provisioner you will download a set of YAML files, edit them to add your NFS server's connection information and then apply each with the ``kubectl`` / ``oc`` command.
 
 Get all of the files in the [deploy](https://github.com/kubernetes-incubator/external-storage/tree/master/nfs-client/deploy) directory of this repository. These instructions assume that you have cloned the [external-storage](https://github.com/kubernetes-incubator/external-storage) repository and have a bash-shell open in the ``nfs-client`` directory.
 
@@ -40,7 +40,7 @@ $ kubectl create -f deploy/rbac.yaml
 
 OpenShift:
 
-On some installations of OpenShift the default admin user does not have cluster-admin permissions. If these commands fail refer to the OpenShift documentation for **User and Role Management** or contact your OpenShift provider to help you grant the right permissions to your admin user. 
+On some installations of OpenShift the default admin user does not have cluster-admin permissions. If these commands fail refer to the OpenShift documentation for **User and Role Management** or contact your OpenShift provider to help you grant the right permissions to your admin user.
 
 ```sh
 # Set the subject of the RBAC objects to the current namespace where the provisioner is being deployed
@@ -93,6 +93,8 @@ spec:
             server: <YOUR NFS SERVER HOSTNAME>
             path: /var/nfs
 ```
+
+**Alias mode:** use the provisioner in this mode to share the same existing NFS claim to multiple namespaces, without propagating manually the server/path in each namespace's claim. For example, first create a `data-original` claim as normal, through any provisioner such as `example.com/efs-aws` or the `fuseim.pri/ifs` example below. In the same namespace of your choice, run a new NFS client provisioner that uses the claim. Set NFS_SERVER to the magic value of `--alias`. Give the new deployment a clearer name, `nfs-alias-provisioner`, and set PROVISIONER_NAME to `foo.com/nfs-alias-provisioner`. Then create a StorageClass `nfs-alias` with its provisioner set to `foo.com/nfs-alias-provisioner`. Now, every new `nfs-alias` claim you create in any namespace will have the same `server:path` as the `data-original` volume.
 
 You may also want to change the PROVISIONER_NAME above from ``fuseim.pri/ifs`` to something more descriptive like ``nfs-storage``, but if you do remember to also change the PROVISIONER_NAME in the storage class definition below:
 

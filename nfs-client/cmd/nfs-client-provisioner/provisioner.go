@@ -26,10 +26,11 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	mnt "k8s.io/kubernetes/pkg/util/mount"
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/controller"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -39,12 +40,14 @@ import (
 
 const (
 	provisionerNameKey = "PROVISIONER_NAME"
+	magicAliasHostname = "--alias"
 )
 
 type nfsProvisioner struct {
 	client kubernetes.Interface
 	server string
 	path   string
+	static bool
 }
 
 const (
@@ -54,24 +57,17 @@ const (
 var _ controller.Provisioner = &nfsProvisioner{}
 
 func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.PersistentVolume, error) {
+	var path string
+	var err error
+
 	if options.PVC.Spec.Selector != nil {
 		return nil, fmt.Errorf("claim Selector is not supported")
 	}
 	glog.V(4).Infof("nfs provisioner: VolumeOptions %v", options)
 
-	pvcNamespace := options.PVC.Namespace
-	pvcName := options.PVC.Name
-
-	pvName := strings.Join([]string{pvcNamespace, pvcName, options.PVName}, "-")
-
-	fullPath := filepath.Join(mountPath, pvName)
-	glog.V(4).Infof("creating path %s", fullPath)
-	if err := os.MkdirAll(fullPath, 0777); err != nil {
-		return nil, errors.New("unable to create directory to provision new pv: " + err.Error())
+	if path, err = p.getOrMakeDir(options); err != nil {
+		return nil, err
 	}
-	os.Chmod(fullPath, 0777)
-
-	path := filepath.Join(p.path, pvName)
 
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
@@ -88,12 +84,33 @@ func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 				NFS: &v1.NFSVolumeSource{
 					Server:   p.server,
 					Path:     path,
-					ReadOnly: false,
+					ReadOnly: false, // Pass ReadOnly through if in alias mode?
 				},
 			},
 		},
 	}
 	return pv, nil
+}
+
+// If in alias mode, forward the server:path details from the PVC we mounted.
+// If not, create a new directory.
+func (p *nfsProvisioner) getOrMakeDir(options controller.VolumeOptions) (_ string, err error) {
+	if p.static {
+		return p.path, nil
+	}
+
+	pvcNamespace := options.PVC.Namespace
+	pvcName := options.PVC.Name
+	pvName := strings.Join([]string{pvcNamespace, pvcName, options.PVName}, "-")
+
+	fullPath := filepath.Join(mountPath, pvName)
+	glog.V(4).Infof("creating path %s", fullPath)
+	if err = os.MkdirAll(fullPath, 0777); err == nil {
+		os.Chmod(fullPath, 0777)
+		return filepath.Join(p.path, pvName), nil
+	}
+	err = errors.New("unable to create directory to provision new pv: " + err.Error())
+	return
 }
 
 func (p *nfsProvisioner) Delete(volume *v1.PersistentVolume) error {
@@ -145,6 +162,17 @@ func (p *nfsProvisioner) getClassForVolume(pv *v1.PersistentVolume) (*storage.St
 	return class, nil
 }
 
+// Return the server and path parts for the given NFS mount
+func getDetailsForMountPoint(m string) (server, path string, err error) {
+	if path, _, err = mnt.GetDeviceNameFromMount(mnt.New(""), m); err == nil {
+		if parts := strings.Split(path, ":"); len(parts) == 2 {
+			return parts[0], parts[1], err
+		}
+		err = errors.New("Can't parse server:path from device string: " + path)
+	}
+	return
+}
+
 func main() {
 	flag.Parse()
 	flag.Set("logtostderr", "true")
@@ -180,10 +208,23 @@ func main() {
 		glog.Fatalf("Error getting server version: %v", err)
 	}
 
+	// If NFS_SERVER=="--alias", we just pass through the server/path we have
+	// mounted and never make a new directory for each volume we provision.
+	var static bool
+	if server == magicAliasHostname {
+		// Figure just once and store the server/path pair
+		if server, path, err = getDetailsForMountPoint(mountPath); err != nil {
+			glog.Fatalf("Error getting server details for %v: %v", mountPath, err)
+		}
+		glog.Infof("Aliasing all new volumes to %v::%v", server, path)
+		static = true
+	}
+
 	clientNFSProvisioner := &nfsProvisioner{
 		client: clientset,
 		server: server,
 		path:   path,
+		static: static,
 	}
 	// Start the provision controller which will dynamically provision efs NFS
 	// PVs
