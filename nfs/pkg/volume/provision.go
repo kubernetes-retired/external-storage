@@ -253,13 +253,20 @@ type volume struct {
 	mountOptions string
 }
 
+type squash struct {
+	anonUID    string
+	anonGID    string
+	rootSquash bool
+	allSquash  bool
+}
+
 // createVolume creates a volume i.e. the storage asset. It creates a unique
 // directory under /export and exports it. Returns the server IP, the path, a
 // zero/non-zero supplemental group, the block it added to either the ganesha
 // config or /etc/exports, and the exportID
 // TODO return values
 func (p *nfsProvisioner) createVolume(options controller.ProvisionOptions) (volume, error) {
-	gid, rootSquash, mountOptions, err := p.validateOptions(options)
+	gid, squash, mountOptions, err := p.validateOptions(options)
 	if err != nil {
 		return volume{}, fmt.Errorf("error validating options for volume: %v", err)
 	}
@@ -280,7 +287,7 @@ func (p *nfsProvisioner) createVolume(options controller.ProvisionOptions) (volu
 		return volume{}, fmt.Errorf("error creating directory for volume: %v", err)
 	}
 
-	exportBlock, exportID, err := p.createExport(options.PVName, rootSquash)
+	exportBlock, exportID, err := p.createExport(options.PVName, squash)
 	if err != nil {
 		os.RemoveAll(path)
 		return volume{}, fmt.Errorf("error creating export for volume: %v", err)
@@ -304,9 +311,9 @@ func (p *nfsProvisioner) createVolume(options controller.ProvisionOptions) (volu
 	}, nil
 }
 
-func (p *nfsProvisioner) validateOptions(options controller.ProvisionOptions) (string, bool, string, error) {
+func (p *nfsProvisioner) validateOptions(options controller.ProvisionOptions) (string, squash, string, error) {
 	gid := "none"
-	rootSquash := false
+	squash := squash{"none", "none", false, false}
 	mountOptions := ""
 	for k, v := range options.StorageClass.Parameters {
 		switch strings.ToLower(k) {
@@ -316,18 +323,40 @@ func (p *nfsProvisioner) validateOptions(options controller.ProvisionOptions) (s
 			} else if i, err := strconv.ParseUint(v, 10, 64); err == nil && i != 0 {
 				gid = v
 			} else {
-				return "", false, "", fmt.Errorf("invalid value for parameter gid: %v. valid values are: 'none' or a non-zero integer", v)
+				return "", squash, "", fmt.Errorf("invalid value for parameter gid: %v. valid values are: 'none' or a non-zero integer", v)
+			}
+		case "anonuid":
+			if strings.ToLower(v) == "none" {
+				squash.anonUID = "none"
+			} else if i, err := strconv.ParseUint(v, 10, 64); err == nil && i != 0 {
+				squash.anonUID = v
+			} else {
+				return "", squash, "", fmt.Errorf("invalid value for parameter anonUID: %v. valid values are: 'none' or a non-zero integer", v)
+			}
+		case "anongid":
+			if strings.ToLower(v) == "none" {
+				squash.anonGID = "none"
+			} else if i, err := strconv.ParseUint(v, 10, 64); err == nil && i != 0 {
+				squash.anonGID = v
+			} else {
+				return "", squash, "", fmt.Errorf("invalid value for parameter anonGID: %v. valid values are: 'none' or a non-zero integer", v)
 			}
 		case "rootsquash":
 			var err error
-			rootSquash, err = strconv.ParseBool(v)
+			squash.rootSquash, err = strconv.ParseBool(v)
 			if err != nil {
-				return "", false, "", fmt.Errorf("invalid value for parameter rootSquash: %v. valid values are: 'true' or 'false'", v)
+				return "", squash, "", fmt.Errorf("invalid value for parameter rootSquash: %v. valid values are: 'true' or 'false'", v)
+			}
+		case "allsquash":
+			var err error
+			squash.allSquash, err = strconv.ParseBool(v)
+			if err != nil {
+				return "", squash, "", fmt.Errorf("invalid value for parameter allSquash: %v. valid values are: 'true' or 'false'", v)
 			}
 		case "mountoptions":
 			mountOptions = v
 		default:
-			return "", false, "", fmt.Errorf("invalid parameter: %q", k)
+			return "", squash, "", fmt.Errorf("invalid parameter: %q", k)
 		}
 	}
 
@@ -335,21 +364,21 @@ func (p *nfsProvisioner) validateOptions(options controller.ProvisionOptions) (s
 	// pv.Labels MUST be set to match claim.spec.selector
 	// gid selector? with or without pv annotation?
 	if options.PVC.Spec.Selector != nil {
-		return "", false, "", fmt.Errorf("claim.Spec.Selector is not supported")
+		return "", squash, "", fmt.Errorf("claim.Spec.Selector is not supported")
 	}
 
 	var stat syscall.Statfs_t
 	if err := syscall.Statfs(p.exportDir, &stat); err != nil {
-		return "", false, "", fmt.Errorf("error calling statfs on %v: %v", p.exportDir, err)
+		return "", squash, "", fmt.Errorf("error calling statfs on %v: %v", p.exportDir, err)
 	}
 	capacity := options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	requestBytes := capacity.Value()
 	available := int64(stat.Bavail) * int64(stat.Bsize)
 	if requestBytes > available {
-		return "", false, "", fmt.Errorf("insufficient available space %v bytes to satisfy claim for %v bytes", available, requestBytes)
+		return "", squash, "", fmt.Errorf("insufficient available space %v bytes to satisfy claim for %v bytes", available, requestBytes)
 	}
 
-	return gid, rootSquash, mountOptions, nil
+	return gid, squash, mountOptions, nil
 }
 
 // getServer gets the server IP to put in a provisioned PV's spec.
@@ -497,10 +526,10 @@ func (p *nfsProvisioner) createDirectory(directory, gid string) error {
 
 // createExport creates the export by adding a block to the appropriate config
 // file and exporting it
-func (p *nfsProvisioner) createExport(directory string, rootSquash bool) (string, uint16, error) {
+func (p *nfsProvisioner) createExport(directory string, squash squash) (string, uint16, error) {
 	path := path.Join(p.exportDir, directory)
 
-	block, exportID, err := p.exporter.AddExportBlock(path, rootSquash, p.exportSubnet)
+	block, exportID, err := p.exporter.AddExportBlock(path, squash, p.exportSubnet)
 	if err != nil {
 		return "", 0, fmt.Errorf("error adding export block for path %s: %v", path, err)
 	}
