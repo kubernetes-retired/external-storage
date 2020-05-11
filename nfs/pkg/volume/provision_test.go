@@ -253,6 +253,9 @@ func TestValidateOptions(t *testing.T) {
 		options            controller.ProvisionOptions
 		expectedGid        string
 		expectedRootSquash bool
+		expectedAllSquash  bool
+		expectedAnonUID    string
+		expectedAnonGID    string
 		expectError        bool
 	}{
 		{
@@ -264,8 +267,10 @@ func TestValidateOptions(t *testing.T) {
 				},
 				PVC: newClaim(resource.MustParse("1Ki"), nil, nil),
 			},
-			expectedGid: "none",
-			expectError: false,
+			expectedGid:     "none",
+			expectedAnonUID: "none",
+			expectedAnonGID: "none",
+			expectError:     false,
 		},
 		{
 			name: "gid parameter value 'none'",
@@ -276,8 +281,10 @@ func TestValidateOptions(t *testing.T) {
 				},
 				PVC: newClaim(resource.MustParse("1Ki"), nil, nil),
 			},
-			expectedGid: "none",
-			expectError: false,
+			expectedGid:     "none",
+			expectedAnonUID: "none",
+			expectedAnonGID: "none",
+			expectError:     false,
 		},
 		{
 			name: "gid parameter value id",
@@ -288,8 +295,10 @@ func TestValidateOptions(t *testing.T) {
 				},
 				PVC: newClaim(resource.MustParse("1Ki"), nil, nil),
 			},
-			expectedGid: "1",
-			expectError: false,
+			expectedGid:     "1",
+			expectedAnonUID: "none",
+			expectedAnonGID: "none",
+			expectError:     false,
 		},
 		{
 			name: "bad parameter name",
@@ -299,8 +308,10 @@ func TestValidateOptions(t *testing.T) {
 					Parameters:    map[string]string{"foo": "bar"},
 				},
 			},
-			expectedGid: "",
-			expectError: true,
+			expectedGid:     "",
+			expectedAnonUID: "none",
+			expectedAnonGID: "none",
+			expectError:     true,
 		},
 		{
 			name: "bad gid parameter value string",
@@ -310,8 +321,10 @@ func TestValidateOptions(t *testing.T) {
 					Parameters:    map[string]string{"gid": "foo"},
 				},
 			},
-			expectedGid: "",
-			expectError: true,
+			expectedGid:     "",
+			expectedAnonUID: "none",
+			expectedAnonGID: "none",
+			expectError:     true,
 		},
 		{
 			name: "bad gid parameter value zero",
@@ -321,8 +334,10 @@ func TestValidateOptions(t *testing.T) {
 					Parameters:    map[string]string{"gid": "0"},
 				},
 			},
-			expectedGid: "",
-			expectError: true,
+			expectedGid:     "",
+			expectedAnonUID: "none",
+			expectedAnonGID: "none",
+			expectError:     true,
 		},
 		{
 			name: "bad gid parameter value negative",
@@ -332,8 +347,62 @@ func TestValidateOptions(t *testing.T) {
 					Parameters:    map[string]string{"gid": "-1"},
 				},
 			},
-			expectedGid: "",
-			expectError: true,
+			expectedGid:     "",
+			expectedAnonUID: "none",
+			expectedAnonGID: "none",
+			expectError:     true,
+		},
+		{
+			name: "bad anonuid parameter value string",
+			options: controller.ProvisionOptions{
+				StorageClass: &storagev1.StorageClass{
+					ReclaimPolicy: &delete,
+					Parameters:    map[string]string{"anonUID": "foo"},
+				},
+			},
+			expectedGid:     "",
+			expectedAnonUID: "none",
+			expectedAnonGID: "none",
+			expectError:     true,
+		},
+		{
+			name: "bad anonuid parameter value zero",
+			options: controller.ProvisionOptions{
+				StorageClass: &storagev1.StorageClass{
+					ReclaimPolicy: &delete,
+					Parameters:    map[string]string{"anonUID": "0"},
+				},
+			},
+			expectedGid:     "",
+			expectedAnonUID: "none",
+			expectedAnonGID: "none",
+			expectError:     true,
+		},
+		{
+			name: "bad anongid parameter value string",
+			options: controller.ProvisionOptions{
+				StorageClass: &storagev1.StorageClass{
+					ReclaimPolicy: &delete,
+					Parameters:    map[string]string{"anonGID": "foo"},
+				},
+			},
+			expectedGid:     "",
+			expectedAnonUID: "none",
+			expectedAnonGID: "none",
+			expectError:     true,
+		},
+		{
+			name: "bad anongid parameter value zero",
+			options: controller.ProvisionOptions{
+				StorageClass: &storagev1.StorageClass{
+					ReclaimPolicy: &delete,
+					Parameters:    map[string]string{"anonGID": "0"},
+				},
+			},
+			expectedGid:     "",
+			expectedAnonUID: "none",
+			expectedAnonGID: "none",
+			expectError:     true,
 		},
 		{
 			name: "root squash parameter value 'true'",
@@ -346,6 +415,8 @@ func TestValidateOptions(t *testing.T) {
 				PVC: newClaim(resource.MustParse("1Ki"), nil, nil),
 			},
 			expectedGid:        "none",
+			expectedAnonUID:    "none",
+			expectedAnonGID:    "none",
 			expectedRootSquash: true,
 			expectError:        false,
 		},
@@ -360,6 +431,8 @@ func TestValidateOptions(t *testing.T) {
 				PVC: newClaim(resource.MustParse("1Ki"), nil, nil),
 			},
 			expectedGid:        "none",
+			expectedAnonUID:    "none",
+			expectedAnonGID:    "none",
 			expectedRootSquash: false,
 			expectError:        false,
 		},
@@ -372,7 +445,54 @@ func TestValidateOptions(t *testing.T) {
 				},
 				PVC: newClaim(resource.MustParse("1Ki"), nil, nil),
 			},
-			expectError: true,
+			expectedAnonUID: "none",
+			expectedAnonGID: "none",
+			expectError:     true,
+		},
+		{
+			name: "all squash parameter value 'true'",
+			options: controller.ProvisionOptions{
+				StorageClass: &storagev1.StorageClass{
+					ReclaimPolicy: &delete,
+					Parameters:    map[string]string{"allSquash": "true"},
+				},
+
+				PVC: newClaim(resource.MustParse("1Ki"), nil, nil),
+			},
+			expectedGid:       "none",
+			expectedAnonUID:   "none",
+			expectedAnonGID:   "none",
+			expectedAllSquash: true,
+			expectError:       false,
+		},
+		{
+			name: "all squash parameter value 'false'",
+			options: controller.ProvisionOptions{
+				StorageClass: &storagev1.StorageClass{
+					ReclaimPolicy: &delete,
+					Parameters:    map[string]string{"allSquash": "false"},
+				},
+
+				PVC: newClaim(resource.MustParse("1Ki"), nil, nil),
+			},
+			expectedGid:       "none",
+			expectedAnonUID:   "none",
+			expectedAnonGID:   "none",
+			expectedAllSquash: false,
+			expectError:       false,
+		},
+		{
+			name: "bad all squash parameter value neither 'true' nor 'false'",
+			options: controller.ProvisionOptions{
+				StorageClass: &storagev1.StorageClass{
+					ReclaimPolicy: &delete,
+					Parameters:    map[string]string{"allSquash": "asdf"},
+				},
+				PVC: newClaim(resource.MustParse("1Ki"), nil, nil),
+			},
+			expectedAnonUID: "none",
+			expectedAnonGID: "none",
+			expectError:     true,
 		},
 
 		// TODO implement options.ProvisionerSelector parsing
@@ -385,8 +505,10 @@ func TestValidateOptions(t *testing.T) {
 				},
 				PVC: newClaim(resource.MustParse("1Ki"), nil, nil),
 			},
-			expectedGid: "none",
-			expectError: false,
+			expectedGid:     "none",
+			expectedAnonUID: "none",
+			expectedAnonGID: "none",
+			expectError:     false,
 		},
 		// TODO implement options.ProvisionerSelector parsing
 		{
@@ -397,8 +519,10 @@ func TestValidateOptions(t *testing.T) {
 				},
 				PVC: newClaim(resource.MustParse("1Ki"), nil, &metav1.LabelSelector{MatchLabels: nil}),
 			},
-			expectedGid: "",
-			expectError: true,
+			expectedGid:     "",
+			expectedAnonUID: "none",
+			expectedAnonGID: "none",
+			expectError:     true,
 		},
 		{
 			name: "bad capacity",
@@ -408,8 +532,10 @@ func TestValidateOptions(t *testing.T) {
 				},
 				PVC: newClaim(resource.MustParse("1Ei"), nil, nil),
 			},
-			expectedGid: "",
-			expectError: true,
+			expectedGid:     "",
+			expectedAnonUID: "none",
+			expectedAnonGID: "none",
+			expectError:     true,
 		},
 	}
 
@@ -417,10 +543,13 @@ func TestValidateOptions(t *testing.T) {
 	p := newNFSProvisionerInternal(tmpDir+"/", client, false, &testExporter{}, newDummyQuotaer(), "", -1, "*")
 
 	for _, test := range tests {
-		gid, rootSquash, _, err := p.validateOptions(test.options)
+		gid, squash, _, err := p.validateOptions(test.options)
 
 		evaluate(t, test.name, test.expectError, err, test.expectedGid, gid, "gid")
-		evaluate(t, test.name, test.expectError, err, test.expectedRootSquash, rootSquash, "root squash")
+		evaluate(t, test.name, test.expectError, err, test.expectedRootSquash, squash.rootSquash, "rootsquash")
+		evaluate(t, test.name, test.expectError, err, test.expectedAllSquash, squash.allSquash, "allsquash")
+		evaluate(t, test.name, test.expectError, err, test.expectedAnonUID, squash.anonUID, "annonuid")
+		evaluate(t, test.name, test.expectError, err, test.expectedAnonGID, squash.anonGID, "annongid")
 	}
 }
 
@@ -986,7 +1115,7 @@ func (e *testExporter) CanExport(limit int) bool {
 	return true
 }
 
-func (e *testExporter) AddExportBlock(path string, _ bool, _ string) (string, uint16, error) {
+func (e *testExporter) AddExportBlock(path string, _ squash, _ string) (string, uint16, error) {
 	id := uint16(1)
 	for ; id <= math.MaxUint16; id++ {
 		if _, ok := e.exportIDs[id]; !ok {

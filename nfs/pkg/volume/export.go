@@ -31,14 +31,14 @@ import (
 
 type exporter interface {
 	CanExport(int) bool
-	AddExportBlock(string, bool, string) (string, uint16, error)
+	AddExportBlock(string, squash, string) (string, uint16, error)
 	RemoveExportBlock(string, uint16) error
 	Export(string) error
 	Unexport(*v1.PersistentVolume) error
 }
 
 type exportBlockCreator interface {
-	CreateExportBlock(string, string, bool, string) string
+	CreateExportBlock(string, string, squash, string) string
 }
 
 type exportMap struct {
@@ -87,11 +87,11 @@ func newGenericExporter(ebc exportBlockCreator, config string, re *regexp.Regexp
 	}
 }
 
-func (e *genericExporter) AddExportBlock(path string, rootSquash bool, exportSubnet string) (string, uint16, error) {
+func (e *genericExporter) AddExportBlock(path string, squash squash, exportSubnet string) (string, uint16, error) {
 	exportID := generateID(e.mapMutex, e.exportIDs)
 	exportIDStr := strconv.FormatUint(uint64(exportID), 10)
 
-	block := e.ebc.CreateExportBlock(exportIDStr, path, rootSquash, exportSubnet)
+	block := e.ebc.CreateExportBlock(exportIDStr, path, squash, exportSubnet)
 
 	// Add the export block to the config file
 	if err := addToFile(e.fileMutex, e.config, block); err != nil {
@@ -161,17 +161,29 @@ type ganeshaExportBlockCreator struct{}
 var _ exportBlockCreator = &ganeshaExportBlockCreator{}
 
 // CreateBlock creates the text block to add to the ganesha config file.
-func (e *ganeshaExportBlockCreator) CreateExportBlock(exportID, path string, rootSquash bool, exportSubnet string) string {
-	squash := "no_root_squash"
-	if rootSquash {
-		squash = "root_id_squash"
+func (e *ganeshaExportBlockCreator) CreateExportBlock(exportID, path string, squash squash, exportSubnet string) string {
+	squashValue := "no_root_squash"
+	anonUIDRow := ""
+	anonGIDRow := ""
+	if squash.rootSquash {
+		squashValue = "root_id_squash"
+	} else if squash.allSquash {
+		squashValue = "all_squash"
+	}
+	if squash.anonUID != "none" {
+		anonUIDRow = "\tAnonymous_Uid = " + squash.anonUID + ";\n"
+	}
+	if squash.anonGID != "none" {
+		anonGIDRow = "\tAnonymous_Gid = " + squash.anonGID + ";\n"
 	}
 	return "\nEXPORT\n{\n" +
 		"\tExport_Id = " + exportID + ";\n" +
 		"\tPath = " + path + ";\n" +
 		"\tPseudo = " + path + ";\n" +
 		"\tAccess_Type = RW;\n" +
-		"\tSquash = " + squash + ";\n" +
+		"\tSquash = " + squashValue + ";\n" +
+		anonUIDRow +
+		anonGIDRow +
 		"\tSecType = sys;\n" +
 		"\tFilesystem_id = " + exportID + "." + exportID + ";\n" +
 		"\tFSAL {\n\t\tName = VFS;\n\t}\n}\n"
@@ -217,10 +229,19 @@ type kernelExportBlockCreator struct{}
 var _ exportBlockCreator = &kernelExportBlockCreator{}
 
 // CreateBlock creates the text block to add to the /etc/exports file.
-func (e *kernelExportBlockCreator) CreateExportBlock(exportID, path string, rootSquash bool, exportSubnet string) string {
-	squash := "no_root_squash"
-	if rootSquash {
-		squash = "root_squash"
+func (e *kernelExportBlockCreator) CreateExportBlock(exportID, path string, squash squash, exportSubnet string) string {
+	squashValues := ",no_root_squash"
+	if squash.rootSquash {
+		squashValues = ",root_squash"
 	}
-	return "\n" + path + " " + exportSubnet + "(rw,insecure," + squash + ",fsid=" + exportID + ")\n"
+	if squash.allSquash {
+		squashValues = ",all_squash"
+	}
+	if squash.anonUID != "none" {
+		squashValues = ",anonuid=" + squash.anonUID
+	}
+	if squash.anonGID != "none" {
+		squashValues = ",anongid=" + squash.anonGID
+	}
+	return "\n" + path + " " + exportSubnet + "(rw,insecure" + squashValues + ",fsid=" + exportID + ")\n"
 }

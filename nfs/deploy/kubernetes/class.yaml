@@ -5,3 +5,7 @@ metadata:
 provisioner: example.com/nfs
 mountOptions:
   - vers=4.1
+  - rootSquash=false
+  - allSquash=false
+  - anonUID=none
+  - anonGID=none
