@@ -52,3 +52,9 @@ roleRef:
   kind: Role
   name: leader-locking-efs-provisioner
   apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: efs-provisioner
+  namespace: default
