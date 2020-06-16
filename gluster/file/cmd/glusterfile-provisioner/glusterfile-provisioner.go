@@ -304,7 +304,7 @@ func (p *glusterfileProvisioner) createVolumeClone(sourceVolID string, config *p
 
 	volSource, volErr := p.createVolumeSource(cli, cloneVolInfo)
 	if volErr != nil {
-		return nil, 0, "", fmt.Errorf("error [%v] when creating volume source  for volume %s", err, cloneVolInfo.Name)
+		return nil, 0, "", fmt.Errorf("error [%v] when creating volume source  for volume %s", volErr, cloneVolInfo.Name)
 	}
 
 	if volSource == nil {
@@ -389,7 +389,7 @@ func (p *glusterfileProvisioner) CreateVolume(gid *int, config *provisionerConfi
 		config.thinPoolSnapFactor,
 	}
 
-	volumeReq := &gapi.VolumeCreateRequest{Size: sz, Name: customVolumeName, Clusters: clusterIDs, Gid: gid64, Durability: p.volumeType, GlusterVolumeOptions: p.volumeOptions, Snapshot: snaps}
+	volumeReq := &gapi.VolumeCreateRequest{Size: sz, Name: customVolumeName, Clusters: clusterIDs, Gid: gid64, Durability: config.volumeType, GlusterVolumeOptions: config.volumeOptions, Snapshot: snaps}
 
 	volume, err := cli.VolumeCreate(volumeReq)
 	if err != nil {
@@ -402,7 +402,7 @@ func (p *glusterfileProvisioner) CreateVolume(gid *int, config *provisionerConfi
 
 	volSource, volErr := p.createVolumeSource(cli, volume)
 	if volErr != nil {
-		return nil, 0, "", fmt.Errorf("error [%v] when creating volume source  for volume %s", err, volume.Name)
+		return nil, 0, "", fmt.Errorf("error [%v] when creating volume source  for volume %s", volErr, volume.Name)
 	}
 
 	if volSource == nil {
