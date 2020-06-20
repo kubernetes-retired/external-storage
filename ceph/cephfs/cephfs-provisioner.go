@@ -116,11 +116,11 @@ func getSecretFromCephFSPersistentVolume(pv *v1.PersistentVolume) (*v1.SecretRef
 }
 
 // Provision creates a storage asset and returns a PV object representing it.
-func (p *cephFSProvisioner) Provision(options controller.VolumeOptions) (*v1.PersistentVolume, error) {
+func (p *cephFSProvisioner) Provision(options controller.ProvisionOptions) (*v1.PersistentVolume, error) {
 	if options.PVC.Spec.Selector != nil {
 		return nil, fmt.Errorf("claim Selector is not supported")
 	}
-	cluster, adminID, adminSecret, pvcRoot, mon, deterministicNames, err := p.parseParameters(options.Parameters)
+	cluster, adminID, adminSecret, pvcRoot, mon, deterministicNames, err := p.parseParameters(options.StorageClass.Parameters)
 	if err != nil {
 		return nil, err
 	}
@@ -200,9 +200,9 @@ func (p *cephFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{
-			PersistentVolumeReclaimPolicy: options.PersistentVolumeReclaimPolicy,
+			PersistentVolumeReclaimPolicy: *options.StorageClass.ReclaimPolicy,
 			AccessModes:                   options.PVC.Spec.AccessModes,
-			MountOptions:                  options.MountOptions,
+			MountOptions:                  options.StorageClass.MountOptions,
 			Capacity: v1.ResourceList{
 				// Quotas are supported by the userspace client(ceph-fuse, libcephfs), or kernel client >= 4.17 but only on mimic clusters.
 				// In other cases capacity is meaningless here.
