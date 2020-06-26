@@ -100,7 +100,11 @@ func NewEFSProvisioner(client kubernetes.Interface) controller.Provisioner {
 }
 
 func getDNSName(fileSystemID, awsRegion string) string {
-	return fileSystemID + ".efs." + awsRegion + ".amazonaws.com"
+	dnsName := fileSystemID + ".efs." + awsRegion + ".amazonaws.com"
+	if strings.HasPrefix(awsRegion, "cn-") {
+		dnsName += ".cn"
+	}
+	return dnsName
 }
 
 func getMount(dnsName string) (string, string, error) {
