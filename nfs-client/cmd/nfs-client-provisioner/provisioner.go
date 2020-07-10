@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -29,7 +30,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/controller"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -45,6 +46,30 @@ type nfsProvisioner struct {
 	client kubernetes.Interface
 	server string
 	path   string
+}
+
+type pvcMetadata struct {
+	data        map[string]string
+	labels      map[string]string
+	annotations map[string]string
+}
+
+func (meta *pvcMetadata) stringParser(str string) string {
+	pattern := regexp.MustCompile(`{pvc\.((labels|annotations)\.(.*?)|.*?)}`)
+	result := pattern.FindAllStringSubmatch(str, -1)
+	for _, r := range result {
+		println(r[2])
+		switch r[2] {
+		case "labels":
+			str = strings.Replace(str, r[0], meta.labels[r[3]], -1)
+		case "annotations":
+			fmt.Println(r[0], r[3], meta.annotations[r[3]])
+			str = strings.Replace(str, r[0], meta.annotations[r[3]], -1)
+		default:
+			str = strings.Replace(str, r[0], meta.data[r[1]], -1)
+		}
+	}
+	return str
 }
 
 const (
@@ -64,14 +89,37 @@ func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 
 	pvName := strings.Join([]string{pvcNamespace, pvcName, options.PVName}, "-")
 
+	metadata := &pvcMetadata{
+		data: map[string]string{
+			"name":      pvcName,
+			"namespace": pvcNamespace,
+		},
+		labels:      options.PVC.Labels,
+		annotations: options.PVC.Annotations,
+	}
+
+	namePattern, exists := options.Parameters["namePattern"]
+	if exists {
+		customName := metadata.stringParser(namePattern)
+		options.PVName = customName
+		pvName = customName
+	}
+
 	fullPath := filepath.Join(mountPath, pvName)
+	path := filepath.Join(p.path, pvName)
+
+	pathPattern, exists := options.Parameters["pathPattern"]
+	if exists {
+		customPath := metadata.stringParser(pathPattern)
+		path = filepath.Join(p.path, customPath)
+		fullPath = filepath.Join(mountPath, customPath)
+	}
+
 	glog.V(4).Infof("creating path %s", fullPath)
 	if err := os.MkdirAll(fullPath, 0777); err != nil {
 		return nil, errors.New("unable to create directory to provision new pv: " + err.Error())
 	}
 	os.Chmod(fullPath, 0777)
-
-	path := filepath.Join(p.path, pvName)
 
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
@@ -98,8 +146,9 @@ func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 
 func (p *nfsProvisioner) Delete(volume *v1.PersistentVolume) error {
 	path := volume.Spec.PersistentVolumeSource.NFS.Path
-	pvName := filepath.Base(path)
-	oldPath := filepath.Join(mountPath, pvName)
+	relativePath := strings.Replace(path, p.path, "", 1)
+	oldPath := filepath.Join(mountPath, relativePath)
+
 	if _, err := os.Stat(oldPath); os.IsNotExist(err) {
 		glog.Warningf("path %s does not exist, deletion skipped", oldPath)
 		return nil
@@ -123,7 +172,7 @@ func (p *nfsProvisioner) Delete(volume *v1.PersistentVolume) error {
 		}
 	}
 
-	archivePath := filepath.Join(mountPath, "archived-"+pvName)
+	archivePath := filepath.Join(mountPath, "archived-"+volume.Name)
 	glog.V(4).Infof("archiving path %s to %s", oldPath, archivePath)
 	return os.Rename(oldPath, archivePath)
 
