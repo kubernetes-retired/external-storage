@@ -31,7 +31,14 @@ import (
 func generateID(mutex *sync.Mutex, ids map[uint16]bool) uint16 {
 	mutex.Lock()
 	id := uint16(1)
+
 	for ; id <= math.MaxUint16; id++ {
+
+		//https://github.com/nfs-ganesha/nfs-ganesha/issues/615
+		if id == 152 {
+			continue
+		}
+
 		if _, ok := ids[id]; !ok {
 			break
 		}
