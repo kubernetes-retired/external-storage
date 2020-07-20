@@ -171,8 +171,8 @@ func (drr *dscpRegistry) escapeECN() []canonECNRecord {
 		sr := strings.NewReplacer(
 			"Capable", "",
 			"Not-ECT", "",
-			"ECT(1)", "",
-			"ECT(0)", "",
+			"ETC(1)", "",
+			"ETC(0)", "",
 			"CE", "",
 			"(", "",
 			")", "",

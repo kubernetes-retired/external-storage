@@ -24,7 +24,7 @@ type ReaderSeekerCloser struct {
 	r io.Reader
 }
 
-// IsReaderSeekable returns if the underlying reader type can be seeked. A
+// IsReaderSeekable returns if the underlying reader type can be sought. A
 // io.Reader might not actually be seekable if it is the ReaderSeekerCloser
 // type.
 func IsReaderSeekable(r io.Reader) bool {

@@ -20,7 +20,7 @@
     src: ../templates/multipath.conf
     dest: /etc/multipath.conf
       
-- name: Enable and Start neccessary services
+- name: Enable and Start necessary services
   service:
     name: '{{ item }}'
     state: started

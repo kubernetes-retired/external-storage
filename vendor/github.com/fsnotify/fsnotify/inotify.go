@@ -144,7 +144,7 @@ func (w *Watcher) Remove(name string) error {
 
 	// inotify_rm_watch will return EINVAL if the file has been deleted;
 	// the inotify will already have been removed.
-	// watches and pathes are deleted in ignoreLinux() implicitly and asynchronously
+	// watches and paths are deleted in ignoreLinux() implicitly and asynchronously
 	// by calling inotify_rm_watch() below. e.g. readEvents() goroutine receives IN_IGNORE
 	// so that EINVAL means that the wd is being rm_watch()ed or its file removed
 	// by another thread and we have not received IN_IGNORE event.

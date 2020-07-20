@@ -42,7 +42,7 @@ func RoundUpSize(volumeSizeBytes int64, allocationUnitBytes int64) int64 {
 	return (volumeSizeBytes + allocationUnitBytes - 1) / allocationUnitBytes
 }
 
-// RoundUpToGiB rounds up given quantity upto chunks of GiB
+// RoundUpToGiB rounds up given quantity up to chunks of GiB
 func RoundUpToGiB(sizeBytes int64) int64 {
 	return RoundUpSize(sizeBytes, GiB)
 }

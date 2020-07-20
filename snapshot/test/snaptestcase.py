@@ -28,7 +28,7 @@ class SnapTestCase(unittest.TestCase):
         If ingnore_error is True tests will not fail on nonzero kubectl result
         """
         kube_command = kubesrcdir + '/cluster/kubectl.sh ' + kubeargs
-        print("Runnning ", kube_command)
+        print("Running ", kube_command)
         res = subprocess.Popen(kube_command, shell=True, stdout=subprocess.PIPE,
                                stderr=subprocess.PIPE)
 

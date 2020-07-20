@@ -15,7 +15,7 @@
     dest: /etc/target/targetd.yaml
     mode: 0644
     
-- name: Enable and Start neccessary services
+- name: Enable and Start necessary services
   service:
     name: '{{ item }}'
     state: started

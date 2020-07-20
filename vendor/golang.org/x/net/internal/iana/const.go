@@ -29,8 +29,8 @@ const (
 	DiffServEF            = 0xb8 // EF
 	DiffServVOICEADMIT    = 0xb0 // VOICE-ADMIT
 	NotECNTransport       = 0x00 // Not-ECT (Not ECN-Capable Transport)
-	ECNTransport1         = 0x01 // ECT(1) (ECN-Capable Transport(1))
-	ECNTransport0         = 0x02 // ECT(0) (ECN-Capable Transport(0))
+	ECNTransport1         = 0x01 // ETC(1) (ECN-Capable Transport(1))
+	ECNTransport0         = 0x02 // ETC(0) (ECN-Capable Transport(0))
 	CongestionExperienced = 0x03 // CE (Congestion Experienced)
 )
 

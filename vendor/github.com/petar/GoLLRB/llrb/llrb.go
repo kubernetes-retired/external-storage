@@ -10,7 +10,7 @@
 //   http://www.cs.princeton.edu/~rs/talks/LLRB/Java/RedBlackBST.java
 //
 //  2-3 trees (and the run-time equivalent 2-3-4 trees) are the de facto standard BST
-//  algoritms found in implementations of Python, Java, and other libraries. The LLRB
+//  algorithms found in implementations of Python, Java, and other libraries. The LLRB
 //  implementation of 2-3 trees is a recent improvement on the traditional implementation,
 //  observed and documented by Robert Sedgewick.
 //

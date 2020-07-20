@@ -524,7 +524,7 @@ func RoundUpToGB(size resource.Quantity) int64 {
 	return RoundUpSize(requestBytes, GB)
 }
 
-// RoundUpToGiB rounds up given quantity upto chunks of GiB
+// RoundUpToGiB rounds up given quantity up to chunks of GiB
 func RoundUpToGiB(size resource.Quantity) int64 {
 	requestBytes := size.Value()
 	return RoundUpSize(requestBytes, GIB)
@@ -549,7 +549,7 @@ func RoundUpToGBInt(size resource.Quantity) (int, error) {
 	return RoundUpSizeInt(requestBytes, GB)
 }
 
-// RoundUpToGiBInt rounds up given quantity upto chunks of GiB. It returns an
+// RoundUpToGiBInt rounds up given quantity up to chunks of GiB. It returns an
 // int instead of an int64 and an error if there's overflow
 func RoundUpToGiBInt(size resource.Quantity) (int, error) {
 	requestBytes := size.Value()

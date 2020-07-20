@@ -169,7 +169,7 @@ The snapshot operation is a no-op for volume plugins that do not support snapsho
 * The `VolumeSnapshot` object
 
 ```
-// The volume snapshot object accessible to the user. Upon succesful creation of the actual
+// The volume snapshot object accessible to the user. Upon successful creation of the actual
 // snapshot by the volume provider it is bound to the corresponding VolumeSnapshotData through
 // the VolumeSnapshotSpec
 type VolumeSnapshot struct {

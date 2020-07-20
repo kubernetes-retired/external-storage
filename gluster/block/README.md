@@ -104,7 +104,7 @@ If provisioner want to operate on `gluster-block`, below args are required to be
 
 * `blockmodeargs`:
 
-This mode requires `glustervol` name and `hosts` to be mentioned in `,` seperated values as shown below. This is a mandatory parameter to be filled
+This mode requires `glustervol` name and `hosts` to be mentioned in `,` separated values as shown below. This is a mandatory parameter to be filled
 in storage class parameter.
 
 ```

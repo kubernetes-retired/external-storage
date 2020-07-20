@@ -91,7 +91,7 @@ type response struct {
 	tcp            net.Conn          // i/o connection if TCP was used
 	udpSession     *SessionUDP       // oob data to get egress interface right
 	writer         Writer            // writer to output the raw DNS bits
-	wg             *sync.WaitGroup   // for gracefull shutdown
+	wg             *sync.WaitGroup   // for graceful shutdown
 }
 
 // HandleFailed returns a HandlerFunc that returns SERVFAIL for every request it gets.
@@ -729,7 +729,7 @@ func (srv *Server) readUDP(conn *net.UDPConn, timeout time.Duration) ([]byte, *S
 // WriteMsg implements the ResponseWriter.WriteMsg method.
 func (w *response) WriteMsg(m *Msg) (err error) {
 	var data []byte
-	if w.tsigSecret != nil { // if no secrets, dont check for the tsig (which is a longer check)
+	if w.tsigSecret != nil { // if no secrets, don't check for the tsig (which is a longer check)
 		if t := m.IsTsig(); t != nil {
 			data, w.tsigRequestMAC, err = TsigGenerate(m, w.tsigSecret[t.Hdr.Name], w.tsigRequestMAC, w.tsigTimersOnly)
 			if err != nil {

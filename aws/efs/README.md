@@ -253,11 +253,11 @@ Your containers will continue to have EFS storage as they are mapped directly to
 
 - Can I scale the efs-provisioner across my nodes? 
 
-You can but it's not needed. You won't see a performance increase and you wont have a storage outage if the underlying node dies.
+You can but it's not needed. You won't see a performance increase and you won't have a storage outage if the underlying node dies.
 
 - Can I have multiple efs-provisioners pointed at multiple EFS mounts?
 
-Yes you can, but would you really need to? EFS is designed to scale across many nodes and the efs-provisioner already has the ability to divide EFS into seperate chunks for your applications.
+Yes you can, but would you really need to? EFS is designed to scale across many nodes and the efs-provisioner already has the ability to divide EFS into separate chunks for your applications.
 
 - I don't like the manual step of mounting and creating the /persistentvolumes directory. 
 

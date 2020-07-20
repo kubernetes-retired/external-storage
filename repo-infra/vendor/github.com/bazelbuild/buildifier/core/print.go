@@ -247,7 +247,7 @@ func (p *printer) expr(v Expr, outerPrec int) {
 	// However, even then we can't emit line comments since that would
 	// end the expression. This is only a concern if we have rewritten
 	// the parse tree. If comments were okay before this expression in
-	// the original input they're still okay now, in the absense of rewrites.
+	// the original input they're still okay now, in the absence of rewrites.
 	//
 	// TODO(bazel-team): Check whether it is valid to emit comments right now,
 	// and if not, insert them earlier in the output instead, at the most

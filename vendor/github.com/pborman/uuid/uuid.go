@@ -13,7 +13,7 @@ import (
 	guuid "github.com/google/uuid"
 )
 
-// Array is a pass-by-value UUID that can be used as an effecient key in a map.
+// Array is a pass-by-value UUID that can be used as an efficient key in a map.
 type Array [16]byte
 
 // UUID converts uuid into a slice.
