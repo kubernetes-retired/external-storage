@@ -23,7 +23,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -58,7 +57,6 @@ func (meta *pvcMetadata) stringParser(str string) string {
 	pattern := regexp.MustCompile(`{pvc\.((labels|annotations)\.(.*?)|.*?)}`)
 	result := pattern.FindAllStringSubmatch(str, -1)
 	for _, r := range result {
-		println(r[2])
 		switch r[2] {
 		case "labels":
 			str = strings.Replace(str, r[0], meta.labels[r[3]], -1)
@@ -96,13 +94,6 @@ func (p *nfsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 		},
 		labels:      options.PVC.Labels,
 		annotations: options.PVC.Annotations,
-	}
-
-	namePattern, exists := options.Parameters["namePattern"]
-	if exists {
-		customName := metadata.stringParser(namePattern)
-		options.PVName = customName
-		pvName = customName
 	}
 
 	fullPath := filepath.Join(mountPath, pvName)
@@ -161,21 +152,20 @@ func (p *nfsProvisioner) Delete(volume *v1.PersistentVolume) error {
 	// Determine if the "archiveOnDelete" parameter exists.
 	// If it exists and has a false value, delete the directory.
 	// Otherwise, archive it.
-	archiveOnDelete, exists := storageClass.Parameters["archiveOnDelete"]
-	if exists {
-		archiveBool, err := strconv.ParseBool(archiveOnDelete)
-		if err != nil {
-			return err
-		}
-		if !archiveBool {
-			return os.RemoveAll(oldPath)
-		}
+	onDelete := storageClass.Parameters["onDelete"]
+	switch onDelete {
+
+	case "delete":
+		return os.RemoveAll(oldPath)
+
+	case "retain":
+		return nil
+
+	default:
+		archivePath := filepath.Join(mountPath, "archived-"+volume.Name)
+		glog.V(4).Infof("archiving path %s to %s", oldPath, archivePath)
+		return os.Rename(oldPath, archivePath)
 	}
-
-	archivePath := filepath.Join(mountPath, "archived-"+volume.Name)
-	glog.V(4).Infof("archiving path %s to %s", oldPath, archivePath)
-	return os.Rename(oldPath, archivePath)
-
 }
 
 // getClassForVolume returns StorageClass
