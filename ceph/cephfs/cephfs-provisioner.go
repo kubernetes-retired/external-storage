@@ -45,6 +45,7 @@ const (
 	provisionCmd       = "/usr/local/bin/cephfs_provisioner"
 	provisionerIDAnn   = "cephFSProvisionerIdentity"
 	cephShareAnn       = "cephShare"
+	cephVolumeGroup    = "CEPH_VOLUME_GROUP"
 	provisionerNameKey = "PROVISIONER_NAME"
 	secretNamespaceKey = "PROVISIONER_SECRET_NAMESPACE"
 )
@@ -124,7 +125,7 @@ func (p *cephFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 	if err != nil {
 		return nil, err
 	}
-	var share, user string
+	var share, user, cephVolGroupVal string
 	if deterministicNames {
 		share = options.PVC.Name
 		user = fmt.Sprintf("k8s.%s.%s", options.PVC.Namespace, options.PVC.Name)
@@ -151,6 +152,7 @@ func (p *cephFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 		"CEPH_AUTH_KEY=" + adminSecret,
 		"CEPH_VOLUME_ROOT=" + pvcRoot}
 	if deterministicNames {
+		cephVolGroupVal = options.PVC.Namespace
 		cmd.Env = append(cmd.Env, "CEPH_VOLUME_GROUP="+options.PVC.Namespace)
 	}
 	if *disableCephNamespaceIsolation {
@@ -197,6 +199,7 @@ func (p *cephFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 			Annotations: map[string]string{
 				provisionerIDAnn: p.identity,
 				cephShareAnn:     share,
+				cephVolumeGroup:  cephVolGroupVal,
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{
@@ -249,7 +252,7 @@ func (p *cephFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 	if err != nil {
 		return err
 	}
-	cluster, adminID, adminSecret, pvcRoot, mon, _, err := p.parseParameters(class.Parameters)
+	cluster, adminID, adminSecret, pvcRoot, mon, deterministicNames, err := p.parseParameters(class.Parameters)
 	if err != nil {
 		return err
 	}
@@ -265,6 +268,12 @@ func (p *cephFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 		"CEPH_VOLUME_ROOT=" + pvcRoot}
 	if *disableCephNamespaceIsolation {
 		cmd.Env = append(cmd.Env, "CEPH_NAMESPACE_ISOLATION_DISABLED=true")
+	}
+	if deterministicNames {
+		cephVolGroupVal := volume.Annotations[cephVolumeGroup]
+		if cephVolGroupVal != "" {
+			cmd.Env = append(cmd.Env, "CEPH_VOLUME_GROUP="+cephVolGroupVal)
+		}
 	}
 
 	output, cmdErr := cmd.CombinedOutput()
