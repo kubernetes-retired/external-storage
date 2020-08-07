@@ -20,6 +20,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"os"
 
 	"github.com/golang/glog"
 	crdv1 "github.com/kubernetes-incubator/external-storage/snapshot/pkg/apis/crd/v1"
@@ -45,8 +46,9 @@ import (
 )
 
 const (
-	provisionerName  = "volumesnapshot.external-storage.k8s.io/snapshot-promoter"
-	provisionerIDAnn = "snapshotProvisionerIdentity"
+	provisionerName       = "volumesnapshot.external-storage.k8s.io/snapshot-promoter"
+	provisionerIDAnn      = "snapshotProvisionerIdentity"
+	skipLeaderElectionKey = "SKIP_LEADER_ELECTION"
 )
 
 type snapshotProvisioner struct {
@@ -241,6 +243,8 @@ func main() {
 	// the controller
 	snapshotProvisioner := newSnapshotProvisioner(clientset, snapshotClient, prID)
 
+	leaderElection := os.Getenv(skipLeaderElectionKey) != "1"
+
 	// Start the provision controller which will dynamically provision snapshot
 	// PVs
 	pc := controller.NewProvisionController(
@@ -248,6 +252,7 @@ func main() {
 		provisionerName,
 		snapshotProvisioner,
 		serverVersion.GitVersion,
+		controller.LeaderElection(leaderElection),
 	)
 	glog.Infof("starting PV provisioner %s", provisionerName)
 	pc.Run(wait.NeverStop)

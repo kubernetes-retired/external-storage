@@ -41,12 +41,13 @@ import (
 )
 
 const (
-	provisionerName    = "ceph.com/cephfs"
-	provisionCmd       = "/usr/local/bin/cephfs_provisioner"
-	provisionerIDAnn   = "cephFSProvisionerIdentity"
-	cephShareAnn       = "cephShare"
-	provisionerNameKey = "PROVISIONER_NAME"
-	secretNamespaceKey = "PROVISIONER_SECRET_NAMESPACE"
+	provisionerName       = "ceph.com/cephfs"
+	provisionCmd          = "/usr/local/bin/cephfs_provisioner"
+	provisionerIDAnn      = "cephFSProvisionerIdentity"
+	cephShareAnn          = "cephShare"
+	provisionerNameKey    = "PROVISIONER_NAME"
+	secretNamespaceKey    = "PROVISIONER_SECRET_NAMESPACE"
+	skipLeaderElectionKey = "SKIP_LEADER_ELECTION"
 )
 
 type provisionOutput struct {
@@ -435,6 +436,8 @@ func main() {
 	klog.Infof("Creating CephFS provisioner %s with identity: %s, secret namespace: %s", prName, prID, *secretNamespace)
 	cephFSProvisioner := newCephFSProvisioner(clientset, prID, *secretNamespace, *enableQuota)
 
+	leaderElection := os.Getenv(skipLeaderElectionKey) != "1"
+
 	// Start the provision controller which will dynamically provision cephFS
 	// PVs
 	pc := controller.NewProvisionController(
@@ -443,6 +446,7 @@ func main() {
 		cephFSProvisioner,
 		serverVersion.GitVersion,
 		controller.MetricsPort(int32(*metricsPort)),
+		controller.LeaderElection(leaderElection),
 	)
 
 	pc.Run(wait.NeverStop)

@@ -39,7 +39,8 @@ var (
 )
 
 const (
-	provisionerNameKey = "PROVISIONER_NAME"
+	provisionerNameKey    = "PROVISIONER_NAME"
+	skipLeaderElectionKey = "SKIP_LEADER_ELECTION"
 )
 
 func main() {
@@ -87,6 +88,8 @@ func main() {
 	klog.Infof("Creating RBD provisioner %s with identity: %s", prName, prID)
 	rbdProvisioner := provision.NewRBDProvisioner(clientset, prID, *commandTimeout, *usePVName)
 
+	leaderElection := os.Getenv(skipLeaderElectionKey) != "1"
+
 	// Start the provision controller which will dynamically provision rbd
 	// PVs
 	pc := controller.NewProvisionController(
@@ -95,6 +98,7 @@ func main() {
 		rbdProvisioner,
 		serverVersion.GitVersion,
 		controller.MetricsPort(int32(*metricsPort)),
+		controller.LeaderElection(leaderElection),
 	)
 
 	pc.Run(wait.NeverStop)

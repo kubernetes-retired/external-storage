@@ -41,19 +41,20 @@ import (
 )
 
 const (
-	secretKeyName      = "key"
-	provisionerNameKey = "PROVISIONER_NAME"
-	shareIDAnn         = "glusterBlockShare"
-	provisionerIDAnn   = "glusterBlkProvIdentity"
-	creatorAnn         = "kubernetes.io/createdby"
-	volumeTypeAnn      = "gluster.org/type"
-	descAnn            = "Gluster-external: Dynamically provisioned PV"
-	provisionerVersion = "v5.0.0"
-	chapType           = "kubernetes.io/iscsi-chap"
-	blockVolPrefix     = "blockvol_"
-	heketiOpmode       = "heketi"
-	glusterBlockOpmode = "gluster-block"
-	volIDAnn           = "gluster.org/volume-id"
+	secretKeyName         = "key"
+	provisionerNameKey    = "PROVISIONER_NAME"
+	skipLeaderElectionKey = "SKIP_LEADER_ELECTION"
+	shareIDAnn            = "glusterBlockShare"
+	provisionerIDAnn      = "glusterBlkProvIdentity"
+	creatorAnn            = "kubernetes.io/createdby"
+	volumeTypeAnn         = "gluster.org/type"
+	descAnn               = "Gluster-external: Dynamically provisioned PV"
+	provisionerVersion    = "v5.0.0"
+	chapType              = "kubernetes.io/iscsi-chap"
+	blockVolPrefix        = "blockvol_"
+	heketiOpmode          = "heketi"
+	glusterBlockOpmode    = "gluster-block"
+	volIDAnn              = "gluster.org/volume-id"
 	// Error string returned by heketi
 	errIDNotFound = "Id not found"
 )
@@ -910,6 +911,8 @@ func main() {
 	// the controller
 	glusterBlockProvisioner := NewGlusterBlockProvisioner(clientset, provisionerName)
 
+	leaderElection := os.Getenv(skipLeaderElectionKey) != "1"
+
 	// Start the provision controller which will dynamically provision glusterblock
 	// PVs
 
@@ -920,6 +923,7 @@ func main() {
 		serverVersion.GitVersion,
 		controller.Threadiness(2),
 		controller.FailedProvisionThreshold(30),
+		controller.LeaderElection(leaderElection),
 	)
 
 	pc.Run(wait.NeverStop)

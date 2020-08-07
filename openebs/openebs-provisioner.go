@@ -37,7 +37,8 @@ import (
 )
 
 const (
-	provisionerName = "openebs.io/provisioner-iscsi"
+	provisionerName       = "openebs.io/provisioner-iscsi"
+	skipLeaderElectionKey = "SKIP_LEADER_ELECTION"
 )
 
 type openEBSProvisioner struct {
@@ -208,6 +209,9 @@ func main() {
 	// Create the provisioner: it implements the Provisioner interface expected by
 	// the controller
 	openEBSProvisioner := NewOpenEBSProvisioner(clientset)
+
+	leaderElection := os.Getenv(skipLeaderElectionKey) != "1"
+
 	if openEBSProvisioner != nil {
 		// Start the provision controller which will dynamically provision OpenEBS VSM
 		// PVs
@@ -215,7 +219,9 @@ func main() {
 			clientset,
 			provisionerName,
 			openEBSProvisioner,
-			serverVersion.GitVersion)
+			serverVersion.GitVersion,
+			controller.LeaderElection(leaderElection),
+		)
 
 		pc.Run(wait.NeverStop)
 	} else {

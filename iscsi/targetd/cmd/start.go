@@ -18,6 +18,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/kubernetes-incubator/external-storage/iscsi/targetd/provisioner"
 	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/controller"
@@ -28,6 +29,10 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+)
+
+const (
+	skipLeaderElectionKey = "SKIP_LEADER_ELECTION"
 )
 
 var log = logrus.New()
@@ -80,6 +85,8 @@ var startcontrollerCmd = &cobra.Command{
 		iscsiProvisioner := provisioner.NewiscsiProvisioner(url)
 		log.Debugln("iscsi provisioner created")
 
+		leaderElection := os.Getenv(skipLeaderElectionKey) != "1"
+
 		pc := controller.NewProvisionController(kubernetesClientSet, viper.GetString("provisioner-name"), iscsiProvisioner, serverVersion.GitVersion, controller.Threadiness(1))
 		controller.ResyncPeriod(viper.GetDuration("resync-period"))
 		controller.ExponentialBackOffOnError(viper.GetBool("exponential-backoff-on-error"))
@@ -88,6 +95,7 @@ var startcontrollerCmd = &cobra.Command{
 		controller.LeaseDuration(viper.GetDuration("lease-period"))
 		controller.RenewDeadline(viper.GetDuration("renew-deadline"))
 		controller.RetryPeriod(viper.GetDuration("retry-period"))
+		controller.LeaderElection(leaderElection)
 		log.Debugln("iscsi controller created, running forever...")
 		pc.Run(wait.NeverStop)
 	},

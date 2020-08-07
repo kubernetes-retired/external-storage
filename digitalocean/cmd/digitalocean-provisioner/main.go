@@ -42,6 +42,10 @@ var (
 	kubeconfig  = flag.String("kubeconfig", "", "Absolute path to the kubeconfig file. Either this or master needs to be set if the provisioner is being run out of cluster.")
 )
 
+const (
+	skipLeaderElectionKey = "SKIP_LEADER_ELECTION"
+)
+
 func main() {
 	flag.Set("logtostderr", "true")
 	flag.Parse()
@@ -90,12 +94,15 @@ func main() {
 	// the controller
 	digitaloceanProvisioner := vol.NewDigitalOceanProvisioner(context.TODO(), clientset, doClient)
 
+	leaderElection := os.Getenv(skipLeaderElectionKey) != "1"
+
 	// Start the provision controller which will dynamically provision NFS PVs
 	pc := controller.NewProvisionController(
 		clientset,
 		*provisioner,
 		digitaloceanProvisioner,
 		serverVersion.GitVersion,
+		controller.LeaderElection(leaderElection),
 	)
 
 	pc.Run(wait.NeverStop)

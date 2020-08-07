@@ -45,6 +45,7 @@ import (
 const (
 	provisionerName           = "gluster.org/glusterfile"
 	provisionerNameKey        = "PROVISIONER_NAME"
+	skipLeaderElectionKey     = "SKIP_LEADER_ELECTION"
 	descAnn                   = "Gluster-external: Dynamically provisioned PV"
 	restStr                   = "server"
 	dynamicEpSvcPrefix        = "glusterfile-dynamic-"
@@ -924,6 +925,8 @@ func main() {
 	// the controller
 	glusterfileProvisioner := NewglusterfileProvisioner(clientset, provName)
 
+	leaderElection := os.Getenv(skipLeaderElectionKey) != "1"
+
 	// Start the provision controller which will dynamically provision glusterfs
 	// PVs
 
@@ -932,6 +935,7 @@ func main() {
 		provName,
 		glusterfileProvisioner,
 		serverVersion.GitVersion,
+		controller.LeaderElection(leaderElection),
 	)
 
 	pc.Run(wait.NeverStop)

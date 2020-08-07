@@ -40,10 +40,11 @@ import (
 )
 
 const (
-	provisionerNameKey = "PROVISIONER_NAME"
-	fileSystemIDKey    = "FILE_SYSTEM_ID"
-	awsRegionKey       = "AWS_REGION"
-	dnsNameKey         = "DNS_NAME"
+	provisionerNameKey    = "PROVISIONER_NAME"
+	fileSystemIDKey       = "FILE_SYSTEM_ID"
+	awsRegionKey          = "AWS_REGION"
+	dnsNameKey            = "DNS_NAME"
+	skipLeaderElectionKey = "SKIP_LEADER_ELECTION"
 )
 
 type efsProvisioner struct {
@@ -302,6 +303,8 @@ func main() {
 		klog.Fatalf("environment variable %s is not set! Please set it.", provisionerNameKey)
 	}
 
+	leaderElection := os.Getenv(skipLeaderElectionKey) != "1"
+
 	// Start the provision controller which will dynamically provision efs NFS
 	// PVs
 	pc := controller.NewProvisionController(
@@ -309,6 +312,7 @@ func main() {
 		provisionerName,
 		efsProvisioner,
 		serverVersion.GitVersion,
+		controller.LeaderElection(leaderElection),
 	)
 
 	pc.Run(wait.NeverStop)

@@ -18,6 +18,7 @@ package main
 
 import (
 	"flag"
+	"os"
 	"strings"
 	"time"
 
@@ -48,10 +49,11 @@ var (
 )
 
 const (
-	exportDir     = "/export"
-	ganeshaLog    = "/export/ganesha.log"
-	ganeshaPid    = "/var/run/ganesha.pid"
-	ganeshaConfig = "/export/vfs.conf"
+	exportDir             = "/export"
+	ganeshaLog            = "/export/ganesha.log"
+	ganeshaPid            = "/var/run/ganesha.pid"
+	ganeshaConfig         = "/export/vfs.conf"
+	skipLeaderElectionKey = "SKIP_LEADER_ELECTION"
 )
 
 func main() {
@@ -132,12 +134,15 @@ func main() {
 	// the controller
 	nfsProvisioner := vol.NewNFSProvisioner(exportDir, clientset, outOfCluster, *useGanesha, ganeshaConfig, *enableXfsQuota, *serverHostname, *maxExports, *exportSubnet)
 
+	leaderElection := os.Getenv(skipLeaderElectionKey) != "1"
+
 	// Start the provision controller which will dynamically provision NFS PVs
 	pc := controller.NewProvisionController(
 		clientset,
 		*provisioner,
 		nfsProvisioner,
 		serverVersion.GitVersion,
+		controller.LeaderElection(leaderElection),
 	)
 
 	pc.Run(wait.NeverStop)

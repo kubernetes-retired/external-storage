@@ -18,6 +18,7 @@ package main
 
 import (
 	"flag"
+	"os"
 	"strings"
 
 	vol "github.com/kubernetes-incubator/external-storage/gluster/glusterfs/pkg/volume"
@@ -35,6 +36,10 @@ var (
 	provisioner = flag.String("provisioner", "gluster.org/glusterfs-simple", "Name of the provisioner. The provisioner will only provision volumes for claims that request a StorageClass with a provisioner field set equal to this name.")
 	master      = flag.String("master", "", "Master URL to build a client config from. Either this or kubeconfig needs to be set if the provisioner is being run out of cluster.")
 	kubeconfig  = flag.String("kubeconfig", "", "Absolute path to the kubeconfig file. Either this or master needs to be set if the provisioner is being run out of cluster.")
+)
+
+const (
+	skipLeaderElectionKey = "SKIP_LEADER_ELECTION"
 )
 
 func main() {
@@ -73,11 +78,14 @@ func main() {
 
 	glusterfsProvisioner := vol.NewGlusterfsProvisioner(config, clientset)
 
+	leaderElection := os.Getenv(skipLeaderElectionKey) != "1"
+
 	pc := controller.NewProvisionController(
 		clientset,
 		*provisioner,
 		glusterfsProvisioner,
 		serverVersion.GitVersion,
+		controller.LeaderElection(leaderElection),
 	)
 
 	pc.Run(wait.NeverStop)
