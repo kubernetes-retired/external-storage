@@ -1,3 +1,7 @@
+## Deprecated
+
+Moved to https://github.com/kubernetes-sigs/nfs-subdir-external-provisioner. This will no longer be updated. Please open issues or PRs there!
+
 # Kubernetes NFS-Client Provisioner
 
 [![Docker Repository on Quay](https://quay.io/repository/external_storage/nfs-client-provisioner/status "Docker Repository on Quay")](https://quay.io/repository/external_storage/nfs-client-provisioner)

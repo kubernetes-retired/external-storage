@@ -1,3 +1,8 @@
+## Deprecated
+
+Moved to https://github.com/kubernetes-sigs/nfs-ganesha-server-and-external-provisioner. This will no longer be updated. Please open issues or PRs there!
+
+
 # nfs-provisioner
 
 [![Docker Repository on Quay](https://quay.io/repository/kubernetes_incubator/nfs-provisioner/status "Docker Repository on Quay")](https://quay.io/repository/kubernetes_incubator/nfs-provisioner)
